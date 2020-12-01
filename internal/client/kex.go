@@ -16,7 +16,7 @@ func (c *Client) start() ([]byte, error) {
 	oprf := c.oprfStart()
 
 	// Build the first key exchange message
-	c.Kex = ake.SigmaI.Get(pake.Initiator, c.Crypto.Parameters.Group, c.Crypto.Parameters.Hash, nil, c.username, c.Sni)
+	c.Kex = ake.SigmaI.Get(pake.Initiator, c.Crypto.Parameters.Group, c.Crypto.Parameters.Hash, nil, c.Encoding(), c.username, c.Sni)
 
 	_, kex, err := c.Kex.Kex(message.StageStart, nil)
 	if err != nil {

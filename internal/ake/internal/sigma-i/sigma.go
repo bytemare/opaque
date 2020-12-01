@@ -2,7 +2,9 @@
 package sigmai
 
 import (
+	"errors"
 	"fmt"
+	"github.com/bytemare/cryptotools/encoding"
 
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/hashtogroup"
@@ -43,6 +45,8 @@ type SigmaI struct {
 	group group.Group
 	hash  *hash.Hash
 	rkr   authenc.RKRAuthenticatedEncryption
+
+	encoding encoding.Encoding
 }
 
 type peer struct {
@@ -54,7 +58,7 @@ type sigmaIkeys struct {
 }
 
 // New initialises and returns a new SigmaI structure.
-func New(role pake.Role, suite hashtogroup.Ciphersuite, hash hash.Identifier, sig signature.Signature, id, peerID []byte) *SigmaI {
+func New(role pake.Role, suite hashtogroup.Ciphersuite, hash hash.Identifier, sig signature.Signature, enc encoding.Encoding, id, peerID []byte) *SigmaI {
 	dst, err := suite.MakeDST(protocol, version)
 	if err != nil {
 		panic(err)
@@ -72,6 +76,7 @@ func New(role pake.Role, suite hashtogroup.Ciphersuite, hash hash.Identifier, si
 		group: g,
 		hash:  hash.Get(),
 		rkr:   authenc.New(authenc.Default),
+		encoding: enc,
 	}
 
 	s.initDH(nil)
@@ -93,7 +98,7 @@ func (s *SigmaI) Kex(stage message.Identifier, kex *message.Kex) (sessionKey []b
 	// if both peerExp and peerEncrypted are nil, it's the initiator starting the key exchange
 	if kex == nil || kex.Element == nil && kex.Auth == nil {
 		if stage != message.StageStart {
-			panic("Initiating Key exchange, stage should be sigma start")
+			return nil, nil, errors.New("initiating Sigma-I key exchange, stage should be sigma start")
 		}
 
 		switch s.role {
@@ -101,13 +106,13 @@ func (s *SigmaI) Kex(stage message.Identifier, kex *message.Kex) (sessionKey []b
 			// Start the protocol
 			return nil, &message.Kex{Element: s.dh.exp}, err
 		case pake.Responder:
-			panic("can't initiate Sigma-I if not Initiator (message is nil)")
+			return nil, nil, errors.New("can't initiate Sigma-I if not Initiator (message is nil)")
 		}
 	}
 
 	// By now, the private key must have been set
 	if s.sig == nil {
-		panic("signature not set. Have you SetSignature() before this ?")
+		return nil, nil, errors.New("signature not set. Have you SetSignature() before this ? ")
 	}
 
 	switch stage {

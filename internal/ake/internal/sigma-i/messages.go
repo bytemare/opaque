@@ -35,16 +35,12 @@ func (s *SigmaI) encryptedResponse() ([]byte, error) {
 }
 
 func (s *SigmaI) encryptSubMessage(sm *auth) ([]byte, error) {
-	// encode
-	var buf bytes.Buffer
-
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(sm); err != nil {
-		return nil, err
+	e, err := s.encoding.Encode(sm)
+	if err != nil {
 	}
 
 	// encrypt
-	return s.rkr.Encrypt(s.sk.ke, buf.Bytes()), nil
+	return s.rkr.Encrypt(s.sk.ke, e), nil
 }
 
 func (s *SigmaI) decryptSubMessage(m []byte) (*auth, error) {

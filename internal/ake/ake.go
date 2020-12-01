@@ -2,6 +2,7 @@
 package ake
 
 import (
+	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/hashtogroup"
 	sigma "github.com/bytemare/opaque/internal/ake/internal/sigma-i"
@@ -32,17 +33,17 @@ type KeyExchange interface {
 	SetPeerPublicKey(publicKey []byte)
 }
 
-type newAKE func(role pake.Role, suite hashtogroup.Ciphersuite, h hash.Identifier, sig signature.Signature, id, peerID []byte) KeyExchange
+type newAKE func(role pake.Role, suite hashtogroup.Ciphersuite, h hash.Identifier, sig signature.Signature, enc encoding.Encoding, id, peerID []byte) KeyExchange
 
 var ake = make(map[Identifier]newAKE)
 
-func (i Identifier) Get(role pake.Role, suite hashtogroup.Ciphersuite, h hash.Identifier, sig signature.Signature, id, peerID []byte) KeyExchange {
-	return ake[i](role, suite, h, sig, id, peerID)
+func (i Identifier) Get(role pake.Role, suite hashtogroup.Ciphersuite, h hash.Identifier, sig signature.Signature, enc encoding.Encoding, id, peerID []byte) KeyExchange {
+	return ake[i](role, suite, h, sig, enc, id, peerID)
 }
 
 func newSigmaI() newAKE {
-	return func(role pake.Role, suite hashtogroup.Ciphersuite, h hash.Identifier, sig signature.Signature, id, peerID []byte) KeyExchange {
-		return sigma.New(role, suite, h, sig, id, peerID)
+	return func(role pake.Role, suite hashtogroup.Ciphersuite, h hash.Identifier, sig signature.Signature, enc encoding.Encoding, id, peerID []byte) KeyExchange {
+		return sigma.New(role, suite, h, sig, enc, id, peerID)
 	}
 }
 

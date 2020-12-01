@@ -26,7 +26,7 @@ func (s *Server) SetUserRecord(rec interface{}) error {
 
 	if s.Mode() == pake.KeyExchange {
 		// Now that we have the user information, we can instantiate the key exchange engine
-		s.Kex = ake.SigmaI.Get(pake.Responder, s.Crypto.Parameters.Group, s.Crypto.Parameters.Hash, s.Signature, s.Sni, s.user.Username)
+		s.Kex = ake.SigmaI.Get(pake.Responder, s.Crypto.Parameters.Group, s.Crypto.Parameters.Hash, s.Signature, s.Encoding(), s.Sni, s.user.Username)
 	}
 
 	// The user record contains the associated OPRF private key
