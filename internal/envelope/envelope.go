@@ -41,5 +41,6 @@ func keys(rwdu, nonce []byte, secEnvLength int, hash hash.Hash) (pad, hmacKey, e
 	keysInfoSuffix := []byte{69, 110, 118, 85} // EnvU
 	i := secEnvLength + hash.OutputSize()
 	keys := hash.DeriveKey(rwdu, append(nonce, keysInfoSuffix...), secEnvLength+2*hash.OutputSize())
+
 	return keys[:secEnvLength], keys[secEnvLength:i], keys[i:]
 }

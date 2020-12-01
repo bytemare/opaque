@@ -1,4 +1,4 @@
-// Package server implements the server-side protocol of OPAQUE
+// Package server implements the server-side protocol of OPAQUE.
 package server
 
 import (
@@ -8,7 +8,7 @@ import (
 	"github.com/bytemare/voprf"
 )
 
-// Server implements the Pake interface
+// Server implements the Pake interface.
 type Server struct {
 	// User related data
 	user *record.UserRecord
@@ -22,7 +22,7 @@ type Server struct {
 	*internal.Opaque
 }
 
-// New returns a pointer to an initialised Server struct
+// New returns a pointer to an initialised Server struct.
 func New(opaque *internal.Opaque) *Server {
 	return &Server{
 		Signature: signature.New(signature.Ed25519),

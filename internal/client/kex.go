@@ -6,6 +6,7 @@ import (
 
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/signature"
+
 	"github.com/bytemare/pake"
 	"github.com/bytemare/pake/message"
 )

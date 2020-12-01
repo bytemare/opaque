@@ -5,11 +5,12 @@ import (
 	"errors"
 
 	"github.com/bytemare/cryptotools"
+
 	"github.com/bytemare/pake"
 	"github.com/bytemare/pake/message"
 )
 
-// SetUserRecord is only used by the server to load the input record matching the client to authenticate
+// SetUserRecord is only used by the server to load the input record matching the client to authenticate.
 func (c *Client) SetUserRecord(_ interface{}) error {
 	return errors.New("can't call SetUserRecord in client role")
 }
@@ -35,7 +36,7 @@ func (c *Client) SessionKey() []byte {
 	return c.sessionKey
 }
 
-// EncodedParameters returns the 4-byte encoding of the ciphersuite parameters
+// EncodedParameters returns the 4-byte encoding of the ciphersuite parameters.
 func (c *Client) EncodedParameters() cryptotools.CiphersuiteEncoding {
 	return c.Crypto.Parameters.Encode()
 }

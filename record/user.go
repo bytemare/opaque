@@ -10,7 +10,7 @@ const (
 	version  = "0.0.0"
 )
 
-// UserRecord implements the user record as specified in the OPAQUE I-D
+// UserRecord implements the user record as specified in the OPAQUE I-D.
 type UserRecord struct {
 	// Username defines a unique user identifying element
 	Username []byte
@@ -33,11 +33,11 @@ type UserRecord struct {
 	ServerPrivateKey []byte
 }
 
-// NewUserRecord provides a quick way to create a user entry
-// Todo : this is for the POC. A proper way to handle user records must be implemented
+// NewUserRecord provides a quick way to create a user entry.
+// Todo : this is for the POC. A proper way to handle user records must be implemented.
 func NewUserRecord(username, serverPrivateKey []byte, csp *cryptotools.Parameters) (*UserRecord, error) {
 	dst, err := csp.Group.MakeDST(protocol, version)
-	if err == nil {
+	if err != nil {
 		panic(err)
 	}
 

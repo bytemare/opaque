@@ -67,7 +67,7 @@ func (s *SigmaI) decryptSubMessage(m []byte) (*auth, error) {
 	return &sm, nil
 }
 
-// verify checks whether the mac and signature are valid
+// verify checks whether the mac and signature are valid.
 func (s *SigmaI) verify(encryptedSubMessage []byte) error {
 	// First check we have everything we need
 	if s.peer.pubkey == nil {

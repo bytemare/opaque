@@ -5,18 +5,18 @@ import (
 	"github.com/bytemare/opaque/internal/signature/ed25519"
 )
 
-// Identifier indicates the signature scheme to be used
+// Identifier indicates the signature scheme to be used.
 type Identifier string
 
 const (
-	// Ed25519 indicates usage of the Ed25519 signature scheme
+	// Ed25519 indicates usage of the Ed25519 signature scheme.
 	Ed25519 Identifier = "Ed25519"
 
 	//
-	// Ed448 Identifier = "Ed448"
+	// Ed448 Identifier = "Ed448".
 )
 
-// Signature abstracts digital signature operations, wrapping built-in implementations
+// Signature abstracts digital signature operations, wrapping built-in implementations.
 type Signature interface {
 	// LoadKey loads the given key. Will not fail if the key is invalid, but it might later.
 	//
@@ -42,7 +42,7 @@ type Signature interface {
 	// Wipe()
 }
 
-// New returns a Signature implementation to the specified scheme
+// New returns a Signature implementation to the specified scheme.
 func New(identifier Identifier) Signature {
 	if identifier == Ed25519 {
 		return ed25519.New()

@@ -6,8 +6,9 @@ import (
 
 	"github.com/bytemare/cryptotools"
 	"github.com/bytemare/cryptotools/encoding"
-	"github.com/bytemare/pake"
 	"github.com/bytemare/voprf"
+
+	"github.com/bytemare/pake"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/client"
@@ -15,18 +16,18 @@ import (
 	"github.com/bytemare/opaque/internal/server"
 )
 
-// Mode is a pake.Mode alias
+// Mode is a pake.Mode alias.
 type Mode pake.Mode
 
 const (
-	Registration = Mode(pake.Registration)
+	Registration   = Mode(pake.Registration)
 	Authentication = Mode(pake.KeyExchange)
 
 	protocol = "OPAQUE"
 	version  = "0.0.0"
 )
 
-// Parameters groups a party's input parameters
+// Parameters groups a party's input parameters.
 type Parameters struct {
 	// SNI
 	SNI []byte
@@ -36,9 +37,6 @@ type Parameters struct {
 
 	// Secret
 	Secret []byte
-
-	// ServerVOPRFPubKey
-	ServerVOPRFPubKey []byte
 
 	// Encoding
 	Encoding encoding.Encoding

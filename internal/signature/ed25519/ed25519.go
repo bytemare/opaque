@@ -9,12 +9,12 @@ import (
 
 const pointLen = 32
 
-// Ed25519 implements the Signature interfaces and wraps crypto/ed22519
+// Ed25519 implements the Signature interfaces and wraps crypto/ed22519.
 type Ed25519 struct {
 	privateKey ed25519.PrivateKey // todo : this is sensitive and should be cleared from memory
 }
 
-// New returns an empty Ed25519 structure
+// New returns an empty Ed25519 structure.
 func New() *Ed25519 {
 	return &Ed25519{privateKey: nil}
 }
@@ -24,7 +24,7 @@ func (ed *Ed25519) LoadKey(seed []byte) {
 	ed.privateKey = ed25519.NewKeyFromSeed(seed)
 }
 
-// GenerateKey generates a fresh signing key and stores it in ed
+// GenerateKey generates a fresh signing key and stores it in ed.
 func (ed *Ed25519) GenerateKey() error {
 	var err error
 	_, ed.privateKey, err = ed25519.GenerateKey(nil)
@@ -32,12 +32,12 @@ func (ed *Ed25519) GenerateKey() error {
 	return err
 }
 
-// GetPrivateKey returns the private key's seed, reducing by half the needed storage
+// GetPrivateKey returns the private key's seed, reducing by half the needed storage.
 func (ed *Ed25519) GetPrivateKey() []byte {
 	return ed.privateKey.Seed()
 }
 
-// GetPublicKey returns the public key
+// GetPublicKey returns the public key.
 func (ed *Ed25519) GetPublicKey() []byte {
 	if ed.privateKey == nil {
 		panic("private key is not set")
@@ -59,7 +59,7 @@ func (ed *Ed25519) Sign(message ...[]byte) []byte {
 	return ed25519.Sign(ed.privateKey, m)
 }
 
-// Verify checks whether signature of the message is valid given the public key
+// Verify checks whether signature of the message is valid given the public key.
 func (ed *Ed25519) Verify(publicKey, message, signature []byte) bool {
 	return ed25519.Verify(publicKey, message, signature)
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/bytemare/cryptotools/hashtogroup/group"
 	"github.com/bytemare/opaque/internal/envelope/authenc"
 	"github.com/bytemare/opaque/internal/signature"
+
 	"github.com/bytemare/pake"
 	"github.com/bytemare/pake/message"
 )
@@ -24,7 +25,7 @@ const (
 	keyLength = 32
 )
 
-// SigmaI holds handshake specific information and state
+// SigmaI holds handshake specific information and state.
 type SigmaI struct {
 	// Own info
 	role pake.Role
@@ -52,14 +53,14 @@ type sigmaIkeys struct {
 	ke, km, sessionKey []byte
 }
 
-// New initialises and returns a new SigmaI structure
-func New(role pake.Role, group hashtogroup.Ciphersuite, hash hash.Identifier, sig signature.Signature, id, peerID []byte) *SigmaI {
-	dst, err := group.MakeDST(protocol, version)
-	if err == nil {
+// New initialises and returns a new SigmaI structure.
+func New(role pake.Role, suite hashtogroup.Ciphersuite, hash hash.Identifier, sig signature.Signature, id, peerID []byte) *SigmaI {
+	dst, err := suite.MakeDST(protocol, version)
+	if err != nil {
 		panic(err)
 	}
 
-	g := group.Get(dst)
+	g := suite.Get(dst)
 
 	s := &SigmaI{
 		role:  role,
@@ -119,18 +120,18 @@ func (s *SigmaI) Kex(stage message.Identifier, kex *message.Kex) (sessionKey []b
 	return nil, nil, fmt.Errorf("invalid sigma stage '%v'", stage)
 }
 
-// SetSignature specifies the Signature to use for signing operations
+// SetSignature specifies the Signature to use for signing operations.
 func (s *SigmaI) SetSignature(sig signature.Signature) {
 	s.sig = sig
 }
 
-// SetPeerPublicKey sets the peer's public key to use for signature verification
+// SetPeerPublicKey sets the peer's public key to use for signature verification.
 func (s *SigmaI) SetPeerPublicKey(publicKey []byte) {
 	s.peer.pubkey = make([]byte, 0, len(publicKey))
 	s.peer.pubkey = append(s.peer.pubkey, publicKey...)
 }
 
-// response is only called by the responder
+// response is only called by the responder.
 func (s *SigmaI) response(kex *message.Kex) (sessionKey []byte, response *message.Kex, err error) {
 	// Finishes the Diffie-Hellman setup to derive the keys
 	if err := s.finishDH(kex.Element); err != nil {

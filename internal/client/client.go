@@ -11,7 +11,7 @@ type envelope struct {
 	ServerPub  []byte
 }
 
-// Client implements the Pake interface
+// Client implements the Pake interface.
 type Client struct {
 	// Client
 	username, password []byte
@@ -24,7 +24,7 @@ type Client struct {
 	*internal.Opaque
 }
 
-// New returns a pointer to an initialised Client structure
+// New returns a pointer to an initialised Client structure.
 func New(username, password []byte, oprf *voprf.Client, opaque *internal.Opaque) *Client {
 	return &Client{
 		username: username,
@@ -40,9 +40,6 @@ func (c *Client) openEnvelope(rwdu, encrypted []byte) (*envelope, error) {
 		return nil, err
 	}
 
-	// var env envelope // todo : this holds sensitive values and should be cleared from memory
-
-	//_, err = utils.DecodeGob(e, &env)
 	env, err := c.Encoding().Decode(e, &envelope{})
 	if err != nil {
 		return nil, err

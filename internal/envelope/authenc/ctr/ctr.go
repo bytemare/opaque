@@ -16,14 +16,14 @@ import (
 const (
 	hkdfInfo = "EnvelopeEncryptAesCtrHmacSha512"
 
-	// Key Length
+	// Key Length.
 	ivLength   = 16
 	encLength  = 32
 	macLength  = 32
 	hkdfLength = encLength + macLength
 )
 
-// AesCtrHmacSha256 implements the RKRAuthenticatedEncryption interface
+// AesCtrHmacSha256 implements the RKRAuthenticatedEncryption interface.
 type AesCtrHmacSha256 struct {
 	*hash.Hash
 }
@@ -36,7 +36,7 @@ func (a *AesCtrHmacSha256) getKeys(key []byte) (encKey, hmacKey, iv []byte) {
 	return keys[:encLength], keys[encLength:], iv
 }
 
-// Encrypt uses key to encrypt the input plaintext with AES-CTR-Encrypt-then-HMAC-SHA2-256
+// Encrypt uses key to encrypt the input plaintext with AES-CTR-Encrypt-then-HMAC-SHA2-256.
 func (a *AesCtrHmacSha256) Encrypt(key, plaintext []byte) []byte {
 	// Derive keys
 	encKey, hmacKey, iv := a.getKeys(key)
@@ -69,7 +69,7 @@ func split(aead []byte, tagPos int) (iv, ciphertext, mac []byte) {
 	return iv, ciphertext, mac
 }
 
-// Decrypt uses key to decrypt the encrypted input with AES-CTR-Encrypt-then-HMAC-SHA2-256
+// Decrypt uses key to decrypt the encrypted input with AES-CTR-Encrypt-then-HMAC-SHA2-256.
 func (a *AesCtrHmacSha256) Decrypt(key, encrypted []byte) ([]byte, error) {
 	if len(encrypted) <= (a.OutputSize() + ivLength) {
 		return nil, fmt.Errorf("encrypted input is too short (%d), should be %d", len(encrypted), a.OutputSize()+ivLength)

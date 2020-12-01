@@ -1,4 +1,4 @@
-// Package server implements the server-side protocol of OPAQUE
+// Package server implements the server-side protocol of OPAQUE.
 package server
 
 import (
@@ -7,12 +7,13 @@ import (
 	"github.com/bytemare/cryptotools"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/record"
+	"github.com/bytemare/voprf"
+
 	"github.com/bytemare/pake"
 	"github.com/bytemare/pake/message"
-	"github.com/bytemare/voprf"
 )
 
-// SetUserRecord is used by the server to load the input record matching the client to authenticate
+// SetUserRecord is used by the server to load the input record matching the client to authenticate.
 func (s *Server) SetUserRecord(rec interface{}) error {
 	var ok bool
 
@@ -38,6 +39,7 @@ func (s *Server) SetUserRecord(rec interface{}) error {
 	if err != nil {
 		return err
 	}
+
 	s.OPRF, err = o.Server(sks.Bytes())
 	if err != nil {
 		return err
@@ -46,22 +48,22 @@ func (s *Server) SetUserRecord(rec interface{}) error {
 	return nil
 }
 
-// Register is the API to use during the message exchange for client registration
+// Register is the API to use during the message exchange for client registration.
 func (s *Server) Register(m []byte) ([]byte, error) {
 	return s.registration(m)
 }
 
-// Authenticate is the API to use during the message exchange for authenticated key exchange
+// Authenticate is the API to use during the message exchange for authenticated key exchange.
 func (s *Server) Authenticate(m []byte) ([]byte, error) {
 	return s.keyExchange(m)
 }
 
-// SessionKey returns the session key if the authenticated key exchange was successful
+// SessionKey returns the session key if the authenticated key exchange was successful.
 func (s *Server) SessionKey() []byte {
 	return s.sessionKey
 }
 
-// EncodedParameters returns the 4-byte encoding of the ciphersuite parameters
+// EncodedParameters returns the 4-byte encoding of the ciphersuite parameters.
 func (s *Server) EncodedParameters() cryptotools.CiphersuiteEncoding {
 	return s.Crypto.Parameters.Encode()
 }

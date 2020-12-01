@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/bytemare/opaque/internal"
+
 	"github.com/bytemare/pake/message"
 )
 

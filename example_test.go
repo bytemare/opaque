@@ -8,6 +8,8 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"fmt"
+	"log"
+	"testing"
 
 	"github.com/bytemare/cryptotools"
 	"github.com/bytemare/cryptotools/encoding"
@@ -26,7 +28,7 @@ func newServerPrivateKey() []byte {
 	return s.Seed()
 }
 
-func ExampleOPAQUERegistration() {
+func registration() {
 	serverID := []byte("server")
 	username := []byte("user")
 	password := []byte("password")
@@ -123,21 +125,26 @@ func ExampleOPAQUERegistration() {
 	// Output: An envelope was registered on the server.
 }
 
-func ExampleOPAQUEAuthentication() {
+func TestRegistration(t *testing.T) {
+	registration()
+}
+
+func TestAuthentication(t *testing.T) {
 	serverID := []byte("server")
 	username := []byte("user")
 	password := []byte("password")
 
 	// Suppose a client record was setup earlier and stored in a database
-	ExampleOPAQUERegistration()
+	registration()
 
 	/*
 		let's say the client wants to authenticate to the server, using the stored envelope
 	*/
 	clientParams := &Parameters{
-		SNI:    serverID,
-		UserID: username,
-		Secret: password,
+		SNI:      serverID,
+		UserID:   username,
+		Secret:   password,
+		Encoding: encoding.JSON,
 	}
 	client, err := Authentication.Client(clientParams, nil)
 	if err != nil {
@@ -153,9 +160,10 @@ func ExampleOPAQUEAuthentication() {
 		The server answers
 	*/
 	serverParams := &Parameters{
-		SNI: serverID,
+		SNI:      serverID,
+		Encoding: encoding.JSON,
 	}
-	server, err := Authentication.Client(serverParams, nil)
+	server, err := Authentication.Server(serverParams, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -196,6 +204,7 @@ func ExampleOPAQUEAuthentication() {
 	if bytes.Equal(clientSessionKey, serverSessionKey) {
 		fmt.Println("Both parties share the same secret session key")
 	} else {
+		log.Printf("fail.")
 		fmt.Println("Something went wrong, and should have been detected before.")
 	}
 
