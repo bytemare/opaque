@@ -4,7 +4,6 @@ package sigmai
 import (
 	"bytes"
 	"crypto/hmac"
-	"encoding/gob"
 	"errors"
 	"fmt"
 )
@@ -51,16 +50,17 @@ func (s *SigmaI) decryptSubMessage(m []byte) (*auth, error) {
 	}
 
 	// decode
-	var sm auth
-
-	buf := bytes.NewBuffer(p)
-	dec := gob.NewDecoder(buf)
-
-	if err := dec.Decode(&sm); err != nil {
+	d, err := s.encoding.Decode(p, &auth{})
+	if err != nil {
 		return nil, err
 	}
 
-	return &sm, nil
+	sm, ok := d.(*auth)
+	if !ok {
+		return nil, errors.New("failed to assert type on decoded sub message")
+	}
+
+	return sm, nil
 }
 
 // verify checks whether the mac and signature are valid.
@@ -73,7 +73,7 @@ func (s *SigmaI) verify(encryptedSubMessage []byte) error {
 	// Decrypt the sub message
 	sm, err := s.decryptSubMessage(encryptedSubMessage)
 	if err != nil {
-		return nil
+		return fmt.Errorf("sub-message decryption failed : %q", err)
 	}
 
 	// Verify if peer-sent info matches what we want
