@@ -17,17 +17,6 @@ func (c *Client) oprfStart() *message.OPRFInit {
 }
 
 func (c *Client) oprfFinish(p *message.OPRFResponse) ([]byte, error) {
-	// OPRF outputs random password rwdU.
-	// with multiplicative blinding, we 'unblind' v and multiply n with beta (rebinding)
-	//err := c.oprf.DecodeEvaluation(p.RespBlind, c.Encoding())
-	//if err != nil {
-	//	return nil, err
-	//}
-	// TODO : not clear what to do with n here.
-	//_, err := c.oprf.Unblind(p.RespBlind, nil, nil)
-	//if err != nil {
-	//	return nil, err
-	//}
 	eval, err := voprf.DecodeEvaluation(p.RespBlind, c.Encoding())
 	if err != nil {
 		return nil, err
@@ -41,7 +30,7 @@ func (c *Client) oprfFinish(p *message.OPRFResponse) ([]byte, error) {
 
 	// Hardening OPRF via pwKDF
 	// todo : rwdu is sensitive and must be secured and deleted asap
-	rwdU := c.Crypto.IHF.Hash(tmp[0], nil)
+	rwdU := c.Crypto.IHF.Hash(tmp, nil)
 
 	return rwdU, nil
 }

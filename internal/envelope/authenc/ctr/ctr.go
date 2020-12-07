@@ -30,7 +30,7 @@ type AesCtrHmacSha256 struct {
 
 func (a *AesCtrHmacSha256) getKeys(key []byte) (encKey, hmacKey, iv []byte) {
 	// Derive keys
-	keys := a.DeriveKey(key, []byte(hkdfInfo), hkdfLength)
+	keys := a.HKDFExpand(key, []byte(hkdfInfo), hkdfLength)
 	iv = utils.RandomBytes(ivLength)
 
 	return keys[:encLength], keys[encLength:], iv

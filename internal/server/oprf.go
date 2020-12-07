@@ -8,7 +8,6 @@ func (s *Server) oprfResponse(alpha []byte) (*message.OPRFResponse, error) {
 		panic("no user record was set")
 	}
 
-	// Calculate Beta = f (alpha, kU)
 	beta, err := s.OPRF.Evaluate(alpha)
 	if err != nil {
 		return nil, err
@@ -29,6 +28,5 @@ func (s *Server) oprfResponse(alpha []byte) (*message.OPRFResponse, error) {
 		or.Extra = s.Signature.GetPublicKey()
 	}
 
-	// Send back pubS, salt2/V, Beta - OPAQUE assumes an attacker is able to recover those
 	return or, nil
 }

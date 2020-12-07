@@ -67,15 +67,15 @@ func New(role pake.Role, suite hashtogroup.Ciphersuite, hash hash.Identifier, si
 	g := suite.Get(dst)
 
 	s := &SigmaI{
-		role:  role,
-		id:    id,
-		dh:    new(dh),
-		peer:  peer{id: peerID, pubkey: nil},
-		sk:    new(sigmaIkeys),
-		sig:   sig,
-		group: g,
-		hash:  hash.Get(),
-		rkr:   authenc.New(authenc.Default),
+		role:     role,
+		id:       id,
+		dh:       new(dh),
+		peer:     peer{id: peerID, pubkey: nil},
+		sk:       new(sigmaIkeys),
+		sig:      sig,
+		group:    g,
+		hash:     hash.Get(),
+		rkr:      authenc.New(authenc.Default),
 		encoding: enc,
 	}
 
