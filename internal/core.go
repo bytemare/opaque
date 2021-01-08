@@ -70,7 +70,7 @@ func buildLabel(label string) []byte {
 type HkdfLabel struct {
 	length  uint16
 	label   []byte
-	context []byte
+	context []byte // todo: what is this context ?
 }
 
 func hkdfExpand(h *hash.Hash, secret, hkdfLabel []byte, length int) []byte {

@@ -40,7 +40,12 @@ func Response(core *internal.Core, m *internal.Metadata, nonceLen int, sk, pku, 
 	core.Esk = core.NewScalar().Random()
 	core.Epk = core.Base().Mult(core.Esk)
 	core.NonceS = utils.RandomBytes(nonceLen)
+
 	ikm, err := serverK3dh(core, sk, ke1.EpkU, pku)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	core.DeriveKeys(m, tag3DH, ke1.NonceU, core.NonceS, ikm)
 
 	var einfo2 []byte

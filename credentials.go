@@ -5,46 +5,6 @@ import (
 	"github.com/bytemare/cryptotools/encoding"
 )
 
-type EnvelopeMode bool
-
-const (
-	Base             EnvelopeMode = true
-	CustomIdentifier EnvelopeMode = false
-)
-
-type Envelope struct {
-	Contents innerEnvelope `json:"e"`
-	AuthTag  []byte        `json:"t"`
-}
-
-func (e *Envelope) Encode(enc encoding.Encoding) ([]byte, error) {
-	return enc.Encode(e)
-}
-
-func DecodeEnvelope(e []byte, enc encoding.Encoding) (*Envelope, error) {
-	en, err := enc.Decode(e, &Envelope{})
-	if err != nil {
-		return nil, err
-	}
-
-	env, ok := en.(*Envelope)
-	if !ok {
-		return nil, errors.New("could not decode envelope")
-	}
-
-	return env, nil
-}
-
-type innerEnvelope struct {
-	Mode           EnvelopeMode
-	Nonce          []byte `json:"n"`
-	EncryptedCreds []byte `json:"c"`
-}
-
-type secretCredentials struct {
-	Sku []byte
-}
-
 type Credentials interface {
 	Mode() EnvelopeMode
 	ServerPublicKey() []byte
