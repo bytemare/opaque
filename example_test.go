@@ -1,213 +1,435 @@
 package opaque
 
-/**
-This OPAQUE implementation's peers communicate with []byte encoded messages, that can be simply transmitted.
-*/
-
 import (
 	"bytes"
-	"crypto/ed25519"
 	"fmt"
-	"log"
-	"testing"
-
-	"github.com/bytemare/cryptotools"
 	"github.com/bytemare/cryptotools/encoding"
-	"github.com/bytemare/opaque/record"
+	"github.com/bytemare/cryptotools/hash"
+	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/cryptotools/signature"
+	"github.com/bytemare/cryptotools/utils"
+	"github.com/bytemare/opaque/ake"
+	"github.com/bytemare/opaque/records"
+	"github.com/bytemare/voprf"
+	"testing"
 )
 
-// The user record to be used for registration and authentication
-var rec *record.UserRecord
+var exampleTestClient *Client
 
-func newServerPrivateKey() []byte {
-	_, s, err := ed25519.GenerateKey(nil)
+func receiveResponseFromServer(rreq []byte) ([]byte, Credentials) {
+	idu := []byte("user")
+	ids := []byte("server")
+
+	suite := voprf.RistrettoSha512
+	h := hash.SHA256
+	ke := ake.SigmaI
+	enc := encoding.JSON
+
+	oprfKeys := suite.KeyGen()
+	akeKeys := suite.KeyGen()
+
+	// Set up the server.
+	server := NewServer(suite, h, ke, oprfKeys.SecretKey, akeKeys.SecretKey, akeKeys.PublicKey)
+
+	r, err := enc.Decode(rreq, &RegistrationRequest{})
 	if err != nil {
 		panic(err)
 	}
 
-	return s.Seed()
+	req, ok := r.(*RegistrationRequest)
+	if !ok {
+		panic("")
+	}
+
+	// Evaluate the request and respond.
+	resp := server.RegistrationResponse(req, enc)
+
+	encResp, err := enc.Encode(resp)
+	if err != nil {
+		panic(err)
+	}
+
+	creds := &CustomCleartextCredentials{
+		Pks: akeKeys.PublicKey,
+		Idu: idu,
+		Ids: ids,
+	}
+
+	return encResp, creds
 }
 
-func registration() {
-	serverID := []byte("server")
-	username := []byte("user")
+func ExampleClient_registration() {
 	password := []byte("password")
 
-	clientParams := &Parameters{
-		SNI:      serverID,
-		UserID:   username,
-		Secret:   password,
-		Encoding: encoding.JSON,
-	}
+	suite := voprf.RistrettoSha512
+	h := hash.SHA256
+	m := mhf.Argon2id
+	ke := ake.SigmaI
+	enc := encoding.JSON
 
-	/*
-		A client wants to play OPAQUE with the server, identified by sni, and wants to register
-	*/
-	client, err := Registration.Client(clientParams, nil)
+	// Set up the client
+	client := NewClient(suite, h, m, ke)
+
+	// Prepare the registration request
+	req := client.RegistrationStart(password)
+
+	encReq, err := enc.Encode(req)
 	if err != nil {
 		panic(err)
 	}
 
-	/*
-		Let's say the server receives the first message, reads the username from the request,
-		and fetches the database entry for the user.
-
-		In this Example, we're just going to create a dummy user record.
-
-		It is supposed the server disposes of a pair of private and public keys, used for the database.
-	*/
-	privateKey := newServerPrivateKey()
-	csp, err := cryptotools.ReadCiphersuite(client.EncodedParameters())
-	if err != nil {
-		panic(err)
-	}
-	rec, err = record.NewUserRecord(username, privateKey, csp)
+	// encodedReq must be send to the server. The server part is not covered here, this is a mock function.
+	encodedResp, creds := receiveResponseFromServer(encReq)
+	r, err := enc.Decode(encodedResp, &RegistrationResponse{})
 	if err != nil {
 		panic(err)
 	}
 
-	//
-	serverParams := &Parameters{
-		SNI:      serverID,
-		Encoding: encoding.JSON,
+	resp, ok := r.(*RegistrationResponse)
+	if !ok {
+		panic("")
 	}
 
-	server, err := Registration.Server(serverParams, nil)
+	// Create a secret and public key for the client.
+	clientAkeSecretKey, clientAkePublicKey := client.AkeKeyGen()
+
+	// Finalize the registration for the client, and send the output to the server.
+	upload, _, err := client.RegistrationFinalize(clientAkeSecretKey, clientAkePublicKey, creds, resp, enc)
 	if err != nil {
 		panic(err)
 	}
 
-	// And now we load the user record
-	if err := server.SetUserRecord(rec); err != nil {
+	encodedUpload, err := enc.Encode(upload)
+	if encodedUpload == nil || err != nil {
 		panic(err)
 	}
-
-	/*
-		Let's register a new envelope to the server. The client generates the first message, and sends it to the server.
-	*/
-	message1, err := client.Register(nil)
-	if err != nil {
-		panic(err)
-	}
-
-	/*
-		The server sends back the client record
-	*/
-	message2, err := server.Register(message1)
-	if err != nil {
-		panic(err)
-	}
-
-	/*
-		The setup is complete, we can proceed to the key exchange
-	*/
-	message3, err := client.Register(message2)
-	if err != nil {
-		panic(err)
-	}
-
-	/*
-		The server updates the client entry with the new envelope
-	*/
-	_, err = server.Register(message3)
-	if err != nil {
-		panic(err)
-	}
-
-	/*
-		The client has now its sealed enveloped stored on the server
-	*/
-	if rec.Envelope != nil {
-		fmt.Println("An envelope was registered on the server.")
-	} else {
-		fmt.Println("Warning: no envelope was registered but no error has been raised before.")
-	}
-	// Output: An envelope was registered on the server.
+	// Output:
 }
 
-func TestRegistration(t *testing.T) {
-	registration()
-}
-
-func TestAuthentication(t *testing.T) {
-	serverID := []byte("server")
-	username := []byte("user")
+func receiveRequestFromClient() []byte {
 	password := []byte("password")
 
-	// Suppose a client record was setup earlier and stored in a database
-	registration()
+	suite := voprf.RistrettoSha512
+	h := hash.SHA256
+	m := mhf.Argon2id
+	ke := ake.SigmaI
+	enc := encoding.JSON
+
+	// Set up the client
+	exampleTestClient = NewClient(suite, h, m, ke)
+
+	// Prepare the registration request
+	req := exampleTestClient.RegistrationStart(password)
+
+	encReq, err := enc.Encode(req)
+	if err != nil {
+		panic(err)
+	}
+
+	return encReq
+}
+
+func receiveUploadFromClient(encodedResp []byte, creds Credentials) []byte {
+	enc := encoding.JSON
+
+	r, err := enc.Decode(encodedResp, &RegistrationResponse{})
+	if err != nil {
+		panic(err)
+	}
+
+	resp, ok := r.(*RegistrationResponse)
+	if !ok {
+		panic("")
+	}
+
+	// Create a secret and public key for the client.
+	clientAkeSecretKey, clientAkePublicKey := exampleTestClient.AkeKeyGen()
+
+	// Finalize the registration for the client, and send the output to the server.
+	upload, _, err := exampleTestClient.RegistrationFinalize(clientAkeSecretKey, clientAkePublicKey, creds, resp, enc)
+	if err != nil {
+		panic(err)
+	}
+
+	encodedUpload, err := enc.Encode(upload)
+	if err != nil {
+		panic(err)
+	}
+
+	return encodedUpload
+}
+
+func ExampleServer_registration() {
+	idu := []byte("user")
+	ids := []byte("server")
+
+	suite := voprf.RistrettoSha512
+	h := hash.SHA256
+	ke := ake.SigmaI
+	enc := encoding.JSON
+
+	// This can be set up before protocol execution
+	oprfKeys := suite.KeyGen()
+	akeKeys := suite.KeyGen()
+
+	// Receive the request from the client and decode it.
+	encodedReq := receiveRequestFromClient()
+
+	r, err := enc.Decode(encodedReq, &RegistrationRequest{})
+	if err != nil {
+		panic(err)
+	}
+
+	req, ok := r.(*RegistrationRequest)
+	if !ok {
+		panic("")
+	}
+
+	// Set up the server.
+	server := NewServer(suite, h, ke, oprfKeys.SecretKey, akeKeys.SecretKey, akeKeys.PublicKey)
+
+	// Evaluate the request and respond.
+	resp := server.RegistrationResponse(req, enc)
+
+	encResp, err := enc.Encode(resp)
+	if err != nil {
+		panic(err)
+	}
+
+	// Receive the client envelope.
+	creds := &CustomCleartextCredentials{
+		Pks: akeKeys.PublicKey,
+		Idu: idu,
+		Ids: ids,
+	}
+	encodedUpload := receiveUploadFromClient(encResp, creds)
+
+	up, err := enc.Decode(encodedUpload, &RegistrationUpload{})
+	if err != nil {
+		panic(err)
+	}
+
+	upload, ok := up.(*RegistrationUpload)
+	if !ok {
+		panic("")
+	}
+
+	// Identifiers are not covered in OPAQUE. One way to deal with them is to have a human readable "display username"
+	// that can be changed, and an immutable user identifier.
+	username := idu
+	uuid := utils.RandomBytes(32)
+	userRecord, oprfRecord, akeRecord, err := server.RegistrationFinalize(username, uuid, upload, enc)
+	if err != nil {
+		panic(err)
+	}
+	records.Users[string(username)] = userRecord
+	records.OprfRecords[string(oprfRecord.ID)] = oprfRecord
+	records.AkeRecords[string(akeRecord.ID)] = akeRecord
+	// Output:
+}
+
+var (
+	oprfSuites = []voprf.Ciphersuite{
+		voprf.RistrettoSha512, voprf.P256Sha256, voprf.P384Sha512, voprf.P521Sha512,
+	}
+	akes = []ake.Identifier{ake.SigmaI, ake.TripleDH}
+)
+
+func gen3DHkeys(suite voprf.Ciphersuite) (sk, pk []byte) {
+	serverAkeKeys := suite.KeyGen()
+	return serverAkeKeys.SecretKey, serverAkeKeys.PublicKey
+}
+
+func genSigmaKeys(sig signature.Identifier) (sk, pk []byte) {
+	s := sig.New()
+	_ = s.GenerateKey()
+	return s.GetPrivateKey(), s.GetPublicKey()
+}
+
+func registration(t *testing.T, client *Client, server *Server, idu, password, sku, pku, ids, serverPk []byte, enc encoding.Encoding) *RegistrationUpload {
+	// Client start
+	reqReg := client.RegistrationStart(password)
+
+	// Server response
+	respReg := server.RegistrationResponse(reqReg, enc)
+	creds := &CustomCleartextCredentials{
+		Pks: serverPk,
+		Idu: idu,
+		Ids: ids,
+	}
+
+	// Client
+	upload, _, err := client.RegistrationFinalize(sku, pku, creds, respReg, enc)
+	if err != nil {
+		panic(err)
+	}
+
+	// Server
+	username := idu
+	uuid := utils.RandomBytes(32)
+	userRecord, oprfRecord, akeRecord, err := server.RegistrationFinalize(username, uuid, upload, enc)
+	if err != nil {
+		panic(err)
+	}
+	records.Users[string(username)] = userRecord
+	records.OprfRecords[string(oprfRecord.ID)] = oprfRecord
+	records.AkeRecords[string(akeRecord.ID)] = akeRecord
+
+	return upload
+}
+
+func authentication(t *testing.T, client *Client, server *Server, idu, password, ids, pks []byte, userRecord *RegistrationUpload, enc encoding.Encoding) bool {
+	// Client
+	req := client.AuthenticationStart(password, nil, enc)
+
+	// Server
+	resp := server.AuthenticationResponse(req, &userRecord.Envelope, userRecord.Pku, idu, ids, nil, nil, enc)
+	creds := &CustomCleartextCredentials{
+		Pks: pks,
+		Idu: idu,
+		Ids: ids,
+	}
+
+	// Client
+	fin, _, err := client.AuthenticationFinalize(creds, resp, nil, enc)
+	if err != nil {
+		panic(err)
+	}
+
+	// Server
+	if err := server.AuthenticationFinalize(fin, enc); err != nil {
+		panic(err)
+	}
+
+	// Verify session keys
+	clientKey := client.SessionKey()
+	serverKey := server.SessionKey()
+
+	return bytes.Equal(clientKey, serverKey)
+}
+
+func TestFull(t *testing.T) {
+	suite := voprf.RistrettoSha512
+	h := hash.SHA256
+	m := mhf.Argon2id
+	ke := ake.SigmaI
+	enc := encoding.JSON
+
+	idu := []byte("user")
+	ids := []byte("server")
+	password := []byte("password")
+	serverOprfKeys := suite.KeyGen()
+
+	var serverSecretKey, serverPublicKey []byte
+
+	switch ke {
+	case ake.TripleDH:
+		serverAkeKeys := suite.KeyGen()
+		serverSecretKey = serverAkeKeys.SecretKey
+		serverPublicKey = serverAkeKeys.PublicKey
+	case ake.SigmaI:
+		sig := signature.Ed25519.New()
+		_ = sig.GenerateKey()
+		serverSecretKey = sig.GetPrivateKey()
+		serverPublicKey = sig.GetPublicKey()
+	}
+
+
+	// Todo: it is not sure here what the client AKE secret is. HashToScalar on rwdu ? A secret RSA or ECDSA key ?
+	// todo : hence, it's not sure what pku is
 
 	/*
-		let's say the client wants to authenticate to the server, using the stored envelope
+		Registration
 	*/
-	clientParams := &Parameters{
-		SNI:      serverID,
-		UserID:   username,
-		Secret:   password,
-		Encoding: encoding.JSON,
+
+	// Client
+	client := NewClient(suite, h, m, ke)
+	username := idu
+	reqReg := client.RegistrationStart(password)
+
+	// Server
+	server := NewServer(suite, h, ke, serverOprfKeys.SecretKey, serverSecretKey, serverPublicKey)
+	respReg := server.RegistrationResponse(reqReg, enc)
+	uuid := utils.RandomBytes(32)
+	creds := &CustomCleartextCredentials{
+		Pks: serverPublicKey,
+		Idu: uuid,
+		Ids: ids,
 	}
-	client, err := Authentication.Client(clientParams, nil)
+
+	// Client
+	var clientSecretKey, clientPublicKey []byte
+
+	switch ke {
+	case ake.TripleDH:
+		clientSecretKey, clientPublicKey = client.AkeKeyGen()
+	case ake.SigmaI:
+		sig := signature.Ed25519.New()
+		_ = sig.GenerateKey()
+		clientSecretKey = sig.GetPrivateKey()
+		clientPublicKey = sig.GetPublicKey()
+	}
+
+	upload, _, err := client.RegistrationFinalize(clientSecretKey, clientPublicKey, creds, respReg, enc)
 	if err != nil {
 		panic(err)
 	}
 
-	message1, err := client.Authenticate(nil)
+	// Server
+	userRecord, oprfRecord, akeRecord, err := server.RegistrationFinalize(username, uuid, upload, enc)
 	if err != nil {
 		panic(err)
 	}
+	records.Users[string(username)] = userRecord
+	records.OprfRecords[string(oprfRecord.ID)] = oprfRecord
+	records.AkeRecords[string(akeRecord.ID)] = akeRecord
 
 	/*
-		The server answers
+		Authentication + Key Exchange
 	*/
-	serverParams := &Parameters{
-		SNI:      serverID,
-		Encoding: encoding.JSON,
-	}
-	server, err := Authentication.Server(serverParams, nil)
+
+	// Client
+	client = NewClient(suite, h, m, ke)
+	username = idu
+	req := client.AuthenticationStart(password, nil, enc)
+
+	// Server
+	ur := records.Users[string(username)]
+	or := records.OprfRecords[string(ur.ServerOprfID)]
+	ar := records.AkeRecords[string(ur.ServerAkeID)]
+
+	server = NewServer(or.Ciphersuite, h, ar.Ake, or.OprfKey, ar.SecretKey, ar.PublicKey)
+	env, err := DecodeEnvelope(ur.Envelope, enc)
 	if err != nil {
 		panic(err)
 	}
 
-	// And now we load the user record
-	server.SetUserRecord(rec)
+	resp := server.AuthenticationResponse(req, env, ur.UUID, ur.UserPublicKey, ids, nil, nil, enc)
+	creds = &CustomCleartextCredentials{
+		Pks: ar.PublicKey,
+		Idu: ur.UUID,
+		Ids: ids,
+	}
 
-	message2, err := server.Authenticate(message1)
+	// Client
+	fin, _, err := client.AuthenticationFinalize(creds, resp, nil, enc)
 	if err != nil {
 		panic(err)
 	}
 
-	/*
-		The client receives the server's answer and will have the session key, but needs to explicitly authenticate to the
-		server. We therefore send the last message.
-	*/
-	message3, err := client.Authenticate(message2)
-	if err != nil {
+	// Server
+	if err := server.AuthenticationFinalize(fin, enc); err != nil {
 		panic(err)
 	}
 
-	clientSessionKey := client.SessionKey()
+	// Verify session keys
+	clientKey := client.SessionKey()
+	serverKey := server.SessionKey()
 
-	/*
-		The server absolutely MUST verify the client's authenticity before continuing or encrypting anything else.
-		This call will only return a nil message, since message3 is the last message of the key exchange.
-	*/
-	_, err = server.Authenticate(message3)
-	if err != nil {
-		panic(err)
-	}
-
-	serverSessionKey := server.SessionKey()
-
-	/*
-		At this point, both client and server share the same session key
-	*/
-	if bytes.Equal(clientSessionKey, serverSessionKey) {
-		fmt.Println("Both parties share the same secret session key")
+	if bytes.Equal(clientKey, serverKey) {
+		fmt.Println("Session secrets match !!!")
 	} else {
-		log.Printf("fail.")
-		fmt.Println("Something went wrong, and should have been detected before.")
+		fmt.Println("Session secrets don't match.")
 	}
-
-	// Output: An envelope was registered on the server.
-	// Both parties share the same secret session key
+	// Output: Session secrets match !!!
 }
