@@ -1,16 +1,20 @@
 # OPAQUE
 
-OPAQUE implemens the OPAQUE protocol allow for mutual client-server authentication without the server knowing the client's secret.
+OPAQUE implements the OPAQUE protocol allow for mutual public key client-server authentication, with the client only knowing a password, and the server knowing nothing about about the password.
 
-This implements https://tools.ietf.org/html/draft-krawczyk-cfrg-opaque-06
+This follows the latest commits and discussions in the ongoing draft: https://github.com/cfrg/draft-irtf-cfrg-opaque
 
 !!! WARNING : THIS IMPLEMENTATION IS PROOF OF CONCEPT AND BASED ON THE LATEST INTERNET DRAFT. THERE ARE ABSOLUTELY NO WARRANTIES. !!!
 
 This is active work in progress.
 
 Implemented components:
-- (V)OPRF
+- OPRF
 - Authenticated key exchanges
+    - 3DH
     - Sigma-I
-- Random-key Robust Authenticated Encryption Encrypt-then-HMAC schemes (RKR AE)
-    - AES-CTR-Encrypt_then_HMAC-SHA2-256
+
+Run example and tests
+````
+$ go test -v
+````
