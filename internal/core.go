@@ -1,12 +1,16 @@
 package internal
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"errors"
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/signature"
 	"github.com/bytemare/cryptotools/utils"
+	"io"
 )
 
 const (
@@ -17,6 +21,8 @@ const (
 	tagMacClient = "client mac"
 	tagEncServer = "server enc"
 	tagEncClient = "client enc"
+
+	aeadNonceSize = 16
 )
 
 type Core struct {
@@ -135,4 +141,44 @@ func DecodeKe1(input []byte, enc encoding.Encoding) (*Ke1, error) {
 	}
 
 	return de, nil
+}
+
+func AesGcmEncrypt(key, plaintext []byte) []byte {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	nonce := make([]byte, aeadNonceSize)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		panic(err.Error())
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return append(nonce, aesgcm.Seal(nil, nonce, plaintext, nil)...)
+}
+
+func AesGcmDecrypt(key, ciphertext []byte) ([]byte, error) {
+	nonce := ciphertext[:aeadNonceSize]
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	plaintext, err := aesgcm.Open(nil, nonce, ciphertext[aeadNonceSize:], nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return plaintext, nil
 }

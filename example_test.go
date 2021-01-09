@@ -332,7 +332,7 @@ func TestFull(t *testing.T) {
 	}
 
 	// Client
-	fin, _, err := client.AuthenticationFinalize(creds, resp, nil, enc)
+	fin, _, err := client.AuthenticationFinalize(creds, resp, enc)
 	if err != nil {
 		panic(err)
 	}

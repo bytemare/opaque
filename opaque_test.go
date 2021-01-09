@@ -74,7 +74,7 @@ func authentication(t *testing.T, client *Client, server *Server, idu, password,
 	}
 
 	// Client
-	fin, _, err := client.AuthenticationFinalize(creds, resp, nil, enc)
+	fin, _, err := client.AuthenticationFinalize(creds, resp, enc)
 	if err != nil {
 		panic(err)
 	}

@@ -50,7 +50,10 @@ func Response(core *internal.Core, m *internal.Metadata, nonceLen int, sk, pku, 
 
 	var einfo2 []byte
 	if info2 != nil {
-		// Todo : encrypt info2 to einfo2 with ke2
+		einfo2, err = internal.AesGcmDecrypt(core.Ke2, info2)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	core.Transcript2 = utils.Concatenate(0, m.CredReq, ke1.NonceU, m.Info1, ke1.EpkU, m.CredResp, core.NonceS, info2, core.Epk.Bytes(), einfo2)
@@ -62,21 +65,13 @@ func Response(core *internal.Core, m *internal.Metadata, nonceLen int, sk, pku, 
 	}.Encode(enc), einfo2, nil
 }
 
-func ServerFinalize(core *internal.Core, info3, einfo3, req []byte, enc encoding.Encoding) error {
-	if info3 != nil && einfo3 != nil {
-		panic("")
-	}
-
+func ServerFinalize(core *internal.Core, req []byte, enc encoding.Encoding) error {
 	ke3, err := decodeKe3(req, enc)
 	if err != nil {
 		return err
 	}
 
-	if einfo3 != nil {
-		// todo decrypt einfo3 into info with ke3
-	}
-
-	core.Transcript3 = utils.Concatenate(0, core.Transcript2, info3, einfo3)
+	core.Transcript3 = utils.Concatenate(0, core.Transcript2)
 
 	if !checkHmac(core.Hash, core.Transcript3, core.Km3, ke3.Mac) {
 		return errors.New("invalid mac")

@@ -40,13 +40,9 @@ type ServerResponse struct {
 	Cresp CredentialResponse `json:"cres"`
 	KE2   []byte             `json:"ke2"`
 
-	Info2  []byte  `json:"info2,omitempty"`
 	EInfo2 []byte  `json:"einfo2,omitempty"`
 }
 
 type ClientFinish struct {
 	KE3 []byte  `json:"ke3"`
-
-	Info3  []byte  `json:"info3,omitempty"`
-	EInfo3 []byte  `json:"einfo3,omitempty"`
 }

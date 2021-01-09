@@ -1,13 +1,12 @@
 package ake
 
 import (
-	"errors"
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/internal"
 )
 
-type clientFinalize func(core *internal.Core, m *internal.Metadata, sku, pks, message, info2, einfo2, info3 []byte, enc encoding.Encoding) ([]byte, []byte, error)
+type clientFinalize func(core *internal.Core, m *internal.Metadata, sku, pks, message, einfo2 []byte, enc encoding.Encoding) ([]byte, error)
 
 type Client struct {
 	id Identifier
@@ -30,13 +29,8 @@ func (c *Client) Start(nonceLen int, enc encoding.Encoding) []byte {
 	}.Encode(enc)
 }
 
-func (c *Client) Finalize(m *internal.Metadata, sku, pks, message, info2, einfo2, info3 []byte, enc encoding.Encoding) ([]byte, []byte, error) {
-	if einfo2 != nil && info2 != nil {
-		// todo what happens here ?
-		return nil, nil, errors.New("info2 and einfo2 are both non-nil")
-	}
-
-	return c.clientFinalize(c.Core, m, sku, pks, message, info2, einfo2, info3, enc)
+func (c *Client) Finalize(m *internal.Metadata, sku, pks, message, einfo2 []byte, enc encoding.Encoding) ([]byte, error) {
+	return c.clientFinalize(c.Core, m, sku, pks, message, einfo2, enc)
 }
 
 func (c *Client) SessionKey() []byte {

@@ -31,42 +31,36 @@ func clientK3dh(g group.Group, esk group.Scalar, sku, epks, pks []byte) ([]byte,
 	return utils.Concatenate(0, e1.Bytes(), e2.Bytes(), e3.Bytes()), nil
 }
 
-func Finalize(core *internal.Core, m *internal.Metadata, sku, pks, message, info2, einfo2, info3 []byte, enc encoding.Encoding) ([]byte, []byte, error) {
-	if einfo2 != nil && info2 != nil {
-		// todo what happens here ?
-		return nil, nil, errors.New("info2 and einfo2 are both non-nil")
-	}
-
+func Finalize(core *internal.Core, m *internal.Metadata, sku, pks, message, einfo2 []byte, enc encoding.Encoding) ([]byte, error) {
 	ke2, err := decodeke2(message, enc)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	nonceS := ke2.NonceS
 
 	ikm, err := clientK3dh(core.Group, core.Esk, sku, ke2.EpkS, pks)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	core.DeriveKeys(m, tag3DH, core.NonceU, nonceS, ikm)
 
+	var info2 []byte
 	if einfo2 != nil {
-		// todo decrypt einfo2 into info2 with ke2
+		info2, err = internal.AesGcmDecrypt(core.Ke2, einfo2)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	core.Transcript2 = utils.Concatenate(0, m.CredReq, core.NonceU, m.Info1, core.Epk.Bytes(), m.CredResp, nonceS, info2, ke2.EpkS, einfo2)
 
 	if !checkHmac(core.Hash, core.Transcript2, core.Km2, ke2.Mac) {
-		return nil, nil, errors.New("invalid mac")
+		return nil, errors.New("invalid mac")
 	}
 
-	var einfo3 []byte
-	if info3 != nil {
-		// todo encrypt info3 with ke3
-	}
+	core.Transcript3 = utils.Concatenate(0, core.Transcript2)
 
-	core.Transcript3 = utils.Concatenate(0, core.Transcript2, info3, einfo3)
-
-	return ke3{Mac: core.Hmac(core.Transcript3, core.Km3)}.Encode(enc), einfo3, nil
+	return ke3{Mac: core.Hmac(core.Transcript3, core.Km3)}.Encode(enc), nil
 }

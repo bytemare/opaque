@@ -6,7 +6,7 @@ import (
 )
 
 type response func(core *internal.Core, m *internal.Metadata, nonceLen int, sk, pku, req, info2 []byte, enc encoding.Encoding) ([]byte, []byte, error)
-type serverFinalize func(core *internal.Core, info3, einfo3, req []byte, enc encoding.Encoding) error
+type serverFinalize func(core *internal.Core, req []byte, enc encoding.Encoding) error
 
 type Server struct {
 	id Identifier
@@ -28,8 +28,8 @@ func (s *Server) Response(m *internal.Metadata, nonceLen int, pku, req, info2 []
 	return s.response(s.Core, m, nonceLen, s.sk, pku, req, info2, enc)
 }
 
-func (s *Server) Finalize(info3, einfo3, req []byte, enc encoding.Encoding) error {
-	return s.finalize(s.Core, info3, einfo3, req, enc)
+func (s *Server) Finalize(req []byte, enc encoding.Encoding) error {
+	return s.finalize(s.Core, req, enc)
 }
 
 func (s *Server) SessionKey() []byte {
