@@ -1,4 +1,6 @@
-package opaque
+package message
+
+import "github.com/bytemare/opaque/envelope"
 
 // Registration
 
@@ -7,13 +9,13 @@ type RegistrationRequest struct {
 }
 
 type RegistrationResponse struct {
-	Data           []byte `json:"data"`
-	Pks            []byte `json:"pks"`
+	Data []byte `json:"data"`
+	Pks  []byte `json:"pks"`
 }
 
 type RegistrationUpload struct {
-	Envelope Envelope `json:"env"`
-	Pku      []byte   `json:"pku"`
+	Envelope envelope.Envelope `json:"env"`
+	Pku      []byte            `json:"pku"`
 }
 
 // Authentication
@@ -23,9 +25,9 @@ type CredentialRequest struct {
 }
 
 type CredentialResponse struct {
-	Data     []byte   `json:"data"`
-	Pks      []byte   `json:"pks"`
-	Envelope Envelope `json:"env"`
+	Data     []byte            `json:"data"`
+	Pks      []byte            `json:"pks"`
+	Envelope envelope.Envelope `json:"env"`
 }
 
 // Protocol Messages
@@ -40,9 +42,9 @@ type ServerResponse struct {
 	Cresp CredentialResponse `json:"cres"`
 	KE2   []byte             `json:"ke2"`
 
-	EInfo2 []byte  `json:"einfo2,omitempty"`
+	EInfo2 []byte `json:"einfo2,omitempty"`
 }
 
 type ClientFinish struct {
-	KE3 []byte  `json:"ke3"`
+	KE3 []byte `json:"ke3"`
 }

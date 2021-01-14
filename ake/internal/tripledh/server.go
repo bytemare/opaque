@@ -1,8 +1,8 @@
-package threeDH
+package tripledh
 
 import (
-	"errors"
 	"fmt"
+
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/internal"
@@ -31,7 +31,7 @@ func serverK3dh(core *internal.Core, sk, epku, pku []byte) ([]byte, error) {
 	return utils.Concatenate(0, e1.Bytes(), e2.Bytes(), e3.Bytes()), nil
 }
 
-func Response(core *internal.Core, m *internal.Metadata, nonceLen int, sk, pku, req, info2 []byte, enc encoding.Encoding) ([]byte, []byte, error) {
+func Response(core *internal.Core, m *internal.Metadata, nonceLen int, sk, pku, req, info2 []byte, enc encoding.Encoding) (encKe2, einfo2 []byte, err error) {
 	ke1, err := internal.DecodeKe1(req, enc)
 	if err != nil {
 		return nil, nil, err
@@ -48,7 +48,6 @@ func Response(core *internal.Core, m *internal.Metadata, nonceLen int, sk, pku, 
 
 	core.DeriveKeys(m, tag3DH, ke1.NonceU, core.NonceS, ikm)
 
-	var einfo2 []byte
 	if info2 != nil {
 		einfo2, err = internal.AesGcmDecrypt(core.Ke2, info2)
 		if err != nil {
@@ -74,7 +73,7 @@ func ServerFinalize(core *internal.Core, req []byte, enc encoding.Encoding) erro
 	core.Transcript3 = utils.Concatenate(0, core.Transcript2)
 
 	if !checkHmac(core.Hash, core.Transcript3, core.Km3, ke3.Mac) {
-		return errors.New("invalid mac")
+		return internal.ErrAkeInvalidClientMac
 	}
 
 	return nil

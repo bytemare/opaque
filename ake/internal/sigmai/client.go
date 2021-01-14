@@ -1,7 +1,6 @@
 package sigmai
 
 import (
-	"errors"
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/signature"
 	"github.com/bytemare/cryptotools/utils"
@@ -32,11 +31,11 @@ func Finalize(core *internal.Core, m *internal.Metadata, sku, pks, message, einf
 	core.Transcript2 = utils.Concatenate(0, m.CredReq, core.NonceU, m.Info1, core.Epk.Bytes(), m.CredResp, ke2.NonceS, info2, ke2.EpkS, einfo2)
 
 	if !signature.Ed25519.Verify(pks, core.Transcript2, ke2.Signature) {
-		return nil, errors.New("invalid signature")
+		return nil, ErrSigmaInvServerSig
 	}
 
 	if !checkHmac(core.Hash, m.IDs, core.Km2, ke2.Mac) {
-		return nil, errors.New("invalid mac")
+		return nil, internal.ErrAkeInvalidServerMac
 	}
 
 	core.Transcript3 = utils.Concatenate(0, core.Transcript2)

@@ -1,14 +1,17 @@
-package threeDH
+package tripledh
 
 import (
 	"crypto/hmac"
-	"errors"
+
+	"github.com/bytemare/opaque/internal"
+
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
 )
 
-const TripleDHKeyTag = "3DH keys"
-var tag3DH = []byte(TripleDHKeyTag)
+const keyTag = "3DH keys"
+
+var tag3DH = []byte(keyTag)
 
 func checkHmac(h *hash.Hash, transcript2, key, mac []byte) bool {
 	expectedHmac2 := h.Hmac(transcript2, key)
@@ -20,6 +23,7 @@ func encode(k interface{}, enc encoding.Encoding) []byte {
 	if err != nil {
 		panic(err)
 	}
+
 	return output
 }
 
@@ -41,7 +45,7 @@ func decodeke2(input []byte, enc encoding.Encoding) (*ke2, error) {
 
 	de, ok := d.(*ke2)
 	if !ok {
-		return nil, errors.New("could not assert ke2")
+		return nil, internal.ErrAssertKe2
 	}
 
 	return de, nil
@@ -63,7 +67,7 @@ func decodeKe3(input []byte, enc encoding.Encoding) (*ke3, error) {
 
 	de, ok := d.(*ke3)
 	if !ok {
-		return nil, errors.New("could not assert m3dh3")
+		return nil, internal.ErrAssertKe3
 	}
 
 	return de, nil

@@ -3,20 +3,22 @@ package opaque
 import (
 	"bytes"
 	"fmt"
+	"testing"
+
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/cryptotools/signature"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/ake"
-	"github.com/bytemare/opaque/records"
+	"github.com/bytemare/opaque/envelope"
+	"github.com/bytemare/opaque/message"
 	"github.com/bytemare/voprf"
-	"testing"
 )
 
 var exampleTestClient *Client
 
-func receiveResponseFromServer(rreq []byte) ([]byte, Credentials) {
+func receiveResponseFromServer(rreq []byte) ([]byte, message.Credentials) {
 	idu := []byte("user")
 	ids := []byte("server")
 
@@ -31,25 +33,28 @@ func receiveResponseFromServer(rreq []byte) ([]byte, Credentials) {
 	// Set up the server.
 	server := NewServer(suite, h, ke, oprfKeys.SecretKey, akeKeys.SecretKey, akeKeys.PublicKey)
 
-	r, err := enc.Decode(rreq, &RegistrationRequest{})
+	r, err := enc.Decode(rreq, &message.RegistrationRequest{})
 	if err != nil {
 		panic(err)
 	}
 
-	req, ok := r.(*RegistrationRequest)
+	req, ok := r.(*message.RegistrationRequest)
 	if !ok {
 		panic("")
 	}
 
 	// Evaluate the request and respond.
-	resp := server.RegistrationResponse(req, enc)
+	resp, err := server.RegistrationResponse(req, enc)
+	if err != nil {
+		panic(err)
+	}
 
 	encResp, err := enc.Encode(resp)
 	if err != nil {
 		panic(err)
 	}
 
-	creds := &CustomCleartextCredentials{
+	creds := &message.CustomCleartextCredentials{
 		Pks: akeKeys.PublicKey,
 		Idu: idu,
 		Ids: ids,
@@ -61,31 +66,33 @@ func receiveResponseFromServer(rreq []byte) ([]byte, Credentials) {
 func ExampleClient_registration() {
 	password := []byte("password")
 
-	suite := voprf.RistrettoSha512
-	h := hash.SHA256
-	m := mhf.Argon2id
-	ke := ake.SigmaI
-	enc := encoding.JSON
+	p := &Parameters{
+		Ciphersuite: voprf.RistrettoSha512,
+		Hash:        hash.SHA256,
+		AKE:         ake.TripleDH,
+		Encoding:    encoding.JSON,
+		MHF:         mhf.Argon2id.DefaultParameters(),
+	}
 
 	// Set up the client
-	client := NewClient(suite, h, m, ke)
+	client := p.Client()
 
 	// Prepare the registration request
 	req := client.RegistrationStart(password)
 
-	encReq, err := enc.Encode(req)
+	encReq, err := p.Encoding.Encode(req)
 	if err != nil {
 		panic(err)
 	}
 
 	// encodedReq must be send to the server. The server part is not covered here, this is a mock function.
 	encodedResp, creds := receiveResponseFromServer(encReq)
-	r, err := enc.Decode(encodedResp, &RegistrationResponse{})
+	r, err := p.Encoding.Decode(encodedResp, &message.RegistrationResponse{})
 	if err != nil {
 		panic(err)
 	}
 
-	resp, ok := r.(*RegistrationResponse)
+	resp, ok := r.(*message.RegistrationResponse)
 	if !ok {
 		panic("")
 	}
@@ -94,12 +101,12 @@ func ExampleClient_registration() {
 	clientAkeSecretKey, clientAkePublicKey := client.AkeKeyGen()
 
 	// Finalize the registration for the client, and send the output to the server.
-	upload, _, err := client.RegistrationFinalize(clientAkeSecretKey, clientAkePublicKey, creds, resp, enc)
+	upload, _, err := client.RegistrationFinalize(clientAkeSecretKey, clientAkePublicKey, creds, resp, p.Encoding)
 	if err != nil {
 		panic(err)
 	}
 
-	encodedUpload, err := enc.Encode(upload)
+	encodedUpload, err := p.Encoding.Encode(upload)
 	if encodedUpload == nil || err != nil {
 		panic(err)
 	}
@@ -109,19 +116,21 @@ func ExampleClient_registration() {
 func receiveRequestFromClient() []byte {
 	password := []byte("password")
 
-	suite := voprf.RistrettoSha512
-	h := hash.SHA256
-	m := mhf.Argon2id
-	ke := ake.SigmaI
-	enc := encoding.JSON
+	p := &Parameters{
+		Ciphersuite: voprf.RistrettoSha512,
+		Hash:        hash.SHA256,
+		AKE:         ake.TripleDH,
+		Encoding:    encoding.JSON,
+		MHF:         mhf.Argon2id.DefaultParameters(),
+	}
 
 	// Set up the client
-	exampleTestClient = NewClient(suite, h, m, ke)
+	exampleTestClient = p.Client()
 
 	// Prepare the registration request
 	req := exampleTestClient.RegistrationStart(password)
 
-	encReq, err := enc.Encode(req)
+	encReq, err := p.Encoding.Encode(req)
 	if err != nil {
 		panic(err)
 	}
@@ -129,15 +138,15 @@ func receiveRequestFromClient() []byte {
 	return encReq
 }
 
-func receiveUploadFromClient(encodedResp []byte, creds Credentials) []byte {
+func receiveUploadFromClient(encodedResp []byte, creds message.Credentials) []byte {
 	enc := encoding.JSON
 
-	r, err := enc.Decode(encodedResp, &RegistrationResponse{})
+	r, err := enc.Decode(encodedResp, &message.RegistrationResponse{})
 	if err != nil {
 		panic(err)
 	}
 
-	resp, ok := r.(*RegistrationResponse)
+	resp, ok := r.(*message.RegistrationResponse)
 	if !ok {
 		panic("")
 	}
@@ -160,91 +169,95 @@ func receiveUploadFromClient(encodedResp []byte, creds Credentials) []byte {
 }
 
 func ExampleServer_registration() {
-	idu := []byte("user")
+	username := []byte("user")
 	ids := []byte("server")
 
-	suite := voprf.RistrettoSha512
-	h := hash.SHA256
-	ke := ake.SigmaI
-	enc := encoding.JSON
+	p := &Parameters{
+		Ciphersuite: voprf.RistrettoSha512,
+		Hash:        hash.SHA256,
+		AKE:         ake.TripleDH,
+		Encoding:    encoding.JSON,
+	}
 
 	// This can be set up before protocol execution
-	oprfKeys := suite.KeyGen()
-	akeKeys := suite.KeyGen()
+	oprfKeys := p.Ciphersuite.KeyGen()
+	akeKeys := p.Ciphersuite.KeyGen()
 
 	// Receive the request from the client and decode it.
 	encodedReq := receiveRequestFromClient()
 
-	r, err := enc.Decode(encodedReq, &RegistrationRequest{})
+	r, err := p.Encoding.Decode(encodedReq, &message.RegistrationRequest{})
 	if err != nil {
 		panic(err)
 	}
 
-	req, ok := r.(*RegistrationRequest)
+	req, ok := r.(*message.RegistrationRequest)
 	if !ok {
 		panic("")
 	}
 
 	// Set up the server.
-	server := NewServer(suite, h, ke, oprfKeys.SecretKey, akeKeys.SecretKey, akeKeys.PublicKey)
+	server := NewServer(p.Ciphersuite, p.Hash, p.AKE, oprfKeys.SecretKey, akeKeys.SecretKey, akeKeys.PublicKey)
 
 	// Evaluate the request and respond.
-	resp := server.RegistrationResponse(req, enc)
+	resp, err := server.RegistrationResponse(req, p.Encoding)
+	if err != nil {
+		panic(err)
+	}
 
-	encResp, err := enc.Encode(resp)
+	encResp, err := p.Encoding.Encode(resp)
 	if err != nil {
 		panic(err)
 	}
 
 	// Receive the client envelope.
-	creds := &CustomCleartextCredentials{
-		Pks: akeKeys.PublicKey,
-		Idu: idu,
-		Ids: ids,
+	creds := &message.CustomCleartextCredentials{
+		Mode: envelope.CustomIdentifier,
+		Pks:  akeKeys.PublicKey,
+		Idu:  utils.RandomBytes(32),
+		Ids:  ids,
 	}
 	encodedUpload := receiveUploadFromClient(encResp, creds)
 
-	up, err := enc.Decode(encodedUpload, &RegistrationUpload{})
+	up, err := p.Encoding.Decode(encodedUpload, &message.RegistrationUpload{})
 	if err != nil {
 		panic(err)
 	}
 
-	upload, ok := up.(*RegistrationUpload)
+	upload, ok := up.(*message.RegistrationUpload)
 	if !ok {
 		panic("")
 	}
 
 	// Identifiers are not covered in OPAQUE. One way to deal with them is to have a human readable "display username"
 	// that can be changed, and an immutable user identifier.
-	username := idu
-	uuid := utils.RandomBytes(32)
-	userRecord, oprfRecord, akeRecord, err := server.RegistrationFinalize(username, uuid, upload, enc)
+	userRecord, akeRecord, err := server.RegistrationFinalize(username, creds.Idu, creds.Ids, p, upload, p.Encoding)
 	if err != nil {
 		panic(err)
 	}
-	records.Users[string(username)] = userRecord
-	records.OprfRecords[string(oprfRecord.ID)] = oprfRecord
-	records.AkeRecords[string(akeRecord.ID)] = akeRecord
+	Users[string(username)] = userRecord
+	AkeRecords[string(akeRecord.ID)] = akeRecord
 	// Output:
 }
 
 func TestFull(t *testing.T) {
-	suite := voprf.RistrettoSha512
-	h := hash.SHA256
-	m := mhf.Argon2id
-	ke := ake.SigmaI
-	enc := encoding.JSON
+	p := &Parameters{
+		Ciphersuite: voprf.RistrettoSha512,
+		Hash:        hash.SHA256,
+		AKE:         ake.TripleDH,
+		Encoding:    encoding.JSON,
+		MHF:         mhf.Argon2id.DefaultParameters(),
+	}
 
-	idu := []byte("user")
+	mode := envelope.Base
+
 	ids := []byte("server")
-	password := []byte("password")
-	serverOprfKeys := suite.KeyGen()
 
 	var serverSecretKey, serverPublicKey []byte
 
-	switch ke {
+	switch p.AKE {
 	case ake.TripleDH:
-		serverAkeKeys := suite.KeyGen()
+		serverAkeKeys := p.Ciphersuite.KeyGen()
 		serverSecretKey = serverAkeKeys.SecretKey
 		serverPublicKey = serverAkeKeys.PublicKey
 	case ake.SigmaI:
@@ -254,7 +267,6 @@ func TestFull(t *testing.T) {
 		serverPublicKey = sig.GetPublicKey()
 	}
 
-
 	// Todo: it is not sure here what the client AKE secret is. HashToScalar on rwdu ? A secret RSA or ECDSA key ?
 	// todo : hence, it's not sure what pku is
 
@@ -262,27 +274,36 @@ func TestFull(t *testing.T) {
 		Registration
 	*/
 
-	// Client
-	client := NewClient(suite, h, m, ke)
-	username := idu
-	reqReg := client.RegistrationStart(password)
+	// Client : send username + reqReg to server
+	username := []byte("user")
+	password := []byte("password")
+	c := p.Client()
+	reqReg := c.RegistrationStart(password)
 
 	// Server
-	server := NewServer(suite, h, ke, serverOprfKeys.SecretKey, serverSecretKey, serverPublicKey)
-	respReg := server.RegistrationResponse(reqReg, enc)
 	uuid := utils.RandomBytes(32)
-	creds := &CustomCleartextCredentials{
-		Pks: serverPublicKey,
-		Idu: uuid,
-		Ids: ids,
+	serverOprfKeys := p.Ciphersuite.KeyGen()
+	server := NewServer(p.Ciphersuite, p.Hash, p.AKE, serverOprfKeys.SecretKey, serverSecretKey, serverPublicKey)
+
+	respReg, err := server.RegistrationResponse(reqReg, p.Encoding)
+	if err != nil {
+		panic(err)
+	}
+
+	var creds message.Credentials
+	switch mode {
+	case envelope.Base:
+		creds = message.NewClearTextCredentials(envelope.Base, serverPublicKey)
+	case envelope.CustomIdentifier:
+		creds = message.NewClearTextCredentials(envelope.CustomIdentifier, serverPublicKey, uuid, ids)
 	}
 
 	// Client
 	var clientSecretKey, clientPublicKey []byte
 
-	switch ke {
+	switch p.AKE {
 	case ake.TripleDH:
-		clientSecretKey, clientPublicKey = client.AkeKeyGen()
+		clientSecretKey, clientPublicKey = c.AkeKeyGen()
 	case ake.SigmaI:
 		sig := signature.Ed25519.New()
 		_ = sig.GenerateKey()
@@ -290,60 +311,61 @@ func TestFull(t *testing.T) {
 		clientPublicKey = sig.GetPublicKey()
 	}
 
-	upload, _, err := client.RegistrationFinalize(clientSecretKey, clientPublicKey, creds, respReg, enc)
+	upload, _, err := c.RegistrationFinalize(clientSecretKey, clientPublicKey, creds, respReg, p.Encoding)
 	if err != nil {
 		panic(err)
 	}
 
 	// Server
-	userRecord, oprfRecord, akeRecord, err := server.RegistrationFinalize(username, uuid, upload, enc)
+	userRecord, akeRecord, err := server.RegistrationFinalize(username, uuid, ids, p, upload, p.Encoding)
 	if err != nil {
 		panic(err)
 	}
-	records.Users[string(username)] = userRecord
-	records.OprfRecords[string(oprfRecord.ID)] = oprfRecord
-	records.AkeRecords[string(akeRecord.ID)] = akeRecord
+	Users[string(username)] = userRecord
+	AkeRecords[string(akeRecord.ID)] = akeRecord
 
 	/*
 		Authentication + Key Exchange
 	*/
 
 	// Client
-	client = NewClient(suite, h, m, ke)
-	username = idu
-	req := client.AuthenticationStart(password, nil, enc)
-
-	// Server
-	ur := records.Users[string(username)]
-	or := records.OprfRecords[string(ur.ServerOprfID)]
-	ar := records.AkeRecords[string(ur.ServerAkeID)]
-
-	server = NewServer(or.Ciphersuite, h, ar.Ake, or.OprfKey, ar.SecretKey, ar.PublicKey)
-	env, err := DecodeEnvelope(ur.Envelope, enc)
+	c = p.Client()
+	req, err := c.AuthenticationStart(password, nil, p.Encoding)
 	if err != nil {
 		panic(err)
 	}
 
-	resp := server.AuthenticationResponse(req, env, ur.UUID, ur.UserPublicKey, ids, nil, nil, enc)
-	creds = &CustomCleartextCredentials{
-		Pks: ar.PublicKey,
-		Idu: ur.UUID,
-		Ids: ids,
+	// Server
+	user := Users[string(username)]
+	p = &user.Parameters
+	ar := AkeRecords[string(user.ServerAkeID)]
+	server = user.Server()
+	//server = NewServer(user.OprfSuite, h, ar.Ake, user.OprfSecret, ar.SecretKey, ar.PublicKey)
+	env, err := envelope.DecodeEnvelope(user.Envelope, p.Encoding)
+	if err != nil {
+		panic(err)
+	}
+
+	creds = message.NewClearTextCredentials(envelope.Base, ar.PublicKey, user.UUID, user.ServerID)
+
+	respCreds, err := server.AuthenticationResponse(req, env, creds, nil, nil, user.UserPublicKey, p.Encoding)
+	if err != nil {
+		panic(err)
 	}
 
 	// Client
-	fin, _, err := client.AuthenticationFinalize(creds, resp, enc)
+	fin, _, err := c.AuthenticationFinalize(creds, respCreds, p.Encoding)
 	if err != nil {
 		panic(err)
 	}
 
 	// Server
-	if err := server.AuthenticationFinalize(fin, enc); err != nil {
+	if err := server.AuthenticationFinalize(fin, p.Encoding); err != nil {
 		panic(err)
 	}
 
 	// Verify session keys
-	clientKey := client.SessionKey()
+	clientKey := c.SessionKey()
 	serverKey := server.SessionKey()
 
 	if bytes.Equal(clientKey, serverKey) {

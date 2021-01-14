@@ -5,7 +5,7 @@ import (
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/signature"
 	"github.com/bytemare/opaque/ake/internal/sigmai"
-	"github.com/bytemare/opaque/ake/internal/threeDH"
+	"github.com/bytemare/opaque/ake/internal/tripledh"
 	"github.com/bytemare/opaque/internal"
 )
 
@@ -15,7 +15,24 @@ const (
 	SigmaI Identifier = 1 + iota
 	TripleDH
 	HMQV
+
+	sSigmaI   = "Sigma-I"
+	sTripleDH = "3DH"
+	sHMQV     = "HMQV"
 )
+
+func (i Identifier) String() string {
+	switch i {
+	case SigmaI:
+		return sSigmaI
+	case TripleDH:
+		return sTripleDH
+	case HMQV:
+		panic(sHMQV)
+	default:
+		return ""
+	}
+}
 
 func (i Identifier) Client(g group.Group, h *hash.Hash) *Client {
 	c := &Client{
@@ -30,7 +47,7 @@ func (i Identifier) Client(g group.Group, h *hash.Hash) *Client {
 	case SigmaI:
 		c.clientFinalize = sigmai.Finalize
 	case TripleDH:
-		c.clientFinalize = threeDH.Finalize
+		c.clientFinalize = tripledh.Finalize
 	case HMQV:
 		panic("not supported")
 	default:
@@ -47,7 +64,7 @@ func (i Identifier) Server(g group.Group, h *hash.Hash, privateKey []byte) *Serv
 			Group: g,
 			Hash:  h,
 		},
-		sk:       privateKey,
+		sk: privateKey,
 	}
 
 	switch i {
@@ -56,8 +73,8 @@ func (i Identifier) Server(g group.Group, h *hash.Hash, privateKey []byte) *Serv
 		s.response = sigmai.Response
 		s.finalize = sigmai.ServerFinalize
 	case TripleDH:
-		s.response = threeDH.Response
-		s.finalize = threeDH.ServerFinalize
+		s.response = tripledh.Response
+		s.finalize = tripledh.ServerFinalize
 	case HMQV:
 		panic("not supported")
 	default:

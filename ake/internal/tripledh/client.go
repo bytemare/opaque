@@ -1,7 +1,6 @@
-package threeDH
+package tripledh
 
 import (
-	"errors"
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/utils"
@@ -57,7 +56,7 @@ func Finalize(core *internal.Core, m *internal.Metadata, sku, pks, message, einf
 	core.Transcript2 = utils.Concatenate(0, m.CredReq, core.NonceU, m.Info1, core.Epk.Bytes(), m.CredResp, nonceS, info2, ke2.EpkS, einfo2)
 
 	if !checkHmac(core.Hash, core.Transcript2, core.Km2, ke2.Mac) {
-		return nil, errors.New("invalid mac")
+		return nil, internal.ErrAkeInvalidServerMac
 	}
 
 	core.Transcript3 = utils.Concatenate(0, core.Transcript2)

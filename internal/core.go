@@ -4,13 +4,15 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"errors"
+	"io"
+
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/signature"
 	"github.com/bytemare/cryptotools/utils"
-	"io"
+	"github.com/bytemare/opaque/envelope"
+	"github.com/bytemare/opaque/message"
 )
 
 const (
@@ -22,7 +24,8 @@ const (
 	tagEncServer = "server enc"
 	tagEncClient = "client enc"
 
-	aeadNonceSize = 16
+	aeadNonceSize   = 16
+	AesGcmKeyLength = 32
 )
 
 type Core struct {
@@ -33,7 +36,7 @@ type Core struct {
 	Esk           group.Scalar
 	Epk           group.Element
 	Km2, Km3      []byte
-	Ke2, Ke3      []byte
+	Ke2           []byte
 	SessionSecret []byte
 	Transcript2   []byte
 	Transcript3   []byte
@@ -51,12 +54,37 @@ type Metadata struct {
 	KeyLen            int
 }
 
+func (m *Metadata) Fill(creds message.Credentials, cresp *message.CredentialResponse, pku []byte, enc encoding.Encoding) error {
+	if creds.EnvelopeMode() == envelope.CustomIdentifier {
+		m.IDu = creds.UserID()
+		m.IDs = creds.ServerID()
+	}
+
+	if m.IDu == nil {
+		m.IDu = pku
+	}
+
+	if m.IDs == nil {
+		m.IDs = creds.ServerPublicKey()
+	}
+
+	encCresp, err := enc.Encode(cresp)
+	if err != nil {
+		panic(err)
+	}
+
+	m.CredResp = encCresp
+	m.KeyLen = AesGcmKeyLength
+
+	return nil
+}
+
 func (c *Core) DeriveKeys(m *Metadata, tag, nonceU, nonceS, ikm []byte) {
 	info := info(tag, nonceU, nonceS, m.IDu, m.IDs)
 	handshakeSecret, sessionSecret := keySchedule(c.Hash, ikm, info)
 	c.SessionSecret = sessionSecret
 	c.Km2, c.Km3 = macKeys(c.Hash, handshakeSecret)
-	c.Ke2, c.Ke3 = einfoKeys(c.Hash, handshakeSecret, m.KeyLen)
+	c.Ke2 = hkdfExpandLabel(c.Hash, handshakeSecret, []byte(""), tagEncServer, m.KeyLen)
 }
 
 func lengthPrefixEncode(input []byte) []byte {
@@ -91,23 +119,16 @@ func deriveSecret(h *hash.Hash, secret, transcript []byte, label string) []byte 
 	return hkdfExpandLabel(h, secret, h.Hash(0, transcript), label, h.OutputSize())
 }
 
-func keySchedule(h *hash.Hash, ikm, info []byte) ([]byte, []byte) {
-	handshakeSecret := deriveSecret(h, ikm, info, tagHandshake)
-	sessionSecret := deriveSecret(h, ikm, info, tagSession)
-	return handshakeSecret, sessionSecret
+func keySchedule(h *hash.Hash, ikm, info []byte) (handshakeSecret, sessionSecret []byte) {
+	handshakeSecret = deriveSecret(h, ikm, info, tagHandshake)
+	sessionSecret = deriveSecret(h, ikm, info, tagSession)
+
+	return
 }
 
 func macKeys(h *hash.Hash, handshakeSecret []byte) (km2, km3 []byte) {
 	km2 = hkdfExpandLabel(h, handshakeSecret, []byte(""), tagMacServer, h.OutputSize())
 	km3 = hkdfExpandLabel(h, handshakeSecret, []byte(""), tagMacClient, h.OutputSize())
-
-	return
-}
-
-// key_length is the length of the key required for the AKE handshake encryption algorithm.
-func einfoKeys(h *hash.Hash, handshakeSecret []byte, keyLen int) (ke2, ke3 []byte) {
-	ke2 = hkdfExpandLabel(h, handshakeSecret, []byte(""), tagEncServer, keyLen)
-	ke3 = hkdfExpandLabel(h, handshakeSecret, []byte(""), tagEncClient, keyLen)
 
 	return
 }
@@ -122,6 +143,7 @@ func encode(k interface{}, enc encoding.Encoding) []byte {
 	if err != nil {
 		panic(err)
 	}
+
 	return output
 }
 
@@ -137,7 +159,7 @@ func DecodeKe1(input []byte, enc encoding.Encoding) (*Ke1, error) {
 
 	de, ok := d.(*Ke1)
 	if !ok {
-		return nil, errors.New("could not assert Ke1")
+		return nil, ErrAssertKe1
 	}
 
 	return de, nil

@@ -1,109 +1,72 @@
 package opaque
 
 import (
-	"fmt"
 	"github.com/bytemare/cryptotools/encoding"
-	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/opaque/ake"
-	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/client"
+	"github.com/bytemare/opaque/message"
 	"github.com/bytemare/voprf"
 )
 
-const (
-	opaqueInfo = "OPAQUE01"
-)
-
 type Client struct {
-	oprf *voprf.Client
-	ake *ake.Client
-
-	group group.Group
-	hash *hash.Hash
-	mhf mhf.PasswordKDF
-
-	nonceLen int
-
-	meta *internal.Metadata
-
-	keys
+	client *client.Client
 }
 
-type keys struct {
-	sku []byte
-	pad, authKey, exportKey []byte
-}
-
-func NewClient(ciphersuite voprf.Ciphersuite, h hash.Identifier, m mhf.Identifier, k ake.Identifier) *Client {
-	
-	oprf, err := ciphersuite.Client(nil)
-	if err != nil {
-		panic(err)
-	}
-
-	g := ciphersuite.Group().Get(nil)
-	hid := h.Get()
-	
-	return &Client{
-		oprf:     oprf,
-		ake:      k.Client(g, hid),
-		group:    g,
-		hash:     hid,
-		mhf:      m.Get(32),
-		nonceLen: 32,
-		meta:     &internal.Metadata{},
-		keys:     keys{},
-	}
+func NewClient(ciphersuite voprf.Ciphersuite, h hash.Identifier, m *mhf.Parameters, k ake.Identifier) *Client {
+	return &Client{client.New(ciphersuite, h, m, k)}
 }
 
 func (c *Client) AkeKeyGen() (secretKey, publicKey []byte) {
-	sk := c.group.NewScalar().Random()
+	sk := c.client.Group.NewScalar().Random()
 	secretKey = sk.Bytes()
-	publicKey = c.group.Base().Mult(sk).Bytes()
+	publicKey = c.client.Group.Base().Mult(sk).Bytes()
+
 	return
 }
 
-func (c *Client) oprfStart(password []byte) (blinded, blind []byte) {
-	m := c.oprf.Blind(password)
-	return m, c.oprf.Export().Blind[0]
+func (c *Client) RegistrationStart(password []byte) *message.RegistrationRequest {
+	m, _ := c.client.OprfStart(password)
+	return &message.RegistrationRequest{Data: m}
 }
 
-func (c *Client) oprfFinish(evaluation []byte, enc encoding.Encoding) ([]byte, error) {
-	ev, err := voprf.DecodeEvaluation(evaluation, enc)
+func (c *Client) RegistrationFinalize(sku, pku []byte, creds message.Credentials, resp *message.RegistrationResponse, enc encoding.Encoding) (*message.RegistrationUpload, []byte, error) {
+	envU, exportKey, err := c.client.BuildEnvelope(sku, creds, resp, enc)
 	if err != nil {
-		return nil, fmt.Errorf("decoding evaluation : %w", err)
+		return nil, nil, err
 	}
 
-	n, err := c.oprf.Finalize(ev, []byte(opaqueInfo))
-	if err != nil {
-		return nil, fmt.Errorf("finalizing OPRF : %w", err)
-	}
-
-	return n, nil
+	return &message.RegistrationUpload{
+		Envelope: *envU,
+		Pku:      pku,
+	}, exportKey, nil
 }
 
-func (c *Client) clientMetaData(creds Credentials, resp *ServerResponse, sku []byte, enc encoding.Encoding) {
-	c.meta.IDu = creds.UserID()
-	if c.meta.IDu == nil {
-		sk, err := c.group.NewScalar().Decode(sku)
-		if err != nil {
-			panic(err)
-		}
-
-		pku := c.group.Base().Mult(sk)
-		c.meta.IDu = pku.Bytes()
-	}
-
-	c.meta.IDs = creds.ServerID()
-	if c.meta.IDs == nil {
-		c.meta.IDs = creds.ServerPublicKey()
-	}
-
-	cresp, err := enc.Encode(resp.Cresp)
+func (c *Client) AuthenticationStart(password, info1 []byte, enc encoding.Encoding) (*message.ClientInit, error) {
+	credReq, ke1, err := c.client.AuthenticationStart(password, info1, enc)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	c.meta.CredResp = cresp
+	return &message.ClientInit{
+		Creq:  *credReq,
+		KE1:   ke1,
+		Info1: info1,
+	}, nil
+}
+
+func (c *Client) AuthenticationFinalize(creds message.Credentials, resp *message.ServerResponse, enc encoding.Encoding) (*message.ClientFinish, []byte, error) {
+	ke3, exportKey, err := c.client.AuthenticationFinalize(creds, resp, enc)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return &message.ClientFinish{
+		KE3: ke3,
+	}, exportKey, nil
+}
+
+func (c *Client) SessionKey() []byte {
+	return c.client.Ake.SessionKey()
 }

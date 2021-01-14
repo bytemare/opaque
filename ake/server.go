@@ -5,8 +5,10 @@ import (
 	"github.com/bytemare/opaque/internal"
 )
 
-type response func(core *internal.Core, m *internal.Metadata, nonceLen int, sk, pku, req, info2 []byte, enc encoding.Encoding) ([]byte, []byte, error)
-type serverFinalize func(core *internal.Core, req []byte, enc encoding.Encoding) error
+type (
+	response       func(core *internal.Core, m *internal.Metadata, nonceLen int, sk, pku, req, info2 []byte, enc encoding.Encoding) ([]byte, []byte, error)
+	serverFinalize func(core *internal.Core, req []byte, enc encoding.Encoding) error
+)
 
 type Server struct {
 	id Identifier
@@ -24,7 +26,7 @@ func (s *Server) PrivateKey() []byte {
 	return s.sk
 }
 
-func (s *Server) Response(m *internal.Metadata, nonceLen int, pku, req, info2 []byte, enc encoding.Encoding) ([]byte, []byte, error) {
+func (s *Server) Response(m *internal.Metadata, nonceLen int, pku, req, info2 []byte, enc encoding.Encoding) (encKe2, einfo2 []byte, err error) {
 	return s.response(s.Core, m, nonceLen, s.sk, pku, req, info2, enc)
 }
 

@@ -3,15 +3,23 @@ package sigmai
 import (
 	"crypto/hmac"
 	"errors"
+
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/hash"
+	"github.com/bytemare/opaque/internal"
 )
 
 const SigmaKeyTag = "SIGMA-I keys"
-var tagSigmaI = []byte(SigmaKeyTag)
 
-func kSigma(g group.Group, esk group.Scalar, epkp []byte) ([]byte, error){
+var (
+	tagSigmaI = []byte(SigmaKeyTag)
+
+	ErrSigmaInvServerSig = errors.New("invalid server signature")
+	ErrSigmaInvClientSig = errors.New("invalid client signature")
+)
+
+func kSigma(g group.Group, esk group.Scalar, epkp []byte) ([]byte, error) {
 	e, err := g.NewElement().Decode(epkp)
 	if err != nil {
 		return nil, err
@@ -30,6 +38,7 @@ func encode(k interface{}, enc encoding.Encoding) []byte {
 	if err != nil {
 		panic(err)
 	}
+
 	return output
 }
 
@@ -40,7 +49,7 @@ type ke2 struct {
 	Mac       []byte `json:"m"`
 }
 
-func (k ke2) Encode(enc encoding.Encoding) []byte {
+func (k *ke2) Encode(enc encoding.Encoding) []byte {
 	return encode(k, enc)
 }
 
@@ -52,7 +61,7 @@ func decodeke2(input []byte, enc encoding.Encoding) (*ke2, error) {
 
 	de, ok := d.(*ke2)
 	if !ok {
-		return nil, errors.New("could not assert ke2")
+		return nil, internal.ErrAssertKe2
 	}
 
 	return de, nil
@@ -60,7 +69,7 @@ func decodeke2(input []byte, enc encoding.Encoding) (*ke2, error) {
 
 type ke3 struct {
 	Signature []byte `json:"s"`
-	Mac []byte `json:"m"`
+	Mac       []byte `json:"m"`
 }
 
 func (k ke3) Encode(enc encoding.Encoding) []byte {
@@ -75,7 +84,7 @@ func decodeKe3(input []byte, enc encoding.Encoding) (*ke3, error) {
 
 	de, ok := d.(*ke3)
 	if !ok {
-		return nil, errors.New("could not assert ke3")
+		return nil, internal.ErrAssertKe3
 	}
 
 	return de, nil

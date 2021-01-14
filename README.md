@@ -9,10 +9,14 @@ This follows the latest commits and discussions in the ongoing draft: https://gi
 This is active work in progress.
 
 Implemented components:
-- OPRF
+- OPRF on groups Ristretto255, P-256, P-384, and P-512
 - Authenticated key exchanges
     - 3DH
     - Sigma-I
+    - ~~HMQV~~
+- Random Key Robust envelope encryption: xor + hmac
+
+Test vectors can be found in tests/allVectors.json.
 
 Run example and tests
 ````
