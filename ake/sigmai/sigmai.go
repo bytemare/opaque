@@ -7,17 +7,30 @@ import (
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/hash"
+	"github.com/bytemare/cryptotools/signature"
 	"github.com/bytemare/opaque/internal"
 )
 
-const SigmaKeyTag = "SIGMA-I keys"
+const (
+	Name   = "Sigma-I"
+	keyTag = "SIGMA-I keys"
+)
 
 var (
-	tagSigmaI = []byte(SigmaKeyTag)
+	sig = signature.Ed25519
+
+	tagSigmaI = []byte(keyTag)
 
 	ErrSigmaInvServerSig = errors.New("invalid server signature")
 	ErrSigmaInvClientSig = errors.New("invalid client signature")
 )
+
+func KeyGen() (sk, pk []byte) {
+	s := sig.New()
+	s.GenerateKey()
+
+	return s.GetPrivateKey(), s.GetPublicKey()
+}
 
 func kSigma(g group.Group, esk group.Scalar, epkp []byte) ([]byte, error) {
 	e, err := g.NewElement().Decode(epkp)
@@ -42,24 +55,24 @@ func encode(k interface{}, enc encoding.Encoding) []byte {
 	return output
 }
 
-type ke2 struct {
+type Ke2 struct {
 	NonceS    []byte `json:"n"`
 	EpkS      []byte `json:"e"`
 	Signature []byte `json:"s"`
 	Mac       []byte `json:"m"`
 }
 
-func (k *ke2) Encode(enc encoding.Encoding) []byte {
+func (k *Ke2) Encode(enc encoding.Encoding) []byte {
 	return encode(k, enc)
 }
 
-func decodeke2(input []byte, enc encoding.Encoding) (*ke2, error) {
-	d, err := enc.Decode(input, &ke2{})
+func Decodeke2(input []byte, enc encoding.Encoding) (*Ke2, error) {
+	d, err := enc.Decode(input, &Ke2{})
 	if err != nil {
 		return nil, err
 	}
 
-	de, ok := d.(*ke2)
+	de, ok := d.(*Ke2)
 	if !ok {
 		return nil, internal.ErrAssertKe2
 	}
@@ -67,22 +80,22 @@ func decodeke2(input []byte, enc encoding.Encoding) (*ke2, error) {
 	return de, nil
 }
 
-type ke3 struct {
+type Ke3 struct {
 	Signature []byte `json:"s"`
 	Mac       []byte `json:"m"`
 }
 
-func (k ke3) Encode(enc encoding.Encoding) []byte {
+func (k Ke3) Encode(enc encoding.Encoding) []byte {
 	return encode(k, enc)
 }
 
-func decodeKe3(input []byte, enc encoding.Encoding) (*ke3, error) {
-	d, err := enc.Decode(input, &ke3{})
+func DecodeKe3(input []byte, enc encoding.Encoding) (*Ke3, error) {
+	d, err := enc.Decode(input, &Ke3{})
 	if err != nil {
 		return nil, err
 	}
 
-	de, ok := d.(*ke3)
+	de, ok := d.(*Ke3)
 	if !ok {
 		return nil, internal.ErrAssertKe3
 	}

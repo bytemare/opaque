@@ -1,4 +1,4 @@
-package internal
+package engine
 
 import (
 	"crypto/aes"
@@ -9,10 +9,8 @@ import (
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/signature"
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/envelope"
-	"github.com/bytemare/opaque/message"
+	"github.com/bytemare/opaque/internal"
 )
 
 const (
@@ -22,15 +20,14 @@ const (
 	tagMacServer = "server mac"
 	tagMacClient = "client mac"
 	tagEncServer = "server enc"
-	tagEncClient = "client enc"
 
-	aeadNonceSize   = 16
-	AesGcmKeyLength = 32
+	aeadNonceSize = 16
 )
 
-type Core struct {
+type Ake struct {
 	group.Group
 	*hash.Hash
+	NonceLen      int
 	NonceU        []byte
 	NonceS        []byte
 	Esk           group.Scalar
@@ -40,51 +37,16 @@ type Core struct {
 	SessionSecret []byte
 	Transcript2   []byte
 	Transcript3   []byte
-	SigmaServer
+	Idu, Pku      []byte // Used by Sigma
 }
 
-type SigmaServer struct {
-	signature.Identifier
-	Idu, Pku []byte
-}
-
-type Metadata struct {
-	CredReq, CredResp []byte
-	IDu, IDs, Info1   []byte
-	KeyLen            int
-}
-
-func (m *Metadata) Fill(creds message.Credentials, cresp *message.CredentialResponse, pku []byte, enc encoding.Encoding) error {
-	if creds.EnvelopeMode() == envelope.CustomIdentifier {
-		m.IDu = creds.UserID()
-		m.IDs = creds.ServerID()
-	}
-
-	if m.IDu == nil {
-		m.IDu = pku
-	}
-
-	if m.IDs == nil {
-		m.IDs = creds.ServerPublicKey()
-	}
-
-	encCresp, err := enc.Encode(cresp)
-	if err != nil {
-		panic(err)
-	}
-
-	m.CredResp = encCresp
-	m.KeyLen = AesGcmKeyLength
-
-	return nil
-}
-
-func (c *Core) DeriveKeys(m *Metadata, tag, nonceU, nonceS, ikm []byte) {
+func (c *Ake) DeriveKeys(m *Metadata, tag, nonceU, nonceS, ikm []byte) {
 	info := info(tag, nonceU, nonceS, m.IDu, m.IDs)
-	handshakeSecret, sessionSecret := keySchedule(c.Hash, ikm, info)
-	c.SessionSecret = sessionSecret
-	c.Km2, c.Km3 = macKeys(c.Hash, handshakeSecret)
-	c.Ke2 = hkdfExpandLabel(c.Hash, handshakeSecret, []byte(""), tagEncServer, m.KeyLen)
+	handshakeSecret := hkdfExpandLabel(c.Hash, ikm, c.Hash.Hash(0, info), tagHandshake)
+	c.SessionSecret = hkdfExpandLabel(c.Hash, ikm, c.Hash.Hash(0, info), tagSession)
+	c.Km2 = hkdfExpandLabel(c.Hash, handshakeSecret, []byte(""), tagMacServer)
+	c.Km3 = hkdfExpandLabel(c.Hash, handshakeSecret, []byte(""), tagMacClient)
+	c.Ke2 = hkdfExpandLabel(c.Hash, handshakeSecret, []byte(""), tagEncServer)
 }
 
 func lengthPrefixEncode(input []byte) []byte {
@@ -107,30 +69,12 @@ type HkdfLabel struct {
 	context []byte // todo: what is this context ?
 }
 
-func hkdfExpand(h *hash.Hash, secret, hkdfLabel []byte, length int) []byte {
-	return h.HKDFExpand(secret, hkdfLabel, length)
+func hkdfExpand(h *hash.Hash, secret, hkdfLabel []byte) []byte {
+	return h.HKDFExpand(secret, hkdfLabel, h.OutputSize())
 }
 
-func hkdfExpandLabel(h *hash.Hash, secret, context []byte, label string, length int) []byte {
-	return hkdfExpand(h, secret, buildLabel(label), length)
-}
-
-func deriveSecret(h *hash.Hash, secret, transcript []byte, label string) []byte {
-	return hkdfExpandLabel(h, secret, h.Hash(0, transcript), label, h.OutputSize())
-}
-
-func keySchedule(h *hash.Hash, ikm, info []byte) (handshakeSecret, sessionSecret []byte) {
-	handshakeSecret = deriveSecret(h, ikm, info, tagHandshake)
-	sessionSecret = deriveSecret(h, ikm, info, tagSession)
-
-	return
-}
-
-func macKeys(h *hash.Hash, handshakeSecret []byte) (km2, km3 []byte) {
-	km2 = hkdfExpandLabel(h, handshakeSecret, []byte(""), tagMacServer, h.OutputSize())
-	km3 = hkdfExpandLabel(h, handshakeSecret, []byte(""), tagMacClient, h.OutputSize())
-
-	return
+func hkdfExpandLabel(h *hash.Hash, secret, context []byte, label string) []byte {
+	return hkdfExpand(h, secret, buildLabel(label))
 }
 
 type Ke1 struct {
@@ -159,7 +103,7 @@ func DecodeKe1(input []byte, enc encoding.Encoding) (*Ke1, error) {
 
 	de, ok := d.(*Ke1)
 	if !ok {
-		return nil, ErrAssertKe1
+		return nil, internal.ErrAssertKe1
 	}
 
 	return de, nil

@@ -3,6 +3,9 @@ package opaque
 import (
 	"fmt"
 
+	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/opaque/envelope"
+
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
@@ -12,11 +15,12 @@ import (
 )
 
 type Parameters struct {
-	Ciphersuite voprf.Ciphersuite `json:"s"`
-	Hash        hash.Identifier   `json:"h"`
-	AKE         ake.Identifier    `json:"a"`
-	Encoding    encoding.Encoding `json:"e"`
-	MHF         *mhf.Parameters   `json:"m"`
+	OprfCiphersuite voprf.Ciphersuite      `json:"s"`
+	Mode            envelope.Mode          `json:"m"`
+	Hash            hash.Identifier        `json:"h"`
+	AKE             ake.Identifier         `json:"a"`
+	AkeGroup        ciphersuite.Identifier `json:"g"`
+	NonceLen        int                    `json:"l"`
 }
 
 func (p *Parameters) Encode(enc encoding.Encoding) []byte {
@@ -28,16 +32,16 @@ func (p *Parameters) Encode(enc encoding.Encoding) []byte {
 	return e
 }
 
-func (p *Parameters) Client() *Client {
-	return NewClient(p.Ciphersuite, p.Hash, p.MHF, p.AKE)
+func (p *Parameters) Client(m *mhf.Parameters) *Client {
+	return NewClient(p.OprfCiphersuite, p.Hash, p.Mode, m, p.AKE, p.AkeGroup, p.NonceLen)
 }
 
-func (p *Parameters) Server(oprfKey, akeSecretKey, akePubKey []byte) *Server {
-	return NewServer(p.Ciphersuite, p.Hash, p.AKE, oprfKey, akeSecretKey, akePubKey)
+func (p *Parameters) Server() *Server {
+	return NewServer(p.OprfCiphersuite, p.Hash, p.AKE, p.AkeGroup, p.NonceLen)
 }
 
 func (p *Parameters) String() string {
-	return fmt.Sprintf("%s-%s-%s-%s-%s", p.Ciphersuite, p.Hash, p.AKE, p.Encoding, p.MHF)
+	return fmt.Sprintf("%s-%s-%s", p.OprfCiphersuite, p.Hash, p.AKE)
 }
 
 func DecodeParameters(encoded []byte, enc encoding.Encoding) (*Parameters, error) {
@@ -52,4 +56,18 @@ func DecodeParameters(encoded []byte, enc encoding.Encoding) (*Parameters, error
 	}
 
 	return p, nil
+}
+
+type AkeRecord struct {
+	ServerID  []byte `json:"ids"`
+	SecretKey []byte `json:"sks"`
+	PublicKey []byte `json:"pks"`
+}
+
+type UserRecord struct {
+	HumanUserID    []byte `json:"uname"` // Human-memorizable, modifiable user identifier
+	UUID           []byte `json:"uuid"`  // Unique long-term user identifier
+	ServerAkeID    []byte `json:"aid"`
+	CredentialFile `json:"file"`
+	Parameters     `json:"params"`
 }

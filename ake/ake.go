@@ -1,12 +1,14 @@
 package ake
 
 import (
+	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/signature"
-	"github.com/bytemare/opaque/ake/internal/sigmai"
-	"github.com/bytemare/opaque/ake/internal/tripledh"
-	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/ake/engine"
+	"github.com/bytemare/opaque/ake/hmqv"
+	"github.com/bytemare/opaque/ake/sigmai"
+	"github.com/bytemare/opaque/ake/tripledh"
 )
 
 type Identifier byte
@@ -15,32 +17,30 @@ const (
 	SigmaI Identifier = 1 + iota
 	TripleDH
 	HMQV
-
-	sSigmaI   = "Sigma-I"
-	sTripleDH = "3DH"
-	sHMQV     = "HMQV"
 )
 
 func (i Identifier) String() string {
 	switch i {
 	case SigmaI:
-		return sSigmaI
+		return sigmai.Name
 	case TripleDH:
-		return sTripleDH
+		return tripledh.Name
 	case HMQV:
-		panic(sHMQV)
+		panic(hmqv.Name)
 	default:
 		return ""
 	}
 }
 
-func (i Identifier) Client(g group.Group, h *hash.Hash) *Client {
+func (i Identifier) Client(g ciphersuite.Identifier, h hash.Identifier, nonceLen int) *Client {
 	c := &Client{
 		id: i,
-		Core: &internal.Core{
-			Group: g,
-			Hash:  h,
+		Ake: &engine.Ake{
+			Group:    g.Get(nil),
+			Hash:     h.Get(),
+			NonceLen: nonceLen,
 		},
+		Metadata: &engine.Metadata{},
 	}
 
 	switch i {
@@ -57,19 +57,19 @@ func (i Identifier) Client(g group.Group, h *hash.Hash) *Client {
 	return c
 }
 
-func (i Identifier) Server(g group.Group, h *hash.Hash, privateKey []byte) *Server {
+func (i Identifier) Server(g group.Group, h *hash.Hash, nonceLen int) *Server {
 	s := &Server{
 		id: i,
-		Core: &internal.Core{
-			Group: g,
-			Hash:  h,
+		Ake: &engine.Ake{
+			Group:    g,
+			Hash:     h,
+			NonceLen: nonceLen,
 		},
-		sk: privateKey,
+		Metadata: &engine.Metadata{},
 	}
 
 	switch i {
 	case SigmaI:
-		s.SigmaServer = internal.SigmaServer{Identifier: signature.Ed25519}
 		s.response = sigmai.Response
 		s.finalize = sigmai.ServerFinalize
 	case TripleDH:
@@ -82,4 +82,8 @@ func (i Identifier) Server(g group.Group, h *hash.Hash, privateKey []byte) *Serv
 	}
 
 	return s
+}
+
+type Message interface {
+	Encode(encoding encoding.Encoding) ([]byte, error)
 }

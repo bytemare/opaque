@@ -1,37 +1,40 @@
-package message
+package envelope
 
 import (
 	"github.com/bytemare/cryptotools/encoding"
-	"github.com/bytemare/opaque/envelope"
 )
 
-type Credentials interface {
-	EnvelopeMode() envelope.Mode
+type Credentials struct {
+	Sk, Pk, Idu, Ids []byte
+}
+
+type CleartextCredentials interface {
+	EnvelopeMode() Mode
 	ServerPublicKey() []byte
 	UserID() []byte
 	ServerID() []byte
 }
 
 type BaseCleartextCredentials struct {
-	envelope.Mode
+	Mode
 	Pks []byte
 }
 
 type CustomCleartextCredentials struct {
-	envelope.Mode
+	Mode
 	Pks []byte
 	Idu []byte
 	Ids []byte
 }
 
-// NewClearTextCredentials returns either a base or custom Credentials struct.
+// NewClearTextCredentials returns either a base or custom CleartextCredentials struct.
 // The arguments MUST be provided in the following order: (mode, ServerPublicKey, UserID, ServerID).
 // Note that UserID and ServerID only have to be provided in CustomIdentifier mode.
-func NewClearTextCredentials(mode envelope.Mode, args ...[]byte) Credentials {
+func NewClearTextCredentials(mode Mode, args ...[]byte) CleartextCredentials {
 	switch mode {
-	case envelope.Base:
+	case Base:
 		return newBaseClearTextCredentials(args[0])
-	case envelope.CustomIdentifier:
+	case CustomIdentifier:
 		return newCustomClearTextCredentials(args[0], args[1], args[2])
 	default:
 		panic(ErrCredsInvalidMode)
@@ -40,12 +43,12 @@ func NewClearTextCredentials(mode envelope.Mode, args ...[]byte) Credentials {
 
 func newBaseClearTextCredentials(pks []byte) *BaseCleartextCredentials {
 	return &BaseCleartextCredentials{
-		Mode: envelope.Base,
+		Mode: Base,
 		Pks:  pks,
 	}
 }
 
-func (b *BaseCleartextCredentials) EnvelopeMode() envelope.Mode {
+func (b *BaseCleartextCredentials) EnvelopeMode() Mode {
 	return b.Mode
 }
 
@@ -63,14 +66,14 @@ func (b *BaseCleartextCredentials) ServerID() []byte {
 
 func newCustomClearTextCredentials(pks, idu, ids []byte) *CustomCleartextCredentials {
 	return &CustomCleartextCredentials{
-		Mode: envelope.CustomIdentifier,
+		Mode: CustomIdentifier,
 		Pks:  pks,
 		Idu:  idu,
 		Ids:  ids,
 	}
 }
 
-func (c *CustomCleartextCredentials) EnvelopeMode() envelope.Mode {
+func (c *CustomCleartextCredentials) EnvelopeMode() Mode {
 	return c.Mode
 }
 
@@ -86,24 +89,17 @@ func (c *CustomCleartextCredentials) ServerID() []byte {
 	return c.Ids
 }
 
-func EncodeClearTextCredentials(mode envelope.Mode, creds Credentials, enc encoding.Encoding) (encClear []byte, err error) {
-	if mode == envelope.CustomIdentifier {
-		clear := NewClearTextCredentials(
-			envelope.CustomIdentifier,
-			creds.ServerPublicKey(),
-			creds.UserID(),
-			creds.ServerID())
-
-		encClear, err = enc.Encode(clear)
-		if err != nil {
-			return nil, err
-		}
+func EncodeClearTextCredentials(idu, ids, pks []byte, mode Mode, enc encoding.Encoding) (encClear []byte, err error) {
+	var clear CleartextCredentials
+	if mode == CustomIdentifier {
+		clear = newCustomClearTextCredentials(pks, idu, ids)
 	} else {
-		clear := NewClearTextCredentials(envelope.Base, creds.ServerPublicKey())
-		encClear, err = enc.Encode(clear)
-		if err != nil {
-			return nil, err
-		}
+		clear = NewClearTextCredentials(Base, pks)
+	}
+
+	encClear, err = enc.Encode(clear)
+	if err != nil {
+		return nil, err
 	}
 
 	return encClear, nil

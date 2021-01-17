@@ -10,6 +10,8 @@ import (
 	"path"
 	"testing"
 
+	"github.com/bytemare/cryptotools/group/ciphersuite"
+
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
@@ -17,7 +19,6 @@ import (
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/envelope"
-	"github.com/bytemare/opaque/message"
 	"github.com/bytemare/voprf"
 )
 
@@ -83,7 +84,7 @@ type TestVectorParameters struct {
 	ClientAkeSecretKey ByteToHex `json:"ClientAkeSecretKEy"`
 	ServerAkePubkey    ByteToHex `json:"ServerAkePubkey"`
 	ServerAkeSecretKey ByteToHex `json:"ServerAkeSecretKEy"`
-	testCredentials    `json:"Credentials"`
+	testCredentials    `json:"CleartextCredentials"`
 	UserRecord         UserRecord `json:"UserRecord"`
 	testAkeSession     `json:"AkeSession"`
 	testMessages       `json:"Messages"`
@@ -91,22 +92,11 @@ type TestVectorParameters struct {
 	SharedSecret       ByteToHex `json:"SharedSecret"`
 }
 
-func gen3DHkeys(suite voprf.Ciphersuite) (sk, pk []byte) {
-	serverAkeKeys := suite.KeyGen()
-	return serverAkeKeys.SecretKey, serverAkeKeys.PublicKey
-}
-
-func genSigmaKeys(sig signature.Identifier) (sk, pk []byte) {
-	s := sig.New()
-	_ = s.GenerateKey()
-	return s.GetPrivateKey(), s.GetPublicKey()
-}
-
-func GenerateTestVector(p *Parameters, s signature.Identifier, mode envelope.Mode) *TestVectorParameters {
+func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier, mode envelope.Mode, enc encoding.Encoding) *TestVectorParameters {
 	params := testParameters{
-		OPRFSuiteID:       p.Ciphersuite.String(),
+		OPRFSuiteID:       p.OprfCiphersuite.String(),
 		Hash:              p.Hash.String(),
-		MHF:               p.MHF.String(),
+		MHF:               m.String(),
 		AKE:               p.AKE.String(),
 		SigmaSignatureAlg: s.String(),
 	}
@@ -126,56 +116,49 @@ func GenerateTestVector(p *Parameters, s signature.Identifier, mode envelope.Mod
 	}
 
 	// Client
-	client := p.Client()
+	client := p.Client(m)
 	reqReg := client.RegistrationStart(t.Password)
 
-	reg, err := p.Encoding.Encode(reqReg)
+	reg, err := enc.Encode(reqReg)
 	if err != nil {
 		panic(err)
 	}
 	t.RegistrationRequest = reg
 
-	switch p.AKE {
-	case ake.TripleDH:
-		t.ServerAkeSecretKey, t.ServerAkePubkey = gen3DHkeys(p.Ciphersuite)
-		t.ClientAkeSecretKey, t.ClientAkePubkey = client.AkeKeyGen()
-	case ake.SigmaI:
-		t.ServerAkeSecretKey, t.ServerAkePubkey = genSigmaKeys(signature.Ed25519)
-		t.ClientAkeSecretKey, t.ClientAkePubkey = genSigmaKeys(signature.Ed25519)
-	}
+	t.ClientAkeSecretKey, t.ClientAkePubkey = client.KeyGen()
 
 	// Server
-	serverOprfKeys := p.Ciphersuite.KeyGen()
+	serverOprfKeys := p.OprfCiphersuite.KeyGen()
 	t.OprfKey = serverOprfKeys.SecretKey
-	server := NewServer(p.Ciphersuite, p.Hash, p.AKE, t.OprfKey, t.ServerAkeSecretKey, t.ServerAkePubkey)
+	server := p.Server()
+	t.ServerAkeSecretKey, t.ServerAkePubkey = server.KeyGen()
 
-	respReg, err := server.RegistrationResponse(reqReg, p.Encoding)
+	respReg, err := server.RegistrationResponse(reqReg, t.ServerAkePubkey)
 	if err != nil {
 		panic(err)
 	}
 
-	resp, err := p.Encoding.Encode(respReg)
+	resp, err := enc.Encode(respReg)
 	if err != nil {
 		panic(err)
 	}
 
 	t.RegistrationResponse = resp
 
-	var creds message.Credentials
-	switch mode {
-	case envelope.Base:
-		creds = message.NewClearTextCredentials(envelope.Base, t.ServerAkePubkey)
-	case envelope.CustomIdentifier:
-		creds = message.NewClearTextCredentials(envelope.CustomIdentifier, t.ServerAkePubkey, t.Idu, t.Ids)
+	creds := &envelope.Credentials{
+		Sk:  t.ClientAkeSecretKey,
+		Pk:  t.ClientAkePubkey,
+		Idu: t.Idu,
+		Ids: t.Ids,
 	}
 
 	// Client
-	upload, _, err := client.RegistrationFinalize(t.ClientAkeSecretKey, t.ClientAkePubkey, creds, respReg, p.Encoding)
+	upload, _, err := client.RegistrationFinalize(creds, respReg, enc)
 	if err != nil {
 		panic(err)
 	}
 
-	up, err := p.Encoding.Encode(upload)
+	up, err := enc.Encode(upload)
 	if err != nil {
 		panic(err)
 	}
@@ -184,71 +167,84 @@ func GenerateTestVector(p *Parameters, s signature.Identifier, mode envelope.Mod
 	t.EnvelopeMode = byte(mode)
 	t.EnvelopeNonce = upload.Envelope.Contents.Nonce
 
-	envU, err := p.Encoding.Encode(upload.Envelope)
+	envU, err := enc.Encode(upload.Envelope)
 	if err != nil {
 		panic(err)
 	}
 	t.Envelope = envU
 
-	userRecord, akeRecord, err := server.RegistrationFinalize(credentials.Username, credentials.Idu, credentials.Ids, p, upload, p.Encoding)
-	if err != nil {
-		panic(err)
+	a := &AkeRecord{
+		ServerID:  t.Ids,
+		SecretKey: t.ServerAkeSecretKey,
+		PublicKey: t.ServerAkePubkey,
 	}
 
-	t.UserRecord = *userRecord
+	file := &CredentialFile{
+		Ku:       server.OprfKey(),
+		Pku:      upload.Pku,
+		Envelope: upload.Envelope,
+	}
 
-	AkeRecords[string(akeRecord.ID)] = akeRecord
-	Users[string(credentials.Username)] = userRecord
+	t.UserRecord = UserRecord{
+		HumanUserID:    t.Username,
+		UUID:           t.Idu,
+		ServerAkeID:    a.ServerID,
+		CredentialFile: *file,
+		Parameters:     *p,
+	}
 
 	// Authentication
 
 	// Client
-	client = p.Client()
-	username := string(credentials.Username)
-	reqCreds, err := client.AuthenticationStart(t.Password, nil, p.Encoding)
+	client = p.Client(m)
+	reqCreds, err := client.AuthenticationStart(t.Password, nil, enc)
 	if err != nil {
 		panic(err)
 	}
 
-	x := client.client.Oprf.Export()
+	x := client.oprf.Export()
 
 	t.BlindingFactor = x.Blind[0]
-	t.ClientEphPubkey = client.client.Ake.Epk.Bytes()
-	t.ClientEphSecretKey = client.client.Ake.Esk.Bytes()
-	t.ClientNonce = client.client.Ake.NonceU
+	t.ClientEphPubkey = client.Ake.Epk.Bytes()
+	t.ClientEphSecretKey = client.Ake.Esk.Bytes()
+	t.ClientNonce = client.Ake.NonceU
 
-	reqc, err := p.Encoding.Encode(reqCreds)
+	reqc, err := enc.Encode(reqCreds)
 	if err != nil {
 		panic(err)
 	}
 	t.CredentialRequest = reqc
 
 	// Server
-	user := Users[username]
-	server = user.Server()
-	//server = NewServer(suite, h, ke, t.OprfKey, t.ServerAkeSecretKey, t.ServerAkePubkey)
-	respCreds, err := server.AuthenticationResponse(reqCreds, &upload.Envelope, creds, nil, nil, t.ClientAkePubkey, p.Encoding)
+	server = p.Server()
+	serverCreds := &envelope.Credentials{
+		Sk:  a.SecretKey,
+		Pk:  a.PublicKey,
+		Idu: t.UserRecord.UUID,
+		Ids: a.ServerID,
+	}
+	respCreds, err := server.AuthenticationResponse(reqCreds, nil, nil, &t.UserRecord.CredentialFile, serverCreds, enc)
 	if err != nil {
 		panic(err)
 	}
 
-	t.ServerEphPubkey = server.server.Ake.Epk.Bytes()
-	t.ServerEphSecretKey = server.server.Ake.Esk.Bytes()
-	t.ServerNonce = server.server.Ake.NonceS
+	t.ServerEphPubkey = server.Ake.Epk.Bytes()
+	t.ServerEphSecretKey = server.Ake.Esk.Bytes()
+	t.ServerNonce = server.Ake.NonceS
 
-	respc, err := p.Encoding.Encode(respCreds)
+	respc, err := enc.Encode(respCreds)
 	if err != nil {
 		panic(err)
 	}
 	t.CredentialResponse = respc
 
 	// Client
-	fin, exportKey, err := client.AuthenticationFinalize(creds, respCreds, p.Encoding)
+	fin, exportKey, err := client.AuthenticationFinalize(t.Idu, t.Ids, respCreds, enc)
 	if err != nil {
 		panic(err)
 	}
 
-	finc, err := p.Encoding.Encode(fin)
+	finc, err := enc.Encode(fin)
 	if err != nil {
 		panic(err)
 	}
@@ -274,33 +270,33 @@ func GenerateAllVectors(t *testing.T) []*TestVectorParameters {
 		for _, h := range Hashes {
 			for _, a := range Akes {
 				for _, m := range MHF {
-					//for _, sig := range SigmaSignatures {
-						for _, mode := range Modes {
-							var name string
-							if a == ake.SigmaI {
-								name = fmt.Sprintf("%d : %v-%v-%v-%v-%v-%v", w, s, h, a, m, 0, mode)
-							} else {
-								name = fmt.Sprintf("%d : %v-%v-%v-%v-%v", w, s, h, a, m, mode)
-							}
-
-							p := &Parameters{
-								Ciphersuite: s,
-								Hash:        h,
-								MHF:         m.DefaultParameters(),
-								AKE:         a,
-								Encoding:    encoding.JSON,
-							}
-
-							t.Run(name, func(t *testing.T) {
-								vectors[w] = GenerateTestVector(p, 0, mode)
-							},
-							)
-							w++
-
-							//if w >= 1 {
-							//	return vectors
-							//}
+					// for _, sig := range SigmaSignatures {
+					for _, mode := range Modes {
+						var name string
+						if a == ake.SigmaI {
+							name = fmt.Sprintf("%d : %v-%v-%v-%v-%v-%v", w, s, h, a, m, 0, mode)
+						} else {
+							name = fmt.Sprintf("%d : %v-%v-%v-%v-%v", w, s, h, a, m, mode)
 						}
+
+						p := &Parameters{
+							OprfCiphersuite: s,
+							Hash:            h,
+							AKE:             a,
+							AkeGroup:        ciphersuite.Ristretto255Sha512,
+							NonceLen:        32,
+						}
+
+						t.Run(name, func(t *testing.T) {
+							vectors[w] = GenerateTestVector(p, m.DefaultParameters(), 0, mode, encoding.JSON)
+						},
+						)
+						w++
+
+						//if w >= 1 {
+						//	return vectors
+						//}
+					}
 					//}
 				}
 			}
