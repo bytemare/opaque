@@ -11,15 +11,15 @@ import (
 )
 
 type CredentialFile struct {
-	Ku       []byte
-	Pku      []byte
-	Envelope envelope.Envelope
+	Ku       []byte            `json:"ku"`
+	Pku      []byte            `json:"pku"`
+	Envelope envelope.Envelope `json:"envU"`
 }
 
 type Server struct {
-	ku []byte
+	ku   []byte
 	oprf voprf.Ciphersuite
-	Ake *ake.Server
+	Ake  *ake.Server
 }
 
 func NewServer(suite voprf.Ciphersuite, h hash.Identifier, k ake.Identifier, g ciphersuite.Identifier, nonceLen int) *Server {

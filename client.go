@@ -45,10 +45,13 @@ func (c *Client) RegistrationStart(password []byte) *message.RegistrationRequest
 	return &message.RegistrationRequest{Data: m}
 }
 
-func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message.RegistrationResponse, enc encoding.Encoding) (*message.RegistrationUpload, []byte, error) {
-	ev := &voprf.Evaluation{Elements: [][]byte{resp.Data}}
+func (c *Client) oprfFinish(data []byte) ([]byte, error) {
+	ev := &voprf.Evaluation{Elements: [][]byte{data}}
+	return c.oprf.Finalize(ev, []byte(opaqueInfo))
+}
 
-	unblinded, err := c.oprf.Finalize(ev, []byte(opaqueInfo))
+func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message.RegistrationResponse, enc encoding.Encoding) (*message.RegistrationUpload, []byte, error) {
+	unblinded, err := c.oprfFinish(resp.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
@@ -82,9 +85,7 @@ func (c *Client) AuthenticationStart(password, info1 []byte, enc encoding.Encodi
 }
 
 func (c *Client) RecoverCredentials(idu, ids []byte, resp *message.ServerResponse, enc encoding.Encoding) (*envelope.SecretCredentials, []byte, error) {
-	ev := &voprf.Evaluation{Elements: [][]byte{resp.Cresp.Data}}
-
-	unblinded, err := c.oprf.Finalize(ev, []byte(opaqueInfo))
+	unblinded, err := c.oprfFinish(resp.Cresp.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}

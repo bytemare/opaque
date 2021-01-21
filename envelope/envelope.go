@@ -53,7 +53,7 @@ func DecodeEnvelope(e []byte, enc encoding.Encoding) (*Envelope, error) {
 }
 
 type InnerEnvelope struct {
-	Mode           Mode
+	Mode           Mode   `json:"m"`
 	Nonce          []byte `json:"n"`
 	EncryptedCreds []byte `json:"c"`
 }

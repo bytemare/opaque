@@ -37,27 +37,35 @@ func (j ByteToHex) MarshalJSON() ([]byte, error) {
 	return json.Marshal(hex.EncodeToString(j))
 }
 
-type testParameters struct {
-	OPRFSuiteID       string `json:"OPRFSuite"`
-	Hash              string `json:"Hash"`
-	MHF               string `json:"MHF"`
+type testEnvParameters struct {
+	OPRFSuiteID  string `json:"OPRFSuite"`
+	EnvHash      string `json:"EnvHash"`
+	MHF          string `json:"MHF"`
+	EnvelopeMode byte   `json:"EnvelopeMode"`
+}
+
+type testAkeParameters struct {
 	AKE               string `json:"AKE"`
+	AkeGroup          string `json:"AkeGroup"`
+	AkeHash           string `json:"AkeHash"`
 	SigmaSignatureAlg string `json:"SigmaSignatureAlg,omitempty"`
 }
 
-type testCredentials struct {
-	Username       ByteToHex `json:"Username"`
-	Idu            ByteToHex `json:"Idu"`
-	Ids            ByteToHex `json:"Ids"`
-	Password       ByteToHex `json:"Password"`
-	BlindingFactor ByteToHex `json:"BlindingFactor"`
-	OprfKey        ByteToHex `json:"OprfKey"`
-	EnvelopeMode   byte      `json:"EnvelopeMode"`
-	EnvelopeNonce  ByteToHex `json:"EnvelopeNonce"`
-	Envelope       ByteToHex `json:"Envelope"`
+type testParameters struct {
+	testEnvParameters `json:"Envelope"`
+	testAkeParameters `json:"AKE"`
 }
 
-type testAkeSession struct {
+type testRegistrationInput struct {
+	BlindReg ByteToHex `json:"RegistrationBlind"`
+}
+
+type testLoginInput struct {
+	BlindLog           ByteToHex `json:"LoginBlind"`
+	ClientAkePubkey    ByteToHex `json:"ClientAkePubkey"`
+	ClientAkeSecretKey ByteToHex `json:"ClientAkeSecretKey"`
+	ServerAkePubkey    ByteToHex `json:"ServerAkePubkey"`
+	ServerAkeSecretKey ByteToHex `json:"ServerAkeSecretKey"`
 	ClientEphPubkey    ByteToHex `json:"ClientEphPubkey"`
 	ClientEphSecretKey ByteToHex `json:"ClientEphSecretKey"`
 	ServerEphPubkey    ByteToHex `json:"ServerEphPubkey"`
@@ -66,7 +74,16 @@ type testAkeSession struct {
 	ServerNonce        ByteToHex `json:"ServerNonce"`
 	Info1              ByteToHex `json:"Info1"`
 	Info2              ByteToHex `json:"Info2"`
-	Einfo2             ByteToHex `json:"Einfo2"`
+}
+
+type testInput struct {
+	Idu                   ByteToHex `json:"Idu"`
+	Ids                   ByteToHex `json:"Ids"`
+	Password              ByteToHex `json:"Password"`
+	OprfKey               ByteToHex `json:"OprfKey"`
+	EnvelopeNonce         ByteToHex `json:"EnvelopeNonce"`
+	testRegistrationInput `json:"Registration"`
+	testLoginInput        `json:"Login"`
 }
 
 type testMessages struct {
@@ -78,62 +95,82 @@ type testMessages struct {
 	KeyExchange          ByteToHex `json:"KeyExchange"`
 }
 
-type TestVectorParameters struct {
-	testParameters     `json:"parameters"`
-	ClientAkePubkey    ByteToHex `json:"ClientAkePubkey"`
-	ClientAkeSecretKey ByteToHex `json:"ClientAkeSecretKEy"`
-	ServerAkePubkey    ByteToHex `json:"ServerAkePubkey"`
-	ServerAkeSecretKey ByteToHex `json:"ServerAkeSecretKEy"`
-	testCredentials    `json:"CleartextCredentials"`
-	UserRecord         UserRecord `json:"UserRecord"`
-	testAkeSession     `json:"AkeSession"`
-	testMessages       `json:"Messages"`
-	ExportKey          ByteToHex `json:"ExportKey"`
-	SharedSecret       ByteToHex `json:"SharedSecret"`
+type testOutput struct {
+	testMessages   `json:"Messages"`
+	Einfo2         ByteToHex      `json:"Einfo2"`
+	Envelope       ByteToHex      `json:"Envelope"`
+	CredentialFile CredentialFile `json:"CredentialFile"`
+	ExportKey      ByteToHex      `json:"ExportKey"`
+	SharedSecret   ByteToHex      `json:"SharedSecret"`
 }
 
-func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier, mode envelope.Mode, enc encoding.Encoding) *TestVectorParameters {
+type testVector struct {
+	testParameters `json:"Parameters"`
+	testInput      `json:"Input"`
+	testOutput     `json:"Output"`
+}
+
+func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier, mode envelope.Mode, enc encoding.Encoding) *testVector {
 	params := testParameters{
-		OPRFSuiteID:       p.OprfCiphersuite.String(),
-		Hash:              p.Hash.String(),
-		MHF:               m.String(),
-		AKE:               p.AKE.String(),
-		SigmaSignatureAlg: s.String(),
+		testEnvParameters: testEnvParameters{
+			OPRFSuiteID:  p.OprfCiphersuite.String(),
+			EnvHash:      p.Hash.String(),
+			MHF:          m.String(),
+			EnvelopeMode: byte(mode),
+		},
+		testAkeParameters: testAkeParameters{
+			AKE:               p.AKE.String(),
+			AkeGroup:          p.OprfCiphersuite.String(),
+			AkeHash:           p.Hash.String(),
+			SigmaSignatureAlg: s.String(),
+		},
 	}
 
-	credentials := testCredentials{
-		Username: []byte("user"),
-		Idu:      utils.RandomBytes(32),
-		Ids:      []byte("server"),
-		Password: utils.RandomBytes(8),
+	in := testInput{
+		Idu:                   []byte("user"),
+		Ids:                   []byte("server"),
+		Password:              utils.RandomBytes(8),
+		OprfKey:               nil,
+		EnvelopeNonce:         nil,
+		testRegistrationInput: testRegistrationInput{},
+		testLoginInput: testLoginInput{
+			Info1: []byte("aa"),
+			Info2: []byte("aaa"),
+		},
 	}
 
-	t := &TestVectorParameters{
-		testParameters:  params,
-		testCredentials: credentials,
-		testAkeSession:  testAkeSession{},
-		testMessages:    testMessages{},
+	out := testOutput{
+		testMessages:   testMessages{},
+		Envelope:       nil,
+		CredentialFile: CredentialFile{},
+		ExportKey:      nil,
+		SharedSecret:   nil,
 	}
+
+	/*
+		Registration
+	*/
 
 	// Client
 	client := p.Client(m)
-	reqReg := client.RegistrationStart(t.Password)
+	reqReg := client.RegistrationStart(in.Password)
+	in.BlindReg = client.oprf.Export().Blind[0]
 
 	reg, err := enc.Encode(reqReg)
 	if err != nil {
 		panic(err)
 	}
-	t.RegistrationRequest = reg
+	out.RegistrationRequest = reg
 
-	t.ClientAkeSecretKey, t.ClientAkePubkey = client.KeyGen()
+	in.ClientAkeSecretKey, in.ClientAkePubkey = client.KeyGen()
 
 	// Server
 	serverOprfKeys := p.OprfCiphersuite.KeyGen()
-	t.OprfKey = serverOprfKeys.SecretKey
+	in.OprfKey = serverOprfKeys.SecretKey
 	server := p.Server()
-	t.ServerAkeSecretKey, t.ServerAkePubkey = server.KeyGen()
+	in.ServerAkeSecretKey, in.ServerAkePubkey = server.KeyGen()
 
-	respReg, err := server.RegistrationResponse(reqReg, t.ServerAkePubkey)
+	respReg, err := server.RegistrationResponse(reqReg, in.ServerAkePubkey)
 	if err != nil {
 		panic(err)
 	}
@@ -143,13 +180,13 @@ func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier
 		panic(err)
 	}
 
-	t.RegistrationResponse = resp
+	out.RegistrationResponse = resp
 
 	creds := &envelope.Credentials{
-		Sk:  t.ClientAkeSecretKey,
-		Pk:  t.ClientAkePubkey,
-		Idu: t.Idu,
-		Ids: t.Ids,
+		Sk:  in.ClientAkeSecretKey,
+		Pk:  in.ClientAkePubkey,
+		Idu: in.Idu,
+		Ids: in.Ids,
 	}
 
 	// Client
@@ -162,21 +199,20 @@ func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier
 	if err != nil {
 		panic(err)
 	}
-	t.RegistrationUpload = up
+	out.RegistrationUpload = up
 
-	t.EnvelopeMode = byte(mode)
-	t.EnvelopeNonce = upload.Envelope.Contents.Nonce
+	in.EnvelopeNonce = upload.Envelope.Contents.Nonce
 
 	envU, err := enc.Encode(upload.Envelope)
 	if err != nil {
 		panic(err)
 	}
-	t.Envelope = envU
+	out.Envelope = envU
 
 	a := &AkeRecord{
-		ServerID:  t.Ids,
-		SecretKey: t.ServerAkeSecretKey,
-		PublicKey: t.ServerAkePubkey,
+		ServerID:  in.Ids,
+		SecretKey: in.ServerAkeSecretKey,
+		PublicKey: in.ServerAkePubkey,
 	}
 
 	file := &CredentialFile{
@@ -185,61 +221,55 @@ func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier
 		Envelope: upload.Envelope,
 	}
 
-	t.UserRecord = UserRecord{
-		HumanUserID:    t.Username,
-		UUID:           t.Idu,
-		ServerAkeID:    a.ServerID,
-		CredentialFile: *file,
-		Parameters:     *p,
-	}
+	out.CredentialFile = *file
 
-	// Authentication
+	/*
+		Authentication
+	*/
 
 	// Client
 	client = p.Client(m)
-	reqCreds, err := client.AuthenticationStart(t.Password, nil, enc)
+	reqCreds, err := client.AuthenticationStart(in.Password, nil, enc)
 	if err != nil {
 		panic(err)
 	}
 
-	x := client.oprf.Export()
-
-	t.BlindingFactor = x.Blind[0]
-	t.ClientEphPubkey = client.Ake.Epk.Bytes()
-	t.ClientEphSecretKey = client.Ake.Esk.Bytes()
-	t.ClientNonce = client.Ake.NonceU
+	in.BlindLog = client.oprf.Export().Blind[0]
+	in.ClientEphPubkey = client.Ake.Epk.Bytes()
+	in.ClientEphSecretKey = client.Ake.Esk.Bytes()
+	in.ClientNonce = client.Ake.NonceU
 
 	reqc, err := enc.Encode(reqCreds)
 	if err != nil {
 		panic(err)
 	}
-	t.CredentialRequest = reqc
+	out.CredentialRequest = reqc
 
 	// Server
 	server = p.Server()
 	serverCreds := &envelope.Credentials{
 		Sk:  a.SecretKey,
 		Pk:  a.PublicKey,
-		Idu: t.UserRecord.UUID,
+		Idu: in.Idu,
 		Ids: a.ServerID,
 	}
-	respCreds, err := server.AuthenticationResponse(reqCreds, nil, nil, &t.UserRecord.CredentialFile, serverCreds, enc)
+	respCreds, err := server.AuthenticationResponse(reqCreds, nil, nil, &out.CredentialFile, serverCreds, enc)
 	if err != nil {
 		panic(err)
 	}
 
-	t.ServerEphPubkey = server.Ake.Epk.Bytes()
-	t.ServerEphSecretKey = server.Ake.Esk.Bytes()
-	t.ServerNonce = server.Ake.NonceS
+	in.ServerEphPubkey = server.Ake.Epk.Bytes()
+	in.ServerEphSecretKey = server.Ake.Esk.Bytes()
+	in.ServerNonce = server.Ake.NonceS
 
 	respc, err := enc.Encode(respCreds)
 	if err != nil {
 		panic(err)
 	}
-	t.CredentialResponse = respc
+	out.CredentialResponse = respc
 
 	// Client
-	fin, exportKey, err := client.AuthenticationFinalize(t.Idu, t.Ids, respCreds, enc)
+	fin, exportKey, err := client.AuthenticationFinalize(in.Idu, in.Ids, respCreds, enc)
 	if err != nil {
 		panic(err)
 	}
@@ -248,23 +278,27 @@ func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier
 	if err != nil {
 		panic(err)
 	}
-	t.KeyExchange = finc
+	out.KeyExchange = finc
 
-	t.ExportKey = exportKey
+	out.ExportKey = exportKey
 
 	if !bytes.Equal(client.SessionKey(), server.SessionKey()) {
 		panic("Session secrets don't match.")
 	}
 
-	t.SharedSecret = client.SessionKey()
+	out.SharedSecret = client.SessionKey()
 
-	return t
+	return &testVector{
+		testParameters: params,
+		testInput:      in,
+		testOutput:     out,
+	}
 }
 
-func GenerateAllVectors(t *testing.T) []*TestVectorParameters {
+func GenerateAllVectors(t *testing.T) []*testVector {
 	v := len(OprfSuites) * len(Hashes) * len(Akes) * len(MHF) * len(SigmaSignatures) * len(Modes)
 	log.Printf("v := %v", v)
-	vectors := make([]*TestVectorParameters, v)
+	vectors := make([]*testVector, v)
 	w := 0
 	for _, s := range OprfSuites {
 		for _, h := range Hashes {
