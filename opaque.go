@@ -3,8 +3,7 @@ package opaque
 import (
 	"fmt"
 
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/opaque/envelope"
+	"github.com/bytemare/opaque/core/envelope"
 
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
@@ -15,12 +14,11 @@ import (
 )
 
 type Parameters struct {
-	OprfCiphersuite voprf.Ciphersuite      `json:"s"`
-	Mode            envelope.Mode          `json:"m"`
-	Hash            hash.Identifier        `json:"h"`
-	AKE             ake.Identifier         `json:"a"`
-	AkeGroup        ciphersuite.Identifier `json:"g"`
-	NonceLen        int                    `json:"l"`
+	OprfCiphersuite voprf.Ciphersuite `json:"s"`
+	Mode            envelope.Mode     `json:"m"`
+	Hash            hash.Identifier   `json:"h"`
+	AKE             ake.Identifier    `json:"a"`
+	NonceLen        int               `json:"l"`
 }
 
 func (p *Parameters) Encode(enc encoding.Encoding) []byte {
@@ -33,11 +31,11 @@ func (p *Parameters) Encode(enc encoding.Encoding) []byte {
 }
 
 func (p *Parameters) Client(m *mhf.Parameters) *Client {
-	return NewClient(p.OprfCiphersuite, p.Hash, p.Mode, m, p.AKE, p.AkeGroup, p.NonceLen)
+	return NewClient(p.OprfCiphersuite, p.Hash, p.Mode, m, p.AKE, p.NonceLen)
 }
 
 func (p *Parameters) Server() *Server {
-	return NewServer(p.OprfCiphersuite, p.Hash, p.AKE, p.AkeGroup, p.NonceLen)
+	return NewServer(p.OprfCiphersuite, p.Hash, p.AKE, p.NonceLen)
 }
 
 func (p *Parameters) String() string {

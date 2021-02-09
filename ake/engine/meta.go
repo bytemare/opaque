@@ -1,32 +1,24 @@
 package engine
 
 import (
-	"github.com/bytemare/cryptotools/encoding"
-	"github.com/bytemare/opaque/envelope"
+	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/message"
 )
 
 const AesGcmKeyLength = 32
 
 type Metadata struct {
-	CredReq, CredResp []byte
-	IDu, IDs, Info1   []byte
-	KeyLen            int
+	CredReq, CredResp    []byte
+	IDu, IDs, ClientInfo []byte
+	KeyLen               int
 }
 
-func (m *Metadata) Init(creq *message.CredentialRequest, info1 []byte, enc encoding.Encoding) error {
-	encCreq, err := enc.Encode(creq)
-	if err != nil {
-		return err
-	}
-
-	m.CredReq = encCreq
-	m.Info1 = info1
-
-	return nil
+func (m *Metadata) Init(creq *message.CredentialRequest, clientInfo []byte) {
+	m.CredReq = creq.Serialize()
+	m.ClientInfo = clientInfo
 }
 
-func (m *Metadata) Fill(mode envelope.Mode, cresp *message.CredentialResponse, pku, pks []byte, creds *envelope.Credentials, enc encoding.Encoding) error {
+func (m *Metadata) Fill(mode envelope.Mode, cresp *message.CredentialResponse, pku, pks []byte, creds *envelope.Credentials) {
 	if mode == envelope.CustomIdentifier {
 		m.IDu = creds.Idu
 		m.IDs = creds.Ids
@@ -40,13 +32,6 @@ func (m *Metadata) Fill(mode envelope.Mode, cresp *message.CredentialResponse, p
 		m.IDs = pks
 	}
 
-	encCresp, err := enc.Encode(cresp)
-	if err != nil {
-		panic(err)
-	}
-
-	m.CredResp = encCresp
+	m.CredResp = cresp.Serialize()
 	m.KeyLen = AesGcmKeyLength
-
-	return nil
 }

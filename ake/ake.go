@@ -1,7 +1,6 @@
 package ake
 
 import (
-	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
@@ -85,5 +84,5 @@ func (i Identifier) Server(g group.Group, h *hash.Hash, nonceLen int) *Server {
 }
 
 type Message interface {
-	Encode(encoding encoding.Encoding) ([]byte, error)
+	Serialize() []byte
 }

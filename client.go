@@ -1,38 +1,23 @@
 package opaque
 
 import (
-	"fmt"
-
-	"github.com/bytemare/cryptotools/encoding"
-	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/opaque/ake"
-	"github.com/bytemare/opaque/envelope"
+	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/message"
 	"github.com/bytemare/voprf"
 )
 
-const (
-	opaqueInfo = "OPAQUE01"
-)
-
 type Client struct {
-	oprf *voprf.Client
 	Core *envelope.Core
 	Ake  *ake.Client
 }
 
-func NewClient(suite voprf.Ciphersuite, h hash.Identifier, mode envelope.Mode, m *mhf.Parameters, k ake.Identifier, g ciphersuite.Identifier, nonceLen int) *Client {
-	oprf, err := suite.Client(nil)
-	if err != nil {
-		panic(err)
-	}
-
+func NewClient(suite voprf.Ciphersuite, h hash.Identifier, mode envelope.Mode, m *mhf.Parameters, k ake.Identifier, nonceLen int) *Client {
 	return &Client{
-		oprf: oprf,
-		Core: envelope.NewCore(h, mode, m),
-		Ake:  k.Client(g, h, nonceLen),
+		Core: envelope.NewCore(suite, h, mode, m),
+		Ake:  k.Client(suite.Group(), h, nonceLen),
 	}
 }
 
@@ -41,60 +26,44 @@ func (c *Client) KeyGen() (sk, pk []byte) {
 }
 
 func (c *Client) RegistrationStart(password []byte) *message.RegistrationRequest {
-	m := c.oprf.Blind(password)
+	m := c.Core.OprfStart(password)
 	return &message.RegistrationRequest{Data: m}
 }
 
-func (c *Client) oprfFinish(data []byte) ([]byte, error) {
-	ev := &voprf.Evaluation{Elements: [][]byte{data}}
-	return c.oprf.Finalize(ev, []byte(opaqueInfo))
-}
-
-func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message.RegistrationResponse, enc encoding.Encoding) (*message.RegistrationUpload, []byte, error) {
-	unblinded, err := c.oprfFinish(resp.Data)
-	if err != nil {
-		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
-	}
-
-	envU, exportKey, err := c.Core.BuildEnvelope(unblinded, resp.Pks, creds, enc)
+func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message.RegistrationResponse) (*message.RegistrationUpload, []byte, error) {
+	envU, exportKey, err := c.Core.BuildEnvelope(resp.Data, resp.Pks, creds)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	return &message.RegistrationUpload{
-		Envelope: *envU,
+		Envelope: envU,
 		Pku:      creds.Pk,
 	}, exportKey, nil
 }
 
-func (c *Client) AuthenticationStart(password, info1 []byte, enc encoding.Encoding) (*message.ClientInit, error) {
-	m := c.oprf.Blind(password)
+func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.ClientInit {
+	m := c.Core.OprfStart(password)
 	credReq := &message.CredentialRequest{Data: m}
 
-	if err := c.Ake.Metadata.Init(credReq, info1, enc); err != nil {
-		return nil, err
-	}
+	c.Ake.Metadata.Init(credReq, clientInfo)
 
+	c.Ake.Initialize(nil, nil)
 	ke1 := c.Ake.Start()
 
 	return &message.ClientInit{
-		Creq:  *credReq,
-		KE1:   ke1.Encode(enc),
-		Info1: info1,
-	}, nil
+		Creq: credReq,
+		KE1:  ke1.Serialize(),
+	}
 }
 
-func (c *Client) RecoverCredentials(idu, ids []byte, resp *message.ServerResponse, enc encoding.Encoding) (*envelope.SecretCredentials, []byte, error) {
-	unblinded, err := c.oprfFinish(resp.Cresp.Data)
+func (c *Client) AuthenticationFinalize(idu, ids []byte, resp *message.ServerResponse) (*message.ClientFinish, []byte, error) {
+	credResp, _, err := message.DeserializeCredentialResponse(resp.Cresp.Serialize(), c.Core.Group.Get(nil).ElementLength(), c.Core.Hash.OutputSize())
 	if err != nil {
-		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
+		return nil, nil, err
 	}
 
-	return c.Core.RecoverSecret(idu, ids, resp.Cresp.Pks, unblinded, &resp.Cresp.Envelope, enc)
-}
-
-func (c *Client) AuthenticationFinalize(idu, ids []byte, resp *message.ServerResponse, enc encoding.Encoding) (*message.ClientFinish, []byte, error) {
-	secretCreds, exportKey, err := c.RecoverCredentials(idu, ids, resp, enc)
+	secretCreds, exportKey, err := c.Core.RecoverSecret(idu, ids, credResp.Pks, credResp.Data, credResp.Envelope)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -106,11 +75,9 @@ func (c *Client) AuthenticationFinalize(idu, ids []byte, resp *message.ServerRes
 		Ids: ids,
 	}
 
-	if err := c.Ake.Metadata.Fill(resp.Cresp.Envelope.Contents.Mode, &resp.Cresp, creds.Pk, resp.Cresp.Pks, creds, enc); err != nil {
-		return nil, nil, err
-	}
+	c.Ake.Metadata.Fill(credResp.Envelope.Contents.Mode, credResp, creds.Pk, credResp.Pks, creds)
 
-	ke3, err := c.Ake.Finalize(creds.Sk, resp.Cresp.Pks, resp.KE2, resp.EInfo2, enc)
+	ke3, _, err := c.Ake.Finalize(creds.Sk, credResp.Pks, resp.KE2)
 	if err != nil {
 		return nil, nil, err
 	}

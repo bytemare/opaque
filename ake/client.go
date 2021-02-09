@@ -1,15 +1,14 @@
 package ake
 
 import (
-	"github.com/bytemare/cryptotools/encoding"
+	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/signature"
-	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/ake/engine"
 	"github.com/bytemare/opaque/ake/sigmai"
 	"github.com/bytemare/opaque/ake/tripledh"
 )
 
-type clientFinalize func(core *engine.Ake, m *engine.Metadata, sku, pks, message, einfo2 []byte, enc encoding.Encoding) ([]byte, error)
+type clientFinalize func(core *engine.Ake, m *engine.Metadata, sku, pks, message []byte) ([]byte, []byte, error)
 
 type Client struct {
 	id Identifier
@@ -22,19 +21,25 @@ func (c *Client) Identifier() Identifier {
 	return c.id
 }
 
-func (c *Client) Start() *engine.Ke1 {
-	c.Esk = c.NewScalar().Random()
-	c.Epk = c.Base().Mult(c.Esk)
-	c.NonceU = utils.RandomBytes(c.NonceLen)
+// Note := there's no effect if esk, epk, and nonce have already been set
+func (c *Client) Initialize(scalar group.Scalar, nonce []byte) {
+	nonce = c.Ake.Initialize(scalar, nonce)
+	if c.NonceU == nil {
+		c.NonceU = nonce
+	}
+}
 
+func (c *Client) Start() *engine.Ke1 {
+	c.Initialize(nil, nil)
 	return &engine.Ke1{
 		NonceU: c.NonceU,
+		ClientInfo: c.Metadata.ClientInfo,
 		EpkU:   c.Epk.Bytes(),
 	}
 }
 
-func (c *Client) Finalize(sku, pks, message, einfo2 []byte, enc encoding.Encoding) ([]byte, error) {
-	return c.clientFinalize(c.Ake, c.Metadata, sku, pks, message, einfo2, enc)
+func (c *Client) Finalize(sku, pks, message []byte) ([]byte, []byte, error) {
+	return c.clientFinalize(c.Ake, c.Metadata, sku, pks, message)
 }
 
 func (c *Client) KeyGen() (sk, pk []byte) {

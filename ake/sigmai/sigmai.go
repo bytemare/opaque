@@ -3,8 +3,8 @@ package sigmai
 import (
 	"crypto/hmac"
 	"errors"
+	"github.com/bytemare/cryptotools/utils"
 
-	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/signature"
@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	Name   = "Sigma-I"
-	keyTag = "SIGMA-I keys"
+	Name          = "Sigma-I"
+	keyTag        = "SIGMA-I keys"
+	encryptionTag = "encryption key"
 )
 
 var (
@@ -46,38 +47,39 @@ func checkHmac(h *hash.Hash, ids, key, mac []byte) bool {
 	return hmac.Equal(expectedHmac, mac)
 }
 
-func encode(k interface{}, enc encoding.Encoding) []byte {
-	output, err := enc.Encode(k)
-	if err != nil {
-		panic(err)
-	}
-
-	return output
-}
-
 type Ke2 struct {
 	NonceS    []byte `json:"n"`
 	EpkS      []byte `json:"e"`
+	EInfo     []byte `json:"i,omitempty"`
 	Signature []byte `json:"s"`
 	Mac       []byte `json:"m"`
 }
 
-func (k *Ke2) Encode(enc encoding.Encoding) []byte {
-	return encode(k, enc)
+func (k Ke2) Serialize() []byte {
+	return utils.Concatenate(0, k.NonceS, k.EpkS, internal.EncodeVector(k.EInfo), k.Signature, k.Mac)
 }
 
-func Decodeke2(input []byte, enc encoding.Encoding) (*Ke2, error) {
-	d, err := enc.Decode(input, &Ke2{})
-	if err != nil {
-		return nil, err
+func DeserializeKe2(in []byte, nonceLength, elementLength, signatureLength, macLength int) (*Ke2, error) {
+	nonceS := in[0:nonceLength]
+	offset := nonceLength
+	epks := in[offset : offset+elementLength]
+	offset = offset + elementLength
+	einfo, eOffset := internal.DecodeVector(in[offset:])
+	offset = nonceLength + elementLength + eOffset
+	sig := in[offset : offset+signatureLength]
+	offset = offset + signatureLength
+	mac := in[offset:]
+	if len(mac) != macLength {
+		return nil, errors.New("invalid mac length")
 	}
 
-	de, ok := d.(*Ke2)
-	if !ok {
-		return nil, internal.ErrAssertKe2
-	}
-
-	return de, nil
+	return &Ke2{
+		NonceS:    nonceS,
+		EpkS:      epks,
+		EInfo:     einfo,
+		Signature: sig,
+		Mac:       mac,
+	}, nil
 }
 
 type Ke3 struct {
@@ -85,20 +87,20 @@ type Ke3 struct {
 	Mac       []byte `json:"m"`
 }
 
-func (k Ke3) Encode(enc encoding.Encoding) []byte {
-	return encode(k, enc)
+func (k Ke3) Serialize() []byte {
+	return append(k.Signature, k.Mac...)
 }
 
-func DecodeKe3(input []byte, enc encoding.Encoding) (*Ke3, error) {
-	d, err := enc.Decode(input, &Ke3{})
-	if err != nil {
-		return nil, err
+func DeserializeKe3(in []byte, signatureLength, macLength int) (*Ke3, error) {
+	if len(in) != signatureLength+macLength {
+		return nil, errors.New("ke3 is too short")
 	}
 
-	de, ok := d.(*Ke3)
-	if !ok {
-		return nil, internal.ErrAssertKe3
-	}
+	sig := in[:signatureLength]
+	mac := in[signatureLength:]
 
-	return de, nil
+	return &Ke3{
+		Signature: sig,
+		Mac:       mac,
+	}, nil
 }

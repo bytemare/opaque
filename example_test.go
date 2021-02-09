@@ -5,14 +5,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-
-	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/ake"
-	"github.com/bytemare/opaque/envelope"
+	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/voprf"
 )
 
@@ -245,13 +242,11 @@ func TestFull(t *testing.T) {
 		OprfCiphersuite: voprf.RistrettoSha512,
 		Mode:            envelope.CustomIdentifier,
 		Hash:            hash.SHA256,
-		AKE:             ake.SigmaI,
-		AkeGroup:        ciphersuite.Ristretto255Sha512,
+		AKE:             ake.TripleDH,
 		NonceLen:        32,
 	}
 
 	m := mhf.Argon2id.DefaultParameters()
-	enc := encoding.JSON
 
 	ids := []byte("server")
 
@@ -272,7 +267,7 @@ func TestFull(t *testing.T) {
 	uuid := utils.RandomBytes(32)
 	server := p.Server()
 	serverSecretKey, serverPublicKey := server.KeyGen()
-	respReg, err := server.RegistrationResponse(reqReg, serverPublicKey)
+	respReg, kU, err := server.RegistrationResponse(reqReg, serverPublicKey, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -289,7 +284,7 @@ func TestFull(t *testing.T) {
 		Ids: ids,
 	}
 
-	upload, _, err := client.RegistrationFinalize(creds, respReg, enc)
+	upload, _, err := client.RegistrationFinalize(creds, respReg)
 	if err != nil {
 		panic(err)
 	}
@@ -303,7 +298,7 @@ func TestFull(t *testing.T) {
 	}
 
 	file := &CredentialFile{
-		Ku:       server.OprfKey(),
+		Ku:       kU,
 		Pku:      upload.Pku,
 		Envelope: upload.Envelope,
 	}
@@ -322,10 +317,7 @@ func TestFull(t *testing.T) {
 
 	// Client
 	client = p.Client(m)
-	req, err := client.AuthenticationStart(password, nil, enc)
-	if err != nil {
-		panic(err)
-	}
+	req := client.AuthenticationStart(password, nil)
 
 	// Server
 	p = &user.Parameters
@@ -338,19 +330,19 @@ func TestFull(t *testing.T) {
 		Ids: a.ServerID,
 	}
 
-	respCreds, err := server.AuthenticationResponse(req, nil, nil, &user.CredentialFile, serverCreds, enc)
+	respCreds, err := server.AuthenticationResponse(req, nil, &user.CredentialFile, serverCreds)
 	if err != nil {
 		panic(err)
 	}
 
 	// Client
-	fin, _, err := client.AuthenticationFinalize(uuid, ids, respCreds, enc)
+	fin, _, err := client.AuthenticationFinalize(uuid, ids, respCreds)
 	if err != nil {
 		panic(err)
 	}
 
 	// Server
-	if err := server.AuthenticationFinalize(fin, enc); err != nil {
+	if err := server.AuthenticationFinalize(fin); err != nil {
 		panic(err)
 	}
 
