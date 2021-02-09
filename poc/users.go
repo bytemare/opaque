@@ -1,44 +1,29 @@
-package opaque
+package poc
 
 import (
-	"github.com/bytemare/opaque/envelope"
+	"github.com/bytemare/opaque"
 )
 
 var Users = map[string]*UserRecord{}
 
-type Credentials struct {
-	UUID          []byte `json:"uuid"` // Unique long-term user identifier
-	UserPublicKey []byte `json:"pku"`
-	ServerID      []byte `json:"ids"`
-}
-
 type UserRecord struct {
-	HumanUserID []byte `json:"uname"` // Human-memorizable, modifiable user identifier
-	Credentials
-	EnvelopeMode byte   `json:"mode"`
-	Envelope     []byte `json:"env"`
-	OprfSecret   []byte `json:"oprfSecret"`
-	ServerAkeID  []byte `json:"aid"`
-	Parameters   `json:"params"`
+	HumanUserID           []byte `json:"uname"` // Human-memorizable, modifiable user identifier
+	UUID                  []byte `json:"uuid"`  // Unique long-term user identifier
+	ServerAkeID           []byte `json:"aid"`
+	opaque.CredentialFile `json:"file"`
+	opaque.Parameters     `json:"params"`
 }
 
-func NewUserRecord(username, uuid, pku, envU, ids, oprfSecret, akeID []byte, p *Parameters, mode envelope.Mode) *UserRecord {
+func NewUserRecord(username, uuid, akeID []byte, file *opaque.CredentialFile, p *opaque.Parameters) *UserRecord {
 	return &UserRecord{
-		HumanUserID: username,
-		Credentials: Credentials{
-			UUID:          uuid,
-			UserPublicKey: pku,
-			ServerID:      ids,
-		},
-		EnvelopeMode: byte(mode),
-		Envelope:     envU,
-		OprfSecret:   oprfSecret,
-		ServerAkeID:  akeID,
-		Parameters:   *p,
+		HumanUserID:    username,
+		UUID:           uuid,
+		ServerAkeID:    akeID,
+		CredentialFile: *file,
+		Parameters:     *p,
 	}
 }
 
-func (u *UserRecord) Server() *Server {
-	a := AkeRecords[string(u.ServerAkeID)]
-	return NewServer(u.Ciphersuite, u.Hash, u.AKE, u.OprfSecret, a.SecretKey, a.PublicKey)
+func (u *UserRecord) Server() *opaque.Server {
+	return u.Parameters.Server()
 }

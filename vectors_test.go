@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/bytemare/opaque/ake/engine"
-	"github.com/bytemare/opaque/ake/tripledh"
 	"github.com/bytemare/opaque/message"
 	"io/ioutil"
 	"log"
@@ -495,7 +493,7 @@ func (v *draftVector) test(t *testing.T) {
 	client.Ake.Metadata.Init(request, input.ClientInfo)
 
 	client.Ake.Initialize(client.Ake.Esk, input.ClientNonce)
-	dhKE1 := &engine.Ke1{
+	dhKE1 := &ake.Ke1{
 		NonceU: client.Ake.NonceU,
 		ClientInfo: client.Ake.Metadata.ClientInfo,
 		EpkU:   client.Ake.Epk.Bytes(),
@@ -575,7 +573,7 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, req *message.Creden
 		t.Fatal(err)
 	}
 
-	dhKE1 := &engine.Ke1{
+	dhKE1 := &ake.Ke1{
 		NonceU: 	v.Inputs.ClientNonce,
 		ClientInfo: v.Inputs.ClientInfo,
 		EpkU:   	v.Inputs.ClientKeyshare,
@@ -625,7 +623,7 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, req *message.Creden
 		t.Fatal("envu do not match")
 	}
 
-	cke2, err := tripledh.DeserializeKe2(cKE2.KE2, s.Ake.NonceLen, s.Ake.Group.ElementLength(), s.Ake.Hash.OutputSize())
+	cke2, err := ake.DeserializeKe2(cKE2.KE2, s.Ake.NonceLen, s.Ake.Group.ElementLength(), s.Ake.Hash.OutputSize())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -638,7 +636,7 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, req *message.Creden
 			t.Fatal("CredResp do not match")
 	}
 
-	ke22, err := tripledh.DeserializeKe2(ke2, s.Ake.NonceLen, s.Ake.Group.ElementLength(), s.Ake.Hash.OutputSize())
+	ke22, err := ake.DeserializeKe2(ke2, s.Ake.NonceLen, s.Ake.Group.ElementLength(), s.Ake.Hash.OutputSize())
 	if err != nil {
 		t.Fatal(err)
 	}

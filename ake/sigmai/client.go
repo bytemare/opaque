@@ -2,11 +2,11 @@ package sigmai
 
 import (
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/ake/engine"
+	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/internal"
 )
 
-func Finalize(c *engine.Ake, m *engine.Metadata, sku, pks, message []byte) ([]byte, []byte, error) {
+func Finalize(c *ake.Ake, m *ake.Metadata, sku, pks, message []byte) ([]byte, []byte, error) {
 	ke2, err := DeserializeKe2(message, c.NonceLen, c.Group.ElementLength(), int(sig.SignatureLength()), c.Hash.OutputSize())
 	if err != nil {
 		return nil, nil, err

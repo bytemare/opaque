@@ -1,4 +1,4 @@
-package tripledh
+package ake
 
 import (
 	"crypto/hmac"
