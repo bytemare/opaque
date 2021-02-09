@@ -656,13 +656,13 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, req *message.Creden
 		t.Fatal("epks do not match")
 	}
 
-	//if !bytes.Equal(cke2.Mac, ke22.Mac) {
-	//	t.Fatal("mac do not match")
-	//}
+	if !bytes.Equal(cke2.Mac, ke22.Mac) {
+		t.Fatal("mac do not match")
+	}
 
-	//if !bytes.Equal(v.Outputs.KE2, KE2.Serialize()) {
-	//	t.Fatal("KE2 do not match")
-	//}
+	if !bytes.Equal(v.Outputs.KE2, KE2.Serialize()) {
+		t.Fatal("KE2 do not match")
+	}
 
 	return KE2
 }
