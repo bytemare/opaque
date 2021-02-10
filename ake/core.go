@@ -1,7 +1,7 @@
-package engine
+package ake
 
 import (
-	"errors"
+	"crypto/hmac"
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/hash"
@@ -32,7 +32,7 @@ type Ake struct {
 	SessionSecret        []byte
 	Transcript2          []byte
 	Transcript3          []byte
-	Idu, Pku             []byte // Used by Sigma
+	Ke2Mac               []byte
 }
 
 func (a *Ake) Initialize(scalar group.Scalar, nonce []byte) []byte {
@@ -51,6 +51,11 @@ func (a *Ake) Initialize(scalar group.Scalar, nonce []byte) []byte {
 	} else {
 		return utils.RandomBytes(a.NonceLen)
 	}
+}
+
+func (a *Ake) checkHmac(transcript2, key, mac []byte) bool {
+	expectedHmac2 := a.Hmac(transcript2, key)
+	return hmac.Equal(expectedHmac2, mac)
 }
 
 func buildLabel(length int, label, context []byte) []byte {
@@ -87,28 +92,4 @@ func (a *Ake) DeriveKeys(m *Metadata, tag, nonceU, nonceS, ikm []byte) {
 	a.ServerMac = hkdfExpandLabel(a.Hash, a.HandshakeSecret, []byte(tagMacServer), nil)
 	a.ClientMac = hkdfExpandLabel(a.Hash, a.HandshakeSecret, []byte(tagMacClient), nil)
 	a.HandshakeEncryptKey = hkdfExpandLabel(a.Hash, a.HandshakeSecret, []byte(tagEncServer), nil)
-}
-
-type Ke1 struct {
-	NonceU     []byte `json:"n"`
-	ClientInfo []byte `json:"i"`
-	EpkU       []byte `json:"e"`
-}
-
-func (k *Ke1) Serialize() []byte {
-	return utils.Concatenate(0, k.NonceU, internal.EncodeVector(k.ClientInfo), k.EpkU)
-}
-
-func DeserializeKe1(in []byte, nonceLength, elementLength int) (*Ke1, error) {
-	nonceU := in[0:nonceLength]
-	info, offset := internal.DecodeVector(in[nonceLength:])
-	epku := in[nonceLength+offset:]
-	if len(epku) != elementLength {
-		return nil, errors.New("invalid epku length")
-	}
-	return &Ke1{
-		NonceU:     nonceU,
-		ClientInfo: info,
-		EpkU:       epku,
-	}, nil
 }

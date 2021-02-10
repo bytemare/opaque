@@ -9,8 +9,8 @@ import (
 )
 
 type CredentialFile struct {
-	Ku       []byte            `json:"ku"`
-	Pku      []byte            `json:"pku"`
+	Ku       []byte             `json:"ku"`
+	Pku      []byte             `json:"pku"`
 	Envelope *envelope.Envelope `json:"envU"`
 }
 
@@ -19,10 +19,10 @@ type Server struct {
 	Ake  *ake.Server
 }
 
-func NewServer(suite voprf.Ciphersuite, h hash.Identifier, k ake.Identifier, nonceLen int) *Server {
+func NewServer(suite voprf.Ciphersuite, h hash.Identifier, nonceLen int) *Server {
 	return &Server{
 		oprf: suite,
-		Ake:  k.Server(suite.Group().Get(nil), h.Get(), nonceLen),
+		Ake:  ake.NewServer(suite.Group().Get(nil), h, nonceLen),
 	}
 }
 
@@ -65,33 +65,32 @@ func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, 
 	}, nil
 }
 
-func (s *Server) AuthenticationResponse(req *message.ClientInit, serverInfo []byte, credFile *CredentialFile, creds *envelope.Credentials) (*message.ServerResponse, error) {
-	response, err := s.CredentialResponse(req.Creq, creds.Pk, credFile)
+func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo []byte, credFile *CredentialFile, creds *envelope.Credentials) (*message.KE2, error) {
+	response, err := s.CredentialResponse(ke1.CredentialRequest, creds.Pk, credFile)
 	if err != nil {
 		return nil, err
 	}
 
-	s.Ake.Metadata.Init(req.Creq, nil)
+	s.Ake.Metadata.Init(ke1.CredentialRequest, nil)
 	s.Ake.Metadata.Fill(credFile.Envelope.Contents.Mode, response, credFile.Pku, creds.Pk, creds)
 
 	s.Ake.Initialize(nil, nil)
-	ke2, err := s.Ake.Response(creds.Sk, credFile.Pku, req.KE1, serverInfo)
+	ke2, err := s.Ake.Response(creds.Sk, credFile.Pku, serverInfo, ke1)
 	if err != nil {
 		return nil, err
 	}
 
-	return &message.ServerResponse{
-		Cresp: response,
-		KE2:   ke2,
-	}, nil
+	ke2.CredentialResponse = response
+
+	return ke2, nil
 }
 
-func (s *Server) AuthenticationFinalize(req *message.ClientFinish) error {
-	return s.Ake.Finalize(req.KE3)
+func (s *Server) AuthenticationFinalize(req *message.KE3) error {
+	return s.Ake.Finalize(req)
 }
 
 func (s *Server) KeyGen() (sk, pk []byte) {
-	return s.Ake.KeyGen()
+	return ake.KeyGen(s.Ake.Group)
 }
 
 func (s *Server) SessionKey() []byte {

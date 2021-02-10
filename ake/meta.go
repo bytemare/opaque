@@ -1,20 +1,17 @@
-package engine
+package ake
 
 import (
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/message"
 )
 
-const AesGcmKeyLength = 32
-
 type Metadata struct {
-	CredReq, CredResp    []byte
-	IDu, IDs, ClientInfo []byte
-	KeyLen               int
+	CredentialRequest, CredentialResponse []byte
+	IDu, IDs, ClientInfo                  []byte
 }
 
 func (m *Metadata) Init(creq *message.CredentialRequest, clientInfo []byte) {
-	m.CredReq = creq.Serialize()
+	m.CredentialRequest = creq.Serialize()
 	m.ClientInfo = clientInfo
 }
 
@@ -32,6 +29,5 @@ func (m *Metadata) Fill(mode envelope.Mode, cresp *message.CredentialResponse, p
 		m.IDs = pks
 	}
 
-	m.CredResp = cresp.Serialize()
-	m.KeyLen = AesGcmKeyLength
+	m.CredentialResponse = cresp.Serialize()
 }

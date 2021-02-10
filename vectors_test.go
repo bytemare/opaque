@@ -5,8 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/bytemare/opaque/ake/engine"
-	"github.com/bytemare/opaque/ake/tripledh"
 	"github.com/bytemare/opaque/message"
 	"io/ioutil"
 	"log"
@@ -20,7 +18,6 @@ import (
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/cryptotools/signature"
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/voprf"
 )
@@ -28,7 +25,6 @@ import (
 var (
 	OprfSuites      = []voprf.Ciphersuite{voprf.RistrettoSha512, voprf.P256Sha256}
 	Hashes          = []hash.Identifier{hash.SHA256, hash.SHA512}
-	Akes            = []ake.Identifier{ake.TripleDH}
 	MHF             = []mhf.MHF{mhf.Argon2id}
 	SigmaSignatures = []signature.Identifier{signature.Ed25519}
 	Modes           = []envelope.Mode{envelope.Base, envelope.CustomIdentifier}
@@ -60,7 +56,6 @@ type testEnvParameters struct {
 }
 
 type testAkeParameters struct {
-	AKE               string `json:"AKE"`
 	AkeGroup          string `json:"AkeGroup"`
 	AkeHash           string `json:"AkeHash"`
 	SigmaSignatureAlg string `json:"SigmaSignatureAlg,omitempty"`
@@ -134,7 +129,6 @@ func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier
 			EnvelopeMode: byte(p.Mode),
 		},
 		testAkeParameters: testAkeParameters{
-			AKE:               p.AKE.String(),
 			AkeGroup:          p.OprfCiphersuite.String(),
 			AkeHash:           p.Hash.String(),
 			SigmaSignatureAlg: s.String(),
@@ -281,43 +275,35 @@ func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier
 }
 
 func GenerateAllVectors(t *testing.T) []*testVector {
-	v := len(OprfSuites) * len(Hashes) * len(Akes) * len(MHF) * len(SigmaSignatures) * len(Modes)
+	v := len(OprfSuites) * len(Hashes) * len(MHF) * len(SigmaSignatures) * len(Modes)
 	log.Printf("v := %v", v)
 	vectors := make([]*testVector, v)
 	w := 0
 	for _, s := range OprfSuites {
 		for _, h := range Hashes {
-			for _, a := range Akes {
-				for _, m := range MHF {
-					// for _, sig := range SigmaSignatures {
-					for _, mode := range Modes {
-						var name string
-						if a == ake.SigmaI {
-							name = fmt.Sprintf("%d : %v-%v-%v-%v-%v-%v", w, s, h, a, m, 0, mode)
-						} else {
-							name = fmt.Sprintf("%d : %v-%v-%v-%v-%v", w, s, h, a, m, mode)
-						}
+			for _, m := range MHF {
+				// for _, sig := range SigmaSignatures {
+				for _, mode := range Modes {
+					name := fmt.Sprintf("%d : %v-%v-%v-%v-%v", w, s, h, "3DH", m, mode)
 
-						p := &Parameters{
-							OprfCiphersuite: s,
-							Mode:            mode,
-							Hash:            h,
-							AKE:             a,
-							NonceLen:        32,
-						}
-
-						t.Run(name, func(t *testing.T) {
-							vectors[w] = GenerateTestVector(p, m.DefaultParameters(), 0)
-						},
-						)
-						w++
-
-						//if w >= 1 {
-						//	return vectors
-						//}
+					p := &Parameters{
+						OprfCiphersuite: s,
+						Mode:            mode,
+						Hash:            h,
+						NonceLen:        32,
 					}
+
+					t.Run(name, func(t *testing.T) {
+						vectors[w] = GenerateTestVector(p, m.DefaultParameters(), 0)
+					},
+					)
+					w++
+
+					//if w >= 1 {
+					//	return vectors
 					//}
 				}
+				//}
 			}
 		}
 	}
@@ -405,7 +391,6 @@ func (v *draftVector) test(t *testing.T) {
 		OprfCiphersuite: voprf.Ciphersuite(v.Config.OPRF[1]),
 		Mode:            envelope.Mode(mode[0]),
 		Hash:            hashToHash(v.Config.Hash),
-		AKE:             ake2ake(v.Config.Name),
 		NonceLen:        32,
 	}
 
@@ -449,7 +434,7 @@ func (v *draftVector) test(t *testing.T) {
 		Nonce: input.EnvelopeNonce,
 	}
 
-	upload, _, err := client.RegistrationFinalize(userCredentials, regResp)
+	upload, exportKey, err := client.RegistrationFinalize(userCredentials, regResp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -462,6 +447,10 @@ func (v *draftVector) test(t *testing.T) {
 
 	if !bytes.Equal(check.AuthKey, authKey) {
 		t.Fatal("authKeys do not match")
+	}
+
+	if !bytes.Equal(out.ExportKey, exportKey) {
+		t.Fatal("exportKey do not match")
 	}
 
 	if !bytes.Equal(check.PseudorandomPad, pad) {
@@ -495,15 +484,11 @@ func (v *draftVector) test(t *testing.T) {
 	client.Ake.Metadata.Init(request, input.ClientInfo)
 
 	client.Ake.Initialize(client.Ake.Esk, input.ClientNonce)
-	dhKE1 := &engine.Ke1{
-		NonceU: client.Ake.NonceU,
-		ClientInfo: client.Ake.Metadata.ClientInfo,
-		EpkU:   client.Ake.Epk.Bytes(),
-	}
-
-	KE1 := &message.ClientInit{
-		Creq: request,
-		KE1:  dhKE1.Serialize(),
+	KE1 := &message.KE1{
+		CredentialRequest: request,
+		NonceU:            client.Ake.NonceU,
+		ClientInfo:        client.Ake.Metadata.ClientInfo,
+		EpkU:              client.Ake.Epk.Bytes(),
 	}
 
 	if !bytes.Equal(out.KE1, KE1.Serialize()) {
@@ -529,7 +514,7 @@ func (v *draftVector) test(t *testing.T) {
 	_ = v.loginResponse(t, server, request, serverCredentials, credFile)
 
 	// Client
-	cke2, err := message.DeserializeServerResponse(out.KE2, client.Ake.Group.ElementLength(), client.Core.Hash.OutputSize())
+	cke2, err := message.DeserializeKE2(out.KE2, 32, client.Ake.Group.ElementLength(), client.Core.Hash.OutputSize())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -537,6 +522,10 @@ func (v *draftVector) test(t *testing.T) {
 	ke3, exportKey, err := client.AuthenticationFinalize(input.ClientIdentity, input.ServerIdentity, cke2)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if !bytes.Equal(v.Intermediates.ClientMacKey, client.Ake.ClientMac) {
+		t.Fatal("ClientMacs do not match")
 	}
 
 	if !bytes.Equal(v.Outputs.KE3, ke3.Serialize()) {
@@ -555,13 +544,12 @@ func (v *draftVector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(v.Outputs.ExportKey, server.SessionKey()) {
+	if !bytes.Equal(v.Outputs.SessionKey, server.SessionKey()) {
 		t.Fatal("Server session keys do not match")
 	}
-
 }
 
-func (v *draftVector) loginResponse(t *testing.T, s *Server, req *message.CredentialRequest, creds *envelope.Credentials, credFile *CredentialFile) *message.ServerResponse {
+func (v *draftVector) loginResponse(t *testing.T, s *Server, req *message.CredentialRequest, creds *envelope.Credentials, credFile *CredentialFile) *message.KE2 {
 	response, err := s.CredentialResponse(req, creds.Pk, credFile)
 	if err != nil {
 		t.Fatal(err)
@@ -575,14 +563,14 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, req *message.Creden
 		t.Fatal(err)
 	}
 
-	dhKE1 := &engine.Ke1{
-		NonceU: 	v.Inputs.ClientNonce,
+	KE1 := &message.KE1{
+		NonceU:     v.Inputs.ClientNonce,
 		ClientInfo: v.Inputs.ClientInfo,
-		EpkU:   	v.Inputs.ClientKeyshare,
+		EpkU:       v.Inputs.ClientKeyshare,
 	}
 
 	s.Ake.Initialize(sks, v.Inputs.ServerNonce)
-	ke2, err := s.Ake.Response(creds.Sk, credFile.Pku, dhKE1.Serialize(), v.Inputs.ServerInfo)
+	KE2, err := s.Ake.Response(creds.Sk, credFile.Pku, v.Inputs.ServerInfo, KE1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -603,60 +591,42 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, req *message.Creden
 		t.Fatal("HandshakeEncryptKeys do not match")
 	}
 
-	KE2 := &message.ServerResponse{
-		Cresp: response,
-		KE2:   ke2,
-	}
+	KE2.CredentialResponse = response
 
-	cKE2, err := message.DeserializeServerResponse(v.Outputs.KE2, s.Ake.Group.ElementLength(), s.Ake.Hash.OutputSize())
+	draftKE2, err := message.DeserializeKE2(v.Outputs.KE2, 32, s.Ake.Group.ElementLength(), s.Ake.Hash.OutputSize())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(cKE2.Cresp.Pks, response.Pks) {
+	if !bytes.Equal(draftKE2.CredentialResponse.Serialize(), s.Ake.Metadata.CredentialResponse) {
+		t.Fatal("CredResp do not match")
+	}
+
+	if !bytes.Equal(draftKE2.CredentialResponse.Pks, response.Pks) {
 		t.Fatal("pks do not match")
 	}
 
-	if !bytes.Equal(cKE2.Cresp.Data, response.Data) {
+	if !bytes.Equal(draftKE2.CredentialResponse.Data, response.Data) {
 		t.Fatal("data do not match")
 	}
 
-	if !bytes.Equal(cKE2.Cresp.Envelope.Serialize(), response.Envelope.Serialize()) {
+	if !bytes.Equal(draftKE2.CredentialResponse.Envelope.Serialize(), response.Envelope.Serialize()) {
 		t.Fatal("envu do not match")
 	}
 
-	cke2, err := tripledh.DeserializeKe2(cKE2.KE2, s.Ake.NonceLen, s.Ake.Group.ElementLength(), s.Ake.Hash.OutputSize())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !bytes.Equal(v.Inputs.ClientInfo, s.Ake.Metadata.ClientInfo) {
-		t.Fatal("ClientInfo do not match")
-	}
-
-	if !bytes.Equal(cKE2.Cresp.Serialize(), s.Ake.Metadata.CredResp) {
-			t.Fatal("CredResp do not match")
-	}
-
-	ke22, err := tripledh.DeserializeKe2(ke2, s.Ake.NonceLen, s.Ake.Group.ElementLength(), s.Ake.Hash.OutputSize())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-
-	if !bytes.Equal(cke2.Einfo, ke22.Einfo) {
-		t.Fatalf("einfo do not match\n%v\n%v", cke2.Einfo, ke22.Einfo)
-	}
-
-	if !bytes.Equal(cke2.NonceS, ke22.NonceS) {
+	if !bytes.Equal(draftKE2.NonceS, KE2.NonceS) {
 		t.Fatal("nonces do not match")
 	}
 
-	if !bytes.Equal(cke2.EpkS, ke22.EpkS) {
+	if !bytes.Equal(draftKE2.EpkS, KE2.EpkS) {
 		t.Fatal("epks do not match")
 	}
 
-	if !bytes.Equal(cke2.Mac, ke22.Mac) {
+	if !bytes.Equal(draftKE2.Einfo, KE2.Einfo) {
+		t.Fatalf("einfo do not match")
+	}
+
+	if !bytes.Equal(draftKE2.Mac, KE2.Mac) {
 		t.Fatal("mac do not match")
 	}
 
@@ -686,15 +656,6 @@ func buildOPRFClient(cs voprf.Ciphersuite, blind []byte) *voprf.Client {
 	}
 
 	return c
-}
-
-func ake2ake(a string) ake.Identifier {
-	switch a {
-	case "3DH":
-		return ake.TripleDH
-	default:
-		panic("invalid ake")
-	}
 }
 
 func hashToHash(h string) hash.Identifier {

@@ -8,7 +8,6 @@ import (
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/voprf"
 )
@@ -242,16 +241,12 @@ func TestFull(t *testing.T) {
 		OprfCiphersuite: voprf.RistrettoSha512,
 		Mode:            envelope.CustomIdentifier,
 		Hash:            hash.SHA256,
-		AKE:             ake.TripleDH,
 		NonceLen:        32,
 	}
 
 	m := mhf.Argon2id.DefaultParameters()
 
 	ids := []byte("server")
-
-	// Todo: it is not sure here what the client AKE secret is. HashToScalar on rwdu ? A secret RSA or ECDSA key ?
-	// todo : hence, it's not sure what pku is
 
 	/*
 		Registration

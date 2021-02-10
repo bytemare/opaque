@@ -2,12 +2,12 @@ package sigmai
 
 import (
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/ake/engine"
+	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/internal"
 )
 
-func Response(c *engine.Ake, m *engine.Metadata, sk, pku, req, serverInfo []byte) (encKe2 []byte, err error) {
-	ke1, err := engine.DeserializeKe1(req, c.NonceLen, c.Group.ElementLength())
+func Response(c *ake.Ake, m *ake.Metadata, sk, pku, req, serverInfo []byte) (encKe2 []byte, err error) {
+	ke1, err := ake.DeserializeKe1(req, c.NonceLen, c.Group.ElementLength())
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func Response(c *engine.Ake, m *engine.Metadata, sk, pku, req, serverInfo []byte
 		einfo = internal.Xor(pad, serverInfo)
 	}
 
-	c.Transcript2 = utils.Concatenate(0, m.CredReq, ke1.NonceU, m.ClientInfo, ke1.EpkU, m.CredResp, c.NonceS, serverInfo, c.Epk.Bytes(), einfo)
+	c.Transcript2 = utils.Concatenate(0, m.CredentialRequest, ke1.NonceU, m.ClientInfo, ke1.EpkU, m.CredentialResponse, c.NonceS, serverInfo, c.Epk.Bytes(), einfo)
 
 	sig := sig.Sign(sk, c.Transcript2)
 
@@ -44,7 +44,7 @@ func Response(c *engine.Ake, m *engine.Metadata, sk, pku, req, serverInfo []byte
 	return k.Serialize(), nil
 }
 
-func ServerFinalize(c *engine.Ake, req []byte) error {
+func ServerFinalize(c *ake.Ake, req []byte) error {
 	ke3, err := DeserializeKe3(req, int(sig.SignatureLength()), c.Hash.OutputSize())
 	if err != nil {
 		return err

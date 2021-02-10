@@ -2,11 +2,11 @@ package sigmai
 
 import (
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/ake/engine"
+	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/internal"
 )
 
-func Finalize(c *engine.Ake, m *engine.Metadata, sku, pks, message []byte) ([]byte, []byte, error) {
+func Finalize(c *ake.Ake, m *ake.Metadata, sku, pks, message []byte) ([]byte, []byte, error) {
 	ke2, err := DeserializeKe2(message, c.NonceLen, c.Group.ElementLength(), int(sig.SignatureLength()), c.Hash.OutputSize())
 	if err != nil {
 		return nil, nil, err
@@ -25,7 +25,7 @@ func Finalize(c *engine.Ake, m *engine.Metadata, sku, pks, message []byte) ([]by
 		serverInfo = internal.Xor(pad, ke2.EInfo)
 	}
 
-	c.Transcript2 = utils.Concatenate(0, m.CredReq, c.NonceU, m.ClientInfo, c.Epk.Bytes(), m.CredResp, ke2.NonceS, serverInfo, ke2.EpkS, ke2.EInfo)
+	c.Transcript2 = utils.Concatenate(0, m.CredentialRequest, c.NonceU, m.ClientInfo, c.Epk.Bytes(), m.CredentialResponse, ke2.NonceS, serverInfo, ke2.EpkS, ke2.EInfo)
 
 	if !sig.Verify(pks, c.Transcript2, ke2.Signature) {
 		return nil, nil, ErrSigmaInvServerSig

@@ -1,30 +1,19 @@
 package ake
 
 import (
+	"fmt"
 	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/opaque/ake/engine"
-	"github.com/bytemare/opaque/ake/sigmai"
-	"github.com/bytemare/opaque/ake/tripledh"
-)
-
-type (
-	response       func(core *engine.Ake, m *engine.Metadata, sk, pku, req, serverInfo []byte) ([]byte, error)
-	serverFinalize func(core *engine.Ake, req []byte) error
+	"github.com/bytemare/cryptotools/utils"
+	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/message"
 )
 
 type Server struct {
-	id Identifier
-	*engine.Ake
-	*engine.Metadata
-	response
-	finalize serverFinalize
+	*Ake
+	*Metadata
 }
 
-func (s *Server) Identifier() Identifier {
-	return s.id
-}
-
-// Note := there's no effect if esk, epk, and nonce have already been set
+// Note := there's no effect if esk, epk, and nonce have already been set in a previous call
 func (s *Server) Initialize(scalar group.Scalar, nonce []byte) {
 	nonce = s.Ake.Initialize(scalar, nonce)
 	if s.NonceS == nil {
@@ -32,26 +21,70 @@ func (s *Server) Initialize(scalar group.Scalar, nonce []byte) {
 	}
 }
 
-func (s *Server) Response(sk, pku, req, serverInfo []byte) (encKe2 []byte, err error) {
+func (s *Server) Response(sk, pku, serverInfo []byte, kex *message.KE1) (*message.KE2, error) {
 	s.Initialize(nil, nil)
-	return s.response(s.Ake, s.Metadata, sk, pku, req, serverInfo)
-}
 
-func (s *Server) Finalize(req []byte) error {
-	return s.finalize(s.Ake, req)
-}
+	s.Metadata.ClientInfo = kex.ClientInfo
 
-func (s *Server) KeyGen() (sk, pk []byte) {
-	switch s.Identifier() {
-	case SigmaI:
-		return sigmai.KeyGen()
-	case TripleDH:
-		return tripledh.KeyGen(s.Group)
-	default:
-		panic("invalid")
+	ikm, err := serverK3dh(s.Ake, sk, kex.EpkU, pku)
+	if err != nil {
+		return nil, err
 	}
+
+	s.DeriveKeys(s.Metadata, tag3DH, kex.NonceU, s.NonceS, ikm)
+
+	var einfo []byte
+	if len(serverInfo) != 0 {
+		pad := s.Hash.HKDFExpand(s.HandshakeEncryptKey, []byte(encryptionTag), len(serverInfo))
+		einfo = internal.Xor(pad, serverInfo)
+	}
+
+	s.Transcript2 = utils.Concatenate(0, s.Metadata.CredentialRequest, kex.NonceU, internal.EncodeVector(s.Metadata.ClientInfo), kex.EpkU,
+		s.Metadata.CredentialResponse, s.NonceS, s.Epk.Bytes(), internal.EncodeVector(einfo))
+	ht := s.Hash.Hash(0, s.Transcript2)
+	s.Ke2Mac = s.Hmac(ht, s.ServerMac)
+
+	return &message.KE2{
+		NonceS: s.NonceS,
+		EpkS:   s.Epk.Bytes(),
+		Einfo:  einfo,
+		Mac:    s.Ke2Mac,
+	}, nil
+}
+
+func (s *Server) Finalize(kex *message.KE3) error {
+	s.Transcript3 = s.Hash.Hash(0, utils.Concatenate(0, s.Transcript2, s.Ke2Mac))
+
+	if !s.checkHmac(s.Transcript3, s.ClientMac, kex.Mac) {
+		return internal.ErrAkeInvalidClientMac
+	}
+
+	return nil
 }
 
 func (s *Server) SessionKey() []byte {
 	return s.SessionSecret
+}
+
+func serverK3dh(a *Ake, sk, epku, pku []byte) ([]byte, error) {
+	sks, err := a.NewScalar().Decode(sk)
+	if err != nil {
+		return nil, fmt.Errorf("sk : %w", err)
+	}
+
+	epk, err := a.NewElement().Decode(epku)
+	if err != nil {
+		return nil, fmt.Errorf("epku : %w", err)
+	}
+
+	gpk, err := a.NewElement().Decode(pku)
+	if err != nil {
+		return nil, fmt.Errorf("pku : %w", err)
+	}
+
+	e1 := epk.Mult(a.Esk)
+	e2 := epk.Mult(sks)
+	e3 := gpk.Mult(a.Esk)
+
+	return utils.Concatenate(0, e1.Bytes(), e2.Bytes(), e3.Bytes()), nil
 }

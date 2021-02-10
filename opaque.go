@@ -8,7 +8,6 @@ import (
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
-	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/voprf"
 )
@@ -17,7 +16,6 @@ type Parameters struct {
 	OprfCiphersuite voprf.Ciphersuite `json:"s"`
 	Mode            envelope.Mode     `json:"m"`
 	Hash            hash.Identifier   `json:"h"`
-	AKE             ake.Identifier    `json:"a"`
 	NonceLen        int               `json:"l"`
 }
 
@@ -31,15 +29,15 @@ func (p *Parameters) Encode(enc encoding.Encoding) []byte {
 }
 
 func (p *Parameters) Client(m *mhf.Parameters) *Client {
-	return NewClient(p.OprfCiphersuite, p.Hash, p.Mode, m, p.AKE, p.NonceLen)
+	return NewClient(p.OprfCiphersuite, p.Hash, p.Mode, m, p.NonceLen)
 }
 
 func (p *Parameters) Server() *Server {
-	return NewServer(p.OprfCiphersuite, p.Hash, p.AKE, p.NonceLen)
+	return NewServer(p.OprfCiphersuite, p.Hash, p.NonceLen)
 }
 
 func (p *Parameters) String() string {
-	return fmt.Sprintf("%s-%s-%s", p.OprfCiphersuite, p.Hash, p.AKE)
+	return fmt.Sprintf("%s-%s", p.OprfCiphersuite, p.Hash)
 }
 
 func DecodeParameters(encoded []byte, enc encoding.Encoding) (*Parameters, error) {

@@ -4,25 +4,26 @@ import (
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/opaque/ake"
+	"github.com/bytemare/opaque/core"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/message"
 	"github.com/bytemare/voprf"
 )
 
 type Client struct {
-	Core *envelope.Core
+	Core *core.Core
 	Ake  *ake.Client
 }
 
-func NewClient(suite voprf.Ciphersuite, h hash.Identifier, mode envelope.Mode, m *mhf.Parameters, k ake.Identifier, nonceLen int) *Client {
+func NewClient(suite voprf.Ciphersuite, h hash.Identifier, mode envelope.Mode, m *mhf.Parameters, nonceLen int) *Client {
 	return &Client{
-		Core: envelope.NewCore(suite, h, mode, m),
-		Ake:  k.Client(suite.Group(), h, nonceLen),
+		Core: core.NewCore(suite, h, mode, m),
+		Ake:  ake.NewClient(suite.Group(), h, nonceLen),
 	}
 }
 
 func (c *Client) KeyGen() (sk, pk []byte) {
-	return c.Ake.KeyGen()
+	return ake.KeyGen(c.Ake.Group)
 }
 
 func (c *Client) RegistrationStart(password []byte) *message.RegistrationRequest {
@@ -42,7 +43,7 @@ func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message
 	}, exportKey, nil
 }
 
-func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.ClientInit {
+func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
 	credReq := &message.CredentialRequest{Data: m}
 
@@ -51,14 +52,13 @@ func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.Clien
 	c.Ake.Initialize(nil, nil)
 	ke1 := c.Ake.Start()
 
-	return &message.ClientInit{
-		Creq: credReq,
-		KE1:  ke1.Serialize(),
-	}
+	ke1.CredentialRequest = credReq
+
+	return ke1
 }
 
-func (c *Client) AuthenticationFinalize(idu, ids []byte, resp *message.ServerResponse) (*message.ClientFinish, []byte, error) {
-	credResp, _, err := message.DeserializeCredentialResponse(resp.Cresp.Serialize(), c.Core.Group.Get(nil).ElementLength(), c.Core.Hash.OutputSize())
+func (c *Client) AuthenticationFinalize(idu, ids []byte, resp *message.KE2) (*message.KE3, []byte, error) {
+	credResp, _, err := message.DeserializeCredentialResponse(resp.CredentialResponse.Serialize(), c.Core.Group.Get(nil).ElementLength(), c.Core.Hash.OutputSize())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -77,14 +77,12 @@ func (c *Client) AuthenticationFinalize(idu, ids []byte, resp *message.ServerRes
 
 	c.Ake.Metadata.Fill(credResp.Envelope.Contents.Mode, credResp, creds.Pk, credResp.Pks, creds)
 
-	ke3, _, err := c.Ake.Finalize(creds.Sk, credResp.Pks, resp.KE2)
+	ke3, _, err := c.Ake.Finalize(creds.Sk, credResp.Pks, resp)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return &message.ClientFinish{
-		KE3: ke3,
-	}, exportKey, nil
+	return ke3, exportKey, nil
 }
 
 func (c *Client) PublicKey(sku []byte) []byte {

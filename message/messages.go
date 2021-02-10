@@ -3,134 +3,97 @@ package message
 import (
 	"errors"
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
 )
 
-// Registration
-
-type RegistrationRequest struct {
-	Data []byte `json:"data"`
-}
-
-func (r *RegistrationRequest) Serialize() []byte {
-	return r.Data
-}
-
-type RegistrationResponse struct {
-	Data []byte `json:"data"`
-	Pks  []byte `json:"pks"`
-}
-
-func (r *RegistrationResponse) Serialize() []byte {
-	return append(r.Data, internal.EncodeVector(r.Pks)...)
-}
-
-type RegistrationUpload struct {
-	Envelope *envelope.Envelope `json:"env"`
-	Pku      []byte            `json:"pku"`
-}
-
-func (r *RegistrationUpload) Serialize() []byte {
-	return append(internal.EncodeVector(r.Pku), r.Envelope.Serialize()...)
-}
-
-// Authentication
-
-type CredentialRequest struct {
-	Data []byte `json:"data"`
-}
-
-func (c *CredentialRequest) Serialize() []byte {
-	return c.Data
-}
-
-func DeserializeCredentialRequest(input []byte, pointLen int) (*CredentialRequest, error) {
-	if len(input) <= pointLen {
-		return nil, errors.New("malformed credential request")
-	}
-	return &CredentialRequest{input[:pointLen]}, nil
-}
-
-type CredentialResponse struct {
-	Data     []byte `json:"data"`
-	Pks      []byte `json:"pks"`
-	Envelope *envelope.Envelope `json:"env"`
-}
-
-func (c *CredentialResponse) Serialize() []byte {
-	return utils.Concatenate(0, c.Data, internal.EncodeVector(c.Pks), c.Envelope.Serialize())
-}
-
-func DeserializeCredentialResponse(input []byte, pointLen, hashSize int) (*CredentialResponse, int, error) {
-	if len(input) < pointLen {
-		return nil, 0, errors.New("credential response too short")
-	}
-	data := input[:pointLen]
-	pks, pksLength := internal.DecodeVector(input[pointLen:])
-	envU, envLength, err := envelope.DeserializeEnvelope(input[pointLen+pksLength:], hashSize)
-	if err != nil {
-		return nil, 0, err
-	}
-	offset := pointLen + pksLength + envLength
-
-	return &CredentialResponse{
-		Data:     data,
-		Pks:      pks,
-		Envelope: envU,
-	}, offset, nil
+type Message interface {
+	Serialize() []byte
 }
 
 // Protocol Messages
 
-type ClientInit struct {
-	Creq *CredentialRequest `json:"creq"`
-	KE1  []byte `json:"ke1"`
+type KE1 struct {
+	*CredentialRequest
+	NonceU     []byte `json:"n"`
+	ClientInfo []byte `json:"i"`
+	EpkU       []byte `json:"e"`
 }
 
-func (m *ClientInit) Serialize() []byte {
-	return append(m.Creq.Serialize(), m.KE1...)
+func (m *KE1) Serialize() []byte {
+	return utils.Concatenate(0, m.CredentialRequest.Serialize(), m.NonceU, internal.EncodeVector(m.ClientInfo), m.EpkU)
 }
 
-func DeserializeClientInit(input []byte, pointLen int) (*ClientInit, error) {
+func DeserializeKE1(input []byte, nonceLength, pointLen int) (*KE1, error) {
 	creq, err := DeserializeCredentialRequest(input, pointLen)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ClientInit{
-		Creq: creq,
-		KE1:  input[pointLen:],
+	nonceU := input[pointLen:nonceLength]
+	info, offset := internal.DecodeVector(input[pointLen+nonceLength:])
+	offset = pointLen + nonceLength + offset
+	epku := input[offset:]
+	if len(epku) != pointLen {
+		return nil, errors.New("invalid epku length")
+	}
+
+	return &KE1{
+		CredentialRequest: creq,
+		NonceU:            nonceU,
+		ClientInfo:        info,
+		EpkU:              epku,
 	}, nil
 }
 
-type ServerResponse struct {
-	Cresp *CredentialResponse `json:"cres"`
-	KE2   []byte `json:"ke2"`
+type KE2 struct {
+	*CredentialResponse
+	NonceS []byte `json:"n"`
+	EpkS   []byte `json:"e"`
+	Einfo  []byte `json:"i"`
+	Mac    []byte `json:"m"`
 }
 
-func (m *ServerResponse) Serialize() []byte {
-	return append(m.Cresp.Serialize(), m.KE2...)
+func (m *KE2) Serialize() []byte {
+	return utils.Concatenate(0, m.CredentialResponse.Serialize(), m.NonceS, m.EpkS, internal.EncodeVector(m.Einfo), m.Mac)
 }
 
-func DeserializeServerResponse(input []byte, pointLen, hashLen int) (*ServerResponse, error) {
+func DeserializeKE2(input []byte, nonceLength, pointLen, hashLen int) (*KE2, error) {
 	cresp, offset, err := DeserializeCredentialResponse(input, pointLen, hashLen)
 	if err != nil {
 		return nil, err
 	}
 
-	ke2 := input[offset:]
+	nonceS := input[offset : offset+nonceLength]
+	offset = offset + nonceLength
+	epks := input[offset : offset+pointLen]
+	offset = offset + pointLen
+	einfo, length := internal.DecodeVector(input[offset:])
+	mac := input[offset+length:]
+	if len(mac) != hashLen {
+		return nil, errors.New("invalid mac length")
+	}
 
-	return &ServerResponse{
-		Cresp: cresp,
-		KE2:   ke2,
+	return &KE2{
+		CredentialResponse: cresp,
+		NonceS:             nonceS,
+		EpkS:               epks,
+		Einfo:              einfo,
+		Mac:                mac,
 	}, nil
 }
 
-type ClientFinish struct {
-	KE3 []byte `json:"ke3"`
+type KE3 struct {
+	Mac []byte `json:"m"`
 }
 
-func (m *ClientFinish) Serialize() []byte {
-	return m.KE3
+func (k KE3) Serialize() []byte {
+	return k.Mac
+}
+
+func DeserializeKe3(input []byte, hashSize int) (*KE3, error) {
+	if len(input) != hashSize {
+		return nil, errors.New("invalid mac length")
+	}
+
+	return &KE3{Mac: input}, nil
 }
