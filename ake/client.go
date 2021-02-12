@@ -47,7 +47,7 @@ func (c *Client) Finalize(idu, sku, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 		return nil, nil, internal.ErrAkeInvalidServerMac
 	}
 
-	transcript3 := c.Hash.Hash(0, utils.Concatenate(0, transcript2, ke2.Mac))
+	transcript3 := c.Hash.Hash(0, append(transcript2, ke2.Mac...))
 	c.Keys = keys
 	c.SessionSecret = keys.SessionSecret
 

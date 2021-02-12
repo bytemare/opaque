@@ -12,7 +12,7 @@ var errEnvelopeDecode = errors.New("could not decode envelope")
 type Mode byte
 
 const (
-	Base Mode = iota
+	Base Mode = iota + 1
 	CustomIdentifier
 
 	sBase             = "Base"
