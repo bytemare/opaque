@@ -18,9 +18,7 @@ func NewClient(g ciphersuite.Identifier, h hash.Identifier, nonceLen int) *Clien
 		Ake: &Ake{
 			Group:    g.Get(nil),
 			Hash:     h.Get(),
-			NonceLen: nonceLen,
 		},
-		Metadata: &Metadata{},
 	}
 
 	return c
@@ -31,9 +29,7 @@ func NewServer(g group.Group, h hash.Identifier, nonceLen int) *Server {
 		Ake: &Ake{
 			Group:    g,
 			Hash:     h.Get(),
-			NonceLen: nonceLen,
 		},
-		Metadata: &Metadata{},
 	}
 
 	return s

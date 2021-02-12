@@ -21,21 +21,16 @@ const (
 type Ake struct {
 	group.Group
 	*hash.Hash
-	NonceLen             int
-	NonceU               []byte
-	NonceS               []byte
-	Esk                  group.Scalar
-	Epk                  group.Element
-	ServerMac, ClientMac []byte
-	HandshakeSecret      []byte
-	HandshakeEncryptKey  []byte
-	SessionSecret        []byte
-	Transcript2          []byte
-	Transcript3          []byte
-	Ke2Mac               []byte
+	NonceU        []byte
+	NonceS        []byte
+	Esk           group.Scalar
+	Epk           group.Element
+	SessionSecret []byte
+
+	*Keys
 }
 
-func (a *Ake) Initialize(scalar group.Scalar, nonce []byte) []byte {
+func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) []byte {
 	if a.Esk == nil {
 		if scalar != nil {
 			a.Esk = scalar
@@ -49,7 +44,7 @@ func (a *Ake) Initialize(scalar group.Scalar, nonce []byte) []byte {
 	if nonce != nil {
 		return nonce
 	} else {
-		return utils.RandomBytes(a.NonceLen)
+		return utils.RandomBytes(nonceLen)
 	}
 }
 
@@ -72,8 +67,8 @@ func hkdfExpandLabel(h *hash.Hash, secret, label, context []byte) []byte {
 	return hkdfExpand(h, secret, hkdfLabel)
 }
 
-func (a *Ake) DeriveSecret(secret, label, transcript []byte) []byte {
-	return hkdfExpandLabel(a.Hash, secret, label, a.Hash.Hash(0, transcript))
+func DeriveSecret(h *hash.Hash, secret, label, transcript []byte) []byte {
+	return hkdfExpandLabel(h, secret, label, h.Hash(0, transcript))
 }
 
 func info(protoTag, nonceU, nonceS, idU, idS []byte) []byte {
@@ -84,12 +79,22 @@ func info(protoTag, nonceU, nonceS, idU, idS []byte) []byte {
 		internal.EncodeVectorLen(idS, 2))
 }
 
-func (a *Ake) DeriveKeys(m *Metadata, tag, nonceU, nonceS, ikm []byte) {
-	info := info(tag, nonceU, nonceS, m.IDu, m.IDs)
-	prk := a.Hash.HKDFExtract(ikm, nil)
-	a.HandshakeSecret = a.DeriveSecret(prk, []byte(tagHandshake), info)
-	a.SessionSecret = a.DeriveSecret(prk, []byte(tagSession), info)
-	a.ServerMac = hkdfExpandLabel(a.Hash, a.HandshakeSecret, []byte(tagMacServer), nil)
-	a.ClientMac = hkdfExpandLabel(a.Hash, a.HandshakeSecret, []byte(tagMacClient), nil)
-	a.HandshakeEncryptKey = hkdfExpandLabel(a.Hash, a.HandshakeSecret, []byte(tagEncServer), nil)
+type Keys struct {
+	ServerMac, ClientMac []byte
+	HandshakeSecret      []byte
+	HandshakeEncryptKey  []byte
+	SessionSecret        []byte
+}
+
+func DeriveKeys(h *hash.Hash, tag, idu, nonceU, ids, nonceS, ikm []byte) *Keys {
+	info := info(tag, nonceU, nonceS, idu, ids)
+	prk := h.HKDFExtract(ikm, nil)
+	k := &Keys{}
+	k.HandshakeSecret = DeriveSecret(h, prk, []byte(tagHandshake), info)
+	k.SessionSecret = DeriveSecret(h, prk, []byte(tagSession), info)
+	k.ServerMac = hkdfExpandLabel(h, k.HandshakeSecret, []byte(tagMacServer), nil)
+	k.ClientMac = hkdfExpandLabel(h, k.HandshakeSecret, []byte(tagMacClient), nil)
+	k.HandshakeEncryptKey = hkdfExpandLabel(h, k.HandshakeSecret, []byte(tagEncServer), nil)
+
+	return k
 }

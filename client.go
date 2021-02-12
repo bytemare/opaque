@@ -13,6 +13,7 @@ import (
 type Client struct {
 	Core *core.Core
 	Ake  *ake.Client
+	Ke1  *message.KE1
 }
 
 func NewClient(suite voprf.Ciphersuite, h hash.Identifier, mode envelope.Mode, m *mhf.Parameters, nonceLen int) *Client {
@@ -46,24 +47,15 @@ func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message
 func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
 	credReq := &message.CredentialRequest{Data: m}
+	c.Ake.Initialize(nil, nil, 32)
+	c.Ke1 = c.Ake.Start(clientInfo)
+	c.Ke1.CredentialRequest = credReq
 
-	c.Ake.Metadata.Init(credReq, clientInfo)
-
-	c.Ake.Initialize(nil, nil)
-	ke1 := c.Ake.Start()
-
-	ke1.CredentialRequest = credReq
-
-	return ke1
+	return c.Ke1
 }
 
-func (c *Client) AuthenticationFinalize(idu, ids []byte, resp *message.KE2) (*message.KE3, []byte, error) {
-	credResp, _, err := message.DeserializeCredentialResponse(resp.CredentialResponse.Serialize(), c.Core.Group.Get(nil).ElementLength(), c.Core.Hash.OutputSize())
-	if err != nil {
-		return nil, nil, err
-	}
-
-	secretCreds, exportKey, err := c.Core.RecoverSecret(idu, ids, credResp.Pks, credResp.Data, credResp.Envelope)
+func (c *Client) AuthenticationFinalize(idu, ids []byte, ke2 *message.KE2) (*message.KE3, []byte, error) {
+	secretCreds, exportKey, err := c.Core.RecoverSecret(idu, ids, ke2.Pks, ke2.Data, ke2.Envelope)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -75,9 +67,15 @@ func (c *Client) AuthenticationFinalize(idu, ids []byte, resp *message.KE2) (*me
 		Ids: ids,
 	}
 
-	c.Ake.Metadata.Fill(credResp.Envelope.Contents.Mode, credResp, creds.Pk, credResp.Pks, creds)
+	if creds.Idu == nil {
+		creds.Idu = creds.Pk
+	}
+	if creds.Ids == nil {
+		creds.Ids = ke2.Pks
+	}
 
-	ke3, _, err := c.Ake.Finalize(creds.Sk, credResp.Pks, resp)
+	// id, sk, peerID, peerPK - (creds, peerPK)
+	ke3, _, err := c.Ake.Finalize(creds.Idu, creds.Sk, creds.Ids, ke2.Pks, c.Ke1, ke2)
 	if err != nil {
 		return nil, nil, err
 	}

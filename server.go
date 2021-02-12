@@ -71,11 +71,16 @@ func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo []byte, cre
 		return nil, err
 	}
 
-	s.Ake.Metadata.Init(ke1.CredentialRequest, nil)
-	s.Ake.Metadata.Fill(credFile.Envelope.Contents.Mode, response, credFile.Pku, creds.Pk, creds)
+	if creds.Idu == nil {
+		creds.Idu = credFile.Pku
+	}
+	if creds.Ids == nil {
+		creds.Ids = creds.Pk
+	}
 
-	s.Ake.Initialize(nil, nil)
-	ke2, err := s.Ake.Response(creds.Sk, credFile.Pku, serverInfo, ke1)
+	s.Ake.Initialize(nil, nil, 32)
+	// id, sk, peerID, peerPK - (creds, peerPK)
+	ke2, err := s.Ake.Response(creds.Ids, creds.Sk, creds.Idu, credFile.Pku, serverInfo, ke1, response)
 	if err != nil {
 		return nil, err
 	}

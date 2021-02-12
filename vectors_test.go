@@ -472,24 +472,12 @@ func (v *draftVector) test(t *testing.T) {
 	// Client
 	client = p.Client(nil)
 	client.Core.Oprf = buildOPRFClient(p.OprfCiphersuite, input.BlindLogin)
-
-	m := client.Core.OprfStart(input.Password)
-	request := &message.CredentialRequest{Data: m}
-
-	client.Ake.Esk, err = client.Ake.Group.NewScalar().Decode(input.ClientPrivateKeyshare)
+	esk, err := client.Ake.Group.NewScalar().Decode(input.ClientPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	client.Ake.Metadata.Init(request, input.ClientInfo)
-
-	client.Ake.Initialize(client.Ake.Esk, input.ClientNonce)
-	KE1 := &message.KE1{
-		CredentialRequest: request,
-		NonceU:            client.Ake.NonceU,
-		ClientInfo:        client.Ake.Metadata.ClientInfo,
-		EpkU:              client.Ake.Epk.Bytes(),
-	}
+	client.Ake.Initialize(esk, input.ClientNonce, 32)
+	KE1 := client.AuthenticationStart(input.Password, input.ClientInfo)
 
 	if !bytes.Equal(out.KE1, KE1.Serialize()) {
 		t.Fatal("KE1 do not match")
@@ -511,7 +499,7 @@ func (v *draftVector) test(t *testing.T) {
 		Ids: input.ServerIdentity,
 	}
 
-	_ = v.loginResponse(t, server, request, serverCredentials, credFile)
+	_ = v.loginResponse(t, server, KE1, serverCredentials, credFile)
 
 	// Client
 	cke2, err := message.DeserializeKE2(out.KE2, 32, client.Ake.Group.ElementLength(), client.Core.Hash.OutputSize())
@@ -549,41 +537,24 @@ func (v *draftVector) test(t *testing.T) {
 	}
 }
 
-func (v *draftVector) loginResponse(t *testing.T, s *Server, req *message.CredentialRequest, creds *envelope.Credentials, credFile *CredentialFile) *message.KE2 {
-	response, err := s.CredentialResponse(req, creds.Pk, credFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	s.Ake.Metadata.Init(req, v.Inputs.ClientInfo)
-	s.Ake.Metadata.Fill(credFile.Envelope.Contents.Mode, response, credFile.Pku, creds.Pk, creds)
-
+func (v *draftVector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, creds *envelope.Credentials, credFile *CredentialFile) *message.KE2 {
 	sks, err := s.Ake.Group.NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)
 	}
+	s.Ake.Initialize(sks, v.Inputs.ServerNonce, 32)
 
-	KE1 := &message.KE1{
-		NonceU:     v.Inputs.ClientNonce,
-		ClientInfo: v.Inputs.ClientInfo,
-		EpkU:       v.Inputs.ClientKeyshare,
-	}
-
-	s.Ake.Initialize(sks, v.Inputs.ServerNonce)
-	KE2, err := s.Ake.Response(creds.Sk, credFile.Pku, v.Inputs.ServerInfo, KE1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	KE2, err := s.AuthenticationResponse(ke1, v.Inputs.ServerInfo, credFile, creds)
 
 	if !bytes.Equal(v.Intermediates.HandshakeSecret, s.Ake.HandshakeSecret) {
-		t.Fatal("HandshakeSecrets do not match")
+		t.Fatalf("HandshakeSecrets do not match : %v", s.Ake.HandshakeSecret)
 	}
 
 	if !bytes.Equal(v.Intermediates.ServerMacKey, s.Ake.ServerMac) {
 		t.Fatal("ServerMacs do not match")
 	}
 
-	if !bytes.Equal(v.Intermediates.ClientMacKey, s.Ake.ClientMac) {
+	if !bytes.Equal(v.Intermediates.ClientMacKey, s.Ake.ClientMacKey) {
 		t.Fatal("ClientMacs do not match")
 	}
 
@@ -591,26 +562,24 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, req *message.Creden
 		t.Fatal("HandshakeEncryptKeys do not match")
 	}
 
-	KE2.CredentialResponse = response
-
 	draftKE2, err := message.DeserializeKE2(v.Outputs.KE2, 32, s.Ake.Group.ElementLength(), s.Ake.Hash.OutputSize())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(draftKE2.CredentialResponse.Serialize(), s.Ake.Metadata.CredentialResponse) {
+	if !bytes.Equal(draftKE2.CredentialResponse.Serialize(), KE2.CredentialResponse.Serialize()) {
 		t.Fatal("CredResp do not match")
 	}
 
-	if !bytes.Equal(draftKE2.CredentialResponse.Pks, response.Pks) {
+	if !bytes.Equal(draftKE2.CredentialResponse.Pks, KE2.CredentialResponse.Pks) {
 		t.Fatal("pks do not match")
 	}
 
-	if !bytes.Equal(draftKE2.CredentialResponse.Data, response.Data) {
+	if !bytes.Equal(draftKE2.CredentialResponse.Data, KE2.CredentialResponse.Data) {
 		t.Fatal("data do not match")
 	}
 
-	if !bytes.Equal(draftKE2.CredentialResponse.Envelope.Serialize(), response.Envelope.Serialize()) {
+	if !bytes.Equal(draftKE2.CredentialResponse.Envelope.Serialize(), KE2.CredentialResponse.Envelope.Serialize()) {
 		t.Fatal("envu do not match")
 	}
 
