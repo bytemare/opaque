@@ -52,7 +52,7 @@ func (o *Optimal) buildKeys(unblinded, pks, nonce []byte) (sk group.Scalar, pk g
 	h := o.Hash.Get()
 	prk := h.HKDFExtract(hardened, nonce)
 
-	dst := "Opaque-HashToScalarSku"
+	dst := "Opaque-KeyGenerationSeed"
 	g := o.Group.Get([]byte(dst))
 	sk = g.HashToScalar(prk)
 	pk = g.Base().Mult(sk)
