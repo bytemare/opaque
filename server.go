@@ -19,10 +19,10 @@ type Server struct {
 	Ake  *ake.Server
 }
 
-func NewServer(suite voprf.Ciphersuite, h hash.Identifier, nonceLen int) *Server {
+func NewServer(suite voprf.Ciphersuite, h hash.Identifier) *Server {
 	return &Server{
 		oprf: suite,
-		Ake:  ake.NewServer(suite.Group().Get(nil), h, nonceLen),
+		Ake:  ake.NewServer(suite.Group().Get(nil), h),
 	}
 }
 
@@ -84,8 +84,6 @@ func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo []byte, cre
 	if err != nil {
 		return nil, err
 	}
-
-	ke2.CredentialResponse = response
 
 	return ke2, nil
 }

@@ -16,10 +16,10 @@ type Client struct {
 	Ke1  *message.KE1
 }
 
-func NewClient(suite voprf.Ciphersuite, h hash.Identifier, mode envelope.Mode, m *mhf.Parameters, nonceLen int) *Client {
+func NewClient(suite voprf.Ciphersuite, h hash.Identifier, mode envelope.Mode, m *mhf.Parameters) *Client {
 	return &Client{
 		Core: core.NewCore(suite, h, mode, m),
-		Ake:  ake.NewClient(suite.Group(), h, nonceLen),
+		Ake:  ake.NewClient(suite.Group(), h),
 	}
 }
 
