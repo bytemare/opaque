@@ -136,7 +136,7 @@ func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier
 	}
 
 	in := testInput{
-		Idu:                   []byte("user"),
+		Idu:                   []byte("client"),
 		Ids:                   []byte("server"),
 		Password:              utils.RandomBytes(8),
 		OprfKey:               nil,
@@ -200,12 +200,6 @@ func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier
 	in.EnvelopeNonce = upload.Envelope.Contents.Nonce
 	out.Envelope = upload.Envelope.Serialize()
 
-	a := &AkeRecord{
-		ServerID:  in.Ids,
-		SecretKey: in.ServerAkeSecretKey,
-		PublicKey: in.ServerAkePubkey,
-	}
-
 	file := &CredentialFile{
 		Ku:       in.OprfKey,
 		Pku:      upload.Pku,
@@ -233,10 +227,10 @@ func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier
 	// Server
 	server = p.Server()
 	serverCreds := &envelope.Credentials{
-		Sk:  a.SecretKey,
-		Pk:  a.PublicKey,
+		Sk:  in.ServerAkeSecretKey,
+		Pk:  in.ServerAkePubkey,
 		Idu: in.Idu,
-		Ids: a.ServerID,
+		Ids: in.Ids,
 	}
 	respCreds, err := server.AuthenticationResponse(reqCreds, nil, &out.CredentialFile, serverCreds)
 	if err != nil {
@@ -426,7 +420,7 @@ func (v *draftVector) test(t *testing.T) {
 	}
 
 	// Client
-	userCredentials := &envelope.Credentials{
+	clientCredentials := &envelope.Credentials{
 		Sk:    input.ClientPrivateKey,
 		Pk:    input.ClientPublicKey,
 		Idu:   input.ClientIdentity,
@@ -434,7 +428,7 @@ func (v *draftVector) test(t *testing.T) {
 		Nonce: input.EnvelopeNonce,
 	}
 
-	upload, exportKey, err := client.RegistrationFinalize(userCredentials, regResp)
+	upload, exportKey, err := client.RegistrationFinalize(clientCredentials, regResp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,11 +507,7 @@ func (v *draftVector) test(t *testing.T) {
 	}
 
 	if !bytes.Equal(v.Intermediates.ClientMacKey, client.Ake.ClientMac) {
-		t.Fatal("ClientMacs do not match")
-	}
-
-	if !bytes.Equal(v.Outputs.KE3, ke3.Serialize()) {
-		t.Fatal("KE3 do not match")
+		t.Fatal("client mac keys do not match")
 	}
 
 	if !bytes.Equal(v.Outputs.ExportKey, exportKey) {
@@ -526,6 +516,10 @@ func (v *draftVector) test(t *testing.T) {
 
 	if !bytes.Equal(v.Outputs.SessionKey, client.SessionKey()) {
 		t.Fatal("Client session keys do not match")
+	}
+
+	if !bytes.Equal(v.Outputs.KE3, ke3.Serialize()) {
+		t.Fatal("KE3 do not match")
 	}
 
 	if err := server.AuthenticationFinalize(ke3); err != nil {
@@ -596,7 +590,7 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, c
 	}
 
 	if !bytes.Equal(draftKE2.Mac, KE2.Mac) {
-		t.Fatal("mac do not match")
+		t.Fatal("server macs do not match")
 	}
 
 	if !bytes.Equal(v.Outputs.KE2, KE2.Serialize()) {
@@ -653,7 +647,7 @@ func hashToHash(h string) hash.Identifier {
 type draftVectors []*draftVector
 
 func TestOpaqueVectors(t *testing.T) {
-	if err := filepath.Walk("./tests/vectors.json",
+	if err := filepath.Walk("./tests/new.json",
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err

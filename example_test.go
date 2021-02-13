@@ -7,14 +7,13 @@ import (
 
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
-	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/voprf"
 )
 
 //var exampleTestClient *Client
 //
-//func receiveResponseFromServer(rreq []byte) ([]byte, message.CleartextCredentials) {
+//func receiveResponseFromServer(rreq []byte) ([]byte, message.cleartextCredentials) {
 //	idu := []byte("user")
 //	ids := []byte("server")
 //
@@ -50,7 +49,7 @@ import (
 //		panic(err)
 //	}
 //
-//	creds := &message.CustomCleartextCredentials{
+//	creds := &message.customCleartextCredentials{
 //		Pks: akeKeys.PublicKey,
 //		Idu: idu,
 //		Ids: ids,
@@ -134,7 +133,7 @@ import (
 //	return encReq
 //}
 //
-//func receiveUploadFromClient(encodedResp []byte, creds message.CleartextCredentials) []byte {
+//func receiveUploadFromClient(encodedResp []byte, creds message.cleartextCredentials) []byte {
 //	enc := encoding.JSON
 //
 //	r, err := enc.Decode(encodedResp, &message.RegistrationResponse{})
@@ -207,7 +206,7 @@ import (
 //	}
 //
 //	// Receive the client envelope.
-//	creds := &message.CustomCleartextCredentials{
+//	creds := &message.customCleartextCredentials{
 //		Mode: envelope.CustomIdentifier,
 //		Pks:  akeKeys.PublicKey,
 //		Idu:  utils.RandomBytes(32),
@@ -245,7 +244,6 @@ func TestFull(t *testing.T) {
 	}
 
 	m := mhf.Argon2id.DefaultParameters()
-
 	ids := []byte("server")
 
 	/*
@@ -253,13 +251,12 @@ func TestFull(t *testing.T) {
 	*/
 
 	// Client : send username + reqReg to server
-	username := []byte("user")
+	username := []byte("client")
 	password := []byte("password")
 	client := p.Client(m)
 	reqReg := client.RegistrationStart(password)
 
 	// Server
-	uuid := utils.RandomBytes(32)
 	server := p.Server()
 	serverSecretKey, serverPublicKey := server.KeyGen()
 	respReg, kU, err := server.RegistrationResponse(reqReg, serverPublicKey, nil)
@@ -275,7 +272,7 @@ func TestFull(t *testing.T) {
 	creds := &envelope.Credentials{
 		Sk:  clientSecretKey,
 		Pk:  clientPublicKey,
-		Idu: uuid,
+		Idu: username,
 		Ids: ids,
 	}
 
@@ -285,25 +282,10 @@ func TestFull(t *testing.T) {
 	}
 
 	// Server
-
-	a := &AkeRecord{
-		ServerID:  ids,
-		SecretKey: serverSecretKey,
-		PublicKey: serverPublicKey,
-	}
-
-	file := &CredentialFile{
+	credentialFile := &CredentialFile{
 		Ku:       kU,
 		Pku:      upload.Pku,
 		Envelope: upload.Envelope,
-	}
-
-	user := &UserRecord{
-		HumanUserID:    username,
-		UUID:           uuid,
-		ServerAkeID:    a.ServerID,
-		CredentialFile: *file,
-		Parameters:     *p,
 	}
 
 	/*
@@ -315,23 +297,22 @@ func TestFull(t *testing.T) {
 	req := client.AuthenticationStart(password, nil)
 
 	// Server
-	p = &user.Parameters
 	server = p.Server()
 
 	serverCreds := &envelope.Credentials{
-		Sk:  a.SecretKey,
-		Pk:  a.PublicKey,
-		Idu: user.UUID,
-		Ids: a.ServerID,
+		Sk:  serverSecretKey,
+		Pk:  serverPublicKey,
+		Idu: username,
+		Ids: ids,
 	}
 
-	respCreds, err := server.AuthenticationResponse(req, nil, &user.CredentialFile, serverCreds)
+	respCreds, err := server.AuthenticationResponse(req, nil, credentialFile, serverCreds)
 	if err != nil {
 		panic(err)
 	}
 
 	// Client
-	fin, _, err := client.AuthenticationFinalize(uuid, ids, respCreds)
+	fin, _, err := client.AuthenticationFinalize(username, ids, respCreds)
 	if err != nil {
 		panic(err)
 	}

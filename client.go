@@ -54,15 +54,29 @@ func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.KE1 {
 	return c.Ke1
 }
 
+func (c *Client) publicKey(sku []byte) ([]byte, error) {
+	sk, err := c.Ake.Group.NewScalar().Decode(sku)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.Ake.Group.Base().Mult(sk).Bytes(), nil
+}
+
 func (c *Client) AuthenticationFinalize(idu, ids []byte, ke2 *message.KE2) (*message.KE3, []byte, error) {
 	secretCreds, exportKey, err := c.Core.RecoverSecret(idu, ids, ke2.Pks, ke2.Data, ke2.Envelope)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	pubKey, err := c.publicKey(secretCreds.Sku)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	creds := &envelope.Credentials{
 		Sk:  secretCreds.Sku,
-		Pk:  c.PublicKey(secretCreds.Sku),
+		Pk:  pubKey,
 		Idu: idu,
 		Ids: ids,
 	}
@@ -70,6 +84,7 @@ func (c *Client) AuthenticationFinalize(idu, ids []byte, ke2 *message.KE2) (*mes
 	if creds.Idu == nil {
 		creds.Idu = creds.Pk
 	}
+
 	if creds.Ids == nil {
 		creds.Ids = ke2.Pks
 	}
@@ -81,10 +96,6 @@ func (c *Client) AuthenticationFinalize(idu, ids []byte, ke2 *message.KE2) (*mes
 	}
 
 	return ke3, exportKey, nil
-}
-
-func (c *Client) PublicKey(sku []byte) []byte {
-	return c.Ake.PublicKey(sku)
 }
 
 func (c *Client) SessionKey() []byte {
