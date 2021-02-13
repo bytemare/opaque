@@ -1,6 +1,6 @@
 # OPAQUE
 
-OPAQUE implements the OPAQUE protocol allow for mutual public key client-server authentication, with the client only knowing a password, and the server knowing nothing about about the password.
+This package implements the OPAQUE protocol. It allows for mutual public key client-server authentication, with only the client knowing a password.
 
 This follows the latest commits and discussions in the ongoing draft: https://github.com/cfrg/draft-irtf-cfrg-opaque
 
@@ -8,15 +8,7 @@ This follows the latest commits and discussions in the ongoing draft: https://gi
 
 This is active work in progress.
 
-Implemented components:
-- OPRF on groups Ristretto255, P-256, P-384, and P-512
-- Authenticated key exchanges
-    - 3DH
-    - Sigma-I
-    - ~~HMQV~~
-- Random Key Robust envelope encryption: xor + hmac
-
-Test vectors can be found in tests/allVectors.json.
+Test vectors can be found in the __tests__ directory.
 
 Run example and tests
 ````
