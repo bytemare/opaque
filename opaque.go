@@ -1,14 +1,15 @@
 package opaque
 
 import (
+	"errors"
 	"fmt"
+	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/core/envelope"
 
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
-	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/voprf"
 )
 
@@ -19,51 +20,31 @@ type Parameters struct {
 	NonceLen        int               `json:"l"`
 }
 
-func (p *Parameters) Encode(enc encoding.Encoding) []byte {
-	e, err := enc.Encode(p)
-	if err != nil {
-		panic(err)
-	}
-
-	return e
+func (p *Parameters) Serialize() []byte {
+	return utils.Concatenate(0, []byte{byte(p.OprfCiphersuite)}, []byte{byte(p.Mode)}, []byte{byte(p.Hash)}, encoding.I2OSP(p.NonceLen, 1))
 }
 
 func (p *Parameters) Client(m *mhf.Parameters) *Client {
-	return NewClient(p.OprfCiphersuite, p.Hash, p.Mode, m, p.NonceLen)
+	return NewClient(p.OprfCiphersuite, p.Hash, p.Mode, m)
 }
 
 func (p *Parameters) Server() *Server {
-	return NewServer(p.OprfCiphersuite, p.Hash, p.NonceLen)
+	return NewServer(p.OprfCiphersuite, p.Hash)
 }
 
 func (p *Parameters) String() string {
 	return fmt.Sprintf("%s-%s", p.OprfCiphersuite, p.Hash)
 }
 
-func DecodeParameters(encoded []byte, enc encoding.Encoding) (*Parameters, error) {
-	d, err := enc.Decode(encoded, &Parameters{})
-	if err != nil {
-		return nil, err
+func DeserializeParameters(encoded []byte) (*Parameters, error) {
+	if len(encoded) != 4 {
+		return nil, errors.New("invalid length")
 	}
 
-	p, ok := d.(*Parameters)
-	if !ok {
-		return nil, internal.ErrAssertParameters
-	}
-
-	return p, nil
-}
-
-type AkeRecord struct {
-	ServerID  []byte `json:"ids"`
-	SecretKey []byte `json:"sks"`
-	PublicKey []byte `json:"pks"`
-}
-
-type UserRecord struct {
-	HumanUserID    []byte `json:"uname"` // Human-memorizable, modifiable user identifier
-	UUID           []byte `json:"uuid"`  // Unique long-term user identifier
-	ServerAkeID    []byte `json:"aid"`
-	CredentialFile `json:"file"`
-	Parameters     `json:"params"`
+	return &Parameters{
+		OprfCiphersuite: voprf.Ciphersuite(encoded[0]),
+		Mode:            envelope.Mode(encoded[1]),
+		Hash:            hash.Identifier(encoded[2]),
+		NonceLen:        int(encoded[3]),
+	}, nil
 }
