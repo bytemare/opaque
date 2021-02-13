@@ -78,7 +78,7 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 
 func (s *Server) Finalize(kex *message.KE3) error {
 	if !s.checkHmac(s.Transcript3, s.ClientMacKey, kex.Mac) {
-		return internal.ErrAkeInvalidClientMac
+		return ErrAkeInvalidClientMac
 	}
 
 	return nil

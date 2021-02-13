@@ -2,6 +2,7 @@ package envelope
 
 import (
 	"crypto/hmac"
+	"errors"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/cryptotools/utils"
@@ -14,6 +15,8 @@ const (
 	tagAuthKey   = "AuthKey"
 	tagExportKey = "ExportKey"
 )
+
+var ErrEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
 
 type Keys struct {
 	Hash                         *hash.Hash
@@ -53,7 +56,7 @@ func (k *Keys) BuildEnvelope(unblinded, pks []byte, mode Mode, creds *Credential
 		EncryptedCreds: encryptedCreds,
 	}
 
-	clearCreds := EncodeClearTextCredentials(creds.Idu, creds.Ids, pks, mode)
+	clearCreds := encodeClearTextCredentials(creds.Idu, creds.Ids, pks, mode)
 
 	tag := k.Hash.Hmac(append(contents.Serialize(), clearCreds...), k.AuthKey)
 	envU := &Envelope{
@@ -69,12 +72,12 @@ func (k *Keys) RecoverSecret(idu, ids, pks, unblinded []byte, envU *Envelope) (*
 	rwdu := k.buildRwdu(unblinded, contents.Nonce)
 	k.buildKeys(rwdu, len(contents.EncryptedCreds))
 
-	clearCreds := EncodeClearTextCredentials(idu, ids, pks, contents.Mode)
+	clearCreds := encodeClearTextCredentials(idu, ids, pks, contents.Mode)
 
 	expectedTag := k.Hash.Hmac(append(contents.Serialize(), clearCreds...), k.AuthKey)
 
 	if !hmac.Equal(expectedTag, envU.AuthTag) {
-		return nil, nil, internal.ErrEnvelopeInvalidTag
+		return nil, nil, ErrEnvelopeInvalidTag
 	}
 
 	pt := internal.Xor(contents.EncryptedCreds, k.Pad)

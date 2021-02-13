@@ -2,6 +2,7 @@ package ake
 
 import (
 	"crypto/hmac"
+	"errors"
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/hash"
@@ -20,7 +21,12 @@ const (
 	encryptionTag = "encryption pad"
 )
 
-var tag3DH = []byte(keyTag)
+var (
+	tag3DH = []byte(keyTag)
+
+	ErrAkeInvalidServerMac = errors.New("invalid server mac")
+	ErrAkeInvalidClientMac = errors.New("invalid client mac")
+)
 
 func KeyGen(g group.Group) (sk, pk []byte) {
 	scalar := g.NewScalar().Random()

@@ -65,7 +65,7 @@ func (c *Client) Finalize(idu, sku, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 
 	transcript2 := utils.Concatenate(0, ke1.Serialize(), ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS, internal.EncodeVector(ke2.Einfo))
 	if !c.checkHmac(transcript2, keys.ServerMac, ke2.Mac) {
-		return nil, nil, internal.ErrAkeInvalidServerMac
+		return nil, nil, ErrAkeInvalidServerMac
 	}
 
 	transcript3 := append(transcript2, ke2.Mac...)
@@ -73,15 +73,6 @@ func (c *Client) Finalize(idu, sku, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 	c.SessionSecret = keys.SessionSecret
 
 	return &message.KE3{Mac: c.Hmac(transcript3, keys.ClientMac)}, serverInfo, nil
-}
-
-func (c *Client) PublicKey(sku []byte) []byte {
-	sk, err := c.Ake.Group.NewScalar().Decode(sku)
-	if err != nil {
-		panic(err)
-	}
-
-	return c.Ake.Group.Base().Mult(sk).Bytes()
 }
 
 func (c *Client) SessionKey() []byte {
