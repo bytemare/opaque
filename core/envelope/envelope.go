@@ -7,8 +7,6 @@ import (
 	"github.com/bytemare/opaque/internal"
 )
 
-var errEnvelopeDecode = errors.New("could not decode envelope")
-
 type Mode byte
 
 const (
@@ -39,13 +37,17 @@ func (e *Envelope) Serialize() []byte {
 	return append(e.Contents.Serialize(), e.AuthTag...)
 }
 
-func DeserializeEnvelope(in []byte, Nh int) (*Envelope, int, error) {
-	contents, offset := DeserializeInnerEnvelope(in)
-	if len(in) < offset+Nh {
-		return nil, 0, errors.New("decode envelope: Insufficient bytes")
+func DeserializeEnvelope(in []byte, Nh int) (envU *Envelope, offset int, err error) {
+	contents, length, err := deserializeInnerEnvelope(in)
+	if err != nil {
+		return nil, 0, err
 	}
-	authTag := in[offset : offset+Nh]
-	return &Envelope{*contents, authTag}, offset + Nh, nil
+
+	if len(in) < length+Nh {
+		return nil, 0, errors.New("decode envelope: insufficient bytes")
+	}
+	authTag := in[length : length+Nh]
+	return &Envelope{*contents, authTag}, length + Nh, nil
 }
 
 type InnerEnvelope struct {
@@ -58,12 +60,18 @@ func (i *InnerEnvelope) Serialize() []byte {
 	return utils.Concatenate(0, encoding.I2OSP(int(i.Mode), 1), i.Nonce, internal.EncodeVector(i.EncryptedCreds))
 }
 
-func DeserializeInnerEnvelope(in []byte) (*InnerEnvelope, int) {
+func deserializeInnerEnvelope(in []byte) (*InnerEnvelope, int, error) {
 	if len(in) < nonceLen+2 {
-		panic("Insufficient bytes")
+		return nil, 0, errors.New("insufficient length of inner envelope")
 	}
+
 	mode := encoding.OS2IP(in[0:1])
 	nonce := in[1 : nonceLen+1]
-	ct, ctOffset := internal.DecodeVector(in[nonceLen+1:])
-	return &InnerEnvelope{Mode(mode), nonce, ct}, nonceLen + 1 + ctOffset
+
+	ct, ctOffset, err := internal.DecodeVector(in[nonceLen+1:])
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return &InnerEnvelope{Mode(mode), nonce, ct}, nonceLen + 1 + ctOffset, nil
 }

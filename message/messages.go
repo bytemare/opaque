@@ -30,7 +30,12 @@ func DeserializeKE1(input []byte, nonceLength, pointLen int) (*KE1, error) {
 	}
 
 	nonceU := input[pointLen:nonceLength]
-	info, offset := internal.DecodeVector(input[pointLen+nonceLength:])
+
+	info, offset, err := internal.DecodeVector(input[pointLen+nonceLength:])
+	if err != nil {
+		return nil, err
+	}
+
 	offset = pointLen + nonceLength + offset
 	epku := input[offset:]
 	if len(epku) != pointLen {
@@ -67,7 +72,12 @@ func DeserializeKE2(input []byte, nonceLength, pointLen, hashLen int) (*KE2, err
 	offset = offset + nonceLength
 	epks := input[offset : offset+pointLen]
 	offset = offset + pointLen
-	einfo, length := internal.DecodeVector(input[offset:])
+
+	einfo, length, err := internal.DecodeVector(input[offset:])
+	if err != nil {
+		return nil, err
+	}
+
 	mac := input[offset+length:]
 	if len(mac) != hashLen {
 		return nil, errors.New("invalid mac length")

@@ -62,17 +62,23 @@ func (c *CredentialResponse) Serialize() []byte {
 	return utils.Concatenate(0, c.Data, internal.EncodeVector(c.Pks), c.Envelope.Serialize())
 }
 
-func DeserializeCredentialResponse(input []byte, pointLen, hashSize int) (*CredentialResponse, int, error) {
+func DeserializeCredentialResponse(input []byte, pointLen, hashSize int) (response *CredentialResponse, offset int, err error) {
 	if len(input) < pointLen {
 		return nil, 0, errors.New("credential response too short")
 	}
+
 	data := input[:pointLen]
-	pks, pksLength := internal.DecodeVector(input[pointLen:])
+
+	pks, pksLength, err := internal.DecodeVector(input[pointLen:])
+	if err != nil {
+		return nil, 0, err
+	}
+
 	envU, envLength, err := envelope.DeserializeEnvelope(input[pointLen+pksLength:], hashSize)
 	if err != nil {
 		return nil, 0, err
 	}
-	offset := pointLen + pksLength + envLength
+	offset = pointLen + pksLength + envLength
 
 	return &CredentialResponse{
 		Data:     data,

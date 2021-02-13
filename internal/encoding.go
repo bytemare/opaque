@@ -22,20 +22,21 @@ func EncodeVector(in []byte) []byte {
 	return EncodeVectorLen(in, 2)
 }
 
-func decodeVectorLen(in []byte, size int) ([]byte, int) {
+func decodeVectorLen(in []byte, size int) ([]byte, int, error) {
 	if len(in) < size {
-		panic("Insufficient length")
+		return nil, 0, errors.New("insufficient header length for decoding")
 	}
 
 	dataLen := encoding.OS2IP(in[0:size])
 	total := size + dataLen
 
 	if len(in) < total {
-		panic("Insufficient length (2)")
+		return nil, 0, errors.New("insufficient total length for decoding")
 	}
-	return in[size:total], total
+
+	return in[size:total], total, nil
 }
 
-func DecodeVector(in []byte) ([]byte, int) {
+func DecodeVector(in []byte) ([]byte, int, error) {
 	return decodeVectorLen(in, 2)
 }
