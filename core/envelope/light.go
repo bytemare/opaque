@@ -14,50 +14,48 @@ import (
 const OptimalMode Mode = 2
 
 type EnvelopeOpt struct {
-	Nonce   []byte
 	AuthTag []byte
 }
 
 type Optimal struct {
 	Group ciphersuite.Identifier
-	Hash  hash.Identifier
+	Hash  hash.Hashing
 	*mhf.Parameters
 }
 
-func (o *Optimal) BuildEnvelopeOptimal(unblinded, pks, nonce []byte) (sku, pku []byte, envU *EnvelopeOpt) {
-	if nonce == nil {
-		nonce = utils.RandomBytes(nonceLen)
-	}
-
-	sk, pk, authTag := o.buildKeys(unblinded, pks, nonce)
+func (o *Optimal) BuildEnvelopeOptimal(unblinded, pks []byte) (skc, pkc []byte, envU *EnvelopeOpt) {
+	sk, authTag := o.buildKeys(unblinded, pks)
+	pk := o.Group.Get(nil).Base().Mult(sk)
 
 	return sk.Bytes(), pk.Bytes(), &EnvelopeOpt{
-		Nonce:   nonce,
 		AuthTag: authTag,
 	}
 }
 
-func (o *Optimal) RecoverSecret(unblinded, pks []byte, envU *EnvelopeOpt) (sk group.Scalar, pk group.Element, err error) {
-	sk, pk, authTag := o.buildKeys(unblinded, pks, envU.Nonce)
+func (o *Optimal) RecoverSecret(unblinded, pks []byte, envU *EnvelopeOpt) (group.Scalar, error) {
+	sk, authTag := o.buildKeys(unblinded, pks)
 
 	if !hmac.Equal(authTag, envU.AuthTag) {
-		return nil, nil, errors.New("invalid mac")
+		return nil, errors.New("invalid mac")
 	}
 
-	return sk, pk, nil
+	return sk, nil
 }
 
-func (o *Optimal) buildKeys(unblinded, pks, nonce []byte) (sk group.Scalar, pk group.Element, authTag []byte) {
+func deriveSecretKey(cs ciphersuite.Identifier, prk []byte) group.Scalar {
+	dst := "Opaque-KeyGenerationSeed"
+	g := cs.Get([]byte(dst)) // expand
+
+	return g.HashToScalar(prk)
+}
+
+func (o *Optimal) buildKeys(unblinded, pks []byte) (group.Scalar, []byte) {
 	hardened := o.Parameters.Hash(unblinded, nil)
 	h := o.Hash.Get()
-	prk := h.HKDFExtract(hardened, nonce)
-
-	dst := "Opaque-KeyGenerationSeed"
-	g := o.Group.Get([]byte(dst))
-	sk = g.HashToScalar(prk)
-	pk = g.Base().Mult(sk)
+	prk := h.HKDFExtract(hardened, nil)
+	sk := deriveSecretKey(o.Group, prk)
 	authKey := h.HKDFExpand(prk, []byte("AuthKey"), 0)
-	authTag = h.Hmac(utils.Concatenate(0, nonce, pk.Bytes(), pks), authKey)
+	authTag := h.Hmac(utils.Concatenate(0, pks), authKey)
 
-	return sk, pk, authTag
+	return sk, authTag
 }

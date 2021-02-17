@@ -1,12 +1,9 @@
 package envelope
 
 import (
-	"errors"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/internal"
 )
-
-var ErrCredsInvalidMode = errors.New("credentials - invalid ClearTextCredentials mode")
 
 type SecretCredentials struct {
 	Sku []byte

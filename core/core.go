@@ -24,7 +24,7 @@ func (c *Core) DebugGetKeys() (pad, authKey, exportKey, prk []byte) {
 	return c.Pad, c.AuthKey, c.ExportKey, c.Prk
 }
 
-func NewCore(suite voprf.Ciphersuite, h hash.Identifier, mode envelope.Mode, m *mhf.Parameters) *Core {
+func NewCore(suite voprf.Ciphersuite, h hash.Hashing, mode envelope.Mode, m *mhf.Parameters) *Core {
 	oprf, err := suite.Client(nil)
 	if err != nil {
 		panic(err)
