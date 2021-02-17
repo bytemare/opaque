@@ -16,7 +16,7 @@ import (
 type Parameters struct {
 	OprfCiphersuite voprf.Ciphersuite `json:"s"`
 	Mode            envelope.Mode     `json:"m"`
-	Hash            hash.Identifier   `json:"h"`
+	Hash            hash.Hashing      `json:"h"`
 	NonceLen        int               `json:"l"`
 }
 
@@ -44,7 +44,7 @@ func DeserializeParameters(encoded []byte) (*Parameters, error) {
 	return &Parameters{
 		OprfCiphersuite: voprf.Ciphersuite(encoded[0]),
 		Mode:            envelope.Mode(encoded[1]),
-		Hash:            hash.Identifier(encoded[2]),
+		Hash:            hash.Hashing(encoded[2]),
 		NonceLen:        int(encoded[3]),
 	}, nil
 }
