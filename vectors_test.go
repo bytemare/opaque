@@ -23,11 +23,10 @@ import (
 )
 
 var (
-	OprfSuites      = []voprf.Ciphersuite{voprf.RistrettoSha512, voprf.P256Sha256}
-	Hashes          = []hash.Identifier{hash.SHA256, hash.SHA512}
-	MHF             = []mhf.MHF{mhf.Argon2id}
-	SigmaSignatures = []signature.Identifier{signature.Ed25519}
-	Modes           = []envelope.Mode{envelope.Base, envelope.CustomIdentifier}
+	OprfSuites = []voprf.Ciphersuite{voprf.RistrettoSha512, voprf.P256Sha256}
+	Hashes     = []hash.Hashing{hash.SHA256, hash.SHA512}
+	MHF        = []mhf.MHF{mhf.Argon2id}
+	Modes      = []envelope.Mode{envelope.Base, envelope.CustomIdentifier}
 )
 
 type ByteToHex []byte
@@ -269,14 +268,13 @@ func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier
 }
 
 func GenerateAllVectors(t *testing.T) []*testVector {
-	v := len(OprfSuites) * len(Hashes) * len(MHF) * len(SigmaSignatures) * len(Modes)
+	v := len(OprfSuites) * len(Hashes) * len(MHF) * len(Modes)
 	log.Printf("v := %v", v)
 	vectors := make([]*testVector, v)
 	w := 0
 	for _, s := range OprfSuites {
 		for _, h := range Hashes {
 			for _, m := range MHF {
-				// for _, sig := range SigmaSignatures {
 				for _, mode := range Modes {
 					name := fmt.Sprintf("%d : %v-%v-%v-%v-%v", w, s, h, "3DH", m, mode)
 
@@ -297,7 +295,6 @@ func GenerateAllVectors(t *testing.T) []*testVector {
 					//	return vectors
 					//}
 				}
-				//}
 			}
 		}
 	}
@@ -506,7 +503,7 @@ func (v *draftVector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(v.Intermediates.ClientMacKey, client.Ake.ClientMac) {
+	if !bytes.Equal(v.Intermediates.ClientMacKey, client.Ake.ClientMacKey) {
 		t.Fatal("client mac keys do not match")
 	}
 
@@ -544,11 +541,11 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, c
 		t.Fatalf("HandshakeSecrets do not match : %v", s.Ake.HandshakeSecret)
 	}
 
-	if !bytes.Equal(v.Intermediates.ServerMacKey, s.Ake.ServerMac) {
+	if !bytes.Equal(v.Intermediates.ServerMacKey, s.Ake.ServerMacKey) {
 		t.Fatal("ServerMacs do not match")
 	}
 
-	if !bytes.Equal(v.Intermediates.ClientMacKey, s.Ake.ClientMacKey) {
+	if !bytes.Equal(v.Intermediates.ClientMacKey, s.Ake.Keys.ClientMacKey) {
 		t.Fatal("ClientMacs do not match")
 	}
 
@@ -556,7 +553,7 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, c
 		t.Fatal("HandshakeEncryptKeys do not match")
 	}
 
-	draftKE2, err := message.DeserializeKE2(v.Outputs.KE2, 32, s.Ake.Group.ElementLength(), s.Ake.Hash.OutputSize())
+	draftKE2, err := message.DeserializeKE2(v.Outputs.KE2, 32, s.Ake.Group.ElementLength(), s.Ake.Hashing.OutputSize())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -621,24 +618,12 @@ func buildOPRFClient(cs voprf.Ciphersuite, blind []byte) *voprf.Client {
 	return c
 }
 
-func hashToHash(h string) hash.Identifier {
+func hashToHash(h string) hash.Hashing {
 	switch h {
 	case "SHA256":
 		return hash.SHA256
 	case "SHA512":
 		return hash.SHA512
-	case "SHA3-256":
-		return hash.SHA3_256
-	case "SHA3-512":
-		return hash.SHA3_512
-	case "SHAKE128":
-		return hash.SHAKE128
-	case "SHAKE256":
-		return hash.SHAKE256
-	case "BLAKE2XB":
-		return hash.BLAKE2XB
-	case "BLAKE2XS":
-		return hash.BLAKE2XS
 	default:
 		return 0
 	}
@@ -647,7 +632,7 @@ func hashToHash(h string) hash.Identifier {
 type draftVectors []*draftVector
 
 func TestOpaqueVectors(t *testing.T) {
-	if err := filepath.Walk("./tests/new.json",
+	if err := filepath.Walk("./tests/newVectors2.json",
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
