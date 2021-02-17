@@ -19,7 +19,7 @@ type Server struct {
 	Ake  *ake.Server
 }
 
-func NewServer(suite voprf.Ciphersuite, h hash.Identifier) *Server {
+func NewServer(suite voprf.Ciphersuite, h hash.Hashing) *Server {
 	return &Server{
 		oprf: suite,
 		Ake:  ake.NewServer(suite.Group().Get(nil), h),
@@ -78,7 +78,6 @@ func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo []byte, cre
 		creds.Ids = creds.Pk
 	}
 
-	s.Ake.Initialize(nil, nil, 32)
 	// id, sk, peerID, peerPK - (creds, peerPK)
 	ke2, err := s.Ake.Response(creds.Ids, creds.Sk, creds.Idu, credFile.Pku, serverInfo, ke1, response)
 	if err != nil {

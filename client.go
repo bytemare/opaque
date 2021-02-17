@@ -16,7 +16,7 @@ type Client struct {
 	Ke1  *message.KE1
 }
 
-func NewClient(suite voprf.Ciphersuite, h hash.Identifier, mode envelope.Mode, m *mhf.Parameters) *Client {
+func NewClient(suite voprf.Ciphersuite, h hash.Hashing, mode envelope.Mode, m *mhf.Parameters) *Client {
 	return &Client{
 		Core: core.NewCore(suite, h, mode, m),
 		Ake:  ake.NewClient(suite.Group(), h),
@@ -47,15 +47,14 @@ func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message
 func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
 	credReq := &message.CredentialRequest{Data: m}
-	c.Ake.Initialize(nil, nil, 32)
 	c.Ke1 = c.Ake.Start(clientInfo)
 	c.Ke1.CredentialRequest = credReq
 
 	return c.Ke1
 }
 
-func (c *Client) publicKey(sku []byte) ([]byte, error) {
-	sk, err := c.Ake.Group.NewScalar().Decode(sku)
+func (c *Client) publicKey(skc []byte) ([]byte, error) {
+	sk, err := c.Ake.Group.NewScalar().Decode(skc)
 	if err != nil {
 		return nil, err
 	}
