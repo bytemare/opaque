@@ -10,16 +10,11 @@ type SecretCredentials struct {
 }
 
 func (s *SecretCredentials) Serialize() []byte {
-	return internal.EncodeVector(s.Sku)
+	return s.Sku
 }
 
-func DeserializeSecretCredentials(in []byte) (sk *SecretCredentials, err error) {
-	skU, _, err := internal.DecodeVector(in)
-	if err != nil {
-		return nil, err
-	}
-
-	return &SecretCredentials{skU}, nil
+func DeserializeSecretCredentials(input []byte) *SecretCredentials {
+return &SecretCredentials{input}
 }
 
 type cleartextCredentials interface {
@@ -46,7 +41,7 @@ func newBaseClearTextCredentials(pks []byte) *baseCleartextCredentials {
 }
 
 func (b *baseCleartextCredentials) Serialize() []byte {
-	return internal.EncodeVector(b.Pks)
+	return b.Pks
 }
 
 func newCustomClearTextCredentials(pks, idu, ids []byte) *customCleartextCredentials {
@@ -59,7 +54,7 @@ func newCustomClearTextCredentials(pks, idu, ids []byte) *customCleartextCredent
 }
 
 func (c *customCleartextCredentials) Serialize() []byte {
-	return utils.Concatenate(0, internal.EncodeVector(c.Pks), internal.EncodeVector(c.Idu), internal.EncodeVector(c.Ids))
+	return utils.Concatenate(0, c.Pks, internal.EncodeVector(c.Idu), internal.EncodeVector(c.Ids))
 }
 
 func encodeClearTextCredentials(idu, ids, pks []byte, mode Mode) []byte {

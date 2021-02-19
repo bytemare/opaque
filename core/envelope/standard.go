@@ -81,7 +81,7 @@ func (k *Keys) RecoverSecret(idu, ids, pks, unblinded []byte, envU *Envelope) (*
 	}
 
 	pt := internal.Xor(contents.EncryptedCreds, k.Pad)
-	sec, _ := DeserializeSecretCredentials(pt)
+	sec := DeserializeSecretCredentials(pt)
 
 	return sec, k.ExportKey, nil
 }

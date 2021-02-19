@@ -9,8 +9,6 @@ import (
 	"github.com/bytemare/voprf"
 )
 
-const opaqueInfo = "OPAQUE"
-
 type Core struct {
 	Group ciphersuite.Identifier
 	Oprf  *voprf.Client
@@ -44,7 +42,7 @@ func (c *Core) OprfStart(password []byte) []byte {
 
 func (c *Core) oprfFinalize(data []byte) ([]byte, error) {
 	ev := &voprf.Evaluation{Elements: [][]byte{data}}
-	return c.Oprf.Finalize(ev, []byte(opaqueInfo))
+	return c.Oprf.Finalize(ev)
 }
 
 func (c *Core) BuildEnvelope(evaluation, pks []byte, creds *envelope.Credentials) (*envelope.Envelope, []byte, error) {

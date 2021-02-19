@@ -320,6 +320,9 @@ type draftConfig struct {
 	Group        string    `json:"Group"`
 	Hash         string    `json:"Hash"`
 	Name         string    `json:"Name"`
+	Nh           string 	`json:"Nh"`
+	Npk          string 	`json:"Npk"`
+	Nsk          string 	`json:"Nsk"`
 	OPRF         ByteToHex `json:"OPRF"`
 	SlowHash     string    `json:"SlowHash"`
 }
@@ -410,6 +413,19 @@ func (v *draftVector) test(t *testing.T) {
 	regResp, _, err := server.RegistrationResponse(regReq, input.ServerPublicKey, input.OprfKey)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	vRegResp, err := message.DeserializeRegistrationResponse(out.RegistrationResponse, p.OprfCiphersuite.Group().Get(nil).ElementLength())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(vRegResp.Data, regResp.Data) {
+		t.Fatal("registration response data do not match")
+	}
+
+	if !bytes.Equal(vRegResp.Pks, regResp.Pks) {
+		t.Fatal("registration response pks do not match")
 	}
 
 	if !bytes.Equal(out.RegistrationResponse, regResp.Serialize()) {
@@ -654,7 +670,10 @@ func TestOpaqueVectors(t *testing.T) {
 			}
 
 			for _, tv := range v {
-				t.Run(fmt.Sprintf("%s - %s", tv.Config.Name, tv.Config.EnvelopeMode), tv.test)
+				if tv.Config.Group == "decaf448" {
+					continue
+				}
+				t.Run(fmt.Sprintf("%s - %s - %s", tv.Config.Name, tv.Config.EnvelopeMode, tv.Config.Group), tv.test)
 			}
 			return nil
 		}); err != nil {

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/core/envelope"
-	"github.com/bytemare/opaque/internal"
 )
 
 // Registration
@@ -17,13 +16,28 @@ func (r *RegistrationRequest) Serialize() []byte {
 	return r.Data
 }
 
+func DeserializeRegistrationRequest(input []byte) *RegistrationRequest {
+	return &RegistrationRequest{input}
+}
+
 type RegistrationResponse struct {
 	Data []byte `json:"data"`
 	Pks  []byte `json:"pks"`
 }
 
 func (r *RegistrationResponse) Serialize() []byte {
-	return append(r.Data, internal.EncodeVector(r.Pks)...)
+	return append(r.Data, r.Pks...)
+}
+
+func DeserializeRegistrationResponse(input []byte, pointLen int) (*RegistrationResponse, error) {
+	if len(input) != 2*pointLen {
+		return nil, errors.New("invalid size")
+	}
+
+	return &RegistrationResponse{
+		Data: input[:pointLen],
+		Pks:  input[pointLen:],
+	}, nil
 }
 
 type RegistrationUpload struct {
@@ -32,7 +46,7 @@ type RegistrationUpload struct {
 }
 
 func (r *RegistrationUpload) Serialize() []byte {
-	return append(internal.EncodeVector(r.Pku), r.Envelope.Serialize()...)
+	return append(r.Pku, r.Envelope.Serialize()...)
 }
 
 // Authentication
@@ -59,26 +73,22 @@ type CredentialResponse struct {
 }
 
 func (c *CredentialResponse) Serialize() []byte {
-	return utils.Concatenate(0, c.Data, internal.EncodeVector(c.Pks), c.Envelope.Serialize())
+	return utils.Concatenate(0, c.Data, c.Pks, c.Envelope.Serialize())
 }
 
 func DeserializeCredentialResponse(input []byte, pointLen, hashSize int) (response *CredentialResponse, offset int, err error) {
-	if len(input) < pointLen {
+	if len(input) < 2*pointLen {
 		return nil, 0, errors.New("credential response too short")
 	}
 
 	data := input[:pointLen]
+	pks := input[pointLen:2*pointLen]
 
-	pks, pksLength, err := internal.DecodeVector(input[pointLen:])
+	envU, envLength, err := envelope.DeserializeEnvelope(input[2*pointLen:], hashSize)
 	if err != nil {
 		return nil, 0, err
 	}
-
-	envU, envLength, err := envelope.DeserializeEnvelope(input[pointLen+pksLength:], hashSize)
-	if err != nil {
-		return nil, 0, err
-	}
-	offset = pointLen + pksLength + envLength
+	offset = 2*pointLen + envLength
 
 	return &CredentialResponse{
 		Data:     data,
