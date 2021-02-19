@@ -648,7 +648,7 @@ func hashToHash(h string) hash.Hashing {
 type draftVectors []*draftVector
 
 func TestOpaqueVectors(t *testing.T) {
-	if err := filepath.Walk("./tests/newVectors2.json",
+	if err := filepath.Walk("./tests/vectors.json",
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
