@@ -2,6 +2,7 @@ package message
 
 import (
 	"errors"
+
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/core/envelope"
 )
@@ -63,6 +64,7 @@ func DeserializeCredentialRequest(input []byte, pointLen int) (*CredentialReques
 	if len(input) <= pointLen {
 		return nil, errors.New("malformed credential request")
 	}
+
 	return &CredentialRequest{input[:pointLen]}, nil
 }
 
@@ -76,19 +78,20 @@ func (c *CredentialResponse) Serialize() []byte {
 	return utils.Concatenate(0, c.Data, c.Pks, c.Envelope.Serialize())
 }
 
-func DeserializeCredentialResponse(input []byte, pointLen, hashSize int) (response *CredentialResponse, offset int, err error) {
-	if len(input) < 2*pointLen {
+func DeserializeCredentialResponse(input []byte, pointLength, hashSize, skLength int) (response *CredentialResponse, offset int, err error) {
+	if len(input) < 2*pointLength {
 		return nil, 0, errors.New("credential response too short")
 	}
 
-	data := input[:pointLen]
-	pks := input[pointLen:2*pointLen]
+	data := input[:pointLength]
+	pks := input[pointLength : 2*pointLength]
 
-	envU, envLength, err := envelope.DeserializeEnvelope(input[2*pointLen:], hashSize)
+	envU, envLength, err := envelope.DeserializeEnvelope(input[2*pointLength:], hashSize, skLength)
 	if err != nil {
 		return nil, 0, err
 	}
-	offset = 2*pointLen + envLength
+
+	offset = 2*pointLength + envLength
 
 	return &CredentialResponse{
 		Data:     data,

@@ -3,6 +3,7 @@ package opaque
 import (
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/core"
 	"github.com/bytemare/opaque/core/envelope"
@@ -36,6 +37,10 @@ func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message
 	envU, exportKey, err := c.Core.BuildEnvelope(resp.Data, resp.Pks, creds)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if creds.Nonce == nil {
+		creds.Nonce = utils.RandomBytes(32)
 	}
 
 	return &message.RegistrationUpload{

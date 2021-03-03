@@ -2,6 +2,7 @@ package ake
 
 import (
 	"errors"
+
 	"github.com/bytemare/cryptotools/hash"
 
 	"github.com/bytemare/cryptotools/encoding"

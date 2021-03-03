@@ -2,10 +2,12 @@ package ake
 
 import (
 	"crypto/hmac"
-	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/hash"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
+
+	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/cryptotools/hash"
 )
 
 type Server struct {
@@ -28,6 +30,7 @@ func NewServer(g group.Group, h hash.Hashing) *Server {
 //  Note := there's no effect if esk, epk, and nonce have already been set in a previous call
 func (s *Server) Initialize(esk group.Scalar, nonce []byte, nonceLen int) {
 	nonce = s.Ake.Initialize(esk, nonce, nonceLen)
+
 	if s.NonceS == nil {
 		s.NonceS = nonce
 	}
@@ -59,6 +62,7 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 	keys := deriveKeys(h, ikm, transcriptHasher.Sum(nil))
 
 	var einfo []byte
+
 	if len(serverInfo) != 0 {
 		pad := h.HKDFExpand(keys.HandshakeEncryptKey, []byte(encryptionTag), len(serverInfo))
 		einfo = internal.Xor(pad, serverInfo)

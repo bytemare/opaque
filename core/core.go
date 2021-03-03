@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
@@ -51,7 +52,7 @@ func (c *Core) BuildEnvelope(evaluation, pks []byte, creds *envelope.Credentials
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	return c.Keys.BuildEnvelope(unblinded, pks, c.Mode, creds)
+	return c.Keys.BuildEnvelopeNew(unblinded, pks, c.Mode, creds)
 }
 
 func (c *Core) RecoverSecret(idu, ids, pks, evaluation []byte, envU *envelope.Envelope) (*envelope.SecretCredentials, []byte, error) {
@@ -60,5 +61,5 @@ func (c *Core) RecoverSecret(idu, ids, pks, evaluation []byte, envU *envelope.En
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	return c.Keys.RecoverSecret(idu, ids, pks, unblinded, envU)
+	return c.Keys.RecoverSecretNew(idu, ids, pks, unblinded, envU)
 }

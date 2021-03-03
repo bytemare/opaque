@@ -5,28 +5,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/bytemare/opaque/message"
 	"io/ioutil"
-	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/message"
+
 	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/mhf"
-	"github.com/bytemare/cryptotools/signature"
-	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/voprf"
-)
-
-var (
-	OprfSuites = []voprf.Ciphersuite{voprf.RistrettoSha512, voprf.P256Sha256}
-	Hashes     = []hash.Hashing{hash.SHA256, hash.SHA512}
-	MHF        = []mhf.MHF{mhf.Argon2id}
-	Modes      = []envelope.Mode{envelope.Base, envelope.CustomIdentifier}
 )
 
 type ByteToHex []byte
@@ -47,286 +37,23 @@ func (j *ByteToHex) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-type testEnvParameters struct {
-	OPRFSuiteID  string `json:"OPRFSuite"`
-	EnvHash      string `json:"EnvHash"`
-	MHF          string `json:"MHF"`
-	EnvelopeMode byte   `json:"EnvelopeMode"`
-}
-
-type testAkeParameters struct {
-	AkeGroup          string `json:"AkeGroup"`
-	AkeHash           string `json:"AkeHash"`
-	SigmaSignatureAlg string `json:"SigmaSignatureAlg,omitempty"`
-}
-
-type testParameters struct {
-	testEnvParameters `json:"Envelope"`
-	testAkeParameters `json:"AKE"`
-}
-
-type testRegistrationInput struct {
-	BlindReg ByteToHex `json:"RegistrationBlind"`
-}
-
-type testLoginInput struct {
-	BlindLog           ByteToHex `json:"LoginBlind"`
-	ClientAkePubkey    ByteToHex `json:"ClientAkePubkey"`
-	ClientAkeSecretKey ByteToHex `json:"ClientAkeSecretKey"`
-	ServerAkePubkey    ByteToHex `json:"ServerAkePubkey"`
-	ServerAkeSecretKey ByteToHex `json:"ServerAkeSecretKey"`
-	ClientEphPubkey    ByteToHex `json:"ClientEphPubkey"`
-	ClientEphSecretKey ByteToHex `json:"ClientEphSecretKey"`
-	ServerEphPubkey    ByteToHex `json:"ServerEphPubkey"`
-	ServerEphSecretKey ByteToHex `json:"ServerEphSecretKey"`
-	ClientNonce        ByteToHex `json:"ClientNonce"`
-	ServerNonce        ByteToHex `json:"ServerNonce"`
-	Info1              ByteToHex `json:"Info1"`
-	Info2              ByteToHex `json:"Info2"`
-}
-
-type testInput struct {
-	Idu                   ByteToHex `json:"Idu"`
-	Ids                   ByteToHex `json:"Ids"`
-	Password              ByteToHex `json:"Password"`
-	OprfKey               ByteToHex `json:"OprfKey"`
-	EnvelopeNonce         ByteToHex `json:"EnvelopeNonce"`
-	testRegistrationInput `json:"Registration"`
-	testLoginInput        `json:"Login"`
-}
-
-type testMessages struct {
-	RegistrationRequest  ByteToHex `json:"RegistrationRequest"`
-	RegistrationResponse ByteToHex `json:"RegistrationResponse"`
-	RegistrationUpload   ByteToHex `json:"RegistrationUpload"`
-	CredentialRequest    ByteToHex `json:"CredentialRequest"`
-	CredentialResponse   ByteToHex `json:"CredentialResponse"`
-	KeyExchange          ByteToHex `json:"KeyExchange"`
-}
-
-type testOutput struct {
-	testMessages   `json:"Messages"`
-	EInfo          ByteToHex      `json:"EInfo"`
-	Envelope       ByteToHex      `json:"Envelope"`
-	CredentialFile CredentialFile `json:"CredentialFile"`
-	ExportKey      ByteToHex      `json:"ExportKey"`
-	SharedSecret   ByteToHex      `json:"SharedSecret"`
-}
-
-type testVector struct {
-	testParameters `json:"Parameters"`
-	testInput      `json:"Input"`
-	testOutput     `json:"Output"`
-}
-
-func GenerateTestVector(p *Parameters, m *mhf.Parameters, s signature.Identifier) *testVector {
-	params := testParameters{
-		testEnvParameters: testEnvParameters{
-			OPRFSuiteID:  p.OprfCiphersuite.String(),
-			EnvHash:      p.Hash.String(),
-			MHF:          m.String(),
-			EnvelopeMode: byte(p.Mode),
-		},
-		testAkeParameters: testAkeParameters{
-			AkeGroup:          p.OprfCiphersuite.String(),
-			AkeHash:           p.Hash.String(),
-			SigmaSignatureAlg: s.String(),
-		},
-	}
-
-	in := testInput{
-		Idu:                   []byte("client"),
-		Ids:                   []byte("server"),
-		Password:              utils.RandomBytes(8),
-		OprfKey:               nil,
-		EnvelopeNonce:         nil,
-		testRegistrationInput: testRegistrationInput{},
-		testLoginInput: testLoginInput{
-			Info1: []byte("aa"),
-			Info2: []byte("aaa"),
-		},
-	}
-
-	out := testOutput{
-		testMessages:   testMessages{},
-		Envelope:       nil,
-		CredentialFile: CredentialFile{},
-		ExportKey:      nil,
-		SharedSecret:   nil,
-	}
-
-	/*
-		Registration
-	*/
-
-	// Client
-	client := p.Client(m)
-	reqReg := client.RegistrationStart(in.Password)
-	in.BlindReg = client.Core.Oprf.Export().Blind[0]
-
-	out.RegistrationRequest = reqReg.Serialize()
-
-	in.ClientAkeSecretKey, in.ClientAkePubkey = client.KeyGen()
-
-	// Server
-	serverOprfKeys := p.OprfCiphersuite.KeyGen()
-	in.OprfKey = serverOprfKeys.SecretKey
-	server := p.Server()
-	in.ServerAkeSecretKey, in.ServerAkePubkey = server.KeyGen()
-
-	respReg, _, err := server.RegistrationResponse(reqReg, in.ServerAkePubkey, in.OprfKey)
-	if err != nil {
-		panic(err)
-	}
-
-	out.RegistrationResponse = respReg.Serialize()
-
-	creds := &envelope.Credentials{
-		Sk:    in.ClientAkeSecretKey,
-		Pk:    in.ClientAkePubkey,
-		Idu:   in.Idu,
-		Ids:   in.Ids,
-		Nonce: utils.RandomBytes(32),
-	}
-
-	// Client
-	upload, _, err := client.RegistrationFinalize(creds, respReg)
-	if err != nil {
-		panic(err)
-	}
-
-	out.RegistrationUpload = upload.Serialize()
-	in.EnvelopeNonce = upload.Envelope.Contents.Nonce
-	out.Envelope = upload.Envelope.Serialize()
-
-	file := &CredentialFile{
-		Ku:       in.OprfKey,
-		Pku:      upload.Pku,
-		Envelope: upload.Envelope,
-	}
-
-	out.CredentialFile = *file
-
-	/*
-		Authentication
-	*/
-
-	// Client
-	client = p.Client(m)
-	reqCreds := client.AuthenticationStart(in.Password, nil)
-
-	in.BlindLog = client.Core.Oprf.Export().Blind[0]
-	in.ClientEphPubkey = client.Ake.Epk.Bytes()
-	in.ClientEphSecretKey = client.Ake.Esk.Bytes()
-	in.ClientNonce = client.Ake.NonceU
-
-	reqc := reqCreds.Serialize()
-	out.CredentialRequest = reqc
-
-	// Server
-	server = p.Server()
-	serverCreds := &envelope.Credentials{
-		Sk:  in.ServerAkeSecretKey,
-		Pk:  in.ServerAkePubkey,
-		Idu: in.Idu,
-		Ids: in.Ids,
-	}
-	respCreds, err := server.AuthenticationResponse(reqCreds, nil, &out.CredentialFile, serverCreds)
-	if err != nil {
-		panic(err)
-	}
-
-	in.ServerEphPubkey = server.Ake.Epk.Bytes()
-	in.ServerEphSecretKey = server.Ake.Esk.Bytes()
-	in.ServerNonce = server.Ake.NonceS
-
-	respc := respCreds.Serialize()
-	out.CredentialResponse = respc
-
-	// Client
-	fin, exportKey, err := client.AuthenticationFinalize(in.Idu, in.Ids, respCreds)
-	if err != nil {
-		panic(err)
-	}
-
-	finc := fin.Serialize()
-	out.KeyExchange = finc
-
-	out.ExportKey = exportKey
-
-	if !bytes.Equal(client.SessionKey(), server.SessionKey()) {
-		panic("Session secrets don't match.")
-	}
-
-	out.SharedSecret = client.SessionKey()
-
-	return &testVector{
-		testParameters: params,
-		testInput:      in,
-		testOutput:     out,
-	}
-}
-
-func GenerateAllVectors(t *testing.T) []*testVector {
-	v := len(OprfSuites) * len(Hashes) * len(MHF) * len(Modes)
-	log.Printf("v := %v", v)
-	vectors := make([]*testVector, v)
-	w := 0
-	for _, s := range OprfSuites {
-		for _, h := range Hashes {
-			for _, m := range MHF {
-				for _, mode := range Modes {
-					name := fmt.Sprintf("%d : %v-%v-%v-%v-%v", w, s, h, "3DH", m, mode)
-
-					p := &Parameters{
-						OprfCiphersuite: s,
-						Mode:            mode,
-						Hash:            h,
-						NonceLen:        32,
-					}
-
-					t.Run(name, func(t *testing.T) {
-						vectors[w] = GenerateTestVector(p, m.DefaultParameters(), 0)
-					},
-					)
-					w++
-
-					//if w >= 1 {
-					//	return vectors
-					//}
-				}
-			}
-		}
-	}
-
-	return vectors
-}
-
-func TestGenerateVectorFile(t *testing.T) {
-	dir := "./tests"
-	file := "allVectors.json"
-
-	vectors := GenerateAllVectors(t)
-	content, _ := json.MarshalIndent(vectors, "", "    ")
-	_ = ioutil.WriteFile(path.Join(dir, file), content, 0o644)
-}
-
 /*
 	Test test vectors
 */
 
-type draftConfig struct {
+type config struct {
 	EnvelopeMode string    `json:"EnvelopeMode"`
 	Group        string    `json:"Group"`
 	Hash         string    `json:"Hash"`
 	Name         string    `json:"Name"`
-	Nh           string 	`json:"Nh"`
-	Npk          string 	`json:"Npk"`
-	Nsk          string 	`json:"Nsk"`
+	Nh           string    `json:"Nh"`
+	Npk          string    `json:"Npk"`
+	Nsk          string    `json:"Nsk"`
 	OPRF         ByteToHex `json:"OPRF"`
 	SlowHash     string    `json:"SlowHash"`
 }
-type draftInputs struct {
+
+type inputs struct {
 	BlindLogin            ByteToHex `json:"blind_login"`
 	BlindRegistration     ByteToHex `json:"blind_registration"`
 	ClientIdentity        ByteToHex `json:"client_identity,omitempty"`
@@ -347,7 +74,8 @@ type draftInputs struct {
 	ServerPrivateKeyshare ByteToHex `json:"server_private_keyshare"`
 	ServerPublicKey       ByteToHex `json:"server_public_key"`
 }
-type draftIntermediates struct {
+
+type intermediates struct {
 	AuthKey             ByteToHex `json:"auth_key"`              //
 	ClientMacKey        ByteToHex `json:"client_mac_key"`        //
 	Envelope            ByteToHex `json:"envelope"`              //
@@ -357,7 +85,8 @@ type draftIntermediates struct {
 	PseudorandomPad     ByteToHex `json:"pseudorandom_pad"`      //
 	ServerMacKey        ByteToHex `json:"server_mac_key"`        //
 }
-type draftOutputs struct {
+
+type outputs struct {
 	KE1                  ByteToHex `json:"KE1"`                   //
 	KE2                  ByteToHex `json:"KE2"`                   //
 	KE3                  ByteToHex `json:"KE3"`                   //
@@ -368,14 +97,14 @@ type draftOutputs struct {
 	SessionKey           ByteToHex `json:"session_key"`           //
 }
 
-type draftVector struct {
-	Config        draftConfig        `json:"config"`
-	Inputs        draftInputs        `json:"inputs"`
-	Intermediates draftIntermediates `json:"intermediates"`
-	Outputs       draftOutputs       `json:"outputs"`
+type vector struct {
+	Config        config        `json:"config"`
+	Inputs        inputs        `json:"inputs"`
+	Intermediates intermediates `json:"intermediates"`
+	Outputs       outputs       `json:"outputs"`
 }
 
-func (v *draftVector) test(t *testing.T) {
+func (v *vector) test(t *testing.T) {
 	mode, err := hex.DecodeString(v.Config.EnvelopeMode)
 	if err != nil {
 		t.Fatal(err)
@@ -388,7 +117,7 @@ func (v *draftVector) test(t *testing.T) {
 		NonceLen:        32,
 	}
 
-	//harden := tests.IdentityMHF
+	// harden := tests.IdentityMHF
 
 	input := v.Inputs
 	check := v.Intermediates
@@ -509,7 +238,7 @@ func (v *draftVector) test(t *testing.T) {
 	_ = v.loginResponse(t, server, KE1, serverCredentials, credFile)
 
 	// Client
-	cke2, err := message.DeserializeKE2(out.KE2, 32, client.Ake.Group.ElementLength(), client.Core.Hash.OutputSize())
+	cke2, err := message.DeserializeKE2(out.KE2, 32, internal.PointLength(client.Core.Group), client.Core.Hash.OutputSize(), internal.ScalarLength(client.Core.Group))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -544,7 +273,7 @@ func (v *draftVector) test(t *testing.T) {
 	}
 }
 
-func (v *draftVector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, creds *envelope.Credentials, credFile *CredentialFile) *message.KE2 {
+func (v *vector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, creds *envelope.Credentials, credFile *CredentialFile) *message.KE2 {
 	sks, err := s.Ake.Group.NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)
@@ -569,7 +298,7 @@ func (v *draftVector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, c
 		t.Fatal("HandshakeEncryptKeys do not match")
 	}
 
-	draftKE2, err := message.DeserializeKE2(v.Outputs.KE2, 32, s.Ake.Group.ElementLength(), s.Ake.Hashing.OutputSize())
+	draftKE2, err := message.DeserializeKE2(v.Outputs.KE2, 32, internal.PointLength(s.oprf.Group()), s.Ake.Hashing.OutputSize(), internal.ScalarLength(s.oprf.Group()))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -645,7 +374,7 @@ func hashToHash(h string) hash.Hashing {
 	}
 }
 
-type draftVectors []*draftVector
+type draftVectors []*vector
 
 func TestOpaqueVectors(t *testing.T) {
 	if err := filepath.Walk("./tests/vectors.json",

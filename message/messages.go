@@ -2,6 +2,7 @@ package message
 
 import (
 	"errors"
+
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/internal"
 )
@@ -38,6 +39,7 @@ func DeserializeKE1(input []byte, nonceLength, pointLen int) (*KE1, error) {
 
 	offset = pointLen + nonceLength + offset
 	epku := input[offset:]
+
 	if len(epku) != pointLen {
 		return nil, errors.New("invalid epku length")
 	}
@@ -62,16 +64,16 @@ func (m *KE2) Serialize() []byte {
 	return utils.Concatenate(0, m.CredentialResponse.Serialize(), m.NonceS, m.EpkS, internal.EncodeVector(m.Einfo), m.Mac)
 }
 
-func DeserializeKE2(input []byte, nonceLength, pointLen, hashLen int) (*KE2, error) {
-	cresp, offset, err := DeserializeCredentialResponse(input, pointLen, hashLen)
+func DeserializeKE2(input []byte, nonceLength, pointLength, hashLen, skLength int) (*KE2, error) {
+	cresp, offset, err := DeserializeCredentialResponse(input, pointLength, hashLen, skLength)
 	if err != nil {
 		return nil, err
 	}
 
 	nonceS := input[offset : offset+nonceLength]
-	offset = offset + nonceLength
-	epks := input[offset : offset+pointLen]
-	offset = offset + pointLen
+	offset += nonceLength
+	epks := input[offset : offset+pointLength]
+	offset += efpointLength
 
 	einfo, length, err := internal.DecodeVector(input[offset:])
 	if err != nil {

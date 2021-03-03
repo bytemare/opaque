@@ -74,6 +74,7 @@ func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo []byte, cre
 	if creds.Idu == nil {
 		creds.Idu = credFile.Pku
 	}
+
 	if creds.Ids == nil {
 		creds.Ids = creds.Pk
 	}

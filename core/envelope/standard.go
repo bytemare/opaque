@@ -3,9 +3,10 @@ package envelope
 import (
 	"crypto/hmac"
 	"errors"
+
+	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
-	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/internal"
 )
 
@@ -19,40 +20,40 @@ const (
 var ErrEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
 
 type Keys struct {
+	Group                        ciphersuite.Identifier
 	Hash                         *hash.Hash
 	Mhf                          *mhf.Parameters
 	Pad, AuthKey, ExportKey, Prk []byte
 }
 
 func (k *Keys) buildRwdu(unblinded, nonce []byte) []byte {
-	//hardened := c.Mhf.Harden(unblinded, nil)
+	// hardened := c.Mhf.Harden(unblinded, nil)
 	hardened := unblinded
 	return k.Hash.HKDFExtract(hardened, nonce)
 }
 
-func (k *Keys) buildKeys(rwdu []byte, padLength int) {
+func (k *Keys) padKey(rwdu []byte, padLength int) {
 	k.Pad = k.Hash.HKDFExpand(rwdu, []byte(tagPad), padLength)
+}
+
+func (k *Keys) buildKeys(rwdu []byte) {
 	k.AuthKey = k.Hash.HKDFExpand(rwdu, []byte(tagAuthKey), k.Hash.OutputSize())
 	k.ExportKey = k.Hash.HKDFExpand(rwdu, []byte(tagExportKey), k.Hash.OutputSize())
 }
 
 func (k *Keys) BuildEnvelope(unblinded, pks []byte, mode Mode, creds *Credentials) (*Envelope, []byte, error) {
-	nonce := creds.Nonce
-	if nonce == nil {
-		nonce = utils.RandomBytes(nonceLen)
-	}
-
-	k.Prk = k.buildRwdu(unblinded, nonce)
+	k.Prk = k.buildRwdu(unblinded, creds.Nonce)
 	sec := SecretCredentials{Sku: creds.Sk}
 	pt := sec.Serialize()
 
-	k.buildKeys(k.Prk, len(pt))
+	k.padKey(k.Prk, len(pt))
+	k.buildKeys(k.Prk)
 
 	encryptedCreds := internal.Xor(pt, k.Pad)
 
-	contents := InnerEnvelope{
+	contents := &InnerEnvelope{
 		Mode:           mode,
-		Nonce:          nonce,
+		Nonce:          creds.Nonce,
 		EncryptedCreds: encryptedCreds,
 	}
 
@@ -60,7 +61,7 @@ func (k *Keys) BuildEnvelope(unblinded, pks []byte, mode Mode, creds *Credential
 
 	tag := k.Hash.Hmac(append(contents.Serialize(), clearCreds...), k.AuthKey)
 	envU := &Envelope{
-		Contents: contents,
+		InnerEnv: contents,
 		AuthTag:  tag,
 	}
 
@@ -68,9 +69,9 @@ func (k *Keys) BuildEnvelope(unblinded, pks []byte, mode Mode, creds *Credential
 }
 
 func (k *Keys) RecoverSecret(idu, ids, pks, unblinded []byte, envU *Envelope) (*SecretCredentials, []byte, error) {
-	contents := envU.Contents
+	contents := envU.InnerEnv
 	rwdu := k.buildRwdu(unblinded, contents.Nonce)
-	k.buildKeys(rwdu, len(contents.EncryptedCreds))
+	k.buildKeys(rwdu)
 
 	clearCreds := encodeClearTextCredentials(idu, ids, pks, contents.Mode)
 
@@ -80,6 +81,7 @@ func (k *Keys) RecoverSecret(idu, ids, pks, unblinded []byte, envU *Envelope) (*
 		return nil, nil, ErrEnvelopeInvalidTag
 	}
 
+	k.padKey(rwdu, len(contents.EncryptedCreds))
 	pt := internal.Xor(contents.EncryptedCreds, k.Pad)
 	sec := DeserializeSecretCredentials(pt)
 

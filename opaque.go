@@ -3,13 +3,13 @@ package opaque
 import (
 	"errors"
 	"fmt"
-	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/core/envelope"
 
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/voprf"
 )
 

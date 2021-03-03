@@ -2,6 +2,7 @@ package ake
 
 import (
 	"crypto/hmac"
+
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
@@ -27,6 +28,7 @@ func NewClient(g ciphersuite.Identifier, h hash.Hashing) *Client {
 //  Note := there's no effect if esk, epk, and nonce have already been set in a previous call
 func (c *Client) Initialize(esk group.Scalar, nonce []byte, nonceLen int) {
 	nonce = c.Ake.Initialize(esk, nonce, nonceLen)
+
 	if c.NonceU == nil {
 		c.NonceU = nonce
 	}
@@ -34,6 +36,7 @@ func (c *Client) Initialize(esk group.Scalar, nonce []byte, nonceLen int) {
 
 func (c *Client) Start(clientInfo []byte) *message.KE1 {
 	c.Ake.Initialize(nil, nil, 32)
+
 	return &message.KE1{
 		NonceU:     c.NonceU,
 		ClientInfo: clientInfo,
@@ -63,6 +66,7 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 	keys := deriveKeys(h, ikm, transcriptHasher.Sum(nil))
 
 	var serverInfo []byte
+
 	if len(ke2.Einfo) != 0 {
 		pad := h.HKDFExpand(keys.HandshakeEncryptKey, []byte(encryptionTag), len(ke2.Einfo))
 		serverInfo = internal.Xor(pad, ke2.Einfo)
