@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/bytemare/cryptotools/mhf"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -112,8 +113,12 @@ func (v *vector) test(t *testing.T) {
 
 	p := &Parameters{
 		OprfCiphersuite: voprf.Ciphersuite(v.Config.OPRF[1]),
-		Mode:            envelope.Mode(mode[0]),
+		KDF:             hashToHash(v.Config.Hash),
+		MAC:             hashToHash(v.Config.Hash),
 		Hash:            hashToHash(v.Config.Hash),
+		MHF:             mhf.Scrypt,
+		Mode:            envelope.Mode(mode[0]),
+		AkeGroup:        voprf.Ciphersuite(v.Config.OPRF[1]).Group(),
 		NonceLen:        32,
 	}
 
@@ -128,7 +133,7 @@ func (v *vector) test(t *testing.T) {
 	*/
 
 	// Client
-	client := p.Client(nil)
+	client := p.Client()
 	oprfClient := buildOPRFClient(p.OprfCiphersuite, input.BlindRegistration)
 	client.Core.Oprf = oprfClient
 	regReq := client.RegistrationStart(input.Password)
@@ -206,7 +211,7 @@ func (v *vector) test(t *testing.T) {
 	*/
 
 	// Client
-	client = p.Client(nil)
+	client = p.Client()
 	client.Core.Oprf = buildOPRFClient(p.OprfCiphersuite, input.BlindLogin)
 	esk, err := client.Ake.Group.NewScalar().Decode(input.ClientPrivateKeyshare)
 	if err != nil {
@@ -238,7 +243,7 @@ func (v *vector) test(t *testing.T) {
 	_ = v.loginResponse(t, server, KE1, serverCredentials, credFile)
 
 	// Client
-	cke2, err := message.DeserializeKE2(out.KE2, 32, internal.PointLength(client.Core.Group), client.Core.Hash.OutputSize(), internal.ScalarLength(client.Core.Group))
+	cke2, err := message.DeserializeKE2(out.KE2, 32, internal.PointLength(client.Core.Group), client.Core.Mac.OutputSize(), internal.ScalarLength(client.Core.Group))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +303,7 @@ func (v *vector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, creds 
 		t.Fatal("HandshakeEncryptKeys do not match")
 	}
 
-	draftKE2, err := message.DeserializeKE2(v.Outputs.KE2, 32, internal.PointLength(s.oprf.Group()), s.Ake.Hashing.OutputSize(), internal.ScalarLength(s.oprf.Group()))
+	draftKE2, err := message.DeserializeKE2(v.Outputs.KE2, 32, internal.PointLength(s.oprf.Group()), s.Ake.Hash.H.OutputSize(), internal.ScalarLength(s.oprf.Group()))
 	if err != nil {
 		t.Fatal(err)
 	}

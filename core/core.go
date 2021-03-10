@@ -2,11 +2,11 @@ package core
 
 import (
 	"fmt"
-
+	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/opaque/core/envelope"
+	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/voprf"
 )
 
@@ -23,7 +23,7 @@ func (c *Core) DebugGetKeys() (pad, authKey, exportKey, prk []byte) {
 	return c.Pad, c.AuthKey, c.ExportKey, c.Prk
 }
 
-func NewCore(suite voprf.Ciphersuite, h hash.Hashing, mode envelope.Mode, m *mhf.Parameters) *Core {
+func NewCore(suite voprf.Ciphersuite, kdf *internal.KDF, mac *internal.Mac, h *internal.Hash, m *mhf.MHF, mode envelope.Mode, g group.Group) *Core {
 	oprf, err := suite.Client(nil)
 	if err != nil {
 		panic(err)
@@ -33,7 +33,7 @@ func NewCore(suite voprf.Ciphersuite, h hash.Hashing, mode envelope.Mode, m *mhf
 		Group: suite.Group(),
 		Oprf:  oprf,
 		Mode:  mode,
-		Keys:  &envelope.Keys{Hash: h.Get(), Mhf: m},
+		Keys:  envelope.NewKeys(g, kdf, mac, h, m),
 	}
 }
 

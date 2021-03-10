@@ -3,9 +3,7 @@ package envelope
 import (
 	"crypto/hmac"
 	"errors"
-
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
+	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/opaque/internal"
 )
@@ -20,25 +18,37 @@ const (
 var ErrEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
 
 type Keys struct {
-	Group                        ciphersuite.Identifier
-	Hash                         *hash.Hash
-	Mhf                          *mhf.Parameters
+	Group group.Group
+	*internal.KDF
+	*internal.Mac
+	*internal.Hash
+	*mhf.MHF
 	Pad, AuthKey, ExportKey, Prk []byte
 }
 
+func NewKeys(g group.Group, kdf *internal.KDF, mac *internal.Mac, h *internal.Hash, m *mhf.MHF) *Keys {
+	return &Keys{
+		Group: g,
+		KDF:   kdf,
+		Mac:   mac,
+		Hash:  h,
+		MHF:   m,
+	}
+}
+
 func (k *Keys) buildRwdu(unblinded, nonce []byte) []byte {
-	// hardened := c.Mhf.Harden(unblinded, nil)
+	// hardened := c.Harden(unblinded, nil)
 	hardened := unblinded
-	return k.Hash.HKDFExtract(hardened, nonce)
+	return k.Extract(nonce, hardened)
 }
 
 func (k *Keys) padKey(rwdu []byte, padLength int) {
-	k.Pad = k.Hash.HKDFExpand(rwdu, []byte(tagPad), padLength)
+	k.Pad = k.Expand(rwdu, []byte(tagPad), padLength)
 }
 
 func (k *Keys) buildKeys(rwdu []byte) {
-	k.AuthKey = k.Hash.HKDFExpand(rwdu, []byte(tagAuthKey), k.Hash.OutputSize())
-	k.ExportKey = k.Hash.HKDFExpand(rwdu, []byte(tagExportKey), k.Hash.OutputSize())
+	k.AuthKey = k.Expand(rwdu, []byte(tagAuthKey), k.Hash.Size())
+	k.ExportKey = k.Expand(rwdu, []byte(tagExportKey), k.Hash.Size())
 }
 
 func (k *Keys) BuildEnvelope(unblinded, pks []byte, mode Mode, creds *Credentials) (*Envelope, []byte, error) {
@@ -59,7 +69,7 @@ func (k *Keys) BuildEnvelope(unblinded, pks []byte, mode Mode, creds *Credential
 
 	clearCreds := encodeClearTextCredentials(creds.Idu, creds.Ids, pks, mode)
 
-	tag := k.Hash.Hmac(append(contents.Serialize(), clearCreds...), k.AuthKey)
+	tag := k.MAC(append(contents.Serialize(), clearCreds...), k.AuthKey)
 	envU := &Envelope{
 		InnerEnv: contents,
 		AuthTag:  tag,
@@ -75,7 +85,7 @@ func (k *Keys) RecoverSecret(idu, ids, pks, unblinded []byte, envU *Envelope) (*
 
 	clearCreds := encodeClearTextCredentials(idu, ids, pks, contents.Mode)
 
-	expectedTag := k.Hash.Hmac(append(contents.Serialize(), clearCreds...), k.AuthKey)
+	expectedTag := k.MAC(k.AuthKey, append(contents.Serialize(), clearCreds...))
 
 	if !hmac.Equal(expectedTag, envU.AuthTag) {
 		return nil, nil, ErrEnvelopeInvalidTag

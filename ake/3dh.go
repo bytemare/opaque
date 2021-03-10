@@ -47,7 +47,9 @@ type Keys struct {
 
 type Ake struct {
 	group.Group
-	hash.Hashing
+	*internal.KDF
+	*internal.Mac
+	*internal.Hash
 	SessionSecret []byte
 
 	Esk   group.Scalar  // todo: only useful in testing (except for client), to force value
@@ -80,17 +82,17 @@ func buildLabel(length int, label, context []byte) []byte {
 	return utils.Concatenate(0, encoding.I2OSP(length, 2), internal.EncodeVectorLen(append([]byte(labelPrefix), label...), 1), internal.EncodeVectorLen(context, 1))
 }
 
-func hkdfExpand(h *hash.Hash, secret, hkdfLabel []byte) []byte {
+func hkdfExpand(h *internal.KDF, secret, hkdfLabel []byte) []byte {
 	// todo : If len(label) > 12, the hash function might have additional iterations.
-	return h.HKDFExpand(secret, hkdfLabel, h.OutputSize())
+	return h.Expand(secret, hkdfLabel, h.Size())
 }
 
-func hkdfExpandLabel(h *hash.Hash, secret, label, context []byte) []byte {
+func hkdfExpandLabel(h *internal.KDF, secret, label, context []byte) []byte {
 	hkdfLabel := buildLabel(h.OutputSize(), label, context)
 	return hkdfExpand(h, secret, hkdfLabel)
 }
 
-func deriveSecret(h *hash.Hash, secret, label, context []byte) []byte {
+func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return hkdfExpandLabel(h, secret, label, context)
 }
 
@@ -100,7 +102,7 @@ func newInfo(h *hash.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []
 	_, _ = h.Write(utils.Concatenate(0, tag3DH, cp, ke1.Serialize(), sp, response, nonceS, epks))
 }
 
-func deriveKeys(h *hash.Hash, ikm, context []byte) *Keys {
+func deriveKeys(h *internal.KDF, ikm, context []byte) *Keys {
 	prk := h.Get().HKDFExtract(ikm, nil)
 	k := &Keys{}
 	k.HandshakeSecret = deriveSecret(h, prk, []byte(tagHandshake), context)

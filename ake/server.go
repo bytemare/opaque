@@ -7,7 +7,6 @@ import (
 	"github.com/bytemare/opaque/message"
 
 	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/hash"
 )
 
 type Server struct {
@@ -17,11 +16,13 @@ type Server struct {
 	ClientMac []byte
 }
 
-func NewServer(g group.Group, h hash.Hashing) *Server {
+func NewServer(g group.Group, kdf *internal.KDF, mac *internal.Mac, h *internal.Hash) *Server {
 	return &Server{
 		Ake: &Ake{
-			Group:   g,
-			Hashing: h,
+			Group: g,
+			KDF:   kdf,
+			Mac:   mac,
+			Hash:  h,
 		},
 	}
 }
@@ -55,28 +56,27 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 
 	nonce := s.NonceS
 
-	h := s.Hashing.Get()
-	transcriptHasher := s.Hashing.Get()
+	transcriptHasher := s.Hash.H
 	newInfo(transcriptHasher, ke1, idu, ids, response.Serialize(), nonce, s.Epk.Bytes())
 
-	keys := deriveKeys(h, ikm, transcriptHasher.Sum(nil))
+	keys := deriveKeys(s.KDF, ikm, transcriptHasher.Sum(nil))
 
 	var einfo []byte
 
 	if len(serverInfo) != 0 {
-		pad := h.HKDFExpand(keys.HandshakeEncryptKey, []byte(encryptionTag), len(serverInfo))
+		pad := s.Expand(keys.HandshakeEncryptKey, []byte(encryptionTag), len(serverInfo))
 		einfo = internal.Xor(pad, serverInfo)
 	}
 
 	_, _ = transcriptHasher.Write(internal.EncodeVector(einfo))
 	transcript2 := transcriptHasher.Sum(nil)
-	mac := h.Hmac(transcript2, keys.ServerMacKey)
+	mac := s.MAC(keys.ServerMacKey, transcript2)
 
 	s.Keys = keys
 	s.SessionSecret = keys.SessionSecret
 	_, _ = transcriptHasher.Write(mac)
 	transcript3 := transcriptHasher.Sum(nil)
-	s.ClientMac = h.Hmac(transcript3, keys.ClientMacKey)
+	s.ClientMac = s.MAC(keys.ClientMacKey, transcript3)
 
 	return &message.KE2{
 		CredentialResponse: response,

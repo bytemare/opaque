@@ -3,6 +3,7 @@ package opaque
 import (
 	"bytes"
 	"fmt"
+	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"testing"
 
 	"github.com/bytemare/cryptotools/hash"
@@ -238,12 +239,15 @@ import (
 func TestFull(t *testing.T) {
 	p := &Parameters{
 		OprfCiphersuite: voprf.RistrettoSha512,
+		KDF:             hash.SHA512,
+		MAC:             hash.SHA512,
+		Hash:            hash.SHA512,
+		MHF:             mhf.Scrypt,
 		Mode:            envelope.CustomIdentifier,
-		Hash:            hash.SHA256,
+		AkeGroup:        ciphersuite.Ristretto255Sha512,
 		NonceLen:        32,
 	}
 
-	m := mhf.Argon2id.DefaultParameters()
 	ids := []byte("server")
 
 	/*
@@ -253,7 +257,7 @@ func TestFull(t *testing.T) {
 	// Client : send username + reqReg to server
 	username := []byte("client")
 	password := []byte("password")
-	client := p.Client(m)
+	client := p.Client()
 	reqReg := client.RegistrationStart(password)
 
 	// Server
@@ -293,7 +297,7 @@ func TestFull(t *testing.T) {
 	*/
 
 	// Client
-	client = p.Client(m)
+	client = p.Client()
 	req := client.AuthenticationStart(password, nil)
 
 	// Server

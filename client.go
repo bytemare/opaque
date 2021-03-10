@@ -1,12 +1,14 @@
 package opaque
 
 import (
+	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/core"
 	"github.com/bytemare/opaque/core/envelope"
+	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 	"github.com/bytemare/voprf"
 )
@@ -17,10 +19,15 @@ type Client struct {
 	Ke1  *message.KE1
 }
 
-func NewClient(suite voprf.Ciphersuite, h hash.Hashing, mode envelope.Mode, m *mhf.Parameters) *Client {
+func NewClient(suite voprf.Ciphersuite, kdf, mac, h hash.Hashing, m *mhf.MHF, mode envelope.Mode, akeGroup ciphersuite.Identifier) *Client {
+	g := akeGroup.Get(nil)
+	k := &internal.KDF{Hash: kdf.Get()}
+	mac2 := &internal.Mac{Hash: mac.Get()}
+	h2 := &internal.Hash{H: h.Get()}
+	h3 := &internal.Hash{H: h.Get()}
 	return &Client{
-		Core: core.NewCore(suite, h, mode, m),
-		Ake:  ake.NewClient(suite.Group(), h),
+		Core: core.NewCore(suite, k, mac2, h2, m, mode, g),
+		Ake:  ake.NewClient(g, k, mac2, h3),
 	}
 }
 

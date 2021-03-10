@@ -10,7 +10,7 @@ func (k *Keys) BuildEnvelopeNew(unblinded, pks []byte, mode Mode, creds *Credent
 
 	innerEnv := mode.Get().BuildInnerEnvelope(k.Prk, creds, k)
 	ctc := mode.Get().ClearTextCredentials(creds.Idu, creds.Ids, pks)
-	tag := k.Hash.Hmac(append(innerEnv.Serialize(), ctc.Serialize()...), k.AuthKey)
+	tag := k.MAC(k.AuthKey, append(innerEnv.Serialize(), ctc.Serialize()...))
 
 	envU := &Envelope{
 		InnerEnv: innerEnv,
@@ -26,7 +26,7 @@ func (k *Keys) RecoverSecretNew(idu, ids, pks, unblinded []byte, envU *Envelope)
 	k.buildKeys(prk)
 
 	ctc := contents.Mode.Get().ClearTextCredentials(idu, ids, pks)
-	expectedTag := k.Hash.Hmac(append(contents.Serialize(), ctc.Serialize()...), k.AuthKey)
+	expectedTag := k.MAC(k.AuthKey, append(contents.Serialize(), ctc.Serialize()...))
 
 	if !hmac.Equal(expectedTag, envU.AuthTag) {
 		return nil, nil, ErrEnvelopeInvalidTag

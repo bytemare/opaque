@@ -4,8 +4,6 @@ import (
 	"crypto/hmac"
 
 	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
@@ -15,11 +13,13 @@ type Client struct {
 	NonceU []byte // todo: only useful in testing, to force value
 }
 
-func NewClient(g ciphersuite.Identifier, h hash.Hashing) *Client {
+func NewClient(g group.Group, kdf *internal.KDF, mac *internal.Mac, h *internal.Hash) *Client {
 	return &Client{
 		Ake: &Ake{
-			Group:   g.Get(nil),
-			Hashing: h,
+			Group: g,
+			KDF:   kdf,
+			Mac:   mac,
+			Hash:  h,
 		},
 	}
 }
@@ -59,23 +59,22 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 		return nil, nil, err
 	}
 
-	h := c.Hashing.Get()
-	transcriptHasher := c.Hashing.Get()
+	transcriptHasher := c.Hash.H
 	newInfo(transcriptHasher, ke1, idu, ids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS)
 
-	keys := deriveKeys(h, ikm, transcriptHasher.Sum(nil))
+	keys := deriveKeys(c.KDF, ikm, transcriptHasher.Sum(nil))
 
 	var serverInfo []byte
 
 	if len(ke2.Einfo) != 0 {
-		pad := h.HKDFExpand(keys.HandshakeEncryptKey, []byte(encryptionTag), len(ke2.Einfo))
+		pad := c.Expand(keys.HandshakeEncryptKey, []byte(encryptionTag), len(ke2.Einfo))
 		serverInfo = internal.Xor(pad, ke2.Einfo)
 	}
 
 	_, _ = transcriptHasher.Write(internal.EncodeVector(ke2.Einfo))
 	transcript2 := transcriptHasher.Sum(nil)
 
-	expected := h.Hmac(transcript2, keys.ServerMacKey)
+	expected := c.MAC(keys.ServerMacKey, transcript2)
 	if !hmac.Equal(expected, ke2.Mac) {
 		return nil, nil, ErrAkeInvalidServerMac
 	}
@@ -85,7 +84,7 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 	c.Keys = keys
 	c.SessionSecret = keys.SessionSecret
 
-	return &message.KE3{Mac: h.Hmac(transcript3, keys.ClientMacKey)}, serverInfo, nil
+	return &message.KE3{Mac: c.MAC(keys.ClientMacKey, transcript3)}, serverInfo, nil
 }
 
 func (c *Client) SessionKey() []byte {

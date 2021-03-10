@@ -1,9 +1,11 @@
 package opaque
 
 import (
+	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/core/envelope"
+	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 	"github.com/bytemare/voprf"
 )
@@ -19,10 +21,14 @@ type Server struct {
 	Ake  *ake.Server
 }
 
-func NewServer(suite voprf.Ciphersuite, h hash.Hashing) *Server {
+func NewServer(suite voprf.Ciphersuite, kdf, mac, h hash.Hashing, akeGroup ciphersuite.Identifier) *Server {
+	g := akeGroup.Get(nil)
+	k := &internal.KDF{Hash: kdf.Get()}
+	mac2 := &internal.Mac{Hash: mac.Get()}
+	h2 := &internal.Hash{H: h.Get()}
 	return &Server{
 		oprf: suite,
-		Ake:  ake.NewServer(suite.Group().Get(nil), h),
+		Ake:  ake.NewServer(g, k, mac2, h2),
 	}
 }
 
