@@ -15,14 +15,15 @@ import (
 )
 
 type Parameters struct {
-	OprfCiphersuite voprf.Ciphersuite `json:"s"`
-	KDF             hash.Hashing
-	MAC             hash.Hashing
-	Hash            hash.Hashing `json:"h"`
-	MHF             mhf.Identifier
-	Mode            envelope.Mode `json:"m"`
-	AkeGroup        ciphersuite.Identifier
-	NonceLen        int `json:"l"`
+	OprfCiphersuite voprf.Ciphersuite      `json:"oprf"`
+	KDF             hash.Hashing           `json:"kdf"`
+	MAC             hash.Hashing           `json:"mac"`
+	Hash            hash.Hashing           `json:"hash"`
+	MHF             mhf.Identifier         `json:"mhf"`
+	Mode            envelope.Mode          `json:"mode"`
+	Ake             string                 `json:"ake"`
+	Group           ciphersuite.Identifier `json:"group"`
+	NonceLen        int                    `json:"nl"`
 }
 
 func (p *Parameters) Serialize() []byte {
@@ -30,11 +31,11 @@ func (p *Parameters) Serialize() []byte {
 }
 
 func (p *Parameters) Client() *Client {
-	return NewClient(p.OprfCiphersuite, p.KDF, p.MAC, p.Hash, p.MHF.Get(), p.Mode, p.AkeGroup)
+	return NewClient(p.OprfCiphersuite, p.KDF, p.MAC, p.Hash, p.MHF.Get(), p.Mode, p.Group)
 }
 
 func (p *Parameters) Server() *Server {
-	return NewServer(p.OprfCiphersuite, p.KDF, p.MAC, p.Hash, p.AkeGroup)
+	return NewServer(p.OprfCiphersuite, p.KDF, p.MAC, p.Hash, p.Group)
 }
 
 func (p *Parameters) String() string {

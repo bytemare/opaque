@@ -244,7 +244,7 @@ func TestFull(t *testing.T) {
 		Hash:            hash.SHA512,
 		MHF:             mhf.Scrypt,
 		Mode:            envelope.CustomIdentifier,
-		AkeGroup:        ciphersuite.Ristretto255Sha512,
+		Group:           ciphersuite.Ristretto255Sha512,
 		NonceLen:        32,
 	}
 

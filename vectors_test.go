@@ -46,12 +46,11 @@ type config struct {
 	EnvelopeMode string    `json:"EnvelopeMode"`
 	Group        string    `json:"Group"`
 	Hash         string    `json:"Hash"`
+	KDF          string    `json:"KDF"`
+	MAC          string    `json:"MAC"`
+	MHF          string    `json:"MHF"`
 	Name         string    `json:"Name"`
-	Nh           string    `json:"Nh"`
-	Npk          string    `json:"Npk"`
-	Nsk          string    `json:"Nsk"`
 	OPRF         ByteToHex `json:"OPRF"`
-	SlowHash     string    `json:"SlowHash"`
 }
 
 type inputs struct {
@@ -113,12 +112,12 @@ func (v *vector) test(t *testing.T) {
 
 	p := &Parameters{
 		OprfCiphersuite: voprf.Ciphersuite(v.Config.OPRF[1]),
-		KDF:             hashToHash(v.Config.Hash),
-		MAC:             hashToHash(v.Config.Hash),
 		Hash:            hashToHash(v.Config.Hash),
+		KDF:             kdfToHash(v.Config.KDF),
+		MAC:             macToHash(v.Config.MAC),
 		MHF:             mhf.Scrypt,
 		Mode:            envelope.Mode(mode[0]),
-		AkeGroup:        voprf.Ciphersuite(v.Config.OPRF[1]).Group(),
+		Group:           voprf.Ciphersuite(v.Config.OPRF[1]).Group(),
 		NonceLen:        32,
 	}
 
@@ -373,6 +372,28 @@ func hashToHash(h string) hash.Hashing {
 	case "SHA256":
 		return hash.SHA256
 	case "SHA512":
+		return hash.SHA512
+	default:
+		return 0
+	}
+}
+
+func kdfToHash(h string) hash.Hashing {
+	switch h {
+	case "HKDF-SHA256":
+		return hash.SHA256
+	case "HKDF-SHA512":
+		return hash.SHA512
+	default:
+		return 0
+	}
+}
+
+func macToHash(h string) hash.Hashing {
+	switch h {
+	case "HMAC-SHA256":
+		return hash.SHA256
+	case "HMAC-SHA512":
 		return hash.SHA512
 	default:
 		return 0

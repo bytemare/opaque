@@ -57,19 +57,19 @@ func (e *Envelope) Serialize() []byte {
 	return append(e.InnerEnv.Serialize(), e.AuthTag...)
 }
 
-func DeserializeEnvelope(in []byte, nh, skLength int) (envU *Envelope, offset int, err error) {
+func DeserializeEnvelope(in []byte, Nh, skLength int) (envU *Envelope, offset int, err error) {
 	contents, length, err := deserializeInnerEnvelope(in, skLength)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	if len(in) < length+nh {
+	if len(in) < length+Nh {
 		return nil, 0, errors.New("decode envelope: insufficient bytes")
 	}
 
-	authTag := in[length : length+nh]
+	authTag := in[length : length+Nh]
 
-	return &Envelope{contents, authTag}, length + nh, nil
+	return &Envelope{contents, authTag}, length + Nh, nil
 }
 
 type InnerEnvelope struct {
