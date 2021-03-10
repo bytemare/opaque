@@ -73,7 +73,7 @@ func DeserializeKE2(input []byte, nonceLength, pointLength, hashLen, skLength in
 	nonceS := input[offset : offset+nonceLength]
 	offset += nonceLength
 	epks := input[offset : offset+pointLength]
-	offset += efpointLength
+	offset += pointLength
 
 	einfo, length, err := internal.DecodeVector(input[offset:])
 	if err != nil {
