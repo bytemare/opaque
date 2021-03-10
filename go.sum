@@ -6,6 +6,8 @@ github.com/armfazh/tozan-ecc v0.1.3/go.mod h1:u25eZC5Z8uJFQxJxGBz1Blfii/7m3DfmwX
 github.com/bytemare/cryptotools v0.0.0-20210217001400-aaae176edbfa/go.mod h1:CKpsDERRG5MbUDJUl6xUDAuL228QndGKNabkx/E+Qug=
 github.com/bytemare/cryptotools v0.0.0-20210220202506-7b38001c07b2 h1:8DJFoDx5wERS2o815PMuHUSOLzAUJQ7XenstsuuU1pE=
 github.com/bytemare/cryptotools v0.0.0-20210220202506-7b38001c07b2/go.mod h1:CKpsDERRG5MbUDJUl6xUDAuL228QndGKNabkx/E+Qug=
+github.com/bytemare/cryptotools v0.0.0-20210309005813-f9985b05742f h1:CXLSVUN4laSSTqbZxZ2gCn5bqO+K8a4fhoru+92SQD0=
+github.com/bytemare/cryptotools v0.0.0-20210309005813-f9985b05742f/go.mod h1:CKpsDERRG5MbUDJUl6xUDAuL228QndGKNabkx/E+Qug=
 github.com/bytemare/voprf v0.0.0-20210218233935-d95eb6bda6a5 h1:HJIEshkFb/eYSp4jvSiuoZAF6d7qyuJ7YhkWnkmbSZU=
 github.com/bytemare/voprf v0.0.0-20210218233935-d95eb6bda6a5/go.mod h1:IXvneXhNv+uODbDxwEZCq6rietIv0/y5H9SfzxkRtGA=
 github.com/bytemare/voprf v0.0.0-20210221170502-f0af88d24d16 h1:XRqQTKj1yBJZZ401bOiw/WDlF5BOfh+7OvPOXlfvfs4=
