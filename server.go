@@ -12,7 +12,7 @@ import (
 
 type CredentialFile struct {
 	Ku       []byte             `json:"ku"`
-	Pku      []byte             `json:"pku"`
+	Pkc      []byte             `json:"pku"`
 	Envelope *envelope.Envelope `json:"envU"`
 }
 
@@ -67,26 +67,27 @@ func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, 
 	return &message.CredentialResponse{
 		Data:     z,
 		Pks:      pks,
+		Pkc:      file.Pkc,
 		Envelope: file.Envelope,
 	}, nil
 }
 
 func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo []byte, credFile *CredentialFile, creds *envelope.Credentials) (*message.KE2, error) {
-	response, err := s.CredentialResponse(ke1.CredentialRequest, creds.Pk, credFile)
+	response, err := s.CredentialResponse(ke1.CredentialRequest, creds.Pks, credFile)
 	if err != nil {
 		return nil, err
 	}
 
-	if creds.Idu == nil {
-		creds.Idu = credFile.Pku
+	if creds.Idc == nil {
+		creds.Idc = credFile.Pkc
 	}
 
 	if creds.Ids == nil {
-		creds.Ids = creds.Pk
+		creds.Ids = creds.Pks
 	}
 
 	// id, sk, peerID, peerPK - (creds, peerPK)
-	ke2, err := s.Ake.Response(creds.Ids, creds.Sk, creds.Idu, credFile.Pku, serverInfo, ke1, response)
+	ke2, err := s.Ake.Response(creds.Ids, creds.Skx, creds.Idc, credFile.Pkc, serverInfo, ke1, response)
 	if err != nil {
 		return nil, err
 	}
@@ -94,8 +95,8 @@ func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo []byte, cre
 	return ke2, nil
 }
 
-func (s *Server) AuthenticationFinalize(req *message.KE3) error {
-	return s.Ake.Finalize(req)
+func (s *Server) AuthenticationFinalize(ke3 *message.KE3) error {
+	return s.Ake.Finalize(ke3)
 }
 
 func (s *Server) KeyGen() (sk, pk []byte) {

@@ -1,32 +1,67 @@
 package envelope
 
+import (
+	"github.com/bytemare/cryptotools/utils"
+	"github.com/bytemare/opaque/internal"
+)
+
 type SecretCredentials struct {
-	Sku []byte
+	Skc []byte
 }
 
 func (s *SecretCredentials) Serialize() []byte {
-	return s.Sku
+	return s.Skc
 }
 
 func DeserializeSecretCredentials(input []byte) *SecretCredentials {
 	return &SecretCredentials{input}
 }
 
-type CleartextCredentials interface {
-	Serialize() []byte
+type CleartextCredentials struct {
+	Pks []byte
+	Idc []byte
+	Ids []byte
 }
 
-func encodeClearTextCredentials(idu, ids, pks []byte, mode Mode) []byte {
-	switch mode {
-	case Base:
-		return newBaseClearTextCredentials(pks).Serialize()
-	case CustomIdentifier:
-		return newCustomClearTextCredentials(pks, idu, ids).Serialize()
-	default:
-		panic("invalid mode")
+func (c *CleartextCredentials) Serialize() []byte {
+	var u, s []byte
+	if c.Idc != nil {
+		u = internal.EncodeVector(c.Idc)
 	}
+
+	if c.Ids != nil {
+		s = internal.EncodeVector(c.Ids)
+	}
+
+	return utils.Concatenate(0, c.Pks, u, s)
 }
 
-type Credentials struct {
-	Sk, Pk, Idu, Ids, Nonce []byte
+func CreateCleartextCredentials(pkc, pks []byte, credentials *Credentials) *CleartextCredentials {
+	var idc, ids []byte
+
+	if pks == nil {
+		panic("nil pks")
+	}
+
+	if credentials.Idc == nil {
+		if pkc == nil {
+			panic("nil pkc")
+		}
+
+		idc = pkc
+	}
+
+	if credentials.Ids == nil {
+		//if pks == nil {
+		//	panic("")
+		//}
+
+		ids = pks
+	}
+
+	return &CleartextCredentials{
+		Pks: pks,
+		Idc: idc,
+		Ids: ids,
+	}
 }

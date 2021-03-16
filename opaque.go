@@ -31,7 +31,7 @@ func (p *Parameters) Serialize() []byte {
 }
 
 func (p *Parameters) Client() *Client {
-	return NewClient(p.OprfCiphersuite, p.KDF, p.MAC, p.Hash, p.MHF.Get(), p.Mode, p.Group)
+	return NewClient(p.OprfCiphersuite, p.KDF, p.MAC, p.Hash, p.MHF, p.Mode, p.Group)
 }
 
 func (p *Parameters) Server() *Server {

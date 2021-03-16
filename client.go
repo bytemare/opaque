@@ -19,15 +19,15 @@ type Client struct {
 	Ke1  *message.KE1
 }
 
-func NewClient(suite voprf.Ciphersuite, kdf, mac, h hash.Hashing, m *mhf.MHF, mode envelope.Mode, akeGroup ciphersuite.Identifier) *Client {
+func NewClient(suite voprf.Ciphersuite, kdf, mac, h hash.Hashing, m mhf.Identifier, mode envelope.Mode, akeGroup ciphersuite.Identifier) *Client {
 	g := akeGroup.Get(nil)
 	k := &internal.KDF{Hash: kdf.Get()}
 	mac2 := &internal.Mac{Hash: mac.Get()}
 	h2 := &internal.Hash{H: h.Get()}
-	h3 := &internal.Hash{H: h.Get()}
+	mhf2 := &internal.MHF{MHF: m.Get()}
 	return &Client{
-		Core: core.NewCore(suite, k, mac2, h2, m, mode, g),
-		Ake:  ake.NewClient(g, k, mac2, h3),
+		Core: core.NewCore(suite, k, mac2, mhf2, mode, g),
+		Ake:  ake.NewClient(g, k, mac2, h2),
 	}
 }
 
@@ -41,7 +41,7 @@ func (c *Client) RegistrationStart(password []byte) *message.RegistrationRequest
 }
 
 func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message.RegistrationResponse) (*message.RegistrationUpload, []byte, error) {
-	envU, exportKey, err := c.Core.BuildEnvelope(resp.Data, resp.Pks, creds)
+	envU, pkc, exportKey, err := c.Core.BuildEnvelope(resp.Data, resp.Pks, creds)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -52,7 +52,7 @@ func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message
 
 	return &message.RegistrationUpload{
 		Envelope: envU,
-		Pku:      creds.Pk,
+		Pku:      pkc,
 	}, exportKey, nil
 }
 
@@ -75,25 +75,20 @@ func (c *Client) publicKey(skc []byte) ([]byte, error) {
 }
 
 func (c *Client) AuthenticationFinalize(idu, ids []byte, ke2 *message.KE2) (*message.KE3, []byte, error) {
-	secretCreds, exportKey, err := c.Core.RecoverSecret(idu, ids, ke2.Pks, ke2.Data, ke2.Envelope)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	pubKey, err := c.publicKey(secretCreds.Sku)
+	secretCreds, exportKey, err := c.Core.RecoverSecret(idu, ids, ke2.Pkc, ke2.Pks, ke2.Data, ke2.Envelope)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	creds := &envelope.Credentials{
-		Sk:  secretCreds.Sku,
-		Pk:  pubKey,
-		Idu: idu,
+		Skx: secretCreds.Skc,
+		Pkc: ke2.Pkc,
+		Idc: idu,
 		Ids: ids,
 	}
 
-	if creds.Idu == nil {
-		creds.Idu = creds.Pk
+	if creds.Idc == nil {
+		creds.Idc = creds.Pkc
 	}
 
 	if creds.Ids == nil {
@@ -101,7 +96,7 @@ func (c *Client) AuthenticationFinalize(idu, ids []byte, ke2 *message.KE2) (*mes
 	}
 
 	// id, sk, peerID, peerPK - (creds, peerPK)
-	ke3, _, err := c.Ake.Finalize(creds.Idu, creds.Sk, creds.Ids, ke2.Pks, c.Ke1, ke2)
+	ke3, _, err := c.Ake.Finalize(creds.Idc, creds.Skx, creds.Ids, ke2.Pks, c.Ke1, ke2)
 	if err != nil {
 		return nil, nil, err
 	}

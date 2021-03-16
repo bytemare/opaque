@@ -2,6 +2,7 @@ package internal
 
 import (
 	"github.com/bytemare/cryptotools/hash"
+	"github.com/bytemare/cryptotools/mhf"
 )
 
 type KDF struct {
@@ -36,14 +37,14 @@ type Hash struct {
 	H *hash.Hash
 }
 
-func NewHash(id hash.Hashing) *Hash {
-	return &Hash{id.Get()}
-}
-
 func (h *Hash) Hash(message []byte) []byte {
 	return h.H.Hash(message)
 }
 
 func (h *Hash) Size() int {
 	return h.H.OutputSize()
+}
+
+type MHF struct {
+	*mhf.MHF
 }

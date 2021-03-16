@@ -1,96 +1,158 @@
 package envelope
 
 import (
+	"crypto/hmac"
 	"errors"
-
-	"github.com/bytemare/cryptotools/encoding"
+	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/utils"
+	"github.com/bytemare/opaque/internal"
 )
+
+var ErrEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
 
 type Mode byte
 
 const (
-	Base Mode = iota + 1
-	CustomIdentifier
-	Seed
+	Internal Mode = iota + 1
+	External
 
-	sBase             = "Base"
-	sCustomIdentifier = "CustomIdentifier"
+	nonceLen     = 32
+	tagAuthKey   = "AuthKey"
+	tagExportKey = "ExportKey"
 )
 
-func (e Mode) Get() EnvMode {
-	switch e {
-	case Base:
-		return &BaseMode{}
-	case CustomIdentifier:
-		return &CustomMode{}
-	case Seed:
-		return &SeedMode{}
-	default:
-		panic("invalid mode")
-	}
-}
-
-func (e Mode) String() string {
-	switch e {
-	case Base:
-		return sBase
-	case CustomIdentifier:
-		return sCustomIdentifier
-	default:
-		return ""
-	}
-}
-
-type EnvMode interface {
-	BuildInnerEnvelope(prk []byte, creds *Credentials, k *Keys) *InnerEnvelope
-	ClearTextCredentials(idu, ids, pks []byte) CleartextCredentials
-	Recover(prk []byte, k *Keys, inner *InnerEnvelope) *SecretCredentials
-}
-
 type Envelope struct {
-	InnerEnv *InnerEnvelope `json:"e"`
-	AuthTag  []byte         `json:"t"`
+	Mode
+	Nonce         []byte
+	AuthTag       []byte
+	InnerEnvelope []byte
 }
 
 func (e *Envelope) Serialize() []byte {
-	return append(e.InnerEnv.Serialize(), e.AuthTag...)
+	return utils.Concatenate(0,
+		[]byte{byte(e.Mode)}, e.Nonce, e.AuthTag, e.InnerEnvelope)
 }
 
-func DeserializeEnvelope(in []byte, Nh, skLength int) (envU *Envelope, offset int, err error) {
-	contents, length, err := deserializeInnerEnvelope(in, skLength)
-	if err != nil {
-		return nil, 0, err
+func DeserializeEnvelope(data []byte, Nm int) (*Envelope, error) {
+	minLen := 1 + nonceLen + Nm
+	if len(data) < 1 {
+		return nil, errors.New("envelope corrupted")
 	}
 
-	if len(in) < length+Nh {
-		return nil, 0, errors.New("decode envelope: insufficient bytes")
+	mode := Mode(data[0])
+
+	if mode == Internal && len(data) != minLen {
+		return nil, errors.New("invalid envelope encoding")
 	}
 
-	authTag := in[length : length+Nh]
-
-	return &Envelope{contents, authTag}, length + Nh, nil
-}
-
-type InnerEnvelope struct {
-	Mode           Mode   `json:"m"`
-	Nonce          []byte `json:"n,omitempty"`
-	EncryptedCreds []byte `json:"c,omitempty"`
-}
-
-func (i *InnerEnvelope) Serialize() []byte {
-	return utils.Concatenate(0, encoding.I2OSP(int(i.Mode), 1), i.Nonce, i.EncryptedCreds)
-}
-
-func deserializeInnerEnvelope(in []byte, skLength int) (*InnerEnvelope, int, error) {
-	header := 1 + nonceLen
-	if len(in) < header+skLength {
-		return nil, 0, errors.New("insufficient length of inner envelope")
+	if mode == External && len(data) <= minLen {
+		return nil, errors.New("envelope encoding")
 	}
 
-	mode := encoding.OS2IP(in[0:1])
-	nonce := in[1:header]
-	ct := in[header : header+skLength]
+	nonce := data[1 : 1+nonceLen]
+	tag := data[1+nonceLen : 1+nonceLen+Nm]
 
-	return &InnerEnvelope{Mode(mode), nonce, ct}, header + len(ct), nil
+	var inner []byte
+	if mode == External {
+		inner = data[1+nonceLen+Nm:]
+	}
+
+	return &Envelope{
+		Mode:          mode,
+		Nonce:         nonce,
+		AuthTag:       tag,
+		InnerEnvelope: inner,
+	}, nil
+}
+
+type InnerEnvelope interface {
+	BuildInnerEnvelope(prk []byte, creds *Credentials) (innerEnvelope, pk []byte)
+	RecoverSecret(prk, innerEnvelope []byte) *SecretCredentials
+}
+
+type Thing struct {
+	group.Group
+	*internal.KDF
+	*internal.Mac
+	*internal.MHF
+	Mode
+}
+
+func NewThing(g group.Group, kdf *internal.KDF, mac *internal.Mac, mhf *internal.MHF, mode Mode) *Thing {
+	// todo do checks on whether the necessary arguments are given
+	return &Thing{
+		Group: g,
+		KDF:   kdf,
+		Mac:   mac,
+		MHF:   mhf,
+		Mode:  mode,
+	}
+}
+
+func (t *Thing) inner() InnerEnvelope {
+	var inner InnerEnvelope
+	switch t.Mode {
+	case Internal:
+		inner = &InternalMode{t.Group}
+	case External:
+		inner = &ExternalMode{t.Group.ElementLength(), t.KDF} // todo element length won't work here
+	default:
+		panic("invalid mode")
+	}
+
+	return inner
+}
+
+func (t *Thing) buildPRK(unblinded, nonce []byte) []byte {
+	//hardened := t.Harden(unblinded, nil)
+	hardened := unblinded
+	return t.Extract(nonce, hardened)
+}
+
+func (t *Thing) buildKeys(unblinded, nonce []byte) (prk, authKey, exportKey []byte) {
+	prk = t.buildPRK(unblinded, nonce)
+	authKey = t.Expand(prk, []byte(tagAuthKey), t.KDF.Size())
+	exportKey = t.Expand(prk, []byte(tagExportKey), t.KDF.Size())
+
+	return
+}
+
+func (t *Thing) AuthTag(authKey, nonce, inner, ctc []byte) []byte {
+	return t.MAC(authKey, utils.Concatenate(0, []byte{byte(t.Mode)}, nonce, inner, ctc))
+}
+
+func (t *Thing) CreateEnvelope(unblinded, pks []byte, creds *Credentials) (envelope *Envelope, pkc, exportKey []byte) {
+	nonce := utils.RandomBytes(nonceLen)
+	prk, authKey, exportKey := t.buildKeys(unblinded, nonce)
+
+	inner, pkc := t.inner().BuildInnerEnvelope(prk, creds)
+	ctc := CreateCleartextCredentials(pkc, pks, creds)
+	tag := t.AuthTag(authKey, nonce, inner, ctc.Serialize())
+
+	envelope = &Envelope{
+		Mode:          t.Mode,
+		Nonce:         nonce,
+		AuthTag:       tag,
+		InnerEnvelope: inner,
+	}
+
+	return envelope, pkc, exportKey
+}
+
+func (t *Thing) RecoverSecret(unblinded, pks []byte, creds *Credentials, envelope *Envelope) (*SecretCredentials, []byte, error) {
+	prk, authKey, exportKey := t.buildKeys(unblinded, envelope.Nonce)
+	ctc := CreateCleartextCredentials(creds.Pkc, pks, creds)
+	expectedTag := t.AuthTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
+
+	if !hmac.Equal(expectedTag, envelope.AuthTag) {
+		return nil, nil, ErrEnvelopeInvalidTag
+	}
+
+	sc := t.inner().RecoverSecret(prk, envelope.InnerEnvelope)
+
+	return sc, exportKey, nil
+}
+
+type Credentials struct {
+	Skx, Pkc, Pks, Idc, Ids, Nonce []byte
 }

@@ -2,9 +2,9 @@ package message
 
 import (
 	"errors"
+	"github.com/bytemare/opaque/core/envelope"
 
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/core/envelope"
 )
 
 // Registration
@@ -60,6 +60,12 @@ func (c *CredentialRequest) Serialize() []byte {
 	return c.Data
 }
 
+func (c *CredentialRequest) Verify() error {
+	// todo : verify data is of sufficient length
+
+	return nil
+}
+
 func DeserializeCredentialRequest(input []byte, pointLen int) (*CredentialRequest, error) {
 	if len(input) <= pointLen {
 		return nil, errors.New("malformed credential request")
@@ -71,31 +77,44 @@ func DeserializeCredentialRequest(input []byte, pointLen int) (*CredentialReques
 type CredentialResponse struct {
 	Data     []byte             `json:"data"`
 	Pks      []byte             `json:"pks"`
+	Pkc      []byte             `json:"pkc"`
 	Envelope *envelope.Envelope `json:"env"`
 }
 
 func (c *CredentialResponse) Serialize() []byte {
-	return utils.Concatenate(0, c.Data, c.Pks, c.Envelope.Serialize())
+	return utils.Concatenate(0, c.Data, c.Pkc, c.Pks, c.Envelope.Serialize())
 }
 
-func DeserializeCredentialResponse(input []byte, pointLength, hashSize, skLength int) (response *CredentialResponse, offset int, err error) {
-	if len(input) < 2*pointLength {
+func (c *CredentialResponse) Verify() error {
+	// todo : verify data is of sufficient length
+
+	// todo : verify epks is valid
+
+	// todo : verify envelope is of sufficient length
+
+	return nil
+}
+
+func DeserializeCredentialResponse(input []byte, Npk, Nm int) (response *CredentialResponse, offset int, err error) {
+	if len(input) < 2*Npk {
 		return nil, 0, errors.New("credential response too short")
 	}
 
-	data := input[:pointLength]
-	pks := input[pointLength : 2*pointLength]
+	data := input[:Npk]
+	pks := input[Npk : 2*Npk]
+	pkc := input[2*Npk : 3*Npk]
 
-	envU, envLength, err := envelope.DeserializeEnvelope(input[2*pointLength:], hashSize, skLength)
+	envU, err := envelope.DeserializeEnvelope(input[2*Npk:], Nm)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	offset = 2*pointLength + envLength
+	offset = len(input)
 
 	return &CredentialResponse{
 		Data:     data,
 		Pks:      pks,
+		Pkc:      pkc,
 		Envelope: envU,
 	}, offset, nil
 }
