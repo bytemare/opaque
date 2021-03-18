@@ -40,12 +40,20 @@ func TestFull(t *testing.T) {
 		// Client
 		client := p.Client()
 		reqReg := client.RegistrationStart(password)
+		m1s := reqReg.Serialize()
 
 		// Server
-		respReg, kU, err := server.RegistrationResponse(reqReg, serverPublicKey, nil)
+		m1, err := server.DeserializeRegistrationRequest(m1s)
 		if err != nil {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
+
+		respReg, kU, err := server.RegistrationResponse(m1, serverPublicKey, nil)
+		if err != nil {
+			t.Fatalf("Mode %v: %v", mode, err)
+		}
+
+		m2s := respReg.Serialize()
 
 		// Client
 		clientCreds := &envelope.Credentials{
@@ -59,16 +67,28 @@ func TestFull(t *testing.T) {
 			clientCreds.Pkc = clientPublicKey
 		}
 
-		upload, exportKeyReg, err := client.RegistrationFinalize(clientCreds, respReg)
+		m2, err := client.DeserializeRegistrationResponse(m2s)
 		if err != nil {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
 
+		upload, exportKeyReg, err := client.RegistrationFinalize(clientCreds, m2)
+		if err != nil {
+			t.Fatalf("Mode %v: %v", mode, err)
+		}
+
+		m3s := upload.Serialize()
+
 		// Server
+		m3, err := server.DeserializeRegistrationUpload(m3s)
+		if err != nil {
+			t.Fatalf("Mode %v: %v", mode, err)
+		}
+
 		credFile := &CredentialFile{
 			Ku:       kU,
-			Pkc:      upload.Pku,
-			Envelope: upload.Envelope,
+			Pkc:      m3.Pku,
+			Envelope: m3.Envelope,
 		}
 
 		/*
@@ -78,6 +98,8 @@ func TestFull(t *testing.T) {
 		// Client
 		client = p.Client()
 		ke1 := client.AuthenticationStart(password, nil)
+
+		m4s := ke1.Serialize()
 
 		// Server
 		server = p.Server()
@@ -90,19 +112,38 @@ func TestFull(t *testing.T) {
 			Ids: ids,
 		}
 
-		ke2, err := server.AuthenticationResponse(ke1, nil, credFile, serverCreds)
+		m4, err := server.DeserializeKE1(m4s)
 		if err != nil {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
+
+		ke2, err := server.AuthenticationResponse(m4, nil, credFile, serverCreds)
+		if err != nil {
+			t.Fatalf("Mode %v: %v", mode, err)
+		}
+
+		m5s := ke2.Serialize()
 
 		// Client
-		ke3, exportKeyLogin, err := client.AuthenticationFinalize(username, ids, ke2)
+		m5, err := client.DeserializeKE2(m5s)
 		if err != nil {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
 
+		ke3, exportKeyLogin, err := client.AuthenticationFinalize(username, ids, m5)
+		if err != nil {
+			t.Fatalf("Mode %v: %v", mode, err)
+		}
+
+		m6s := ke3.Serialize()
+
 		// Server
-		if err := server.AuthenticationFinalize(ke3); err != nil {
+		m6, err := server.DeserializeKE3(m6s)
+		if err != nil {
+			t.Fatalf("Mode %v: %v", mode, err)
+		}
+
+		if err := server.AuthenticationFinalize(m6); err != nil {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
 

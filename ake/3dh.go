@@ -2,11 +2,10 @@ package ake
 
 import (
 	"errors"
-
-	"github.com/bytemare/cryptotools/hash"
-
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
@@ -31,11 +30,12 @@ var (
 	ErrAkeInvalidClientMac = errors.New("invalid client mac")
 )
 
-func KeyGen(g group.Group) (sk, pk []byte) {
+func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
+	g := id.Get(nil)
 	scalar := g.NewScalar().Random()
 	publicKey := g.Base().Mult(scalar)
 
-	return scalar.Bytes(), publicKey.Bytes()
+	return internal.SerializeScalar(scalar, id), internal.SerializePoint(publicKey, id)
 }
 
 type Keys struct {
@@ -46,6 +46,7 @@ type Keys struct {
 }
 
 type Ake struct {
+	ciphersuite.Identifier
 	group.Group
 	*internal.KDF
 	*internal.Mac
@@ -70,7 +71,7 @@ func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) []byte
 
 	a.Epk = a.Base().Mult(a.Esk)
 
-	if nonce != nil {
+	if len(nonce) != 0 {
 		return nonce
 	} else {
 		return utils.RandomBytes(nonceLen)

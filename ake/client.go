@@ -2,8 +2,8 @@ package ake
 
 import (
 	"crypto/hmac"
-
 	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
@@ -13,13 +13,14 @@ type Client struct {
 	NonceU []byte // todo: only useful in testing, to force value
 }
 
-func NewClient(g group.Group, kdf *internal.KDF, mac *internal.Mac, h *internal.Hash) *Client {
+func NewClient(id ciphersuite.Identifier, kdf *internal.KDF, mac *internal.Mac, h *internal.Hash) *Client {
 	return &Client{
 		Ake: &Ake{
-			Group: g,
-			KDF:   kdf,
-			Mac:   mac,
-			Hash:  h,
+			Identifier: id,
+			Group:      id.Get(nil),
+			KDF:        kdf,
+			Mac:        mac,
+			Hash:       h,
 		},
 	}
 }
@@ -35,12 +36,11 @@ func (c *Client) Initialize(esk group.Scalar, nonce []byte, nonceLen int) {
 }
 
 func (c *Client) Start(clientInfo []byte) *message.KE1 {
-	c.Ake.Initialize(nil, nil, 32)
-
+	c.Initialize(nil, nil, 32)
 	return &message.KE1{
 		NonceU:     c.NonceU,
 		ClientInfo: clientInfo,
-		EpkU:       c.Epk.Bytes(),
+		EpkU:       internal.SerializePoint(c.Epk, c.Identifier),
 	}
 }
 
@@ -61,9 +61,7 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 
 	transcriptHasher := c.Hash.H
 	newInfo(transcriptHasher, ke1, idu, ids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS)
-
 	keys := deriveKeys(c.KDF, ikm, transcriptHasher.Sum(nil))
-
 	var serverInfo []byte
 
 	if len(ke2.Einfo) != 0 {

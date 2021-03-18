@@ -60,12 +60,15 @@ func SerializeScalar(s group.Scalar, c ciphersuite.Identifier) []byte {
 }
 
 func SerializePoint(e group.Element, c ciphersuite.Identifier) []byte {
-	length := PointLength(c)
-	p := e.Bytes()
+	return PadPoint(e.Bytes(), c)
+}
 
-	for len(p) < length {
-		p = append([]byte{0x00}, p...)
+func PadPoint(point []byte, c ciphersuite.Identifier) []byte {
+	length := PointLength(c)
+
+	for len(point) < length {
+		point = append([]byte{0x00}, point...)
 	}
 
-	return p
+	return point
 }

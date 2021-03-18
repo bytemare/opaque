@@ -1,8 +1,6 @@
 package opaque
 
 import (
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
@@ -19,16 +17,17 @@ type CredentialFile struct {
 type Server struct {
 	oprf voprf.Ciphersuite
 	Ake  *ake.Server
+	*message.Deserializer
 }
 
-func NewServer(suite voprf.Ciphersuite, kdf, mac, h hash.Hashing, akeGroup ciphersuite.Identifier) *Server {
-	g := akeGroup.Get(nil)
-	k := &internal.KDF{Hash: kdf.Get()}
-	mac2 := &internal.Mac{Hash: mac.Get()}
-	h2 := &internal.Hash{H: h.Get()}
+func NewServer(p *Parameters) *Server {
+	k := &internal.KDF{Hash: p.KDF.Get()}
+	mac2 := &internal.Mac{Hash: p.MAC.Get()}
+	h2 := &internal.Hash{H: p.Hash.Get()}
 	return &Server{
-		oprf: suite,
-		Ake:  ake.NewServer(g, k, mac2, h2),
+		oprf:         p.OprfCiphersuite,
+		Ake:          ake.NewServer(p.Group, k, mac2, h2),
+		Deserializer: p.Deserializer(),
 	}
 }
 
@@ -53,7 +52,7 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks, ku 
 	}
 
 	return &message.RegistrationResponse{
-		Data: z,
+		Data: internal.PadPoint(z, s.oprf.Group()),
 		Pks:  pks,
 	}, ku, nil
 }
@@ -65,7 +64,7 @@ func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, 
 	}
 
 	return &message.CredentialResponse{
-		Data:     z,
+		Data:     internal.PadPoint(z, s.oprf.Group()),
 		Pks:      pks,
 		Pkc:      file.Pkc,
 		Envelope: file.Envelope,
@@ -100,7 +99,7 @@ func (s *Server) AuthenticationFinalize(ke3 *message.KE3) error {
 }
 
 func (s *Server) KeyGen() (sk, pk []byte) {
-	return ake.KeyGen(s.Ake.Group)
+	return ake.KeyGen(s.Ake.Identifier)
 }
 
 func (s *Server) SessionKey() []byte {

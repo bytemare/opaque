@@ -3,7 +3,7 @@ package envelope
 import (
 	"crypto/hmac"
 	"errors"
-	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/internal"
 )
@@ -33,28 +33,40 @@ func (e *Envelope) Serialize() []byte {
 		[]byte{byte(e.Mode)}, e.Nonce, e.AuthTag, e.InnerEnvelope)
 }
 
-func DeserializeEnvelope(data []byte, Nm int) (*Envelope, error) {
-	minLen := 1 + nonceLen + Nm
+func EnvelopeSize(mode Mode, nm int, id ciphersuite.Identifier) int {
+	var size int
+	switch mode {
+	case Internal:
+		size = 0
+	case External:
+		size = internal.ScalarLength(id)
+	default:
+		panic("invalid envelope mode")
+	}
+
+	return 1 + nonceLen + nm + size
+}
+
+func DeserializeEnvelope(data []byte, Nm, Nsk int) (*Envelope, int, error) {
 	if len(data) < 1 {
-		return nil, errors.New("envelope corrupted")
+		return nil, 0, errors.New("envelope corrupted")
 	}
 
 	mode := Mode(data[0])
+	baseLen := 1 + nonceLen + Nm
 
-	if mode == Internal && len(data) != minLen {
-		return nil, errors.New("invalid envelope encoding")
-	}
-
-	if mode == External && len(data) <= minLen {
-		return nil, errors.New("envelope encoding")
+	if len(data) < baseLen+Nsk {
+		if mode == External || len(data) < baseLen {
+			return nil, 0, errors.New("envelope too short")
+		}
 	}
 
 	nonce := data[1 : 1+nonceLen]
-	tag := data[1+nonceLen : 1+nonceLen+Nm]
+	tag := data[1+nonceLen : baseLen]
 
 	var inner []byte
 	if mode == External {
-		inner = data[1+nonceLen+Nm:]
+		inner = data[baseLen : baseLen+Nsk]
 	}
 
 	return &Envelope{
@@ -62,7 +74,7 @@ func DeserializeEnvelope(data []byte, Nm int) (*Envelope, error) {
 		Nonce:         nonce,
 		AuthTag:       tag,
 		InnerEnvelope: inner,
-	}, nil
+	}, baseLen + len(inner), nil
 }
 
 type InnerEnvelope interface {
@@ -71,21 +83,21 @@ type InnerEnvelope interface {
 }
 
 type Thing struct {
-	group.Group
+	ciphersuite.Identifier
 	*internal.KDF
 	*internal.Mac
 	*internal.MHF
 	Mode
 }
 
-func NewThing(g group.Group, kdf *internal.KDF, mac *internal.Mac, mhf *internal.MHF, mode Mode) *Thing {
+func NewThing(id ciphersuite.Identifier, kdf *internal.KDF, mac *internal.Mac, mhf *internal.MHF, mode Mode) *Thing {
 	// todo do checks on whether the necessary arguments are given
 	return &Thing{
-		Group: g,
-		KDF:   kdf,
-		Mac:   mac,
-		MHF:   mhf,
-		Mode:  mode,
+		Identifier: id,
+		KDF:        kdf,
+		Mac:        mac,
+		MHF:        mhf,
+		Mode:       mode,
 	}
 }
 
@@ -93,9 +105,9 @@ func (t *Thing) inner() InnerEnvelope {
 	var inner InnerEnvelope
 	switch t.Mode {
 	case Internal:
-		inner = &InternalMode{t.Group}
+		inner = &InternalMode{t.Identifier}
 	case External:
-		inner = &ExternalMode{t.Group.ElementLength(), t.KDF} // todo element length won't work here
+		inner = &ExternalMode{internal.ScalarLength(t.Identifier), t.KDF} // todo element length won't work here
 	default:
 		panic("invalid mode")
 	}
@@ -149,6 +161,10 @@ func (t *Thing) RecoverSecret(unblinded, pks []byte, creds *Credentials, envelop
 	}
 
 	sc := t.inner().RecoverSecret(prk, envelope.InnerEnvelope)
+
+	if len(sc.Skc) != internal.ScalarLength(t.Identifier) {
+		return nil, nil, errors.New("recovered private key is of invalid length")
+	}
 
 	return sc, exportKey, nil
 }

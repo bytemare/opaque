@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-
 	"github.com/bytemare/opaque/core/envelope"
+	"github.com/bytemare/opaque/message"
 
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/hash"
@@ -23,7 +23,7 @@ type Parameters struct {
 	Mode            envelope.Mode          `json:"mode"`
 	Ake             string                 `json:"ake"`
 	Group           ciphersuite.Identifier `json:"group"`
-	NonceLen        int                    `json:"nl"`
+	NonceLen        int                    `json:"nn"`
 }
 
 func (p *Parameters) Serialize() []byte {
@@ -31,11 +31,20 @@ func (p *Parameters) Serialize() []byte {
 }
 
 func (p *Parameters) Client() *Client {
-	return NewClient(p.OprfCiphersuite, p.KDF, p.MAC, p.Hash, p.MHF, p.Mode, p.Group)
+	return NewClient(p)
 }
 
 func (p *Parameters) Server() *Server {
-	return NewServer(p.OprfCiphersuite, p.KDF, p.MAC, p.Hash, p.Group)
+	return NewServer(p)
+}
+
+func (p *Parameters) Deserializer() *message.Deserializer {
+	return &message.Deserializer{
+		OPRFPointLength: p.OprfCiphersuite.Group(),
+		AkeGroup:        p.Group,
+		NonceLen:        p.NonceLen,
+		MacLen:          p.MAC.OutputSize(),
+	}
 }
 
 func (p *Parameters) String() string {

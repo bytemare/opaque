@@ -2,11 +2,10 @@ package ake
 
 import (
 	"crypto/hmac"
-
+	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
-
-	"github.com/bytemare/cryptotools/group"
 )
 
 type Server struct {
@@ -16,13 +15,14 @@ type Server struct {
 	ClientMac []byte
 }
 
-func NewServer(g group.Group, kdf *internal.KDF, mac *internal.Mac, h *internal.Hash) *Server {
+func NewServer(id ciphersuite.Identifier, kdf *internal.KDF, mac *internal.Mac, h *internal.Hash) *Server {
 	return &Server{
 		Ake: &Ake{
-			Group: g,
-			KDF:   kdf,
-			Mac:   mac,
-			Hash:  h,
+			Identifier: id,
+			Group:      id.Get(nil),
+			KDF:        kdf,
+			Mac:        mac,
+			Hash:       h,
 		},
 	}
 }
@@ -47,7 +47,7 @@ func (s *Server) ikm(sks, epku, pku []byte) ([]byte, error) {
 }
 
 func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1, response *message.CredentialResponse) (*message.KE2, error) {
-	s.Ake.Initialize(nil, nil, 32)
+	s.Initialize(nil, nil, 32)
 
 	ikm, err := s.ikm(sk, ke1.EpkU, pku)
 	if err != nil {
@@ -55,12 +55,9 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 	}
 
 	nonce := s.NonceS
-
 	transcriptHasher := s.Hash.H
 	newInfo(transcriptHasher, ke1, idu, ids, response.Serialize(), nonce, s.Epk.Bytes())
-
 	keys := deriveKeys(s.KDF, ikm, transcriptHasher.Sum(nil))
-
 	var einfo []byte
 
 	if len(serverInfo) != 0 {
@@ -81,7 +78,7 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 	return &message.KE2{
 		CredentialResponse: response,
 		NonceS:             nonce,
-		EpkS:               s.Epk.Bytes(),
+		EpkS:               internal.SerializePoint(s.Epk, s.Identifier),
 		Einfo:              einfo,
 		Mac:                mac,
 	}, nil

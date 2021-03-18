@@ -2,11 +2,58 @@ package message
 
 import (
 	"errors"
-	"github.com/bytemare/cryptotools/group"
-
+	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/internal"
 )
+
+type Deserializer struct {
+	OPRFPointLength  ciphersuite.Identifier
+	AkeGroup         ciphersuite.Identifier
+	NonceLen, MacLen int
+}
+
+func (d *Deserializer) DeserializeRegistrationRequest(message []byte) (*RegistrationRequest, error) {
+	r := DeserializeRegistrationRequest(message)
+	if len(r.Data) != internal.PointLength(d.OPRFPointLength) {
+		return nil, errors.New("invalid size")
+	}
+
+	return r, nil
+}
+
+func (d *Deserializer) DeserializeRegistrationResponse(message []byte) (*RegistrationResponse, error) {
+	return DeserializeRegistrationResponse(message, internal.PointLength(d.OPRFPointLength), internal.PointLength(d.AkeGroup))
+}
+
+func (d *Deserializer) DeserializeRegistrationUpload(message []byte) (*RegistrationUpload, error) {
+	return DeserializeRegistrationUpload(message, d.MacLen, internal.PointLength(d.AkeGroup), internal.ScalarLength(d.AkeGroup))
+}
+
+func (d *Deserializer) DeserializeCredentialRequest(message []byte) (*CredentialRequest, error) {
+	if len(message) != internal.PointLength(d.OPRFPointLength) {
+		return nil, errors.New("invalid message size")
+	}
+
+	return DeserializeCredentialRequest(message, internal.PointLength(d.OPRFPointLength)), nil
+}
+
+func (d *Deserializer) DeserializeCredentialResponse(message []byte) (*CredentialResponse, error) {
+	c, _, err := DeserializeCredentialResponse(message, d.MacLen, internal.PointLength(d.OPRFPointLength), internal.PointLength(d.AkeGroup), internal.ScalarLength(d.AkeGroup))
+	return c, err
+}
+
+func (d *Deserializer) DeserializeKE1(message []byte) (*KE1, error) {
+	return DeserializeKE1(message, d.NonceLen, internal.PointLength(d.OPRFPointLength), internal.PointLength(d.AkeGroup))
+}
+
+func (d *Deserializer) DeserializeKE2(message []byte) (*KE2, error) {
+	return DeserializeKE2(message, d.NonceLen, d.MacLen, internal.PointLength(d.OPRFPointLength), internal.PointLength(d.AkeGroup), internal.ScalarLength(d.AkeGroup))
+}
+
+func (d *Deserializer) DeserializeKE3(message []byte) (*KE3, error) {
+	return DeserializeKE3(message, d.MacLen)
+}
 
 type Message interface {
 	Serialize() []byte
@@ -25,37 +72,23 @@ func (m *KE1) Serialize() []byte {
 	return utils.Concatenate(0, m.CredentialRequest.Serialize(), m.NonceU, internal.EncodeVector(m.ClientInfo), m.EpkU)
 }
 
-func (m *KE1) Verify(_ group.Group, nonceLen int) error {
-	if err := m.CredentialRequest.Verify(); err != nil {
-		return err
+func DeserializeKE1(input []byte, nonceLength, oprfLen, akeLen int) (*KE1, error) {
+	if len(input) != oprfLen+nonceLength+2+akeLen {
+		return nil, errors.New("invalid message length")
 	}
 
-	if len(m.NonceU) != nonceLen {
-		return errors.New("invalid server nonce")
-	}
+	creq := DeserializeCredentialRequest(input, oprfLen)
+	nonceU := input[oprfLen : oprfLen+nonceLength]
 
-	// todo : verify if epku is valid
-
-	return nil
-}
-
-func DeserializeKE1(input []byte, nonceLength, pointLen int) (*KE1, error) {
-	creq, err := DeserializeCredentialRequest(input, pointLen)
+	info, offset, err := internal.DecodeVector(input[oprfLen+nonceLength:])
 	if err != nil {
 		return nil, err
 	}
 
-	nonceU := input[pointLen:nonceLength]
-
-	info, offset, err := internal.DecodeVector(input[pointLen+nonceLength:])
-	if err != nil {
-		return nil, err
-	}
-
-	offset = pointLen + nonceLength + offset
+	offset = oprfLen + nonceLength + offset
 	epku := input[offset:]
 
-	if len(epku) != pointLen {
+	if len(epku) != akeLen {
 		return nil, errors.New("invalid epku length")
 	}
 
@@ -79,34 +112,20 @@ func (m *KE2) Serialize() []byte {
 	return utils.Concatenate(0, m.CredentialResponse.Serialize(), m.NonceS, m.EpkS, internal.EncodeVector(m.Einfo), m.Mac)
 }
 
-func (m *KE2) Verify(_ group.Group, nonceLen, macLength int) error {
-	if err := m.CredentialResponse.Verify(); err != nil {
-		return err
-	}
-
-	if len(m.NonceS) != nonceLen {
-		return errors.New("invalid server nonce")
-	}
-
-	// todo : verify if epks is valid
-
-	if len(m.Mac) != macLength {
-		return errors.New("invalid mac length")
-	}
-
-	return nil
-}
-
-func DeserializeKE2(input []byte, nonceLength, pointLength, hashLen int) (*KE2, error) {
-	cresp, offset, err := DeserializeCredentialResponse(input, pointLength, hashLen)
+func DeserializeKE2(input []byte, nonceLength, macLen, oprfLen, akeLen, scalarLen int) (*KE2, error) {
+	cresp, offset, err := DeserializeCredentialResponse(input, macLen, oprfLen, akeLen, scalarLen)
 	if err != nil {
 		return nil, err
 	}
 
+	if len(input) < offset+nonceLength+akeLen+macLen {
+		return nil, errors.New("invalid message length")
+	}
+
 	nonceS := input[offset : offset+nonceLength]
 	offset += nonceLength
-	epks := input[offset : offset+pointLength]
-	offset += pointLength
+	epks := input[offset : offset+akeLen]
+	offset += akeLen
 
 	einfo, length, err := internal.DecodeVector(input[offset:])
 	if err != nil {
@@ -114,9 +133,6 @@ func DeserializeKE2(input []byte, nonceLength, pointLength, hashLen int) (*KE2, 
 	}
 
 	mac := input[offset+length:]
-	if len(mac) != hashLen {
-		return nil, errors.New("invalid mac length")
-	}
 
 	return &KE2{
 		CredentialResponse: cresp,
@@ -135,16 +151,8 @@ func (k KE3) Serialize() []byte {
 	return k.Mac
 }
 
-func (m *KE3) Verify(macLength int) error {
-	if len(m.Mac) != macLength {
-		return errors.New("invalid mac length")
-	}
-
-	return nil
-}
-
-func DeserializeKe3(input []byte, hashSize int) (*KE3, error) {
-	if len(input) != hashSize {
+func DeserializeKE3(input []byte, macLen int) (*KE3, error) {
+	if len(input) != macLen {
 		return nil, errors.New("invalid mac length")
 	}
 

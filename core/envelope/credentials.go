@@ -37,13 +37,12 @@ func (c *CleartextCredentials) Serialize() []byte {
 }
 
 func CreateCleartextCredentials(pkc, pks []byte, credentials *Credentials) *CleartextCredentials {
-	var idc, ids []byte
-
 	if pks == nil {
 		panic("nil pks")
 	}
 
-	if credentials.Idc == nil {
+	idc := credentials.Idc
+	if idc == nil {
 		if pkc == nil {
 			panic("nil pkc")
 		}
@@ -51,7 +50,8 @@ func CreateCleartextCredentials(pkc, pks []byte, credentials *Credentials) *Clea
 		idc = pkc
 	}
 
-	if credentials.Ids == nil {
+	ids := credentials.Ids
+	if ids == nil {
 		//if pks == nil {
 		//	panic("")
 		//}
