@@ -27,7 +27,7 @@ func NewServer(p *Parameters) *Server {
 	return &Server{
 		oprf:         p.OprfCiphersuite,
 		Ake:          ake.NewServer(p.Group, k, mac2, h2),
-		Deserializer: p.Deserializer(),
+		Deserializer: p.MessageDeserializer(),
 	}
 }
 

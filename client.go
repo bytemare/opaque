@@ -24,7 +24,7 @@ func NewClient(p *Parameters) *Client {
 	return &Client{
 		Core:         core.NewCore(p.OprfCiphersuite, k, mac2, mhf2, p.Mode, p.Group),
 		Ake:          ake.NewClient(p.Group, k, mac2, h2),
-		Deserializer: p.Deserializer(),
+		Deserializer: p.MessageDeserializer(),
 	}
 }
 
