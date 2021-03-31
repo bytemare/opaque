@@ -2,12 +2,14 @@ package opaque
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/voprf"
-	"testing"
 )
 
 func TestFull(t *testing.T) {
@@ -33,6 +35,9 @@ func TestFull(t *testing.T) {
 		username := []byte("client")
 		password := []byte("password")
 
+		userID := CredentialIdentifier(utils.RandomBytes(32))
+		oprfSeed := utils.RandomBytes(32)
+
 		/*
 			Registration
 		*/
@@ -48,7 +53,7 @@ func TestFull(t *testing.T) {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
 
-		respReg, kU, err := server.RegistrationResponse(m1, serverPublicKey, nil)
+		respReg, err := server.RegistrationResponse(m1, serverPublicKey, userID, oprfSeed)
 		if err != nil {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
@@ -61,10 +66,9 @@ func TestFull(t *testing.T) {
 			Ids: ids,
 		}
 
+		var clientSecretKey []byte
 		if mode == envelope.External {
-			clientSecretKey, clientPublicKey := client.KeyGen()
-			clientCreds.Skx = clientSecretKey
-			clientCreds.Pkc = clientPublicKey
+			clientSecretKey, _ = client.KeyGen()
 		}
 
 		m2, err := client.DeserializeRegistrationResponse(m2s)
@@ -72,7 +76,7 @@ func TestFull(t *testing.T) {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
 
-		upload, exportKeyReg, err := client.RegistrationFinalize(clientCreds, m2)
+		upload, exportKeyReg, err := client.RegistrationFinalize(clientSecretKey, clientCreds, m2)
 		if err != nil {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
@@ -86,9 +90,9 @@ func TestFull(t *testing.T) {
 		}
 
 		credFile := &CredentialFile{
-			Ku:       kU,
-			Pkc:      m3.Pku,
-			Envelope: m3.Envelope,
+			MaskingKey: m3.MaskingKey,
+			Pkc:        m3.Pku,
+			Envelope:   m3.Envelope,
 		}
 
 		/*
@@ -105,9 +109,6 @@ func TestFull(t *testing.T) {
 		server = p.Server()
 
 		serverCreds := &envelope.Credentials{
-			Skx: serverSecretKey,
-			Pkc: upload.Pku,
-			Pks: serverPublicKey,
 			Idc: username,
 			Ids: ids,
 		}
@@ -117,7 +118,7 @@ func TestFull(t *testing.T) {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
 
-		ke2, err := server.AuthenticationResponse(m4, nil, credFile, serverCreds)
+		ke2, err := server.AuthenticationResponse(m4, nil, serverSecretKey, serverPublicKey, credFile, serverCreds, userID, oprfSeed)
 		if err != nil {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}

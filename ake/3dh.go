@@ -2,6 +2,7 @@ package ake
 
 import (
 	"errors"
+
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
@@ -73,9 +74,9 @@ func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) []byte
 
 	if len(nonce) != 0 {
 		return nonce
-	} else {
-		return utils.RandomBytes(nonceLen)
 	}
+
+	return utils.RandomBytes(nonceLen)
 }
 
 func buildLabel(length int, label, context []byte) []byte {
@@ -89,7 +90,7 @@ func hkdfExpand(h *internal.KDF, secret, hkdfLabel []byte) []byte {
 }
 
 func hkdfExpandLabel(h *internal.KDF, secret, label, context []byte) []byte {
-	hkdfLabel := buildLabel(h.OutputSize(), label, context)
+	hkdfLabel := buildLabel(h.Size(), label, context)
 	return hkdfExpand(h, secret, hkdfLabel)
 }
 
@@ -104,7 +105,7 @@ func newInfo(h *hash.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []
 }
 
 func deriveKeys(h *internal.KDF, ikm, context []byte) *Keys {
-	prk := h.Get().HKDFExtract(ikm, nil)
+	prk := h.Extract(ikm, nil)
 	k := &Keys{}
 	k.HandshakeSecret = deriveSecret(h, prk, []byte(tagHandshake), context)
 	k.SessionSecret = deriveSecret(h, prk, []byte(tagSession), context)

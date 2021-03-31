@@ -2,6 +2,7 @@ package ake
 
 import (
 	"crypto/hmac"
+
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/opaque/internal"

@@ -2,15 +2,18 @@ package message
 
 import (
 	"errors"
+
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"
+	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
 )
 
 type Deserializer struct {
-	OPRFPointLength  ciphersuite.Identifier
-	AkeGroup         ciphersuite.Identifier
-	NonceLen, MacLen int
+	Mode                      envelope.Mode
+	OPRFPointLength           ciphersuite.Identifier
+	AkeGroup                  ciphersuite.Identifier
+	HashLen, MacLen, NonceLen int
 }
 
 func (d *Deserializer) DeserializeRegistrationRequest(message []byte) (*RegistrationRequest, error) {
@@ -27,7 +30,7 @@ func (d *Deserializer) DeserializeRegistrationResponse(message []byte) (*Registr
 }
 
 func (d *Deserializer) DeserializeRegistrationUpload(message []byte) (*RegistrationUpload, error) {
-	return DeserializeRegistrationUpload(message, d.MacLen, internal.PointLength(d.AkeGroup), internal.ScalarLength(d.AkeGroup))
+	return DeserializeRegistrationUpload(message, d.HashLen, d.MacLen, internal.PointLength(d.AkeGroup), internal.ScalarLength(d.AkeGroup), d.NonceLen, envelope.EnvelopeSize(d.Mode, d.NonceLen, d.MacLen, d.AkeGroup))
 }
 
 func (d *Deserializer) DeserializeCredentialRequest(message []byte) (*CredentialRequest, error) {
@@ -39,7 +42,7 @@ func (d *Deserializer) DeserializeCredentialRequest(message []byte) (*Credential
 }
 
 func (d *Deserializer) DeserializeCredentialResponse(message []byte) (*CredentialResponse, error) {
-	c, _, err := DeserializeCredentialResponse(message, d.MacLen, internal.PointLength(d.OPRFPointLength), internal.PointLength(d.AkeGroup), internal.ScalarLength(d.AkeGroup))
+	c, _, err := DeserializeCredentialResponse(message, internal.PointLength(d.OPRFPointLength), d.NonceLen, internal.PointLength(d.AkeGroup), envelope.EnvelopeSize(d.Mode, d.NonceLen, d.MacLen, d.AkeGroup))
 	return c, err
 }
 
@@ -48,7 +51,7 @@ func (d *Deserializer) DeserializeKE1(message []byte) (*KE1, error) {
 }
 
 func (d *Deserializer) DeserializeKE2(message []byte) (*KE2, error) {
-	return DeserializeKE2(message, d.NonceLen, d.MacLen, internal.PointLength(d.OPRFPointLength), internal.PointLength(d.AkeGroup), internal.ScalarLength(d.AkeGroup))
+	return DeserializeKE2(message, d.NonceLen, d.MacLen, internal.PointLength(d.OPRFPointLength), internal.PointLength(d.AkeGroup), d.Mode, d.AkeGroup)
 }
 
 func (d *Deserializer) DeserializeKE3(message []byte) (*KE3, error) {
@@ -112,14 +115,15 @@ func (m *KE2) Serialize() []byte {
 	return utils.Concatenate(0, m.CredentialResponse.Serialize(), m.NonceS, m.EpkS, internal.EncodeVector(m.Einfo), m.Mac)
 }
 
-func DeserializeKE2(input []byte, nonceLength, macLen, oprfLen, akeLen, scalarLen int) (*KE2, error) {
-	cresp, offset, err := DeserializeCredentialResponse(input, macLen, oprfLen, akeLen, scalarLen)
-	if err != nil {
-		return nil, err
+func DeserializeKE2(input []byte, nonceLength, macLen, oprfLen, akeLen int, mode envelope.Mode, g ciphersuite.Identifier) (*KE2, error) {
+	envLen := envelope.EnvelopeSize(mode, nonceLength, macLen, g)
+	if len(input) < oprfLen+nonceLength+envLen+nonceLength+akeLen+macLen {
+		return nil, errors.New("KE2 is too short")
 	}
 
-	if len(input) < offset+nonceLength+akeLen+macLen {
-		return nil, errors.New("invalid message length")
+	cresp, offset, err := DeserializeCredentialResponse(input, oprfLen, nonceLength, akeLen, envLen)
+	if err != nil {
+		return nil, err
 	}
 
 	nonceS := input[offset : offset+nonceLength]

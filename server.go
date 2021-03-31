@@ -1,6 +1,7 @@
 package opaque
 
 import (
+	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
@@ -9,23 +10,25 @@ import (
 )
 
 type CredentialFile struct {
-	Ku       []byte             `json:"ku"`
-	Pkc      []byte             `json:"pku"`
-	Envelope *envelope.Envelope `json:"envU"`
+	Pkc        []byte             `json:"pku"`
+	MaskingKey []byte             `json:"msk"`
+	Envelope   *envelope.Envelope `json:"envU"`
 }
 
 type Server struct {
 	oprf voprf.Ciphersuite
+	kdf  *internal.KDF
 	Ake  *ake.Server
 	*message.Deserializer
 }
 
 func NewServer(p *Parameters) *Server {
-	k := &internal.KDF{Hash: p.KDF.Get()}
+	k := &internal.KDF{H: p.KDF.Get()}
 	mac2 := &internal.Mac{Hash: p.MAC.Get()}
 	h2 := &internal.Hash{H: p.Hash.Get()}
 	return &Server{
 		oprf:         p.OprfCiphersuite,
+		kdf:          k,
 		Ake:          ake.NewServer(p.Group, k, mac2, h2),
 		Deserializer: p.MessageDeserializer(),
 	}
@@ -45,34 +48,51 @@ func (s *Server) evaluate(ku, blinded []byte) (element, k []byte, err error) {
 	return evaluation.Elements[0], oprf.PrivateKey(), nil
 }
 
-func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks, ku []byte) (*message.RegistrationResponse, []byte, error) {
-	z, ku, err := s.evaluate(ku, req.Data)
+func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier, oprfSeed []byte) (*message.RegistrationResponse, error) {
+	x := s.kdf.Expand(oprfSeed, internal.ExtendNonce(id, "OprfKey"), internal.ScalarLength(s.oprf.Group()))
+	ku := DeriveSecretKey(s.oprf.Group(), x)
+
+	z, _, err := s.evaluate(ku.Bytes(), req.Data)
 	if err != nil {
-		return nil, ku, err
+		return nil, err
 	}
 
 	return &message.RegistrationResponse{
 		Data: internal.PadPoint(z, s.oprf.Group()),
 		Pks:  pks,
-	}, ku, nil
+	}, nil
 }
 
-func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, file *CredentialFile) (*message.CredentialResponse, error) {
-	z, _, err := s.evaluate(file.Ku, req.Data)
+const (
+	credentialResponsePad = "CredentialResponsePad"
+	oprfKey               = "OprfKey"
+)
+
+func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, file *CredentialFile, id CredentialIdentifier, oprfSeed []byte) (*message.CredentialResponse, error) {
+	x := s.kdf.Expand(oprfSeed, internal.ExtendNonce(id, oprfKey), internal.ScalarLength(s.oprf.Group()))
+	ku := DeriveSecretKey(s.oprf.Group(), x)
+
+	z, _, err := s.evaluate(ku.Bytes(), req.Data)
 	if err != nil {
 		return nil, err
 	}
 
+	maskingNonce := utils.RandomBytes(32)
+	// todo: find way to use lengths here
+	env := file.Envelope.Serialize()
+	crPad := s.kdf.Expand(file.MaskingKey, utils.Concatenate(len(maskingNonce)+len([]byte(credentialResponsePad)), maskingNonce, []byte("CredentialResponsePad")), len(pks)+len(env))
+	clear := append(pks, env...)
+	maskedResponse := internal.Xor(crPad, clear)
+
 	return &message.CredentialResponse{
-		Data:     internal.PadPoint(z, s.oprf.Group()),
-		Pks:      pks,
-		Pkc:      file.Pkc,
-		Envelope: file.Envelope,
+		Data:           internal.PadPoint(z, s.oprf.Group()),
+		MaskingNonce:   maskingNonce,
+		MaskedResponse: maskedResponse,
 	}, nil
 }
 
-func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo []byte, credFile *CredentialFile, creds *envelope.Credentials) (*message.KE2, error) {
-	response, err := s.CredentialResponse(ke1.CredentialRequest, creds.Pks, credFile)
+func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo, sks, pks []byte, credFile *CredentialFile, creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
+	response, err := s.CredentialResponse(ke1.CredentialRequest, pks, credFile, id, oprfSeed)
 	if err != nil {
 		return nil, err
 	}
@@ -82,11 +102,11 @@ func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo []byte, cre
 	}
 
 	if creds.Ids == nil {
-		creds.Ids = creds.Pks
+		creds.Ids = pks
 	}
 
 	// id, sk, peerID, peerPK - (creds, peerPK)
-	ke2, err := s.Ake.Response(creds.Ids, creds.Skx, creds.Idc, credFile.Pkc, serverInfo, ke1, response)
+	ke2, err := s.Ake.Response(creds.Ids, sks, creds.Idc, credFile.Pkc, serverInfo, ke1, response)
 	if err != nil {
 		return nil, err
 	}

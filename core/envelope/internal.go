@@ -6,10 +6,14 @@ import (
 	"github.com/bytemare/opaque/internal"
 )
 
-const h2sDST = "Opaque-KeyGenerationSeed"
+const (
+	h2sDST = "Opaque-KeyGenerationSeed"
+	skDST  = "PrivateKey"
+)
 
 type InternalMode struct {
 	ciphersuite.Identifier
+	*internal.KDF
 }
 
 func (i *InternalMode) DeriveSecretKey(seed []byte) group.Scalar {
@@ -21,12 +25,15 @@ func (i *InternalMode) DeriveKeyPair(seed []byte) (group.Scalar, group.Element) 
 	return sk, i.Get(nil).Base().Mult(sk)
 }
 
-func (i *InternalMode) BuildInnerEnvelope(prk []byte, _ *Credentials) (inner, pkc []byte) {
-	_, pk := i.DeriveKeyPair(prk)
+func (i *InternalMode) BuildInnerEnvelope(prk, nonce, _ []byte) (inner, pkc []byte) {
+	seed := i.Expand(prk, internal.ExtendNonce(nonce, skDST), 32)
+	_, pk := i.DeriveKeyPair(seed)
 
 	return nil, internal.SerializePoint(pk, i.Identifier)
 }
 
-func (i *InternalMode) RecoverSecret(prk, _ []byte) *SecretCredentials {
-	return &SecretCredentials{Skc: i.DeriveSecretKey(prk).Bytes()}
+func (i *InternalMode) RecoverKeys(prk, nonce, _ []byte) (*SecretCredentials, []byte) {
+	seed := i.Expand(prk, internal.ExtendNonce(nonce, skDST), 32)
+	skc, pkc := i.DeriveKeyPair(seed)
+	return &SecretCredentials{Skc: skc.Bytes()}, pkc.Bytes()
 }

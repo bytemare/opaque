@@ -5,20 +5,29 @@ import (
 	"github.com/bytemare/cryptotools/mhf"
 )
 
+func ExtendNonce(nonce []byte, tag string) []byte {
+	t := []byte(tag)
+	e := make([]byte, 0, len(nonce)+len(t))
+	e = append(e, nonce...)
+	e = append(e, t...)
+
+	return e
+}
+
 type KDF struct {
-	*hash.Hash
+	H *hash.Hash
 }
 
 func (k *KDF) Extract(salt, ikm []byte) []byte {
-	return k.HKDFExtract(ikm, salt)
+	return k.H.HKDFExtract(ikm, salt)
 }
 
 func (k *KDF) Expand(data, info []byte, length int) []byte {
-	return k.HKDFExpand(data, info, length)
+	return k.H.HKDFExpand(data, info, length)
 }
 
 func (k *KDF) Size() int {
-	return k.OutputSize()
+	return k.H.OutputSize()
 }
 
 type Mac struct {

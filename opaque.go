@@ -3,6 +3,8 @@ package opaque
 import (
 	"errors"
 	"fmt"
+
+	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/message"
@@ -13,6 +15,8 @@ import (
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/voprf"
 )
+
+type CredentialIdentifier []byte
 
 type Parameters struct {
 	OprfCiphersuite voprf.Ciphersuite      `json:"oprf"`
@@ -47,10 +51,12 @@ func (p *Parameters) Server() *Server {
 
 func (p *Parameters) MessageDeserializer() *message.Deserializer {
 	return &message.Deserializer{
+		Mode:            p.Mode,
 		OPRFPointLength: p.OprfCiphersuite.Group(),
 		AkeGroup:        p.Group,
-		NonceLen:        p.NonceLen,
+		HashLen:         p.Hash.OutputSize(),
 		MacLen:          p.MAC.OutputSize(),
+		NonceLen:        p.NonceLen,
 	}
 }
 
@@ -74,4 +80,17 @@ func DeserializeParameters(encoded []byte) (*Parameters, error) {
 		Group:           ciphersuite.Identifier(6),
 		NonceLen:        encoding.OS2IP(encoded[7:]),
 	}, nil
+}
+
+const h2sDST = "Opaque-KeyGenerationSeed"
+
+func DeriveSecretKey(id ciphersuite.Identifier, seed []byte) group.Scalar {
+	return id.Get(nil).HashToScalar(seed, []byte(h2sDST))
+}
+
+func DeriveKeyPair(id ciphersuite.Identifier, seed []byte) (group.Scalar, group.Element) {
+	g := id.Get(nil)
+	sk := g.HashToScalar(seed, nil)
+
+	return sk, g.Base().Mult(sk)
 }

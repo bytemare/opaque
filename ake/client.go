@@ -2,6 +2,7 @@ package ake
 
 import (
 	"crypto/hmac"
+
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/opaque/internal"
@@ -37,6 +38,7 @@ func (c *Client) Initialize(esk group.Scalar, nonce []byte, nonceLen int) {
 
 func (c *Client) Start(clientInfo []byte) *message.KE1 {
 	c.Initialize(nil, nil, 32)
+
 	return &message.KE1{
 		NonceU:     c.NonceU,
 		ClientInfo: clientInfo,

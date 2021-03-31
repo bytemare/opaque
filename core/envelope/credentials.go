@@ -52,10 +52,6 @@ func CreateCleartextCredentials(pkc, pks []byte, credentials *Credentials) *Clea
 
 	ids := credentials.Ids
 	if ids == nil {
-		//if pks == nil {
-		//	panic("")
-		//}
-
 		ids = pks
 	}
 
