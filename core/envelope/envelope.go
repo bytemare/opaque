@@ -127,8 +127,7 @@ func (t *Thing) BuildPRK(unblinded, nonce []byte) []byte {
 	return t.Extract(nonce, hardened)
 }
 
-func (t *Thing) buildKeys(unblinded, nonce []byte) (prk, authKey, exportKey, maskingKey []byte) {
-	prk = t.BuildPRK(unblinded, nil)
+func (t *Thing) buildKeys(prk, nonce []byte) (authKey, exportKey, maskingKey []byte) {
 	authKey = t.Expand(prk, internal.ExtendNonce(nonce, tagAuthKey), t.KDF.Size())
 	exportKey = t.Expand(prk, internal.ExtendNonce(nonce, tagExportKey), t.KDF.Size())
 	maskingKey = t.Expand(prk, []byte(tagMaskingKey), t.KDF.Size())
@@ -140,10 +139,9 @@ func (t *Thing) AuthTag(authKey, nonce, inner, ctc []byte) []byte {
 	return t.MAC(authKey, utils.Concatenate(0, []byte{byte(t.Mode)}, nonce, inner, ctc))
 }
 
-func (t *Thing) CreateEnvelope(unblinded, pks, skc []byte, creds *Credentials) (envelope *Envelope, publicKey, maskingKey, exportKey []byte) {
+func (t *Thing) CreateEnvelope(prk, pks, skc []byte, creds *Credentials) (envelope *Envelope, publicKey, maskingKey, exportKey []byte) {
 	nonce := utils.RandomBytes(t.nonceLen)
-	prk, authKey, exportKey, maskingKey := t.buildKeys(unblinded, nonce)
-
+	authKey, exportKey, maskingKey := t.buildKeys(prk, nonce)
 	inner, pkc := t.inner().BuildInnerEnvelope(prk, nonce, skc)
 	ctc := CreateCleartextCredentials(pkc, pks, creds)
 	tag := t.AuthTag(authKey, nonce, inner, ctc.Serialize())

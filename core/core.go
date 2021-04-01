@@ -44,7 +44,8 @@ func (c *Core) BuildEnvelope(evaluation, pks, skc []byte, creds *envelope.Creden
 		return nil, nil, nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	env, pkc, maskingKey, exportKey = c.Thing.CreateEnvelope(unblinded, pks, skc, creds)
+	prk := c.Thing.BuildPRK(unblinded, nil)
+	env, pkc, maskingKey, exportKey = c.Thing.CreateEnvelope(prk, pks, skc, creds)
 
 	return env, pkc, maskingKey, exportKey, nil
 }
