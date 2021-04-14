@@ -3,7 +3,6 @@ package opaque
 import (
 	"errors"
 	"fmt"
-
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/core"
@@ -16,24 +15,35 @@ type Client struct {
 	Core *core.Core
 	Ake  *ake.Client
 	Ke1  *message.KE1
-	*message.Deserializer
+	*internal.Parameters
 }
 
+const (
+	tagCredentialResponsePad = "CredentialResponsePad"
+	tagMaskingKey = "MaskingKey"
+)
+
 func NewClient(p *Parameters) *Client {
-	k := &internal.KDF{H: p.KDF.Get()}
-	mac2 := &internal.Mac{Hash: p.MAC.Get()}
-	h2 := &internal.Hash{H: p.Hash.Get()}
-	mhf2 := &internal.MHF{MHF: p.MHF.Get()}
+	ip := &internal.Parameters{
+		OprfCiphersuite: p.OprfCiphersuite,
+		KDF:             &internal.KDF{H: p.KDF.Get()},
+		MAC:             &internal.Mac{Hash: p.MAC.Get()},
+		Hash:            &internal.Hash{H: p.Hash.Get()},
+		MHF:             &internal.MHF{MHF: p.MHF.Get()},
+		AKEGroup:        p.AKEGroup,
+		NonceLen:        p.NonceLen,
+		Deserializer: p.MessageDeserializer(),
+	}
 
 	return &Client{
-		Core:         core.NewCore(p.OprfCiphersuite, k, mac2, mhf2, p.Mode, p.Group, p.NonceLen),
-		Ake:          ake.NewClient(p.Group, k, mac2, h2),
-		Deserializer: p.MessageDeserializer(),
+		Core:         core.NewCore(ip, p.Mode),
+		Ake:          ake.NewClient(ip),
+		Parameters: ip,
 	}
 }
 
 func (c *Client) KeyGen() (sk, pk []byte) {
-	return ake.KeyGen(c.Ake.Identifier)
+	return ake.KeyGen(c.Ake.AKEGroup)
 }
 
 func (c *Client) RegistrationStart(password []byte) *message.RegistrationRequest {
@@ -48,9 +58,9 @@ func (c *Client) RegistrationFinalize(skc []byte, creds *envelope.Credentials, r
 	}
 
 	return &message.RegistrationUpload{
-		Envelope:   envU,
+		PublicKey:  pkc,
 		MaskingKey: maskingKey,
-		Pku:        pkc,
+		Envelope:   envU.Serialize(),
 	}, exportKey, nil
 }
 
@@ -73,7 +83,7 @@ func (c *Client) publicKey(skc []byte) ([]byte, error) {
 }
 
 func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*message.KE3, []byte, error) {
-	if len(ke2.MaskedResponse) != internal.PointLength(c.AkeGroup)+envelope.EnvelopeSize(c.Core.Mode, c.NonceLen, c.Core.Mac.Size(), c.AkeGroup) {
+	if len(ke2.MaskedResponse) != internal.PointLength(c.AkeGroup)+envelope.Size(c.Core.Mode, c.NonceLen, c.Core.MAC.Size(), c.AkeGroup) {
 		return nil, nil, errors.New("masking response is of invalid length for this mode")
 	}
 
@@ -82,20 +92,20 @@ func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*mes
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	prk := c.Core.BuildPRK(unblinded, nil)
-	maskingKey := c.Core.Expand(prk, []byte("MaskingKey"), c.Core.Hash.Size())
-	crPad := c.Core.Expand(maskingKey, utils.Concatenate(0, ke2.MaskingNonce, []byte("CredentialResponsePad")), internal.PointLength(c.AkeGroup)+envelope.EnvelopeSize(c.Core.Mode, c.NonceLen, c.Core.Mac.Size(), c.AkeGroup))
+	randomizedPwd := c.Core.BuildPRK(unblinded, nil)
+	maskingKey := c.Core.KDF.Expand(randomizedPwd, []byte(tagMaskingKey), c.Core.Hash.Size())
+	crPad := c.Core.KDF.Expand(maskingKey, utils.Concatenate(0, ke2.MaskingNonce, []byte(tagCredentialResponsePad)), internal.PointLength(c.AkeGroup)+envelope.Size(c.Core.Mode, c.NonceLen, c.Core.MAC.Size(), c.AkeGroup))
 	clear := internal.Xor(crPad, ke2.MaskedResponse)
 
 	pks := clear[:internal.PointLength(c.AkeGroup)]
 	e := clear[internal.PointLength(c.AkeGroup):]
 
-	env, _, err := envelope.DeserializeEnvelope(e, c.NonceLen, c.Core.Mac.Size(), internal.ScalarLength(c.AkeGroup))
+	env, _, err := envelope.DeserializeEnvelope(e, c.NonceLen, c.Core.MAC.Size(), internal.ScalarLength(c.AkeGroup))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	secretCreds, pkc, exportKey, err := c.Core.RecoverSecret(idc, ids, pks, prk, env)
+	skc, pkc, exportKey, err := c.Core.RecoverSecret(idc, ids, pks, randomizedPwd, env)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -114,7 +124,7 @@ func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*mes
 	}
 
 	// id, sk, peerID, peerPK - (creds, peerPK)
-	ke3, _, err := c.Ake.Finalize(creds.Idc, secretCreds.Skc, creds.Ids, pks, c.Ke1, ke2)
+	ke3, _, err := c.Ake.Finalize(creds.Idc, skc, creds.Ids, pks, c.Ke1, ke2)
 	if err != nil {
 		return nil, nil, err
 	}

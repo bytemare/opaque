@@ -2,7 +2,6 @@ package core
 
 import (
 	"fmt"
-
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
@@ -16,16 +15,16 @@ type Core struct {
 	*envelope.Thing
 }
 
-func NewCore(suite voprf.Ciphersuite, kdf *internal.KDF, mac *internal.Mac, mhf *internal.MHF, mode envelope.Mode, akeGroup ciphersuite.Identifier, nonceLen int) *Core {
-	oprf, err := suite.Client(nil)
+func NewCore(parameters *internal.Parameters, mode envelope.Mode) *Core {
+	oprf, err := parameters.OprfCiphersuite.Client(nil)
 	if err != nil {
 		panic(err)
 	}
 
 	return &Core{
-		Group: suite.Group(),
+		Group: parameters.OprfCiphersuite.Group(),
 		Oprf:  oprf,
-		Thing: envelope.NewThing(akeGroup, kdf, mac, mhf, mode, nonceLen),
+		Thing: envelope.NewThing(parameters, mode),
 	}
 }
 
@@ -44,17 +43,17 @@ func (c *Core) BuildEnvelope(evaluation, pks, skc []byte, creds *envelope.Creden
 		return nil, nil, nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	prk := c.Thing.BuildPRK(unblinded, nil)
-	env, pkc, maskingKey, exportKey = c.Thing.CreateEnvelope(prk, pks, skc, creds)
+	randomizedPwd := c.Thing.BuildPRK(unblinded, nil)
+	env, pkc, maskingKey, exportKey = c.Thing.CreateEnvelope(randomizedPwd, pks, skc, creds)
 
 	return env, pkc, maskingKey, exportKey, nil
 }
 
-func (c *Core) RecoverSecret(idc, ids, pks, prk []byte, envU *envelope.Envelope) (sc *envelope.SecretCredentials, pkc, exportKey []byte, err error) {
+func (c *Core) RecoverSecret(idc, ids, pks, randomizedPwd []byte, envU *envelope.Envelope) (skc, pkc, exportKey []byte, err error) {
 	creds := &envelope.Credentials{
 		Idc: idc,
 		Ids: ids,
 	}
 
-	return c.Thing.RecoverEnvelope(prk, pks, creds, envU)
+	return c.Thing.RecoverEnvelope(randomizedPwd, pks, creds, envU)
 }

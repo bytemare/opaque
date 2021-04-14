@@ -5,7 +5,7 @@ import (
 	"github.com/bytemare/cryptotools/mhf"
 )
 
-func ExtendNonce(nonce []byte, tag string) []byte {
+func Concat(nonce []byte, tag string) []byte {
 	t := []byte(tag)
 	e := make([]byte, 0, len(nonce)+len(t))
 	e = append(e, nonce...)

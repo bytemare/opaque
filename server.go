@@ -6,36 +6,39 @@ import (
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
-	"github.com/bytemare/voprf"
 )
 
-type CredentialFile struct {
-	Pkc        []byte             `json:"pku"`
-	MaskingKey []byte             `json:"msk"`
-	Envelope   *envelope.Envelope `json:"envU"`
-}
-
 type Server struct {
-	oprf voprf.Ciphersuite
-	kdf  *internal.KDF
+	*internal.Parameters
 	Ake  *ake.Server
-	*message.Deserializer
 }
 
 func NewServer(p *Parameters) *Server {
-	k := &internal.KDF{H: p.KDF.Get()}
-	mac2 := &internal.Mac{Hash: p.MAC.Get()}
-	h2 := &internal.Hash{H: p.Hash.Get()}
-	return &Server{
-		oprf:         p.OprfCiphersuite,
-		kdf:          k,
-		Ake:          ake.NewServer(p.Group, k, mac2, h2),
+	ip := &internal.Parameters{
+		OprfCiphersuite: p.OprfCiphersuite,
+		KDF:             &internal.KDF{H: p.KDF.Get()},
+		MAC:             &internal.Mac{Hash: p.MAC.Get()},
+		Hash:            &internal.Hash{H: p.Hash.Get()},
+		MHF:             &internal.MHF{MHF: p.MHF.Get()},
+		AKEGroup:        p.AKEGroup,
+		NonceLen:        p.NonceLen,
 		Deserializer: p.MessageDeserializer(),
+	}
+
+	return &Server{
+		Parameters: ip,
+		Ake:          ake.NewServer(ip),
 	}
 }
 
-func (s *Server) evaluate(ku, blinded []byte) (element, k []byte, err error) {
-	oprf, err := s.oprf.Server(ku)
+func (s *Server) evaluate(seed, blinded []byte) (element, k []byte, err error) {
+	oprf, err := s.OprfCiphersuite.Server(nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	ku := oprf.HashToScalar(seed)
+	oprf, err = s.OprfCiphersuite.Server(ku.Bytes())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -48,19 +51,18 @@ func (s *Server) evaluate(ku, blinded []byte) (element, k []byte, err error) {
 	return evaluation.Elements[0], oprf.PrivateKey(), nil
 }
 
-func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier, oprfSeed []byte) (*message.RegistrationResponse, error) {
-	x := s.kdf.Expand(oprfSeed, internal.ExtendNonce(id, "OprfKey"), internal.ScalarLength(s.oprf.Group()))
-	ku := DeriveSecretKey(s.oprf.Group(), x)
+func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier, oprfSeed []byte) (*message.RegistrationResponse, []byte, error) {
+	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, oprfKey), internal.ScalarLength(s.OprfCiphersuite.Group()))
 
-	z, _, err := s.evaluate(ku.Bytes(), req.Data)
+	z, ku, err := s.evaluate(seed, req.Data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &message.RegistrationResponse{
-		Data: internal.PadPoint(z, s.oprf.Group()),
+		Data: internal.PadPoint(z, s.OprfCiphersuite.Group()),
 		Pks:  pks,
-	}, nil
+	}, ku, nil
 }
 
 const (
@@ -68,37 +70,35 @@ const (
 	oprfKey               = "OprfKey"
 )
 
-func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, file *CredentialFile, id CredentialIdentifier, oprfSeed []byte) (*message.CredentialResponse, error) {
-	x := s.kdf.Expand(oprfSeed, internal.ExtendNonce(id, oprfKey), internal.ScalarLength(s.oprf.Group()))
-	ku := DeriveSecretKey(s.oprf.Group(), x)
+func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, record *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*message.CredentialResponse, error) {
+	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, oprfKey), internal.ScalarLength(s.OprfCiphersuite.Group()))
 
-	z, _, err := s.evaluate(ku.Bytes(), req.Data)
+	z, _, err := s.evaluate(seed, req.Data)
 	if err != nil {
 		return nil, err
 	}
 
-	maskingNonce := utils.RandomBytes(32)
-	// todo: find way to use lengths here
-	env := file.Envelope.Serialize()
-	crPad := s.kdf.Expand(file.MaskingKey, utils.Concatenate(len(maskingNonce)+len([]byte(credentialResponsePad)), maskingNonce, []byte("CredentialResponsePad")), len(pks)+len(env))
+	//maskingNonce := utils.RandomBytes(32) // todo testing
+	env := record.Envelope
+	crPad := s.KDF.Expand(record.MaskingKey, utils.Concatenate(len(maskingNonce)+len([]byte(credentialResponsePad)), maskingNonce, []byte(credentialResponsePad)), len(pks)+len(env))
 	clear := append(pks, env...)
 	maskedResponse := internal.Xor(crPad, clear)
 
 	return &message.CredentialResponse{
-		Data:           internal.PadPoint(z, s.oprf.Group()),
+		Data:           internal.PadPoint(z, s.OprfCiphersuite.Group()),
 		MaskingNonce:   maskingNonce,
 		MaskedResponse: maskedResponse,
 	}, nil
 }
 
-func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo, sks, pks []byte, credFile *CredentialFile, creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
-	response, err := s.CredentialResponse(ke1.CredentialRequest, pks, credFile, id, oprfSeed)
+func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload, creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
+	response, err := s.CredentialResponse(ke1.CredentialRequest, pks, upload, id, oprfSeed, creds.MaskingNonce)
 	if err != nil {
 		return nil, err
 	}
 
 	if creds.Idc == nil {
-		creds.Idc = credFile.Pkc
+		creds.Idc = upload.PublicKey
 	}
 
 	if creds.Ids == nil {
@@ -106,7 +106,7 @@ func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo, sks, pks [
 	}
 
 	// id, sk, peerID, peerPK - (creds, peerPK)
-	ke2, err := s.Ake.Response(creds.Ids, sks, creds.Idc, credFile.Pkc, serverInfo, ke1, response)
+	ke2, err := s.Ake.Response(creds.Ids, sks, creds.Idc, upload.PublicKey, serverInfo, ke1, response)
 	if err != nil {
 		return nil, err
 	}
@@ -119,7 +119,7 @@ func (s *Server) AuthenticationFinalize(ke3 *message.KE3) error {
 }
 
 func (s *Server) KeyGen() (sk, pk []byte) {
-	return ake.KeyGen(s.Ake.Identifier)
+	return ake.KeyGen(s.Ake.AKEGroup)
 }
 
 func (s *Server) SessionKey() []byte {

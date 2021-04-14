@@ -35,30 +35,27 @@ func (e *ExternalMode) RecoverPublicKey(privateKey group.Scalar) group.Element {
 	return e.Base().Mult(privateKey)
 }
 
-func (e *ExternalMode) BuildInnerEnvelope(prk, nonce, skc []byte) (innerEnvelope, pk []byte) {
+func (e *ExternalMode) BuildInnerEnvelope(randomizedPwd, nonce, skc []byte) (innerEnvelope, pk []byte) {
 	scalar, err := e.NewScalar().Decode(skc)
 	if err != nil {
 		panic(errors.New("invalid private key"))
 	}
 
 	pkc := e.Base().Mult(scalar).Bytes()
-	sec := SecretCredentials{skc}
-	pt := sec.Serialize()
-	pad := e.Expand(prk, internal.ExtendNonce(nonce, tagPad), len(pt))
+	pad := e.Expand(randomizedPwd, internal.Concat(nonce, tagPad), len(skc))
 
-	return internal.Xor(pt, pad), pkc
+	return internal.Xor(skc, pad), pkc
 }
 
-func (e *ExternalMode) RecoverKeys(prk, nonce, innerEnvelope []byte) (*SecretCredentials, []byte) {
+func (e *ExternalMode) RecoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (skc, pkc []byte) {
 	inner := deserializeExternalInnerEnvelope(innerEnvelope, e.Nsk)
-	pad := e.Expand(prk, internal.ExtendNonce(nonce, tagPad), len(inner.encrypted))
-	pt := internal.Xor(inner.encrypted, pad)
-	sc := DeserializeSecretCredentials(pt)
+	pad := e.Expand(randomizedPwd, internal.Concat(nonce, tagPad), len(inner.encrypted))
+	skc = internal.Xor(inner.encrypted, pad)
 
-	skc, err := e.NewScalar().Decode(sc.Skc)
+	sk, err := e.NewScalar().Decode(skc)
 	if err != nil {
 		panic(errors.New("invalid private key"))
 	}
 
-	return sc, e.RecoverPublicKey(skc).Bytes()
+	return skc, e.RecoverPublicKey(sk).Bytes()
 }

@@ -2,20 +2,8 @@ package envelope
 
 import (
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encoding"
 )
-
-type SecretCredentials struct {
-	Skc []byte
-}
-
-func (s *SecretCredentials) Serialize() []byte {
-	return s.Skc
-}
-
-func DeserializeSecretCredentials(input []byte) *SecretCredentials {
-	return &SecretCredentials{input}
-}
 
 type CleartextCredentials struct {
 	Pks []byte
@@ -26,11 +14,11 @@ type CleartextCredentials struct {
 func (c *CleartextCredentials) Serialize() []byte {
 	var u, s []byte
 	if c.Idc != nil {
-		u = internal.EncodeVector(c.Idc)
+		u = encoding.EncodeVector(c.Idc)
 	}
 
 	if c.Ids != nil {
-		s = internal.EncodeVector(c.Ids)
+		s = encoding.EncodeVector(c.Ids)
 	}
 
 	return utils.Concatenate(0, c.Pks, u, s)

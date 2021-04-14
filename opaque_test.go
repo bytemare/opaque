@@ -21,7 +21,7 @@ func TestFull(t *testing.T) {
 		MAC:             hash.SHA512,
 		Hash:            hash.SHA512,
 		MHF:             mhf.Scrypt,
-		Group:           ciphersuite.Ristretto255Sha512,
+		AKEGroup:           ciphersuite.Ristretto255Sha512,
 		NonceLen:        32,
 	}
 
@@ -53,7 +53,7 @@ func TestFull(t *testing.T) {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
 
-		respReg, err := server.RegistrationResponse(m1, serverPublicKey, userID, oprfSeed)
+		respReg, _, err := server.RegistrationResponse(m1, serverPublicKey, userID, oprfSeed)
 		if err != nil {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
@@ -89,12 +89,6 @@ func TestFull(t *testing.T) {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
 
-		credFile := &CredentialFile{
-			MaskingKey: m3.MaskingKey,
-			Pkc:        m3.Pku,
-			Envelope:   m3.Envelope,
-		}
-
 		/*
 			Login
 		*/
@@ -111,6 +105,7 @@ func TestFull(t *testing.T) {
 		serverCreds := &envelope.Credentials{
 			Idc: username,
 			Ids: ids,
+			MaskingNonce: utils.RandomBytes(32),
 		}
 
 		m4, err := server.DeserializeKE1(m4s)
@@ -118,7 +113,7 @@ func TestFull(t *testing.T) {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}
 
-		ke2, err := server.AuthenticationResponse(m4, nil, serverSecretKey, serverPublicKey, credFile, serverCreds, userID, oprfSeed)
+		ke2, err := server.AuthenticationResponse(m4, nil, serverSecretKey, serverPublicKey, m3, serverCreds, userID, oprfSeed)
 		if err != nil {
 			t.Fatalf("Mode %v: %v", mode, err)
 		}

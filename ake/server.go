@@ -2,28 +2,25 @@ package ake
 
 import (
 	"crypto/hmac"
+	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
 
 type Server struct {
 	*Ake
-
-	NonceS    []byte // todo: only useful in testing, to force value
 	ClientMac []byte
+	NonceS    []byte // todo: only useful in testing, to force value
 }
 
-func NewServer(id ciphersuite.Identifier, kdf *internal.KDF, mac *internal.Mac, h *internal.Hash) *Server {
+func NewServer(parameters *internal.Parameters) *Server {
 	return &Server{
 		Ake: &Ake{
-			Identifier: id,
-			Group:      id.Get(nil),
-			KDF:        kdf,
-			Mac:        mac,
-			Hash:       h,
+			Parameters: parameters,
+			Group:      parameters.AKEGroup.Get(nil),
+			keys:       &keys{},
 		},
 	}
 }
@@ -58,35 +55,35 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 	nonce := s.NonceS
 	transcriptHasher := s.Hash.H
 	newInfo(transcriptHasher, ke1, idu, ids, response.Serialize(), nonce, s.Epk.Bytes())
-	keys := deriveKeys(s.KDF, ikm, transcriptHasher.Sum(nil))
+	keys, sessionSecret := deriveKeys(s.KDF, ikm, transcriptHasher.Sum(nil))
 	var einfo []byte
 
 	if len(serverInfo) != 0 {
-		pad := s.Expand(keys.HandshakeEncryptKey, []byte(encryptionTag), len(serverInfo))
+		pad := s.KDF.Expand(keys.HandshakeEncryptKey, []byte(encryptionTag), len(serverInfo))
 		einfo = internal.Xor(pad, serverInfo)
 	}
 
-	_, _ = transcriptHasher.Write(internal.EncodeVector(einfo))
+	_, _ = transcriptHasher.Write(encoding.EncodeVector(einfo))
 	transcript2 := transcriptHasher.Sum(nil)
-	mac := s.MAC(keys.ServerMacKey, transcript2)
+	mac := s.MAC.MAC(keys.ServerMacKey, transcript2)
 
 	s.Keys = keys
-	s.SessionSecret = keys.SessionSecret
+	s.SessionSecret = sessionSecret
 	_, _ = transcriptHasher.Write(mac)
 	transcript3 := transcriptHasher.Sum(nil)
-	s.ClientMac = s.MAC(keys.ClientMacKey, transcript3)
+	s.ClientMac = s.MAC.MAC(keys.ClientMacKey, transcript3)
 
 	return &message.KE2{
 		CredentialResponse: response,
 		NonceS:             nonce,
-		EpkS:               internal.SerializePoint(s.Epk, s.Identifier),
+		EpkS:               internal.SerializePoint(s.Epk, s.AKEGroup),
 		Einfo:              einfo,
 		Mac:                mac,
 	}, nil
 }
 
-func (s *Server) Finalize(kex *message.KE3) error {
-	if !hmac.Equal(s.ClientMac, kex.Mac) {
+func (s *Server) Finalize(ke3 *message.KE3) error {
+	if !hmac.Equal(s.ClientMac, ke3.Mac) {
 		return ErrAkeInvalidClientMac
 	}
 
