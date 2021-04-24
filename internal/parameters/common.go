@@ -1,8 +1,9 @@
-package internal
+package parameters
 
 import (
 	"errors"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/message"
 	"github.com/bytemare/voprf"
@@ -10,10 +11,10 @@ import (
 
 type Parameters struct {
 	OprfCiphersuite voprf.Ciphersuite
-	KDF             *KDF
-	MAC             *Mac
-	Hash            *Hash
-	MHF             *MHF
+	KDF             *internal.KDF
+	MAC             *internal.Mac
+	Hash            *internal.Hash
+	MHF             *internal.MHF
 	AKEGroup        ciphersuite.Identifier
 	NonceLen        int
 	*Deserializer
@@ -64,12 +65,12 @@ func (d *Deserializer) DeserializeRegistrationUpload(input []byte) (*message.Reg
 	}, nil
 }
 
-func (d *Deserializer) DeserializeCredentialRequest(input []byte) (*message.CredentialRequest, error) {
-	if len(input) != d.OPRFPointLength {
-		return nil, errors.New("invalid input size")
+func (d *Deserializer) DeserializeCredentialRequest(input []byte) (*message.CredentialRequest, int, error) {
+	if len(input) <= d.OPRFPointLength {
+		return nil, 0, errors.New("CredentialRequest too short")
 	}
 
-	return &message.CredentialRequest{Data: input[:d.OPRFPointLength]}, nil
+	return &message.CredentialRequest{Data: input[:d.OPRFPointLength]}, d.OPRFPointLength, nil
 }
 
 func (d *Deserializer) deserializeCredentialResponse(input []byte) (*message.CredentialResponse, int, error) {
@@ -94,19 +95,19 @@ func (d *Deserializer) DeserializeKE1(input []byte) (*message.KE1, error) {
 		return nil, errors.New("invalid input length")
 	}
 
-	creq, err := d.DeserializeCredentialRequest(input)
+	creq, offset, err := d.DeserializeCredentialRequest(input)
 	if err != nil {
 		return nil, err
 	}
 
-	nonceU := input[d.OPRFPointLength : d.OPRFPointLength+d.NonceLen]
+	nonceU := input[offset : offset+d.NonceLen]
 
-	info, offset, err := encoding.DecodeVector(input[d.OPRFPointLength+d.NonceLen:])
+	info, offset2, err := encoding.DecodeVector(input[offset+d.NonceLen:])
 	if err != nil {
 		return nil, err
 	}
 
-	offset = d.OPRFPointLength + d.NonceLen + offset
+	offset = offset + d.NonceLen + offset2
 	epku := input[offset:]
 
 	if len(epku) != d.AkePointLength {

@@ -5,16 +5,17 @@ import (
 	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/parameters"
 	"github.com/bytemare/opaque/message"
 )
 
 type Server struct {
-	*internal.Parameters
+	*parameters.Parameters
 	Ake  *ake.Server
 }
 
 func NewServer(p *Parameters) *Server {
-	ip := &internal.Parameters{
+	ip := &parameters.Parameters{
 		OprfCiphersuite: p.OprfCiphersuite,
 		KDF:             &internal.KDF{H: p.KDF.Get()},
 		MAC:             &internal.Mac{Hash: p.MAC.Get()},
@@ -52,7 +53,7 @@ func (s *Server) evaluate(seed, blinded []byte) (element, k []byte, err error) {
 }
 
 func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier, oprfSeed []byte) (*message.RegistrationResponse, []byte, error) {
-	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, oprfKey), internal.ScalarLength(s.OprfCiphersuite.Group()))
+	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, internal.OprfKey), internal.ScalarLength(s.OprfCiphersuite.Group()))
 
 	z, ku, err := s.evaluate(seed, req.Data)
 	if err != nil {
@@ -65,13 +66,8 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []by
 	}, ku, nil
 }
 
-const (
-	credentialResponsePad = "CredentialResponsePad"
-	oprfKey               = "OprfKey"
-)
-
 func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, record *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*message.CredentialResponse, error) {
-	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, oprfKey), internal.ScalarLength(s.OprfCiphersuite.Group()))
+	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, internal.OprfKey), internal.ScalarLength(s.OprfCiphersuite.Group()))
 
 	z, _, err := s.evaluate(seed, req.Data)
 	if err != nil {
@@ -80,7 +76,7 @@ func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, 
 
 	//maskingNonce := utils.RandomBytes(32) // todo testing
 	env := record.Envelope
-	crPad := s.KDF.Expand(record.MaskingKey, utils.Concatenate(len(maskingNonce)+len([]byte(credentialResponsePad)), maskingNonce, []byte(credentialResponsePad)), len(pks)+len(env))
+	crPad := s.KDF.Expand(record.MaskingKey, utils.Concatenate(len(maskingNonce)+len([]byte(internal.TagCredentialResponsePad)), maskingNonce, []byte(internal.TagCredentialResponsePad)), len(pks)+len(env))
 	clear := append(pks, env...)
 	maskedResponse := internal.Xor(crPad, clear)
 

@@ -3,6 +3,7 @@ package ake
 import (
 	"crypto/hmac"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/parameters"
 
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/opaque/internal"
@@ -15,7 +16,7 @@ type Server struct {
 	NonceS    []byte // todo: only useful in testing, to force value
 }
 
-func NewServer(parameters *internal.Parameters) *Server {
+func NewServer(parameters *parameters.Parameters) *Server {
 	return &Server{
 		Ake: &Ake{
 			Parameters: parameters,
@@ -59,7 +60,7 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 	var einfo []byte
 
 	if len(serverInfo) != 0 {
-		pad := s.KDF.Expand(keys.HandshakeEncryptKey, []byte(encryptionTag), len(serverInfo))
+		pad := s.KDF.Expand(keys.HandshakeEncryptKey, []byte(internal.EncryptionTag), len(serverInfo))
 		einfo = internal.Xor(pad, serverInfo)
 	}
 

@@ -2,9 +2,10 @@ package ake
 
 import (
 	"errors"
-	encoding2 "github.com/bytemare/opaque/internal/encoding"
+	encoding "github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/parameters"
 
-	"github.com/bytemare/cryptotools/encoding"
+	i2osp "github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
@@ -12,17 +13,6 @@ import (
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
-)
-
-const (
-	tag3DH        = "3DH"
-	labelPrefix   = "OPAQUE "
-	tagHandshake  = "handshake secret"
-	tagSession    = "session secret"
-	tagMacServer  = "server mac"
-	tagMacClient  = "client mac"
-	tagEncServer  = "handshake enc"
-	encryptionTag = "encryption pad"
 )
 
 var (
@@ -52,7 +42,7 @@ type keys struct {
 }
 
 type Ake struct {
-	*internal.Parameters
+	*parameters.Parameters
 	group.Group
 	SessionSecret []byte
 
@@ -82,7 +72,7 @@ func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) []byte
 
 func buildLabel(length int, label, context []byte) []byte {
 	// todo : the encodings here assume every length fits into a 1-byte encoding
-	return utils.Concatenate(0, encoding.I2OSP(length, 2), encoding2.EncodeVectorLen(append([]byte(labelPrefix), label...), 1), encoding2.EncodeVectorLen(context, 1))
+	return utils.Concatenate(0, i2osp.I2OSP(length, 2), encoding.EncodeVectorLen(append([]byte(internal.LabelPrefix), label...), 1), encoding.EncodeVectorLen(context, 1))
 }
 
 func expand(h *internal.KDF, secret, hkdfLabel []byte) []byte {
@@ -100,19 +90,19 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 }
 
 func newInfo(h *hash.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []byte) {
-	cp := encoding2.EncodeVectorLen(idu, 2)
-	sp := encoding2.EncodeVectorLen(ids, 2)
-	_, _ = h.Write(utils.Concatenate(0, []byte(tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
+	cp := encoding.EncodeVectorLen(idu, 2)
+	sp := encoding.EncodeVectorLen(ids, 2)
+	_, _ = h.Write(utils.Concatenate(0, []byte(internal.Tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
 }
 
 func deriveKeys(h *internal.KDF, ikm, context []byte) (*Keys, []byte) {
 	prk := h.Extract(nil, ikm)
 	k := &Keys{}
-	k.HandshakeSecret = deriveSecret(h, prk, []byte(tagHandshake), context)
-	sessionSecret := deriveSecret(h, prk, []byte(tagSession), context)
-	k.ServerMacKey = expandLabel(h, k.HandshakeSecret, []byte(tagMacServer), nil)
-	k.ClientMacKey = expandLabel(h, k.HandshakeSecret, []byte(tagMacClient), nil)
-	k.HandshakeEncryptKey = expandLabel(h, k.HandshakeSecret, []byte(tagEncServer), nil)
+	k.HandshakeSecret = deriveSecret(h, prk, []byte(internal.TagHandshake), context)
+	sessionSecret := deriveSecret(h, prk, []byte(internal.TagSession), context)
+	k.ServerMacKey = expandLabel(h, k.HandshakeSecret, []byte(internal.TagMacServer), nil)
+	k.ClientMacKey = expandLabel(h, k.HandshakeSecret, []byte(internal.TagMacClient), nil)
+	k.HandshakeEncryptKey = expandLabel(h, k.HandshakeSecret, []byte(internal.TagEncServer), nil)
 
 	return k, sessionSecret
 }

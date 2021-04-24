@@ -8,6 +8,7 @@ import (
 	"github.com/bytemare/opaque/core"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/parameters"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -15,16 +16,11 @@ type Client struct {
 	Core *core.Core
 	Ake  *ake.Client
 	Ke1  *message.KE1
-	*internal.Parameters
+	*parameters.Parameters
 }
 
-const (
-	tagCredentialResponsePad = "CredentialResponsePad"
-	tagMaskingKey = "MaskingKey"
-)
-
 func NewClient(p *Parameters) *Client {
-	ip := &internal.Parameters{
+	ip := &parameters.Parameters{
 		OprfCiphersuite: p.OprfCiphersuite,
 		KDF:             &internal.KDF{H: p.KDF.Get()},
 		MAC:             &internal.Mac{Hash: p.MAC.Get()},
@@ -93,14 +89,14 @@ func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*mes
 	}
 
 	randomizedPwd := c.Core.BuildPRK(unblinded, nil)
-	maskingKey := c.Core.KDF.Expand(randomizedPwd, []byte(tagMaskingKey), c.Core.Hash.Size())
-	crPad := c.Core.KDF.Expand(maskingKey, utils.Concatenate(0, ke2.MaskingNonce, []byte(tagCredentialResponsePad)), internal.PointLength(c.AkeGroup)+envelope.Size(c.Core.Mode, c.NonceLen, c.Core.MAC.Size(), c.AkeGroup))
+	maskingKey := c.Core.KDF.Expand(randomizedPwd, []byte(internal.TagMaskingKey), c.Core.Hash.Size())
+	crPad := c.Core.KDF.Expand(maskingKey, utils.Concatenate(0, ke2.MaskingNonce, []byte(internal.TagCredentialResponsePad)), internal.PointLength(c.AkeGroup)+envelope.Size(c.Core.Mode, c.NonceLen, c.Core.MAC.Size(), c.AkeGroup))
 	clear := internal.Xor(crPad, ke2.MaskedResponse)
 
 	pks := clear[:internal.PointLength(c.AkeGroup)]
 	e := clear[internal.PointLength(c.AkeGroup):]
 
-	env, _, err := envelope.DeserializeEnvelope(e, c.NonceLen, c.Core.MAC.Size(), internal.ScalarLength(c.AkeGroup))
+	env, _, err := envelope.DeserializeEnvelope(e, c.Core.Thing.Mode, c.NonceLen, c.Core.MAC.Size(), internal.ScalarLength(c.AkeGroup))
 	if err != nil {
 		return nil, nil, err
 	}

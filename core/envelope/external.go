@@ -7,8 +7,6 @@ import (
 	"github.com/bytemare/opaque/internal"
 )
 
-const tagPad = "Pad"
-
 type externalInnerEnvelope struct {
 	encrypted []byte
 }
@@ -42,14 +40,14 @@ func (e *ExternalMode) BuildInnerEnvelope(randomizedPwd, nonce, skc []byte) (inn
 	}
 
 	pkc := e.Base().Mult(scalar).Bytes()
-	pad := e.Expand(randomizedPwd, internal.Concat(nonce, tagPad), len(skc))
+	pad := e.Expand(randomizedPwd, internal.Concat(nonce, internal.TagPad), len(skc))
 
 	return internal.Xor(skc, pad), pkc
 }
 
 func (e *ExternalMode) RecoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (skc, pkc []byte) {
 	inner := deserializeExternalInnerEnvelope(innerEnvelope, e.Nsk)
-	pad := e.Expand(randomizedPwd, internal.Concat(nonce, tagPad), len(inner.encrypted))
+	pad := e.Expand(randomizedPwd, internal.Concat(nonce, internal.TagPad), len(inner.encrypted))
 	skc = internal.Xor(inner.encrypted, pad)
 
 	sk, err := e.NewScalar().Decode(skc)

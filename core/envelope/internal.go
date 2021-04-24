@@ -6,18 +6,13 @@ import (
 	"github.com/bytemare/opaque/internal"
 )
 
-const (
-	h2sDST = "OPAQUE-HashToScalar"
-	skDST  = "PrivateKey"
-)
-
 type InternalMode struct {
 	ciphersuite.Identifier
 	*internal.KDF
 }
 
 func (i *InternalMode) DeriveSecretKey(seed []byte) group.Scalar {
-	return i.Get(nil).HashToScalar(seed, []byte(h2sDST))
+	return i.Get(nil).HashToScalar(seed, []byte(internal.H2sDST))
 }
 
 func (i *InternalMode) DeriveAkeKeyPair(seed []byte) (group.Scalar, group.Element) {
@@ -26,14 +21,14 @@ func (i *InternalMode) DeriveAkeKeyPair(seed []byte) (group.Scalar, group.Elemen
 }
 
 func (i *InternalMode) BuildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, pkc []byte) {
-	seed := i.Expand(randomizedPwd, internal.Concat(nonce, skDST), internal.ScalarLength(i.Identifier))
+	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength(i.Identifier))
 	_, pk := i.DeriveAkeKeyPair(seed)
 
 	return nil, internal.SerializePoint(pk, i.Identifier)
 }
 
 func (i *InternalMode) RecoverKeys(randomizedPwd, nonce, _ []byte) (skc, pkc []byte) {
-	seed := i.Expand(randomizedPwd, internal.Concat(nonce, skDST), internal.ScalarLength(i.Identifier))
+	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength(i.Identifier))
 	sk, pk := i.DeriveAkeKeyPair(seed)
 	return sk.Bytes(), pk.Bytes()
 }

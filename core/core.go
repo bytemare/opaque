@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/opaque/core/envelope"
-	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/parameters"
 	"github.com/bytemare/voprf"
 )
 
@@ -15,7 +15,7 @@ type Core struct {
 	*envelope.Thing
 }
 
-func NewCore(parameters *internal.Parameters, mode envelope.Mode) *Core {
+func NewCore(parameters *parameters.Parameters, mode envelope.Mode) *Core {
 	oprf, err := parameters.OprfCiphersuite.Client(nil)
 	if err != nil {
 		panic(err)
