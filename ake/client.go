@@ -2,6 +2,8 @@ package ake
 
 import (
 	"crypto/hmac"
+	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/parameters"
 
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/opaque/internal"
@@ -10,17 +12,17 @@ import (
 
 type Client struct {
 	*Ake
+	//Esk   group.Scalar
 	NonceU []byte // todo: only useful in testing, to force value
 }
 
-func NewClient(g group.Group, kdf *internal.KDF, mac *internal.Mac, h *internal.Hash) *Client {
+func NewClient(parameters *parameters.Parameters) *Client {
 	return &Client{
 		Ake: &Ake{
-			Group: g,
-			KDF:   kdf,
-			Mac:   mac,
-			Hash:  h,
-		},
+		Parameters: parameters,
+		Group:      parameters.AKEGroup.Get(nil),
+		keys:       &keys{},
+	},
 	}
 }
 
@@ -35,12 +37,12 @@ func (c *Client) Initialize(esk group.Scalar, nonce []byte, nonceLen int) {
 }
 
 func (c *Client) Start(clientInfo []byte) *message.KE1 {
-	c.Ake.Initialize(nil, nil, 32)
+	c.Initialize(nil, nil, 32)
 
 	return &message.KE1{
 		NonceU:     c.NonceU,
 		ClientInfo: clientInfo,
-		EpkU:       c.Epk.Bytes(),
+		EpkU:       internal.SerializePoint(c.Epk, c.AKEGroup),
 	}
 }
 
@@ -61,30 +63,28 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 
 	transcriptHasher := c.Hash.H
 	newInfo(transcriptHasher, ke1, idu, ids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS)
+	keys, sessionSecret := deriveKeys(c.KDF, ikm, transcriptHasher.Sum(nil))
+	_, _ = transcriptHasher.Write(encoding.EncodeVector(ke2.Einfo))
+	transcript2 := transcriptHasher.Sum(nil)
 
-	keys := deriveKeys(c.KDF, ikm, transcriptHasher.Sum(nil))
+	expected := c.MAC.MAC(keys.ServerMacKey, transcript2)
+	if !hmac.Equal(expected, ke2.Mac) {
+		return nil, nil, ErrAkeInvalidServerMac
+	}
 
 	var serverInfo []byte
 
 	if len(ke2.Einfo) != 0 {
-		pad := c.Expand(keys.HandshakeEncryptKey, []byte(encryptionTag), len(ke2.Einfo))
+		pad := c.KDF.Expand(keys.HandshakeEncryptKey, []byte(internal.EncryptionTag), len(ke2.Einfo))
 		serverInfo = internal.Xor(pad, ke2.Einfo)
-	}
-
-	_, _ = transcriptHasher.Write(internal.EncodeVector(ke2.Einfo))
-	transcript2 := transcriptHasher.Sum(nil)
-
-	expected := c.MAC(keys.ServerMacKey, transcript2)
-	if !hmac.Equal(expected, ke2.Mac) {
-		return nil, nil, ErrAkeInvalidServerMac
 	}
 
 	_, _ = transcriptHasher.Write(ke2.Mac)
 	transcript3 := transcriptHasher.Sum(nil)
 	c.Keys = keys
-	c.SessionSecret = keys.SessionSecret
+	c.SessionSecret = sessionSecret
 
-	return &message.KE3{Mac: c.MAC(keys.ClientMacKey, transcript3)}, serverInfo, nil
+	return &message.KE3{Mac: c.MAC.MAC(keys.ClientMacKey, transcript3)}, serverInfo, nil
 }
 
 func (c *Client) SessionKey() []byte {

@@ -1,10 +1,7 @@
 package message
 
 import (
-	"errors"
-
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/core/envelope"
 )
 
 // Registration
@@ -17,38 +14,26 @@ func (r *RegistrationRequest) Serialize() []byte {
 	return r.Data
 }
 
-func DeserializeRegistrationRequest(input []byte) *RegistrationRequest {
-	return &RegistrationRequest{input}
-}
-
 type RegistrationResponse struct {
 	Data []byte `json:"data"`
 	Pks  []byte `json:"pks"`
 }
 
 func (r *RegistrationResponse) Serialize() []byte {
-	return append(r.Data, r.Pks...)
+	return utils.Concatenate(len(r.Data)+len(r.Pks), r.Data, r.Pks)
 }
 
-func DeserializeRegistrationResponse(input []byte, pointLen int) (*RegistrationResponse, error) {
-	if len(input) != 2*pointLen {
-		return nil, errors.New("invalid size")
-	}
-
-	return &RegistrationResponse{
-		Data: input[:pointLen],
-		Pks:  input[pointLen:],
-	}, nil
-}
 
 type RegistrationUpload struct {
-	Envelope *envelope.Envelope `json:"env"`
-	Pku      []byte             `json:"pku"`
+	PublicKey  []byte   `json:"pku"`
+	MaskingKey []byte   `json:"msk"`
+	Envelope   []byte	`json:"env"`
 }
 
 func (r *RegistrationUpload) Serialize() []byte {
-	return append(r.Pku, r.Envelope.Serialize()...)
+	return utils.Concatenate(0, r.PublicKey, r.MaskingKey, r.Envelope)
 }
+
 
 // Authentication
 
@@ -60,42 +45,12 @@ func (c *CredentialRequest) Serialize() []byte {
 	return c.Data
 }
 
-func DeserializeCredentialRequest(input []byte, pointLen int) (*CredentialRequest, error) {
-	if len(input) <= pointLen {
-		return nil, errors.New("malformed credential request")
-	}
-
-	return &CredentialRequest{input[:pointLen]}, nil
-}
-
 type CredentialResponse struct {
-	Data     []byte             `json:"data"`
-	Pks      []byte             `json:"pks"`
-	Envelope *envelope.Envelope `json:"env"`
+	Data           []byte `json:"data"`
+	MaskingNonce   []byte `json:"mn"`
+	MaskedResponse []byte `json:"mr"`
 }
 
 func (c *CredentialResponse) Serialize() []byte {
-	return utils.Concatenate(0, c.Data, c.Pks, c.Envelope.Serialize())
-}
-
-func DeserializeCredentialResponse(input []byte, pointLength, hashSize, skLength int) (response *CredentialResponse, offset int, err error) {
-	if len(input) < 2*pointLength {
-		return nil, 0, errors.New("credential response too short")
-	}
-
-	data := input[:pointLength]
-	pks := input[pointLength : 2*pointLength]
-
-	envU, envLength, err := envelope.DeserializeEnvelope(input[2*pointLength:], hashSize, skLength)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	offset = 2*pointLength + envLength
-
-	return &CredentialResponse{
-		Data:     data,
-		Pks:      pks,
-		Envelope: envU,
-	}, offset, nil
+	return utils.Concatenate(0, c.Data, c.MaskingNonce, c.MaskedResponse)
 }

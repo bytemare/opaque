@@ -1,64 +1,68 @@
 package opaque
 
 import (
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/mhf"
+	"errors"
+	"fmt"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/ake"
 	"github.com/bytemare/opaque/core"
 	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/parameters"
 	"github.com/bytemare/opaque/message"
-	"github.com/bytemare/voprf"
 )
 
 type Client struct {
 	Core *core.Core
 	Ake  *ake.Client
 	Ke1  *message.KE1
+	*parameters.Parameters
 }
 
-func NewClient(suite voprf.Ciphersuite, kdf, mac, h hash.Hashing, m *mhf.MHF, mode envelope.Mode, akeGroup ciphersuite.Identifier) *Client {
-	g := akeGroup.Get(nil)
-	k := &internal.KDF{Hash: kdf.Get()}
-	mac2 := &internal.Mac{Hash: mac.Get()}
-	h2 := &internal.Hash{H: h.Get()}
-	h3 := &internal.Hash{H: h.Get()}
+func NewClient(p *Parameters) *Client {
+	ip := &parameters.Parameters{
+		OprfCiphersuite: p.OprfCiphersuite,
+		KDF:             &internal.KDF{H: p.KDF.Get()},
+		MAC:             &internal.Mac{Hash: p.MAC.Get()},
+		Hash:            &internal.Hash{H: p.Hash.Get()},
+		MHF:             &internal.MHF{MHF: p.MHF.Get()},
+		AKEGroup:        p.AKEGroup,
+		NonceLen:        p.NonceLen,
+		Deserializer: p.MessageDeserializer(),
+	}
+
 	return &Client{
-		Core: core.NewCore(suite, k, mac2, h2, m, mode, g),
-		Ake:  ake.NewClient(g, k, mac2, h3),
+		Core:         core.NewCore(ip, p.Mode),
+		Ake:          ake.NewClient(ip),
+		Parameters: ip,
 	}
 }
 
 func (c *Client) KeyGen() (sk, pk []byte) {
-	return ake.KeyGen(c.Ake.Group)
+	return ake.KeyGen(c.Ake.AKEGroup)
 }
 
 func (c *Client) RegistrationStart(password []byte) *message.RegistrationRequest {
 	m := c.Core.OprfStart(password)
-	return &message.RegistrationRequest{Data: m}
+	return &message.RegistrationRequest{Data: internal.PadPoint(m, c.Core.Group)}
 }
 
-func (c *Client) RegistrationFinalize(creds *envelope.Credentials, resp *message.RegistrationResponse) (*message.RegistrationUpload, []byte, error) {
-	envU, exportKey, err := c.Core.BuildEnvelope(resp.Data, resp.Pks, creds)
+func (c *Client) RegistrationFinalize(skc []byte, creds *envelope.Credentials, resp *message.RegistrationResponse) (*message.RegistrationUpload, []byte, error) {
+	envU, pkc, maskingKey, exportKey, err := c.Core.BuildEnvelope(resp.Data, resp.Pks, skc, creds)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if creds.Nonce == nil {
-		creds.Nonce = utils.RandomBytes(32)
-	}
-
 	return &message.RegistrationUpload{
-		Envelope: envU,
-		Pku:      creds.Pk,
+		PublicKey:  pkc,
+		MaskingKey: maskingKey,
+		Envelope:   envU.Serialize(),
 	}, exportKey, nil
 }
 
 func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
-	credReq := &message.CredentialRequest{Data: m}
+	credReq := &message.CredentialRequest{Data: internal.PadPoint(m, c.Core.Group)}
 	c.Ke1 = c.Ake.Start(clientInfo)
 	c.Ke1.CredentialRequest = credReq
 
@@ -74,34 +78,49 @@ func (c *Client) publicKey(skc []byte) ([]byte, error) {
 	return c.Ake.Group.Base().Mult(sk).Bytes(), nil
 }
 
-func (c *Client) AuthenticationFinalize(idu, ids []byte, ke2 *message.KE2) (*message.KE3, []byte, error) {
-	secretCreds, exportKey, err := c.Core.RecoverSecret(idu, ids, ke2.Pks, ke2.Data, ke2.Envelope)
+func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*message.KE3, []byte, error) {
+	if len(ke2.MaskedResponse) != internal.PointLength(c.AkeGroup)+envelope.Size(c.Core.Mode, c.NonceLen, c.Core.MAC.Size(), c.AkeGroup) {
+		return nil, nil, errors.New("masking response is of invalid length for this mode")
+	}
+
+	unblinded, err := c.Core.OprfFinalize(ke2.Data)
+	if err != nil {
+		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
+	}
+
+	randomizedPwd := c.Core.BuildPRK(unblinded, nil)
+	maskingKey := c.Core.KDF.Expand(randomizedPwd, []byte(internal.TagMaskingKey), c.Core.Hash.Size())
+	crPad := c.Core.KDF.Expand(maskingKey, utils.Concatenate(0, ke2.MaskingNonce, []byte(internal.TagCredentialResponsePad)), internal.PointLength(c.AkeGroup)+envelope.Size(c.Core.Mode, c.NonceLen, c.Core.MAC.Size(), c.AkeGroup))
+	clear := internal.Xor(crPad, ke2.MaskedResponse)
+
+	pks := clear[:internal.PointLength(c.AkeGroup)]
+	e := clear[internal.PointLength(c.AkeGroup):]
+
+	env, _, err := envelope.DeserializeEnvelope(e, c.Core.Thing.Mode, c.NonceLen, c.Core.MAC.Size(), internal.ScalarLength(c.AkeGroup))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	pubKey, err := c.publicKey(secretCreds.Sku)
+	skc, pkc, exportKey, err := c.Core.RecoverSecret(idc, ids, pks, randomizedPwd, env)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	creds := &envelope.Credentials{
-		Sk:  secretCreds.Sku,
-		Pk:  pubKey,
-		Idu: idu,
+		Idc: idc,
 		Ids: ids,
 	}
 
-	if creds.Idu == nil {
-		creds.Idu = creds.Pk
+	if creds.Idc == nil {
+		creds.Idc = pkc
 	}
 
 	if creds.Ids == nil {
-		creds.Ids = ke2.Pks
+		creds.Ids = pks
 	}
 
 	// id, sk, peerID, peerPK - (creds, peerPK)
-	ke3, _, err := c.Ake.Finalize(creds.Idu, creds.Sk, creds.Ids, ke2.Pks, c.Ke1, ke2)
+	ke3, _, err := c.Ake.Finalize(creds.Idc, skc, creds.Ids, pks, c.Ke1, ke2)
 	if err != nil {
 		return nil, nil, err
 	}

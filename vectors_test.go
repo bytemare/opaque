@@ -5,15 +5,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/opaque/message"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/message"
+	"github.com/bytemare/cryptotools/mhf"
 
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/opaque/core/envelope"
@@ -62,9 +61,11 @@ type inputs struct {
 	ClientNonce           ByteToHex `json:"client_nonce"`
 	ClientPrivateKey      ByteToHex `json:"client_private_key"`
 	ClientPrivateKeyshare ByteToHex `json:"client_private_keyshare"`
-	ClientPublicKey       ByteToHex `json:"client_public_key"`
+	CredentialIdentifier  ByteToHex `json:"credential_identifier"`
 	EnvelopeNonce         ByteToHex `json:"envelope_nonce"`
+	MaskingNonce          ByteToHex `json:"masking_nonce"`
 	OprfKey               ByteToHex `json:"oprf_key"`
+	OprfSeed              ByteToHex `json:"oprf_seed"`
 	Password              ByteToHex `json:"password"`
 	ServerIdentity        ByteToHex `json:"server_identity,omitempty"`
 	ServerInfo            ByteToHex `json:"server_info"`
@@ -78,12 +79,13 @@ type inputs struct {
 type intermediates struct {
 	AuthKey             ByteToHex `json:"auth_key"`              //
 	ClientMacKey        ByteToHex `json:"client_mac_key"`        //
+	ClientPublicKey     ByteToHex `json:"client_public_key"`
 	Envelope            ByteToHex `json:"envelope"`              //
 	HandshakeEncryptKey ByteToHex `json:"handshake_encrypt_key"` //
 	HandshakeSecret     ByteToHex `json:"handshake_secret"`      //
-	Prk                 ByteToHex `json:"prk"`                   //
-	PseudorandomPad     ByteToHex `json:"pseudorandom_pad"`      //
-	ServerMacKey        ByteToHex `json:"server_mac_key"`        //
+	MaskingKey          ByteToHex `json:"masking_key"`
+	RandomPWD           ByteToHex `json:"random_pwd"`     //
+	ServerMacKey        ByteToHex `json:"server_mac_key"` //
 }
 
 type outputs struct {
@@ -117,7 +119,7 @@ func (v *vector) test(t *testing.T) {
 		MAC:             macToHash(v.Config.MAC),
 		MHF:             mhf.Scrypt,
 		Mode:            envelope.Mode(mode[0]),
-		Group:           voprf.Ciphersuite(v.Config.OPRF[1]).Group(),
+		AKEGroup:           voprf.Ciphersuite(v.Config.OPRF[1]).Group(),
 		NonceLen:        32,
 	}
 
@@ -143,12 +145,16 @@ func (v *vector) test(t *testing.T) {
 
 	// Server
 	server := p.Server()
-	regResp, _, err := server.RegistrationResponse(regReq, input.ServerPublicKey, input.OprfKey)
+	regResp, ku, err := server.RegistrationResponse(regReq, input.ServerPublicKey, CredentialIdentifier(input.CredentialIdentifier), input.OprfSeed)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	vRegResp, err := message.DeserializeRegistrationResponse(out.RegistrationResponse, p.OprfCiphersuite.Group().Get(nil).ElementLength())
+	if !bytes.Equal(input.OprfKey, ku) {
+		t.Fatal("oprf keys do not match")
+	}
+
+	vRegResp, err := client.DeserializeRegistrationResponse(out.RegistrationResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,25 +173,21 @@ func (v *vector) test(t *testing.T) {
 
 	// Client
 	clientCredentials := &envelope.Credentials{
-		Sk:    input.ClientPrivateKey,
-		Pk:    input.ClientPublicKey,
-		Idu:   input.ClientIdentity,
-		Ids:   input.ServerIdentity,
-		Nonce: input.EnvelopeNonce,
+		Idc: input.ClientIdentity,
+		Ids: input.ServerIdentity,
+		EnvelopeNonce: input.EnvelopeNonce,
 	}
 
-	upload, exportKey, err := client.RegistrationFinalize(clientCredentials, regResp)
+	upload, exportKey, err := client.RegistrationFinalize(input.ClientPrivateKey, clientCredentials, regResp)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	pad, authKey, _, prk := client.Core.DebugGetKeys()
-
-	if !bytes.Equal(check.Prk, prk) {
-		t.Fatalf("prk do not match. expected %v,\ngot %v", check.Prk, prk)
+	if !bytes.Equal(check.RandomPWD, client.Core.PRK) {
+		t.Fatalf("prk do not match. expected %v,\ngot %v", check.RandomPWD, client.Core.PRK)
 	}
 
-	if !bytes.Equal(check.AuthKey, authKey) {
+	if !bytes.Equal(check.AuthKey, client.Core.AuthKey) {
 		t.Fatal("authKeys do not match")
 	}
 
@@ -193,16 +195,16 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal("exportKey do not match")
 	}
 
-	if !bytes.Equal(check.PseudorandomPad, pad) {
-		t.Fatalf("pseudorandom pads do not match")
-	}
+	//if !bytes.Equal(check.ClientPublicKey, upload.PublicKey) {
+	//	t.Fatal("Client PublicKey do not match")
+	//}
 
-	if !bytes.Equal(check.Envelope, upload.Envelope.Serialize()) {
-		t.Fatalf("envelopes do not match")
+	if !bytes.Equal(check.Envelope, upload.Envelope) {
+		t.Fatalf("envelopes do not match\nexpected %v,\nngot %v", check.Envelope, upload.Envelope)
 	}
 
 	if !bytes.Equal(out.RegistrationUpload, upload.Serialize()) {
-		t.Fatalf("registration responses do not match")
+		t.Fatalf("registration upload do not match")
 	}
 
 	/*
@@ -223,26 +225,24 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal("KE1 do not match")
 	}
 
-	credFile := &CredentialFile{
-		Ku:       input.OprfKey,
-		Pku:      upload.Pku,
-		Envelope: upload.Envelope,
-	}
-
 	// Server
 	server = p.Server()
 
 	serverCredentials := &envelope.Credentials{
-		Sk:  input.ServerPrivateKey,
-		Pk:  input.ServerPublicKey,
-		Idu: input.ClientIdentity,
+		Idc: input.ClientIdentity,
 		Ids: input.ServerIdentity,
+		MaskingNonce: input.MaskingNonce,
 	}
 
-	_ = v.loginResponse(t, server, KE1, serverCredentials, credFile)
+	cupload, err := client.DeserializeRegistrationUpload(out.RegistrationUpload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_ = v.loginResponse(t, server, KE1, serverCredentials, cupload, CredentialIdentifier(input.CredentialIdentifier), input.OprfSeed,  input.ServerPrivateKey, input.ServerPublicKey)
 
 	// Client
-	cke2, err := message.DeserializeKE2(out.KE2, 32, internal.PointLength(client.Core.Group), client.Core.Mac.OutputSize(), internal.ScalarLength(client.Core.Group))
+	cke2, err := client.DeserializeKE2(out.KE2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,21 +277,25 @@ func (v *vector) test(t *testing.T) {
 	}
 }
 
-func (v *vector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, creds *envelope.Credentials, credFile *CredentialFile) *message.KE2 {
+func (v *vector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, creds *envelope.Credentials, upload *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, serverPrivateKey, serverPublicKey []byte) *message.KE2 {
 	sks, err := s.Ake.Group.NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)
 	}
 	s.Ake.Initialize(sks, v.Inputs.ServerNonce, 32)
 
-	KE2, err := s.AuthenticationResponse(ke1, v.Inputs.ServerInfo, credFile, creds)
+	KE2, err := s.AuthenticationResponse(ke1, v.Inputs.ServerInfo, serverPrivateKey, serverPublicKey, upload, creds, id, oprfSeed)
 
 	if !bytes.Equal(v.Intermediates.HandshakeSecret, s.Ake.HandshakeSecret) {
 		t.Fatalf("HandshakeSecrets do not match : %v", s.Ake.HandshakeSecret)
 	}
 
+	if !bytes.Equal(v.Outputs.SessionKey, s.Ake.SessionSecret) {
+		t.Fatalf("SessionKey do not match : %v", s.Ake.SessionKey())
+	}
+
 	if !bytes.Equal(v.Intermediates.ServerMacKey, s.Ake.ServerMacKey) {
-		t.Fatal("ServerMacs do not match")
+		t.Fatalf("ServerMacs do not match.expected %v,\ngot %v", v.Intermediates.ServerMacKey, s.Ake.ServerMacKey)
 	}
 
 	if !bytes.Equal(v.Intermediates.ClientMacKey, s.Ake.Keys.ClientMacKey) {
@@ -302,7 +306,7 @@ func (v *vector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, creds 
 		t.Fatal("HandshakeEncryptKeys do not match")
 	}
 
-	draftKE2, err := message.DeserializeKE2(v.Outputs.KE2, 32, internal.PointLength(s.oprf.Group()), s.Ake.Hash.H.OutputSize(), internal.ScalarLength(s.oprf.Group()))
+	draftKE2, err := s.DeserializeKE2(v.Outputs.KE2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,15 +315,15 @@ func (v *vector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, creds 
 		t.Fatal("CredResp do not match")
 	}
 
-	if !bytes.Equal(draftKE2.CredentialResponse.Pks, KE2.CredentialResponse.Pks) {
-		t.Fatal("pks do not match")
-	}
-
 	if !bytes.Equal(draftKE2.CredentialResponse.Data, KE2.CredentialResponse.Data) {
 		t.Fatal("data do not match")
 	}
 
-	if !bytes.Equal(draftKE2.CredentialResponse.Envelope.Serialize(), KE2.CredentialResponse.Envelope.Serialize()) {
+	if !bytes.Equal(draftKE2.CredentialResponse.MaskingNonce, KE2.CredentialResponse.MaskingNonce) {
+		t.Fatal("pks do not match")
+	}
+
+	if !bytes.Equal(draftKE2.CredentialResponse.MaskedResponse, KE2.CredentialResponse.MaskedResponse) {
 		t.Fatal("envu do not match")
 	}
 
@@ -428,6 +432,7 @@ func TestOpaqueVectors(t *testing.T) {
 				if tv.Config.Group == "decaf448" {
 					continue
 				}
+
 				t.Run(fmt.Sprintf("%s - %s - %s", tv.Config.Name, tv.Config.EnvelopeMode, tv.Config.Group), tv.test)
 			}
 			return nil

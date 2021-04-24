@@ -1,48 +1,9 @@
 package internal
 
 import (
-	"errors"
-
-	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 )
-
-var errI2OSPLength = errors.New("requested size is too big")
-
-func EncodeVectorLen(in []byte, length int) []byte {
-	switch length {
-	case 1:
-		return append(encoding.I2OSP(len(in), 1), in...)
-	case 2:
-		return append(encoding.I2OSP(len(in), 2), in...)
-	default:
-		panic(errI2OSPLength)
-	}
-}
-
-func EncodeVector(in []byte) []byte {
-	return EncodeVectorLen(in, 2)
-}
-
-func decodeVectorLen(in []byte, size int) ([]byte, int, error) {
-	if len(in) < size {
-		return nil, 0, errors.New("insufficient header length for decoding")
-	}
-
-	dataLen := encoding.OS2IP(in[0:size])
-	total := size + dataLen
-
-	if len(in) < total {
-		return nil, 0, errors.New("insufficient total length for decoding")
-	}
-
-	return in[size:total], total, nil
-}
-
-func DecodeVector(in []byte) ([]byte, int, error) {
-	return decodeVectorLen(in, 2)
-}
 
 const (
 	p256PointLength  = 33
@@ -57,7 +18,7 @@ func ScalarLength(c ciphersuite.Identifier) int {
 	switch c {
 	case ciphersuite.Ristretto255Sha512:
 		return 32
-	// case ciphersuite.Dec:
+	// case ciphersuite.Decaf448Shake256:
 	//	return 56
 	case ciphersuite.P256Sha256:
 		return p256ScalarLength
@@ -74,7 +35,7 @@ func PointLength(c ciphersuite.Identifier) int {
 	switch c {
 	case ciphersuite.Ristretto255Sha512:
 		return 32
-	// case ciphersuite.Decaf448Sha512:
+	// case ciphersuite.Decaf448Shake256:
 	//	return 56
 	case ciphersuite.P256Sha256:
 		return p256PointLength
@@ -99,12 +60,15 @@ func SerializeScalar(s group.Scalar, c ciphersuite.Identifier) []byte {
 }
 
 func SerializePoint(e group.Element, c ciphersuite.Identifier) []byte {
-	length := PointLength(c)
-	p := e.Bytes()
+	return PadPoint(e.Bytes(), c)
+}
 
-	for len(p) < length {
-		p = append([]byte{0x00}, p...)
+func PadPoint(point []byte, c ciphersuite.Identifier) []byte {
+	length := PointLength(c)
+
+	for len(point) < length {
+		point = append([]byte{0x00}, point...)
 	}
 
-	return p
+	return point
 }
