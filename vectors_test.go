@@ -183,14 +183,6 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(check.RandomPWD, client.Core.PRK) {
-		t.Fatalf("prk do not match. expected %v,\ngot %v", check.RandomPWD, client.Core.PRK)
-	}
-
-	if !bytes.Equal(check.AuthKey, client.Core.AuthKey) {
-		t.Fatal("authKeys do not match")
-	}
-
 	if !bytes.Equal(out.ExportKey, exportKey) {
 		t.Fatal("exportKey do not match")
 	}

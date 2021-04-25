@@ -74,15 +74,16 @@ func (d *Deserializer) DeserializeCredentialRequest(input []byte) (*message.Cred
 }
 
 func (d *Deserializer) deserializeCredentialResponse(input []byte) (*message.CredentialResponse, int, error) {
-	if len(input) <= d.OPRFPointLength+d.NonceLen+d.AkePointLength+d.EnvelopeSize {
+	supposedLength := d.OPRFPointLength+d.NonceLen+d.AkePointLength+d.EnvelopeSize
+	if len(input) < supposedLength {
 		return nil, 0, errors.New("invalid CredentialResponse length")
 	}
 
 	return &message.CredentialResponse{
 		Data:           input[:d.OPRFPointLength],
 		MaskingNonce:   input[d.OPRFPointLength : d.OPRFPointLength+d.NonceLen],
-		MaskedResponse: input[d.OPRFPointLength+d.NonceLen : d.OPRFPointLength+d.NonceLen+d.AkePointLength+d.EnvelopeSize],
-	}, d.OPRFPointLength + d.NonceLen + d.AkePointLength + d.EnvelopeSize, nil
+		MaskedResponse: input[d.OPRFPointLength+d.NonceLen : supposedLength],
+	}, supposedLength, nil
 }
 
 func (d *Deserializer) DeserializeCredentialResponse(input []byte) (*message.CredentialResponse, error) {
