@@ -19,10 +19,10 @@ type Client struct {
 func NewClient(parameters *parameters.Parameters) *Client {
 	return &Client{
 		Ake: &Ake{
-		Parameters: parameters,
-		Group:      parameters.AKEGroup.Get(nil),
-		keys:       &keys{},
-	},
+			Parameters: parameters,
+			Group:      parameters.AKEGroup.Get(nil),
+			keys:       &keys{},
+		},
 	}
 }
 

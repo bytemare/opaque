@@ -23,17 +23,15 @@ func (r *RegistrationResponse) Serialize() []byte {
 	return utils.Concatenate(len(r.Data)+len(r.Pks), r.Data, r.Pks)
 }
 
-
 type RegistrationUpload struct {
-	PublicKey  []byte   `json:"pku"`
-	MaskingKey []byte   `json:"msk"`
-	Envelope   []byte	`json:"env"`
+	PublicKey  []byte `json:"pku"`
+	MaskingKey []byte `json:"msk"`
+	Envelope   []byte `json:"env"`
 }
 
 func (r *RegistrationUpload) Serialize() []byte {
 	return utils.Concatenate(0, r.PublicKey, r.MaskingKey, r.Envelope)
 }
-
 
 // Authentication
 

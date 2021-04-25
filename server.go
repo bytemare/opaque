@@ -11,7 +11,7 @@ import (
 
 type Server struct {
 	*parameters.Parameters
-	Ake  *ake.Server
+	Ake *ake.Server
 }
 
 func NewServer(p *Parameters) *Server {
@@ -23,12 +23,13 @@ func NewServer(p *Parameters) *Server {
 		MHF:             &internal.MHF{MHF: p.MHF.Get()},
 		AKEGroup:        p.AKEGroup,
 		NonceLen:        p.NonceLen,
-		Deserializer: p.MessageDeserializer(),
+		EnvelopeSize:    envelope.Size(p.Mode, p.NonceLen, p.MAC.Size(), p.AKEGroup),
 	}
+	ip.Init()
 
 	return &Server{
 		Parameters: ip,
-		Ake:          ake.NewServer(ip),
+		Ake:        ake.NewServer(ip),
 	}
 }
 
@@ -52,10 +53,13 @@ func (s *Server) evaluate(seed, blinded []byte) (element, k []byte, err error) {
 	return evaluation.Elements[0], oprf.PrivateKey(), nil
 }
 
-func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier, oprfSeed []byte) (*message.RegistrationResponse, []byte, error) {
-	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, internal.OprfKey), internal.ScalarLength(s.OprfCiphersuite.Group()))
+func (s *Server) oprfResponse(oprfSeed, id, element []byte) ([]byte, []byte, error) {
+	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, internal.OprfKey), internal.ScalarLength[s.OprfCiphersuite.Group()])
+	return s.evaluate(seed, element)
+}
 
-	z, ku, err := s.evaluate(seed, req.Data)
+func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier, oprfSeed []byte) (*message.RegistrationResponse, []byte, error) {
+	z, ku, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -67,9 +71,7 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []by
 }
 
 func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, record *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*message.CredentialResponse, error) {
-	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, internal.OprfKey), internal.ScalarLength(s.OprfCiphersuite.Group()))
-
-	z, _, err := s.evaluate(seed, req.Data)
+	z, _, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
 		return nil, err
 	}

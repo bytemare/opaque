@@ -14,42 +14,28 @@ const (
 	p521ScalarLength = 66
 )
 
-func ScalarLength(c ciphersuite.Identifier) int {
-	switch c {
-	case ciphersuite.Ristretto255Sha512:
-		return 32
-	// case ciphersuite.Decaf448Shake256:
-	//	return 56
-	case ciphersuite.P256Sha256:
-		return p256ScalarLength
-	case ciphersuite.P384Sha512:
-		return p384ScalarLength
-	case ciphersuite.P521Sha512:
-		return p521ScalarLength
-	default:
-		panic("invalid suite")
-	}
+var ScalarLength = map[ciphersuite.Identifier]int{
+	ciphersuite.Ristretto255Sha512: 32,
+	//ciphersuite.Decaf448Shake256: 56,
+	ciphersuite.P256Sha256: p256ScalarLength,
+	ciphersuite.P384Sha512: p384ScalarLength,
+	ciphersuite.P521Sha512: p521ScalarLength,
 }
 
-func PointLength(c ciphersuite.Identifier) int {
-	switch c {
-	case ciphersuite.Ristretto255Sha512:
-		return 32
-	// case ciphersuite.Decaf448Shake256:
-	//	return 56
-	case ciphersuite.P256Sha256:
-		return p256PointLength
-	case ciphersuite.P384Sha512:
-		return p384PointLength
-	case ciphersuite.P521Sha512:
-		return p521PointLength
-	default:
-		panic("invalid suite")
-	}
+var PointLength = map[ciphersuite.Identifier]int{
+	ciphersuite.Ristretto255Sha512: 32,
+	//ciphersuite.Decaf448Shake256: 56,
+	ciphersuite.P256Sha256: p256PointLength,
+	ciphersuite.P384Sha512: p384PointLength,
+	ciphersuite.P521Sha512: p521PointLength,
 }
 
 func SerializeScalar(s group.Scalar, c ciphersuite.Identifier) []byte {
-	length := ScalarLength(c)
+	length, ok := ScalarLength[c]
+	if !ok {
+		panic("invalid suite")
+	}
+
 	e := s.Bytes()
 
 	for len(e) < length {
@@ -64,7 +50,10 @@ func SerializePoint(e group.Element, c ciphersuite.Identifier) []byte {
 }
 
 func PadPoint(point []byte, c ciphersuite.Identifier) []byte {
-	length := PointLength(c)
+	length, ok := PointLength[c]
+	if !ok {
+		panic("invalid suite")
+	}
 
 	for len(point) < length {
 		point = append([]byte{0x00}, point...)

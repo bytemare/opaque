@@ -9,7 +9,7 @@ import (
 )
 
 type Core struct {
-	Oprf  *voprf.Client
+	Oprf *voprf.Client
 	*parameters.Parameters
 }
 
@@ -20,7 +20,7 @@ func NewCore(parameters *parameters.Parameters) *Core {
 	}
 
 	return &Core{
-		Oprf:  oprf,
+		Oprf:       oprf,
 		Parameters: parameters,
 	}
 }
@@ -47,8 +47,6 @@ func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, pks, skc []byte, cr
 
 	return env, pkc, maskingKey, exportKey, nil
 }
-
-
 
 func (c *Core) RecoverSecret(mode envelope.Mode, idc, ids, pks, randomizedPwd []byte, envU *envelope.Envelope) (skc, pkc, exportKey []byte, err error) {
 	creds := &envelope.Credentials{

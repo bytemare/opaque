@@ -77,8 +77,8 @@ type inputs struct {
 }
 
 type intermediates struct {
-	AuthKey             ByteToHex `json:"auth_key"`              //
-	ClientMacKey        ByteToHex `json:"client_mac_key"`        //
+	AuthKey             ByteToHex `json:"auth_key"`       //
+	ClientMacKey        ByteToHex `json:"client_mac_key"` //
 	ClientPublicKey     ByteToHex `json:"client_public_key"`
 	Envelope            ByteToHex `json:"envelope"`              //
 	HandshakeEncryptKey ByteToHex `json:"handshake_encrypt_key"` //
@@ -119,7 +119,7 @@ func (v *vector) test(t *testing.T) {
 		MAC:             macToHash(v.Config.MAC),
 		MHF:             mhf.Scrypt,
 		Mode:            envelope.Mode(mode[0]),
-		AKEGroup:           voprf.Ciphersuite(v.Config.OPRF[1]).Group(),
+		AKEGroup:        voprf.Ciphersuite(v.Config.OPRF[1]).Group(),
 		NonceLen:        32,
 	}
 
@@ -173,8 +173,8 @@ func (v *vector) test(t *testing.T) {
 
 	// Client
 	clientCredentials := &envelope.Credentials{
-		Idc: input.ClientIdentity,
-		Ids: input.ServerIdentity,
+		Idc:           input.ClientIdentity,
+		Ids:           input.ServerIdentity,
 		EnvelopeNonce: input.EnvelopeNonce,
 	}
 
@@ -221,8 +221,8 @@ func (v *vector) test(t *testing.T) {
 	server = p.Server()
 
 	serverCredentials := &envelope.Credentials{
-		Idc: input.ClientIdentity,
-		Ids: input.ServerIdentity,
+		Idc:          input.ClientIdentity,
+		Ids:          input.ServerIdentity,
 		MaskingNonce: input.MaskingNonce,
 	}
 
@@ -231,7 +231,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_ = v.loginResponse(t, server, KE1, serverCredentials, cupload, CredentialIdentifier(input.CredentialIdentifier), input.OprfSeed,  input.ServerPrivateKey, input.ServerPublicKey)
+	_ = v.loginResponse(t, server, KE1, serverCredentials, cupload, CredentialIdentifier(input.CredentialIdentifier), input.OprfSeed, input.ServerPrivateKey, input.ServerPublicKey)
 
 	// Client
 	cke2, err := client.DeserializeKE2(out.KE2)

@@ -33,6 +33,5 @@ const (
 
 	// Server
 
-	OprfKey               = "OprfKey"
+	OprfKey = "OprfKey"
 )
-

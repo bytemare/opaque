@@ -28,14 +28,15 @@ func NewClient(p *Parameters) *Client {
 		MHF:             &internal.MHF{MHF: p.MHF.Get()},
 		AKEGroup:        p.AKEGroup,
 		NonceLen:        p.NonceLen,
-		Deserializer: p.MessageDeserializer(),
+		EnvelopeSize:    envelope.Size(p.Mode, p.NonceLen, p.MAC.Size(), p.AKEGroup),
 	}
+	ip.Init()
 
 	return &Client{
-		Core:         core.NewCore(ip),
-		Ake:          ake.NewClient(ip),
+		Core:       core.NewCore(ip),
+		Ake:        ake.NewClient(ip),
 		Parameters: ip,
-		mode: p.Mode,
+		mode:       p.Mode,
 	}
 }
 
@@ -70,14 +71,14 @@ func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.KE1 {
 	return c.Ke1
 }
 
-func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte, *envelope.Envelope, error){
-	crPad := c.Core.KDF.Expand(maskingKey, utils.Concatenate(0, maskingNonce, []byte(internal.TagCredentialResponsePad)), internal.PointLength(c.AkeGroup)+envelope.Size(c.mode, c.NonceLen, c.Core.MAC.Size(), c.AkeGroup))
+func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte, *envelope.Envelope, error) {
+	crPad := c.Core.KDF.Expand(maskingKey, utils.Concatenate(0, maskingNonce, []byte(internal.TagCredentialResponsePad)), internal.PointLength[c.AKEGroup]+envelope.Size(c.mode, c.NonceLen, c.Core.MAC.Size(), c.AKEGroup))
 	clear := internal.Xor(crPad, maskedResponse)
 
-	pks := clear[:internal.PointLength(c.AkeGroup)]
-	e := clear[internal.PointLength(c.AkeGroup):]
+	pks := clear[:internal.PointLength[c.AKEGroup]]
+	e := clear[internal.PointLength[c.AKEGroup]:]
 
-	env, _, err := envelope.DeserializeEnvelope(e, c.mode, c.NonceLen, c.Core.MAC.Size(), internal.ScalarLength(c.AkeGroup))
+	env, _, err := envelope.DeserializeEnvelope(e, c.mode, c.NonceLen, c.Core.MAC.Size(), internal.ScalarLength[c.AKEGroup])
 	if err != nil {
 		return nil, nil, err
 	}

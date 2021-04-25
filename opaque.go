@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/opaque/core/envelope"
-	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/parameters"
 	"github.com/bytemare/opaque/message"
 
 	"github.com/bytemare/cryptotools/encoding"
@@ -47,18 +45,6 @@ func (p *Parameters) Client() *Client {
 
 func (p *Parameters) Server() *Server {
 	return NewServer(p)
-}
-
-func (p *Parameters) MessageDeserializer() *parameters.Deserializer {
-	return &parameters.Deserializer{
-		EnvelopeSize:            envelope.Size(p.Mode, p.NonceLen, p.MAC.OutputSize(), p.AKEGroup),
-		OPRFPointLength: internal.PointLength(p.OprfCiphersuite.Group()),
-		AkePointLength: internal.PointLength(p.AKEGroup),
-		AkeGroup:        p.AKEGroup,
-		HashLen:         p.Hash.OutputSize(),
-		MacLen:          p.MAC.OutputSize(),
-		NonceLen:        p.NonceLen,
-	}
 }
 
 func (p *Parameters) String() string {

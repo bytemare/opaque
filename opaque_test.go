@@ -21,7 +21,7 @@ func TestFull(t *testing.T) {
 		MAC:             hash.SHA512,
 		Hash:            hash.SHA512,
 		MHF:             mhf.Scrypt,
-		AKEGroup:           ciphersuite.Ristretto255Sha512,
+		AKEGroup:        ciphersuite.Ristretto255Sha512,
 		NonceLen:        32,
 	}
 
@@ -103,8 +103,8 @@ func TestFull(t *testing.T) {
 		server = p.Server()
 
 		serverCreds := &envelope.Credentials{
-			Idc: username,
-			Ids: ids,
+			Idc:          username,
+			Ids:          ids,
 			MaskingNonce: utils.RandomBytes(32),
 		}
 

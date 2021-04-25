@@ -26,8 +26,8 @@ const (
 
 type Envelope struct {
 	Nonce         []byte
-	AuthTag       []byte
 	InnerEnvelope []byte
+	AuthTag       []byte
 }
 
 func (e *Envelope) String() string {
@@ -44,7 +44,7 @@ func Size(mode Mode, Nn, Nm int, id ciphersuite.Identifier) int {
 	case Internal:
 		innerSize = 0
 	case External:
-		innerSize = internal.ScalarLength(id)
+		innerSize = internal.ScalarLength[id]
 	default:
 		panic("invalid envelope mode")
 	}
@@ -85,28 +85,17 @@ type InnerEnvelope interface {
 	RecoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (skc, pkc []byte)
 }
 
-type Thing struct {
-	Mode
+type Mailer struct {
 	*parameters.Parameters
-	// TODO testing
-	AuthKey, PRK []byte
 }
 
-func NewThing(parameters *parameters.Parameters, mode Mode) *Thing {
-	// todo do checks on whether the necessary arguments are given
-	return &Thing{
-		Mode: mode,
-		Parameters:parameters,
-	}
-}
-
-func (t *Thing) inner(mode Mode) InnerEnvelope {
+func (m *Mailer) inner(mode Mode) InnerEnvelope {
 	var inner InnerEnvelope
 	switch mode {
 	case Internal:
-		inner = &InternalMode{t.AKEGroup, t.KDF}
+		inner = &InternalMode{m.AKEGroup, m.KDF}
 	case External:
-		inner = &ExternalMode{internal.ScalarLength(t.AKEGroup), t.AKEGroup.Get(nil), t.KDF}
+		inner = &ExternalMode{internal.ScalarLength[m.AKEGroup], m.AKEGroup.Get(nil), m.KDF}
 	default:
 		panic("invalid mode")
 	}
@@ -114,39 +103,34 @@ func (t *Thing) inner(mode Mode) InnerEnvelope {
 	return inner
 }
 
-func (t *Thing) BuildPRK(unblinded, nonce []byte) []byte {
-	// hardened := t.Harden(unblinded, nil)
+func BuildPRK(p *parameters.Parameters, unblinded []byte) []byte {
+	// hardened := p.Harden(unblinded, nil)
 	hardened := unblinded
-	return t.KDF.Extract(nonce, hardened)
+	return p.KDF.Extract(nil, hardened)
 }
 
-func (t *Thing) buildKeys(randomizedPwd, nonce []byte) (authKey, exportKey, maskingKey []byte) {
-	authKey = t.KDF.Expand(randomizedPwd, internal.Concat(nonce, internal.TagAuthKey), t.KDF.Size())
-	exportKey = t.KDF.Expand(randomizedPwd, internal.Concat(nonce, internal.TagExportKey), t.KDF.Size())
-	maskingKey = t.KDF.Expand(randomizedPwd, []byte(internal.TagMaskingKey), t.KDF.Size())
+func (m *Mailer) buildKeys(randomizedPwd, nonce []byte) (authKey, exportKey []byte) {
+	authKey = m.KDF.Expand(randomizedPwd, internal.Concat(nonce, internal.TagAuthKey), m.KDF.Size())
+	exportKey = m.KDF.Expand(randomizedPwd, internal.Concat(nonce, internal.TagExportKey), m.KDF.Size())
 
 	return
 }
 
-func (t *Thing) AuthTag(authKey, nonce, inner, ctc []byte) []byte {
-	return t.MAC.MAC(authKey, utils.Concatenate(0, nonce, inner, ctc))
+func (m *Mailer) AuthTag(authKey, nonce, inner, ctc []byte) []byte {
+	return m.MAC.MAC(authKey, utils.Concatenate(0, nonce, inner, ctc))
 }
 
-func (t *Thing) CreateEnvelope(randomizedPwd, pks, skc []byte, creds *Credentials) (envelope *Envelope, publicKey, maskingKey, exportKey []byte) {
+func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte, creds *Credentials) (envelope *Envelope, publicKey, exportKey []byte) {
 	// todo for testing only
 	var nonce = creds.EnvelopeNonce
 	if nonce == nil {
-		nonce = utils.RandomBytes(t.NonceLen)
+		nonce = utils.RandomBytes(m.NonceLen)
 	}
 
-	authKey, exportKey, maskingKey := t.buildKeys(randomizedPwd, nonce)
-	inner, pkc := t.inner(t.Mode).BuildInnerEnvelope(randomizedPwd, nonce, skc)
+	authKey, exportKey := m.buildKeys(randomizedPwd, nonce)
+	inner, pkc := m.inner(mode).BuildInnerEnvelope(randomizedPwd, nonce, skc)
 	ctc := CreateCleartextCredentials(pkc, pks, creds)
-	tag := t.AuthTag(authKey, nonce, inner, ctc.Serialize())
-
-	// todo testing
-	t.AuthKey = authKey
-	t.PRK = randomizedPwd
+	tag := m.AuthTag(authKey, nonce, inner, ctc.Serialize())
 
 	envelope = &Envelope{
 		Nonce:         nonce,
@@ -154,16 +138,15 @@ func (t *Thing) CreateEnvelope(randomizedPwd, pks, skc []byte, creds *Credential
 		AuthTag:       tag,
 	}
 
-	return envelope, pkc, maskingKey, exportKey
+	return envelope, pkc, exportKey
 }
 
-func (t *Thing) RecoverEnvelope(randomizedPwd, pks []byte, creds *Credentials, envelope *Envelope) (skc, pkc, exportKey []byte, err error) {
-	authKey := t.KDF.Expand(randomizedPwd, internal.Concat(envelope.Nonce, internal.TagAuthKey), t.KDF.Size())
-	exportKey = t.KDF.Expand(randomizedPwd, internal.Concat(envelope.Nonce, internal.TagExportKey), t.KDF.Size())
-	skc, pkc = t.inner(t.Mode).RecoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
+func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, pks []byte, creds *Credentials, envelope *Envelope) (skc, pkc, exportKey []byte, err error) {
+	authKey, exportKey := m.buildKeys(randomizedPwd, envelope.Nonce)
+	skc, pkc = m.inner(mode).RecoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
 	ctc := CreateCleartextCredentials(pkc, pks, creds)
 
-	expectedTag := t.AuthTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
+	expectedTag := m.AuthTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
 	if !hmac.Equal(expectedTag, envelope.AuthTag) {
 		return nil, nil, nil, ErrEnvelopeInvalidTag
 	}

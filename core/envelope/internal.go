@@ -21,14 +21,14 @@ func (i *InternalMode) DeriveAkeKeyPair(seed []byte) (group.Scalar, group.Elemen
 }
 
 func (i *InternalMode) BuildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, pkc []byte) {
-	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength(i.Identifier))
+	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength[i.Identifier])
 	_, pk := i.DeriveAkeKeyPair(seed)
 
 	return nil, internal.SerializePoint(pk, i.Identifier)
 }
 
 func (i *InternalMode) RecoverKeys(randomizedPwd, nonce, _ []byte) (skc, pkc []byte) {
-	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength(i.Identifier))
+	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength[i.Identifier])
 	sk, pk := i.DeriveAkeKeyPair(seed)
 	return sk.Bytes(), pk.Bytes()
 }
