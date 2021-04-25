@@ -4,7 +4,6 @@ import (
 	"errors"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/message"
 	"github.com/bytemare/voprf"
 )
@@ -105,7 +104,7 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 
 	nonceU := input[offset : offset+p.NonceLen]
 
-	info, offset2, err := encoding.DecodeVector(input[offset+p.NonceLen:])
+	info, offset2, err := internal.DecodeVector(input[offset+p.NonceLen:])
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +139,7 @@ func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 	epks := input[offset : offset+p.AkePointLength]
 	offset += p.AkePointLength
 
-	einfo, length, err := encoding.DecodeVector(input[offset:])
+	einfo, length, err := internal.DecodeVector(input[offset:])
 	if err != nil {
 		return nil, err
 	}

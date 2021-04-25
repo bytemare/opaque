@@ -2,7 +2,6 @@ package ake
 
 import (
 	"crypto/hmac"
-	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/parameters"
 
 	"github.com/bytemare/cryptotools/group"
@@ -64,7 +63,7 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 	transcriptHasher := c.Hash.H
 	newInfo(transcriptHasher, ke1, idu, ids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS)
 	keys, sessionSecret := deriveKeys(c.KDF, ikm, transcriptHasher.Sum(nil))
-	_, _ = transcriptHasher.Write(encoding.EncodeVector(ke2.Einfo))
+	_, _ = transcriptHasher.Write(internal.EncodeVector(ke2.Einfo))
 	transcript2 := transcriptHasher.Sum(nil)
 
 	expected := c.MAC.MAC(keys.ServerMacKey, transcript2)

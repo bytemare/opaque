@@ -2,7 +2,7 @@ package envelope
 
 import (
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal"
 )
 
 type CleartextCredentials struct {
@@ -14,11 +14,11 @@ type CleartextCredentials struct {
 func (c *CleartextCredentials) Serialize() []byte {
 	var u, s []byte
 	if c.Idc != nil {
-		u = encoding.EncodeVector(c.Idc)
+		u = internal.EncodeVector(c.Idc)
 	}
 
 	if c.Ids != nil {
-		s = encoding.EncodeVector(c.Ids)
+		s = internal.EncodeVector(c.Ids)
 	}
 
 	return utils.Concatenate(0, c.Pks, u, s)

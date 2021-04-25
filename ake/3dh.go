@@ -2,16 +2,15 @@ package ake
 
 import (
 	"errors"
-	encoding "github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/parameters"
 
-	i2osp "github.com/bytemare/cryptotools/encoding"
+	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/utils"
 
-	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -72,7 +71,7 @@ func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) []byte
 
 func buildLabel(length int, label, context []byte) []byte {
 	// todo : the encodings here assume every length fits into a 1-byte encoding
-	return utils.Concatenate(0, i2osp.I2OSP(length, 2), encoding.EncodeVectorLen(append([]byte(internal.LabelPrefix), label...), 1), encoding.EncodeVectorLen(context, 1))
+	return utils.Concatenate(0, encoding.I2OSP(length, 2), internal.EncodeVectorLen(append([]byte(internal.LabelPrefix), label...), 1), internal.EncodeVectorLen(context, 1))
 }
 
 func expand(h *internal.KDF, secret, hkdfLabel []byte) []byte {
@@ -90,8 +89,8 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 }
 
 func newInfo(h *hash.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []byte) {
-	cp := encoding.EncodeVectorLen(idu, 2)
-	sp := encoding.EncodeVectorLen(ids, 2)
+	cp := internal.EncodeVectorLen(idu, 2)
+	sp := internal.EncodeVectorLen(ids, 2)
 	_, _ = h.Write(utils.Concatenate(0, []byte(internal.Tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
 }
 
