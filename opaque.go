@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/opaque/internal/core/envelope"
 	"github.com/bytemare/opaque/message"
 
 	"github.com/bytemare/cryptotools/encoding"
@@ -13,6 +12,13 @@ import (
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/voprf"
+)
+
+type Mode byte
+
+const (
+	Internal Mode = iota + 1
+	External
 )
 
 type CredentialIdentifier []byte
@@ -23,7 +29,7 @@ type Parameters struct {
 	MAC             hash.Hashing           `json:"mac"`
 	Hash            hash.Hashing           `json:"hash"`
 	MHF             mhf.Identifier         `json:"mhf"`
-	Mode            envelope.Mode          `json:"mode"`
+	Mode            Mode          `json:"mode"`
 	AKEGroup        ciphersuite.Identifier `json:"group"`
 	NonceLen        int                    `json:"nn"`
 }
@@ -64,7 +70,7 @@ func DeserializeParameters(encoded []byte) (*Parameters, error) {
 		MAC:             hash.Hashing(encoded[2]),
 		Hash:            hash.Hashing(encoded[3]),
 		MHF:             mhf.Identifier(encoded[4]),
-		Mode:            envelope.Mode(encoded[5]),
+		Mode:            Mode(encoded[5]),
 		AKEGroup:        ciphersuite.Identifier(6),
 		NonceLen:        encoding.OS2IP(encoded[7:]),
 	}, nil

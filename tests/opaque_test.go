@@ -27,7 +27,7 @@ func TestFull(t *testing.T) {
 	username := []byte("client")
 	password := []byte("password")
 
-	modes := []envelope.Mode{envelope.Internal, envelope.External}
+	modes := []opaque.Mode{opaque.Internal, opaque.External}
 
 	p := &opaque.Parameters{
 		OprfCiphersuite: voprf.RistrettoSha512,
@@ -100,7 +100,7 @@ func testRegistration(t *testing.T, p *testParams) (*message.RegistrationUpload,
 	}
 
 	var clientSecretKey []byte
-	if p.Mode == envelope.External {
+	if p.Mode == opaque.External {
 		clientSecretKey, _ = client.KeyGen()
 	}
 

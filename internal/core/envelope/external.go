@@ -11,7 +11,7 @@ type externalInnerEnvelope struct {
 	encrypted []byte
 }
 
-func (e *externalInnerEnvelope) Serialize() []byte {
+func (e externalInnerEnvelope) Serialize() []byte {
 	return e.encrypted
 }
 
@@ -42,7 +42,7 @@ func (e *ExternalMode) BuildInnerEnvelope(randomizedPwd, nonce, skc []byte) (inn
 	pkc := e.Base().Mult(scalar).Bytes()
 	pad := e.Expand(randomizedPwd, internal.Concat(nonce, internal.TagPad), len(skc))
 
-	return internal.Xor(skc, pad), pkc
+	return externalInnerEnvelope{internal.Xor(skc, pad)}.Serialize(), pkc
 }
 
 func (e *ExternalMode) RecoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (skc, pkc []byte) {

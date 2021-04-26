@@ -120,7 +120,7 @@ func (v *vector) test(t *testing.T) {
 		KDF:             kdfToHash(v.Config.KDF),
 		MAC:             macToHash(v.Config.MAC),
 		MHF:             mhf.Scrypt,
-		Mode:            envelope.Mode(mode[0]),
+		Mode:            opaque.Mode(mode[0]),
 		AKEGroup:        voprf.Ciphersuite(v.Config.OPRF[1]).Group(),
 		NonceLen:        32,
 	}

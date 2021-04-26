@@ -29,7 +29,7 @@ func NewClient(p *Parameters) *Client {
 		MHF:             &internal.MHF{MHF: p.MHF.Get()},
 		AKEGroup:        p.AKEGroup,
 		NonceLen:        p.NonceLen,
-		EnvelopeSize:    envelope.Size(p.Mode, p.NonceLen, p.MAC.Size(), p.AKEGroup),
+		EnvelopeSize:    envelope.Size(envelope.Mode(p.Mode), p.NonceLen, p.MAC.Size(), p.AKEGroup),
 	}
 	ip.Init()
 
@@ -37,7 +37,7 @@ func NewClient(p *Parameters) *Client {
 		Core:       core.NewCore(ip),
 		Ake:        ake.NewClient(ip),
 		Parameters: ip,
-		mode:       p.Mode,
+		mode:       envelope.Mode(p.Mode),
 	}
 }
 
