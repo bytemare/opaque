@@ -1,30 +1,46 @@
-package opaque
-
-//var exampleTestClient *Client
+package tests
 //
-//func receiveResponseFromServer(rreq []byte) ([]byte, message.cleartextCredentials) {
+//import (
+//	"github.com/bytemare/cryptotools/encoding"
+//	"github.com/bytemare/cryptotools/group/ciphersuite"
+//	"github.com/bytemare/cryptotools/hash"
+//	"github.com/bytemare/cryptotools/mhf"
+//	"github.com/bytemare/cryptotools/utils"
+//	"github.com/bytemare/opaque"
+//	"github.com/bytemare/opaque/internal/core/envelope"
+//	"github.com/bytemare/opaque/message"
+//	"github.com/bytemare/voprf"
+//)
+//
+//var exampleTestClient *opaque.Client
+//
+//func receiveResponseFromServer(rreq []byte) []byte {
 //	idu := []byte("user")
 //	ids := []byte("server")
 //
-//	suite := voprf.RistrettoSha512
-//	h := hash.SHA256
-//	ke := ake.SigmaI
-//	enc := encoding.JSON
+//	p := &opaque.Parameters{
+//		OprfCiphersuite: voprf.RistrettoSha512,
+//		KDF:             hash.SHA512,
+//		MAC:             hash.SHA512,
+//		Hash:            hash.SHA512,
+//		MHF:             mhf.Scrypt,
+//		Mode: 			 envelope.Internal,
+//		AKEGroup:        ciphersuite.Ristretto255Sha512,
+//		NonceLen:        32,
+//	}
 //
-//	oprfKeys := suite.KeyGen()
-//	akeKeys := suite.KeyGen()
+//	server := p.Server()
+//	serverSecretKey, serverPublicKey := p.Server().KeyGen()
 //
 //	// Set up the server.
-//	server := NewServer(suite, h, ke, oprfKeys.SecretKey, akeKeys.SecretKey, akeKeys.PublicKey)
-//
-//	r, err := enc.Decode(rreq, &message.RegistrationRequest{})
+//	m1, err := server.DeserializeRegistrationRequest(rreq)
 //	if err != nil {
 //		panic(err)
 //	}
 //
-//	req, ok := r.(*message.RegistrationRequest)
-//	if !ok {
-//		panic("")
+//	respReg, _, err := server.RegistrationResponse(m1, serverPublicKey, p.userID, p.oprfSeed)
+//	if err != nil {
+//		panic(err)
 //	}
 //
 //	// Evaluate the request and respond.
@@ -48,52 +64,51 @@ package opaque
 //}
 //
 //func ExampleClient_registration() {
+//	ids := []byte("server")
+//	username := []byte("client")
 //	password := []byte("password")
 //
-//	p := &Parameters{
+//	p := &opaque.Parameters{
 //		OprfCiphersuite: voprf.RistrettoSha512,
-//		Hash:            hash.SHA256,
-//		AKE:             ake.TripleDH,
-//		Encoding:        encoding.JSON,
-//		MHF:             mhf.Argon2id.DefaultParameters(),
+//		KDF:             hash.SHA512,
+//		MAC:             hash.SHA512,
+//		Hash:            hash.SHA512,
+//		MHF:             mhf.Scrypt,
+//		Mode: 			 envelope.Internal,
+//		AKEGroup:        ciphersuite.Ristretto255Sha512,
+//		NonceLen:        32,
+//	}
+//
+//	clientCreds := &envelope.Credentials{
+//		Idc: username,
+//		Ids: ids,
 //	}
 //
 //	// Set up the client
 //	client := p.Client()
 //
 //	// Prepare the registration request
-//	req := client.RegistrationStart(password)
+//	reg := client.RegistrationStart(password)
+//	message1 := reg.Serialize()
 //
-//	encReq, err := p.Encoding.Encode(req)
+//	// message1 must be send to the server. The server part is not covered here, this is a mock function.
+//	encodedResp := receiveResponseFromServer(message1)
+//
+//	// deserialize the server response
+//	regResp, err := client.DeserializeRegistrationResponse(encodedResp)
 //	if err != nil {
 //		panic(err)
 //	}
 //
-//	// encodedReq must be send to the server. The server part is not covered here, this is a mock function.
-//	encodedResp, creds := receiveResponseFromServer(encReq)
-//	r, err := p.Encoding.Decode(encodedResp, &message.RegistrationResponse{})
+//	// Finalize the registration for the client
+//	upload, _, err := client.RegistrationFinalize(nil, clientCreds, regResp)
 //	if err != nil {
 //		panic(err)
 //	}
 //
-//	resp, ok := r.(*message.RegistrationResponse)
-//	if !ok {
-//		panic("")
-//	}
+//	// Send the upload message securely to the server
 //
-//	// Create a secret and public key for the client.
-//	clientAkeSecretKey, clientAkePublicKey := client.AkeKeyGen()
-//
-//	// Finalize the registration for the client, and send the output to the server.
-//	upload, _, err := client.RegistrationFinalize(clientAkeSecretKey, clientAkePublicKey, creds, resp, p.Encoding)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	encodedUpload, err := p.Encoding.Encode(upload)
-//	if encodedUpload == nil || err != nil {
-//		panic(err)
-//	}
+//	_ = upload.Serialize()
 //	// Output:
 //}
 //
@@ -222,3 +237,4 @@ package opaque
 //	poc.Users[string(username)] = userRecord
 //	poc.AkeRecords[string(akeRecord.ID)] = akeRecord
 //	// Output:
+//}

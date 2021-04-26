@@ -1,6 +1,7 @@
 package opaque
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/bytemare/cryptotools/utils"
@@ -72,7 +73,12 @@ func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.KE1 {
 }
 
 func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte, *envelope.Envelope, error) {
-	crPad := c.Core.KDF.Expand(maskingKey, utils.Concatenate(0, maskingNonce, []byte(internal.TagCredentialResponsePad)), internal.PointLength[c.AKEGroup]+envelope.Size(c.mode, c.NonceLen, c.Core.MAC.Size(), c.AKEGroup))
+	envSize := envelope.Size(c.mode, c.NonceLen, c.Core.MAC.Size(), c.AKEGroup)
+	if len(maskedResponse) != internal.PointLength[c.AKEGroup]+envSize {
+		return nil, nil, errors.New("invalid masked response length")
+	}
+
+	crPad := c.Core.KDF.Expand(maskingKey, utils.Concatenate(0, maskingNonce, []byte(internal.TagCredentialResponsePad)), internal.PointLength[c.AKEGroup]+envSize)
 	clear := internal.Xor(crPad, maskedResponse)
 
 	pks := clear[:internal.PointLength[c.AKEGroup]]

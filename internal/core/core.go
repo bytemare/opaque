@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/bytemare/opaque/internal"
-	envelope "github.com/bytemare/opaque/internal/core/envelope"
+	"github.com/bytemare/opaque/internal/core/envelope"
 	"github.com/bytemare/voprf"
 )
 
