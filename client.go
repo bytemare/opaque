@@ -2,12 +2,12 @@ package opaque
 
 import (
 	"fmt"
+
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/ake"
-	"github.com/bytemare/opaque/core"
-	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/parameters"
+	"github.com/bytemare/opaque/internal/ake"
+	"github.com/bytemare/opaque/internal/core"
+	"github.com/bytemare/opaque/internal/core/envelope"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -15,12 +15,12 @@ type Client struct {
 	Core *core.Core
 	Ake  *ake.Client
 	Ke1  *message.KE1
-	*parameters.Parameters
+	*internal.Parameters
 	mode envelope.Mode
 }
 
 func NewClient(p *Parameters) *Client {
-	ip := &parameters.Parameters{
+	ip := &internal.Parameters{
 		OprfCiphersuite: p.OprfCiphersuite,
 		KDF:             &internal.KDF{H: p.KDF.Get()},
 		MAC:             &internal.Mac{Hash: p.MAC.Get()},

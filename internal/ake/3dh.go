@@ -2,14 +2,14 @@ package ake
 
 import (
 	"errors"
-	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/parameters"
 
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/utils"
+	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encode"
 
 	"github.com/bytemare/opaque/message"
 )
@@ -41,7 +41,7 @@ type keys struct {
 }
 
 type Ake struct {
-	*parameters.Parameters
+	*internal.Parameters
 	group.Group
 	SessionSecret []byte
 
@@ -71,7 +71,7 @@ func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) []byte
 
 func buildLabel(length int, label, context []byte) []byte {
 	// todo : the encodings here assume every length fits into a 1-byte encoding
-	return utils.Concatenate(0, encoding.I2OSP(length, 2), internal.EncodeVectorLen(append([]byte(internal.LabelPrefix), label...), 1), internal.EncodeVectorLen(context, 1))
+	return utils.Concatenate(0, encoding.I2OSP(length, 2), encode.EncodeVectorLen(append([]byte(internal.LabelPrefix), label...), 1), encode.EncodeVectorLen(context, 1))
 }
 
 func expand(h *internal.KDF, secret, hkdfLabel []byte) []byte {
@@ -89,8 +89,8 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 }
 
 func newInfo(h *hash.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []byte) {
-	cp := internal.EncodeVectorLen(idu, 2)
-	sp := internal.EncodeVectorLen(ids, 2)
+	cp := encode.EncodeVectorLen(idu, 2)
+	sp := encode.EncodeVectorLen(ids, 2)
 	_, _ = h.Write(utils.Concatenate(0, []byte(internal.Tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
 }
 

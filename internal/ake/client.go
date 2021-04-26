@@ -2,20 +2,20 @@ package ake
 
 import (
 	"crypto/hmac"
-	"github.com/bytemare/opaque/internal/parameters"
 
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encode"
 	"github.com/bytemare/opaque/message"
 )
 
 type Client struct {
 	*Ake
-	//Esk   group.Scalar
+	// Esk   group.Scalar
 	NonceU []byte // todo: only useful in testing, to force value
 }
 
-func NewClient(parameters *parameters.Parameters) *Client {
+func NewClient(parameters *internal.Parameters) *Client {
 	return &Client{
 		Ake: &Ake{
 			Parameters: parameters,
@@ -63,7 +63,7 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 	transcriptHasher := c.Hash.H
 	newInfo(transcriptHasher, ke1, idu, ids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS)
 	keys, sessionSecret := deriveKeys(c.KDF, ikm, transcriptHasher.Sum(nil))
-	_, _ = transcriptHasher.Write(internal.EncodeVector(ke2.Einfo))
+	_, _ = transcriptHasher.Write(encode.EncodeVector(ke2.Einfo))
 	transcript2 := transcriptHasher.Sum(nil)
 
 	expected := c.MAC.MAC(keys.ServerMacKey, transcript2)

@@ -3,8 +3,9 @@ package opaque
 import (
 	"errors"
 	"fmt"
+
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/opaque/core/envelope"
+	"github.com/bytemare/opaque/internal/core/envelope"
 	"github.com/bytemare/opaque/message"
 
 	"github.com/bytemare/cryptotools/encoding"

@@ -5,17 +5,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/bytemare/opaque/message"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/bytemare/opaque/internal/core/envelope"
+	"github.com/bytemare/opaque/message"
+
 	"github.com/bytemare/cryptotools/mhf"
 
 	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/voprf"
 )
 

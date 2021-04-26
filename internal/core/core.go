@@ -2,18 +2,18 @@ package core
 
 import (
 	"fmt"
-	"github.com/bytemare/opaque/core/envelope"
+
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/parameters"
+	envelope "github.com/bytemare/opaque/internal/core/envelope"
 	"github.com/bytemare/voprf"
 )
 
 type Core struct {
 	Oprf *voprf.Client
-	*parameters.Parameters
+	*internal.Parameters
 }
 
-func NewCore(parameters *parameters.Parameters) *Core {
+func NewCore(parameters *internal.Parameters) *Core {
 	oprf, err := parameters.OprfCiphersuite.Client(nil)
 	if err != nil {
 		panic(err)

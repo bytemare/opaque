@@ -4,10 +4,10 @@ import (
 	"crypto/hmac"
 	"errors"
 	"fmt"
+
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/parameters"
 )
 
 var ErrEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
@@ -86,7 +86,7 @@ type InnerEnvelope interface {
 }
 
 type Mailer struct {
-	*parameters.Parameters
+	*internal.Parameters
 }
 
 func (m *Mailer) inner(mode Mode) InnerEnvelope {
@@ -103,7 +103,7 @@ func (m *Mailer) inner(mode Mode) InnerEnvelope {
 	return inner
 }
 
-func BuildPRK(p *parameters.Parameters, unblinded []byte) []byte {
+func BuildPRK(p *internal.Parameters, unblinded []byte) []byte {
 	// hardened := p.Harden(unblinded, nil)
 	hardened := unblinded
 	return p.KDF.Extract(nil, hardened)
@@ -122,7 +122,7 @@ func (m *Mailer) AuthTag(authKey, nonce, inner, ctc []byte) []byte {
 
 func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte, creds *Credentials) (envelope *Envelope, publicKey, exportKey []byte) {
 	// todo for testing only
-	var nonce = creds.EnvelopeNonce
+	nonce := creds.EnvelopeNonce
 	if nonce == nil {
 		nonce = utils.RandomBytes(m.NonceLen)
 	}

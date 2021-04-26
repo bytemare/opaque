@@ -2,10 +2,10 @@ package ake
 
 import (
 	"crypto/hmac"
-	"github.com/bytemare/opaque/internal/parameters"
 
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encode"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -15,7 +15,7 @@ type Server struct {
 	NonceS    []byte // todo: only useful in testing, to force value
 }
 
-func NewServer(parameters *parameters.Parameters) *Server {
+func NewServer(parameters *internal.Parameters) *Server {
 	return &Server{
 		Ake: &Ake{
 			Parameters: parameters,
@@ -63,7 +63,7 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 		einfo = internal.Xor(pad, serverInfo)
 	}
 
-	_, _ = transcriptHasher.Write(internal.EncodeVector(einfo))
+	_, _ = transcriptHasher.Write(encode.EncodeVector(einfo))
 	transcript2 := transcriptHasher.Sum(nil)
 	mac := s.MAC.MAC(keys.ServerMacKey, transcript2)
 

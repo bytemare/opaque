@@ -2,20 +2,19 @@ package opaque
 
 import (
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/opaque/ake"
-	"github.com/bytemare/opaque/core/envelope"
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/parameters"
+	"github.com/bytemare/opaque/internal/ake"
+	"github.com/bytemare/opaque/internal/core/envelope"
 	"github.com/bytemare/opaque/message"
 )
 
 type Server struct {
-	*parameters.Parameters
+	*internal.Parameters
 	Ake *ake.Server
 }
 
 func NewServer(p *Parameters) *Server {
-	ip := &parameters.Parameters{
+	ip := &internal.Parameters{
 		OprfCiphersuite: p.OprfCiphersuite,
 		KDF:             &internal.KDF{H: p.KDF.Get()},
 		MAC:             &internal.Mac{Hash: p.MAC.Get()},
@@ -76,7 +75,7 @@ func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, 
 		return nil, err
 	}
 
-	//maskingNonce := utils.RandomBytes(32) // todo testing
+	// maskingNonce := utils.RandomBytes(32) // todo testing
 	env := record.Envelope
 	crPad := s.KDF.Expand(record.MaskingKey, utils.Concatenate(len(maskingNonce)+len([]byte(internal.TagCredentialResponsePad)), maskingNonce, []byte(internal.TagCredentialResponsePad)), len(pks)+len(env))
 	clear := append(pks, env...)
