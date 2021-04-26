@@ -69,7 +69,7 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []by
 	}, ku, nil
 }
 
-func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, record *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*message.CredentialResponse, error) {
+func (s *Server) credentialResponse(req *message.CredentialRequest, pks []byte, record *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*message.CredentialResponse, error) {
 	z, _, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
 		return nil, err
@@ -88,8 +88,8 @@ func (s *Server) CredentialResponse(req *message.CredentialRequest, pks []byte, 
 	}, nil
 }
 
-func (s *Server) AuthenticationResponse(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload, creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
-	response, err := s.CredentialResponse(ke1.CredentialRequest, pks, upload, id, oprfSeed, creds.MaskingNonce)
+func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload, creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
+	response, err := s.credentialResponse(ke1.CredentialRequest, pks, upload, id, oprfSeed, creds.MaskingNonce)
 	if err != nil {
 		return nil, err
 	}

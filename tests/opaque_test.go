@@ -76,7 +76,7 @@ func TestFull(t *testing.T) {
 func testRegistration(t *testing.T, p *testParams) (*message.RegistrationUpload, []byte) {
 	// Client
 	client := p.Client()
-	reqReg := client.RegistrationStart(p.password)
+	reqReg := client.RegistrationInit(p.password)
 	m1s := reqReg.Serialize()
 
 	// Server
@@ -128,7 +128,7 @@ func testRegistration(t *testing.T, p *testParams) (*message.RegistrationUpload,
 func testAuthentication(t *testing.T, p *testParams, record *message.RegistrationUpload) []byte {
 	// Client
 	client := p.Client()
-	ke1 := client.AuthenticationStart(p.password, nil)
+	ke1 := client.AuthenticationInit(p.password, nil)
 
 	m4s := ke1.Serialize()
 
@@ -146,7 +146,7 @@ func testAuthentication(t *testing.T, p *testParams, record *message.Registratio
 		t.Fatalf(dbgErr, p.Mode, err)
 	}
 
-	ke2, err := server.AuthenticationResponse(m4, nil, p.serverSecretKey, p.serverPublicKey, record, serverCreds, p.userID, p.oprfSeed)
+	ke2, err := server.AuthenticationInit(m4, nil, p.serverSecretKey, p.serverPublicKey, record, serverCreds, p.userID, p.oprfSeed)
 	if err != nil {
 		t.Fatalf(dbgErr, p.Mode, err)
 	}

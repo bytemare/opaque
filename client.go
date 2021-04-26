@@ -45,7 +45,7 @@ func (c *Client) KeyGen() (sk, pk []byte) {
 	return ake.KeyGen(c.Ake.AKEGroup)
 }
 
-func (c *Client) RegistrationStart(password []byte) *message.RegistrationRequest {
+func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest {
 	m := c.Core.OprfStart(password)
 	return &message.RegistrationRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
 }
@@ -63,7 +63,7 @@ func (c *Client) RegistrationFinalize(skc []byte, creds *envelope.Credentials, r
 	}, exportKey, nil
 }
 
-func (c *Client) AuthenticationStart(password, clientInfo []byte) *message.KE1 {
+func (c *Client) AuthenticationInit(password, clientInfo []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
 	credReq := &message.CredentialRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
 	c.Ke1 = c.Ake.Start(clientInfo)

@@ -78,7 +78,7 @@ func (p *Parameters) DeserializeCredentialRequest(input []byte) (*message.Creden
 func (p *Parameters) deserializeCredentialResponse(input []byte) (*message.CredentialResponse, int, error) {
 	supposedLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize
 	if len(input) < supposedLength {
-		return nil, 0, errors.New("invalid CredentialResponse length")
+		return nil, 0, errors.New("invalid credentialResponse length")
 	}
 
 	return &message.CredentialResponse{

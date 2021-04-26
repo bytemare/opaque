@@ -88,7 +88,7 @@ package tests
 //	client := p.Client()
 //
 //	// Prepare the registration request
-//	reg := client.RegistrationStart(password)
+//	reg := client.RegistrationInit(password)
 //	message1 := reg.Serialize()
 //
 //	// message1 must be send to the server. The server part is not covered here, this is a mock function.
@@ -127,7 +127,7 @@ package tests
 //	exampleTestClient = p.Client()
 //
 //	// Prepare the registration request
-//	req := exampleTestClient.RegistrationStart(password)
+//	req := exampleTestClient.RegistrationInit(password)
 //
 //	encReq, err := p.Encoding.Encode(req)
 //	if err != nil {

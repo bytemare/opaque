@@ -139,7 +139,7 @@ func (v *vector) test(t *testing.T) {
 	client := p.Client()
 	oprfClient := buildOPRFClient(p.OprfCiphersuite, input.BlindRegistration)
 	client.Core.Oprf = oprfClient
-	regReq := client.RegistrationStart(input.Password)
+	regReq := client.RegistrationInit(input.Password)
 
 	if !bytes.Equal(out.RegistrationRequest, regReq.Serialize()) {
 		t.Fatal("registration requests do not match")
@@ -213,7 +213,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.Ake.Initialize(esk, input.ClientNonce, 32)
-	KE1 := client.AuthenticationStart(input.Password, input.ClientInfo)
+	KE1 := client.AuthenticationInit(input.Password, input.ClientInfo)
 
 	if !bytes.Equal(out.KE1, KE1.Serialize()) {
 		t.Fatal("KE1 do not match")
@@ -278,7 +278,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, ke1 *message.KE1,
 	}
 	s.Ake.Initialize(sks, v.Inputs.ServerNonce, 32)
 
-	KE2, err := s.AuthenticationResponse(ke1, v.Inputs.ServerInfo, serverPrivateKey, serverPublicKey, upload, creds, id, oprfSeed)
+	KE2, err := s.AuthenticationInit(ke1, v.Inputs.ServerInfo, serverPrivateKey, serverPublicKey, upload, creds, id, oprfSeed)
 	if err != nil {
 		t.Fatal(err)
 	}
