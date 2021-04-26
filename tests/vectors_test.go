@@ -1,10 +1,11 @@
-package opaque
+package tests
 
 import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/bytemare/opaque"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -113,7 +114,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p := &Parameters{
+	p := &opaque.Parameters{
 		OprfCiphersuite: voprf.Ciphersuite(v.Config.OPRF[1]),
 		Hash:            hashToHash(v.Config.Hash),
 		KDF:             kdfToHash(v.Config.KDF),
@@ -146,7 +147,7 @@ func (v *vector) test(t *testing.T) {
 
 	// Server
 	server := p.Server()
-	regResp, ku, err := server.RegistrationResponse(regReq, input.ServerPublicKey, CredentialIdentifier(input.CredentialIdentifier), input.OprfSeed)
+	regResp, ku, err := server.RegistrationResponse(regReq, input.ServerPublicKey, opaque.CredentialIdentifier(input.CredentialIdentifier), input.OprfSeed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +233,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_ = v.loginResponse(t, server, KE1, serverCredentials, cupload, CredentialIdentifier(input.CredentialIdentifier), input.OprfSeed, input.ServerPrivateKey, input.ServerPublicKey)
+	_ = v.loginResponse(t, server, KE1, serverCredentials, cupload, opaque.CredentialIdentifier(input.CredentialIdentifier), input.OprfSeed, input.ServerPrivateKey, input.ServerPublicKey)
 
 	// Client
 	cke2, err := client.DeserializeKE2(out.KE2)
@@ -270,7 +271,7 @@ func (v *vector) test(t *testing.T) {
 	}
 }
 
-func (v *vector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, creds *envelope.Credentials, upload *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, serverPrivateKey, serverPublicKey []byte) *message.KE2 {
+func (v *vector) loginResponse(t *testing.T, s *opaque.Server, ke1 *message.KE1, creds *envelope.Credentials, upload *message.RegistrationUpload, id opaque.CredentialIdentifier, oprfSeed, serverPrivateKey, serverPublicKey []byte) *message.KE2 {
 	sks, err := s.Ake.Group.NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)
@@ -278,6 +279,9 @@ func (v *vector) loginResponse(t *testing.T, s *Server, ke1 *message.KE1, creds 
 	s.Ake.Initialize(sks, v.Inputs.ServerNonce, 32)
 
 	KE2, err := s.AuthenticationResponse(ke1, v.Inputs.ServerInfo, serverPrivateKey, serverPublicKey, upload, creds, id, oprfSeed)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !bytes.Equal(v.Intermediates.HandshakeSecret, s.Ake.HandshakeSecret) {
 		t.Fatalf("HandshakeSecrets do not match : %v", s.Ake.HandshakeSecret)
@@ -400,7 +404,7 @@ func macToHash(h string) hash.Hashing {
 type draftVectors []*vector
 
 func TestOpaqueVectors(t *testing.T) {
-	if err := filepath.Walk("./tests/vectors.json",
+	if err := filepath.Walk("vectors.json",
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -422,6 +426,8 @@ func TestOpaqueVectors(t *testing.T) {
 			}
 
 			for _, tv := range v {
+
+				// Decaf448 not supported, yet
 				if tv.Config.Group == "decaf448" {
 					continue
 				}
