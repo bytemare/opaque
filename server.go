@@ -70,7 +70,7 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []by
 	}, ku, nil
 }
 
-func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, record *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*message.CredentialResponse, error) {
+func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, record *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*cred.CredentialResponse, error) {
 	z, _, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
 		return nil, err
