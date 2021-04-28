@@ -12,6 +12,7 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
+// Client represents an OPAQUE Client, exposing its functions and holding its state.
 type Client struct {
 	Core *core.Core
 	Ake  *ake.Client
@@ -20,6 +21,7 @@ type Client struct {
 	mode envelope.Mode
 }
 
+// NewClient returns a Server instantiation given the application Parameters.
 func NewClient(p *Parameters) *Client {
 	ip := &internal.Parameters{
 		OprfCiphersuite: p.OprfCiphersuite,
@@ -41,15 +43,20 @@ func NewClient(p *Parameters) *Client {
 	}
 }
 
+// KeyGen returns a key pair in the AKE group. It can then be used for the external mode.
 func (c *Client) KeyGen() (sk, pk []byte) {
 	return ake.KeyGen(c.Ake.AKEGroup)
 }
 
+// RegistrationInit returns a RegistrationRequest message blinding the given password
 func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest {
 	m := c.Core.OprfStart(password)
 	return &message.RegistrationRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
 }
 
+// RegistrationFinalize returns a RegistrationUpload message given the server's RegistrationResponse and credentials. If
+// the envelope mode is internal, then the skc private key argument is ignored and can be set to nil. For the external
+// mode, skc must be the client's private key for the AKE.
 func (c *Client) RegistrationFinalize(skc []byte, creds *envelope.Credentials, resp *message.RegistrationResponse) (*message.RegistrationUpload, []byte, error) {
 	envU, pkc, maskingKey, exportKey, err := c.Core.BuildEnvelope(c.mode, resp.Data, resp.Pks, skc, creds)
 	if err != nil {
@@ -63,6 +70,8 @@ func (c *Client) RegistrationFinalize(skc []byte, creds *envelope.Credentials, r
 	}, exportKey, nil
 }
 
+// AuthenticationInit initiates the authentication process, returning a KE1 message blinding the given password.
+// clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) AuthenticationInit(password, clientInfo []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
 	credReq := &message.CredentialRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
@@ -92,6 +101,8 @@ func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte
 	return pks, env, nil
 }
 
+// AuthenticationFinalize returns a KE3 message given the server's KE2 response message and the identities. If the idc
+// or ids parameters are nil, the client and server's public keys are taken as identities for both.
 func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*message.KE3, []byte, error) {
 	unblinded, err := c.Core.OprfFinalize(ke2.Data)
 	if err != nil {
@@ -133,6 +144,7 @@ func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*mes
 	return ke3, exportKey, nil
 }
 
+// SessionKey returns the session key if the previous call to AuthenticationFinalize() was successful.
 func (c *Client) SessionKey() []byte {
 	return c.Ake.SessionKey()
 }

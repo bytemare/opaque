@@ -8,11 +8,13 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
+// Server represents an OPAQUE Server, exposing its functions and holding its state.
 type Server struct {
 	*internal.Parameters
 	Ake *ake.Server
 }
 
+// NewServer returns a Server instantiation given the application Parameters.
 func NewServer(p *Parameters) *Server {
 	ip := &internal.Parameters{
 		OprfCiphersuite: p.OprfCiphersuite,
@@ -30,6 +32,11 @@ func NewServer(p *Parameters) *Server {
 		Parameters: ip,
 		Ake:        ake.NewServer(ip),
 	}
+}
+
+// KeyGen returns a key pair in the AKE group.
+func (s *Server) KeyGen() (sk, pk []byte) {
+	return ake.KeyGen(s.Ake.AKEGroup)
 }
 
 func (s *Server) evaluate(seed, blinded []byte) (element, k []byte, err error) {
@@ -57,6 +64,7 @@ func (s *Server) oprfResponse(oprfSeed, id, element []byte) ([]byte, []byte, err
 	return s.evaluate(seed, element)
 }
 
+// RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given identifiers.
 func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier, oprfSeed []byte) (*message.RegistrationResponse, []byte, error) {
 	z, ku, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
@@ -88,6 +96,7 @@ func (s *Server) credentialResponse(req *message.CredentialRequest, pks []byte, 
 	}, nil
 }
 
+// AuthenticationInit responds to a KE1 message with a KE2 message given server credentials and client record.
 func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload, creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
 	response, err := s.credentialResponse(ke1.CredentialRequest, pks, upload, id, oprfSeed, creds.MaskingNonce)
 	if err != nil {
@@ -111,14 +120,13 @@ func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byt
 	return ke2, nil
 }
 
+// AuthenticationFinalize returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
 func (s *Server) AuthenticationFinalize(ke3 *message.KE3) error {
 	return s.Ake.Finalize(ke3)
 }
 
-func (s *Server) KeyGen() (sk, pk []byte) {
-	return ake.KeyGen(s.Ake.AKEGroup)
-}
-
+// SessionKey returns the session key if the previous calls to AuthenticationInit() and AuthenticationFinalize() were
+// successful.
 func (s *Server) SessionKey() []byte {
 	return s.Ake.SessionKey()
 }
