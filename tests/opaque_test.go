@@ -2,13 +2,15 @@ package tests
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/voprf"
+
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/message"
-	"github.com/bytemare/voprf"
-	"testing"
 
 	"github.com/bytemare/opaque/internal/core/envelope"
 

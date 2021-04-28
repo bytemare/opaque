@@ -7,10 +7,16 @@ import (
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"
+
 	"github.com/bytemare/opaque/internal"
 )
 
-var ErrEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
+var (
+	errEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
+	errCorruptEnvelope = errors.New("envelope corrupted")
+	errInvalidEnvLength = errors.New("envelope of invalid length")
+	errInvalidSK = errors.New("invalid private key")
+)
 
 type Credentials struct {
 	Idc, Ids                    []byte
@@ -38,8 +44,9 @@ func (e *Envelope) Serialize() []byte {
 	return utils.Concatenate(0, e.Nonce, e.InnerEnvelope, e.AuthTag)
 }
 
-func Size(mode Mode, Nn, Nm int, id ciphersuite.Identifier) int {
+func Size(mode Mode, nn, nm int, id ciphersuite.Identifier) int {
 	var innerSize int
+
 	switch mode {
 	case Internal:
 		innerSize = 0
@@ -49,29 +56,29 @@ func Size(mode Mode, Nn, Nm int, id ciphersuite.Identifier) int {
 		panic("invalid envelope mode")
 	}
 
-	return Nn + Nm + innerSize
+	return nn + nm + innerSize
 }
 
-func DeserializeEnvelope(data []byte, mode Mode, Nn, Nm, Nsk int) (*Envelope, int, error) {
-	baseLen := Nn + Nm
+func DeserializeEnvelope(data []byte, mode Mode, nn, nm, nsk int) (*Envelope, int, error) {
+	baseLen := nn + nm
 
 	if len(data) < baseLen {
-		return nil, 0, errors.New("envelope corrupted")
+		return nil, 0, errCorruptEnvelope
 	}
 
-	if mode == External && len(data) != baseLen+Nsk {
-		return nil, 0, errors.New("envelope of invalid length")
+	if mode == External && len(data) != baseLen+nsk {
+		return nil, 0, errInvalidEnvLength
 	}
 
-	nonce := data[:Nn]
+	nonce := data[:nn]
 	innerLen := 0
 
 	if mode == External {
-		innerLen = Nsk
+		innerLen = nsk
 	}
 
-	inner := data[Nn : Nn+innerLen]
-	tag := data[Nn+innerLen:]
+	inner := data[nn : nn+innerLen]
+	tag := data[nn+innerLen:]
 
 	return &Envelope{
 		Nonce:         nonce,
@@ -91,6 +98,7 @@ type Mailer struct {
 
 func (m *Mailer) inner(mode Mode) InnerEnvelope {
 	var inner InnerEnvelope
+
 	switch mode {
 	case Internal:
 		inner = &InternalMode{m.AKEGroup, m.KDF}
@@ -148,7 +156,7 @@ func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, pks []byte, creds *Cr
 
 	expectedTag := m.AuthTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
 	if !hmac.Equal(expectedTag, envelope.AuthTag) {
-		return nil, nil, nil, ErrEnvelopeInvalidTag
+		return nil, nil, nil, errEnvelopeInvalidTag
 	}
 
 	return skc, pkc, exportKey, nil

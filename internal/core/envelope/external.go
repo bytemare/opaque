@@ -1,9 +1,8 @@
 package envelope
 
 import (
-	"errors"
-
 	"github.com/bytemare/cryptotools/group"
+
 	"github.com/bytemare/opaque/internal"
 )
 
@@ -15,8 +14,8 @@ func (e externalInnerEnvelope) Serialize() []byte {
 	return e.encrypted
 }
 
-func deserializeExternalInnerEnvelope(inner []byte, Nsk int) *externalInnerEnvelope {
-	if len(inner) != Nsk {
+func deserializeExternalInnerEnvelope(inner []byte, nsk int) *externalInnerEnvelope {
+	if len(inner) != nsk {
 		panic("invalid inner envelope")
 	}
 
@@ -36,7 +35,7 @@ func (e *ExternalMode) RecoverPublicKey(privateKey group.Scalar) group.Element {
 func (e *ExternalMode) BuildInnerEnvelope(randomizedPwd, nonce, skc []byte) (innerEnvelope, pk []byte) {
 	scalar, err := e.NewScalar().Decode(skc)
 	if err != nil {
-		panic(errors.New("invalid private key"))
+		panic(errInvalidSK)
 	}
 
 	pkc := e.Base().Mult(scalar).Bytes()
@@ -52,7 +51,7 @@ func (e *ExternalMode) RecoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (
 
 	sk, err := e.NewScalar().Decode(skc)
 	if err != nil {
-		panic(errors.New("invalid private key"))
+		panic(errInvalidSK)
 	}
 
 	return skc, e.RecoverPublicKey(sk).Bytes()

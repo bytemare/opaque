@@ -3,6 +3,7 @@ package envelope
 import (
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
+
 	"github.com/bytemare/opaque/internal"
 )
 
@@ -30,5 +31,6 @@ func (i *InternalMode) BuildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner
 func (i *InternalMode) RecoverKeys(randomizedPwd, nonce, _ []byte) (skc, pkc []byte) {
 	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength[i.Identifier])
 	sk, pk := i.DeriveAkeKeyPair(seed)
+
 	return sk.Bytes(), pk.Bytes()
 }

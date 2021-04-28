@@ -3,9 +3,10 @@ package core
 import (
 	"fmt"
 
+	"github.com/bytemare/voprf"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/core/envelope"
-	"github.com/bytemare/voprf"
 )
 
 type Core struct {
@@ -34,7 +35,8 @@ func (c *Core) OprfFinalize(data []byte) ([]byte, error) {
 	return c.Oprf.Finalize(ev)
 }
 
-func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, pks, skc []byte, creds *envelope.Credentials) (env *envelope.Envelope, pkc, maskingKey, exportKey []byte, err error) {
+func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, pks, skc []byte,
+	creds *envelope.Credentials) (env *envelope.Envelope, pkc, maskingKey, exportKey []byte, err error) {
 	unblinded, err := c.OprfFinalize(evaluation)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
@@ -48,7 +50,8 @@ func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, pks, skc []byte, cr
 	return env, pkc, maskingKey, exportKey, nil
 }
 
-func (c *Core) RecoverSecret(mode envelope.Mode, idc, ids, pks, randomizedPwd []byte, envU *envelope.Envelope) (skc, pkc, exportKey []byte, err error) {
+func (c *Core) RecoverSecret(mode envelope.Mode, idc, ids, pks,
+	randomizedPwd []byte, envU *envelope.Envelope) (skc, pkc, exportKey []byte, err error) {
 	creds := &envelope.Credentials{
 		Idc: idc,
 		Ids: ids,

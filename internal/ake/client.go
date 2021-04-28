@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 
 	"github.com/bytemare/cryptotools/group"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encode"
 	"github.com/bytemare/opaque/message"
@@ -18,10 +19,12 @@ type Client struct {
 func NewClient(parameters *internal.Parameters) *Client {
 	return &Client{
 		Ake: &Ake{
-			Parameters: parameters,
-			Group:      parameters.AKEGroup.Get(nil),
-			keys:       &keys{},
+			Parameters:    parameters,
+			Group:         parameters.AKEGroup.Get(nil),
+			keys:          &keys{},
+			SessionSecret: nil,
 		},
+		NonceU: nil,
 	}
 }
 

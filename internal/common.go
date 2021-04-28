@@ -4,23 +4,33 @@ import (
 	"errors"
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/opaque/internal/encode"
-	"github.com/bytemare/opaque/message"
 	"github.com/bytemare/voprf"
+
+	"github.com/bytemare/opaque/internal/encode"
+	cred "github.com/bytemare/opaque/internal/message"
+	"github.com/bytemare/opaque/message"
+)
+
+var (
+	errInvalidSize          = errors.New("invalid message size")
+	errInvalidMEssageLength = errors.New("invalid message length")
+	errCredReqShort         = errors.New("CredentialRequest too short")
+	errInvalidCredRespShort = errors.New("CredentialResponse too short")
+	errInvalidEpkuLength    = errors.New("invalid epku length")
+	errShortMessage         = errors.New("message is too short")
 )
 
 type Parameters struct {
-	OprfCiphersuite voprf.Ciphersuite
 	KDF             *KDF
 	MAC             *Mac
 	Hash            *Hash
 	MHF             *MHF
-	AKEGroup        ciphersuite.Identifier
 	NonceLen        int
-
 	EnvelopeSize    int
 	OPRFPointLength int
 	AkePointLength  int
+	OprfCiphersuite voprf.Ciphersuite
+	AKEGroup        ciphersuite.Identifier
 }
 
 func (p *Parameters) Init() *Parameters {
@@ -33,7 +43,7 @@ func (p *Parameters) Init() *Parameters {
 func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.RegistrationRequest, error) {
 	r := &message.RegistrationRequest{Data: input}
 	if len(r.Data) != p.OPRFPointLength {
-		return nil, errors.New("invalid size")
+		return nil, errInvalidSize
 	}
 
 	return r, nil
@@ -41,7 +51,7 @@ func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.Regi
 
 func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.RegistrationResponse, error) {
 	if len(input) != p.OPRFPointLength+p.AkePointLength {
-		return nil, errors.New("invalid size")
+		return nil, errInvalidSize
 	}
 
 	return &message.RegistrationResponse{
@@ -51,9 +61,8 @@ func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.Reg
 }
 
 func (p *Parameters) DeserializeRegistrationUpload(input []byte) (*message.RegistrationUpload, error) {
-	l := len(input)
-	if l != p.AkePointLength+p.Hash.Size()+p.EnvelopeSize {
-		return nil, errors.New("invalid input length")
+	if len(input) != p.AkePointLength+p.Hash.Size()+p.EnvelopeSize {
+		return nil, errInvalidMEssageLength
 	}
 
 	pku := input[:p.AkePointLength]
@@ -67,35 +76,35 @@ func (p *Parameters) DeserializeRegistrationUpload(input []byte) (*message.Regis
 	}, nil
 }
 
-func (p *Parameters) DeserializeCredentialRequest(input []byte) (*message.CredentialRequest, int, error) {
+func (p *Parameters) DeserializeCredentialRequest(input []byte) (*cred.CredentialRequest, int, error) {
 	if len(input) <= p.OPRFPointLength {
-		return nil, 0, errors.New("CredentialRequest too short")
+		return nil, 0, errCredReqShort
 	}
 
-	return &message.CredentialRequest{Data: input[:p.OPRFPointLength]}, p.OPRFPointLength, nil
+	return &cred.CredentialRequest{Data: input[:p.OPRFPointLength]}, p.OPRFPointLength, nil
 }
 
-func (p *Parameters) deserializeCredentialResponse(input []byte) (*message.CredentialResponse, int, error) {
+func (p *Parameters) deserializeCredentialResponse(input []byte) (*cred.CredentialResponse, int, error) {
 	supposedLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize
 	if len(input) < supposedLength {
-		return nil, 0, errors.New("invalid credentialResponse length")
+		return nil, 0, errInvalidCredRespShort
 	}
 
-	return &message.CredentialResponse{
+	return &cred.CredentialResponse{
 		Data:           input[:p.OPRFPointLength],
 		MaskingNonce:   input[p.OPRFPointLength : p.OPRFPointLength+p.NonceLen],
 		MaskedResponse: input[p.OPRFPointLength+p.NonceLen : supposedLength],
 	}, supposedLength, nil
 }
 
-func (p *Parameters) DeserializeCredentialResponse(input []byte) (*message.CredentialResponse, error) {
+func (p *Parameters) DeserializeCredentialResponse(input []byte) (*cred.CredentialResponse, error) {
 	c, _, err := p.deserializeCredentialResponse(input)
 	return c, err
 }
 
 func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 	if len(input) != p.OPRFPointLength+p.NonceLen+2+p.AkePointLength {
-		return nil, errors.New("invalid input length")
+		return nil, errInvalidSize
 	}
 
 	creq, offset, err := p.DeserializeCredentialRequest(input)
@@ -114,7 +123,7 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 	epku := input[offset:]
 
 	if len(epku) != p.AkePointLength {
-		return nil, errors.New("invalid epku length")
+		return nil, errInvalidEpkuLength
 	}
 
 	return &message.KE1{
@@ -127,7 +136,7 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 
 func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 	if len(input) < p.OPRFPointLength+p.NonceLen+p.AkePointLength+p.EnvelopeSize+p.NonceLen+p.AkePointLength+p.MAC.Size() {
-		return nil, errors.New("KE2 is too short")
+		return nil, errShortMessage
 	}
 
 	cresp, offset, err := p.deserializeCredentialResponse(input)
@@ -158,7 +167,7 @@ func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 
 func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
 	if len(input) != p.MAC.Size() {
-		return nil, errors.New("invalid mac length")
+		return nil, errInvalidMEssageLength
 	}
 
 	return &message.KE3{Mac: input}, nil
