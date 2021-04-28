@@ -3,11 +3,15 @@ package opaque
 import (
 	"errors"
 	"fmt"
+
 	"github.com/bytemare/cryptotools/utils"
+
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/core/envelope"
 	"github.com/bytemare/opaque/internal/encode"
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
+
 	"github.com/bytemare/opaque/message"
 
 	"github.com/bytemare/cryptotools/encoding"
@@ -40,6 +44,22 @@ type Parameters struct {
 	Mode            Mode                   `json:"mode"`
 	AKEGroup        ciphersuite.Identifier `json:"group"`
 	NonceLen        int                    `json:"nn"`
+}
+
+func (p *Parameters) toInternal() *internal.Parameters {
+	ip := &internal.Parameters{
+		OprfCiphersuite: p.OprfCiphersuite,
+		KDF:             &internal.KDF{H: p.KDF.Get()},
+		MAC:             &internal.Mac{Hash: p.MAC.Get()},
+		Hash:            &internal.Hash{H: p.Hash.Get()},
+		MHF:             &internal.MHF{MHF: p.MHF.Get()},
+		AKEGroup:        p.AKEGroup,
+		NonceLen:        p.NonceLen,
+		EnvelopeSize:    envelope.Size(envelope.Mode(p.Mode), p.NonceLen, p.MAC.Size(), p.AKEGroup),
+	}
+	ip.Init()
+
+	return ip
 }
 
 // Serialize returns the byte encoding of the Parameters structure.
@@ -99,7 +119,7 @@ type ClientRecord struct {
 	*message.RegistrationUpload
 }
 
-// Serialize returns the byte encoding the ClientRecord.
+// Serialize returns the byte encoding of the ClientRecord.
 func (c *ClientRecord) Serialize() []byte {
 	return utils.Concatenate(0,
 		encode.EncodeVector(c.CredentialIdentifier), encode.EncodeVector(c.ClientIdentity), c.RegistrationUpload.Serialize())

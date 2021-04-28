@@ -3,8 +3,10 @@ package opaque
 import (
 	"errors"
 	"fmt"
+	cred "github.com/bytemare/opaque/internal/message"
 
 	"github.com/bytemare/cryptotools/utils"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/core"
@@ -23,17 +25,7 @@ type Client struct {
 
 // NewClient returns a Server instantiation given the application Parameters.
 func NewClient(p *Parameters) *Client {
-	ip := &internal.Parameters{
-		OprfCiphersuite: p.OprfCiphersuite,
-		KDF:             &internal.KDF{H: p.KDF.Get()},
-		MAC:             &internal.Mac{Hash: p.MAC.Get()},
-		Hash:            &internal.Hash{H: p.Hash.Get()},
-		MHF:             &internal.MHF{MHF: p.MHF.Get()},
-		AKEGroup:        p.AKEGroup,
-		NonceLen:        p.NonceLen,
-		EnvelopeSize:    envelope.Size(envelope.Mode(p.Mode), p.NonceLen, p.MAC.Size(), p.AKEGroup),
-	}
-	ip.Init()
+	ip := p.toInternal()
 
 	return &Client{
 		Core:       core.NewCore(ip),
@@ -48,7 +40,7 @@ func (c *Client) KeyGen() (sk, pk []byte) {
 	return ake.KeyGen(c.Ake.AKEGroup)
 }
 
-// RegistrationInit returns a RegistrationRequest message blinding the given password
+// RegistrationInit returns a RegistrationRequest message blinding the given password.
 func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest {
 	m := c.Core.OprfStart(password)
 	return &message.RegistrationRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
@@ -74,7 +66,7 @@ func (c *Client) RegistrationFinalize(skc []byte, creds *envelope.Credentials, r
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) AuthenticationInit(password, clientInfo []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
-	credReq := &message.CredentialRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
+	credReq := &cred.CredentialRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
 	c.Ke1 = c.Ake.Start(clientInfo)
 	c.Ke1.CredentialRequest = credReq
 
