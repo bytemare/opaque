@@ -39,7 +39,6 @@ func TestFull(t *testing.T) {
 		NonceLen:        32,
 	}
 
-
 	test := &testParams{
 		Parameters: p,
 		username:   username,
