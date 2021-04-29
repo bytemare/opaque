@@ -34,7 +34,7 @@ const (
 // CredentialIdentifier designates the server's internal unique identifier of the user entry.
 type CredentialIdentifier []byte
 
-// Parameters is the structure holding the OPAQUE configuration.
+// Parameters represents an OPAQUE configuration.
 type Parameters struct {
 	OprfCiphersuite voprf.Ciphersuite      `json:"oprf"`
 	KDF             hash.Hashing           `json:"kdf"`
@@ -112,6 +112,20 @@ func DeserializeParameters(encoded []byte) (*Parameters, error) {
 		AKEGroup:        ciphersuite.Identifier(6),
 		NonceLen:        encoding.OS2IP(encoded[7:]),
 	}, nil
+}
+
+// DefaultParams returns a default configuration with strong parameters.
+func DefaultParams() *Parameters {
+	return &Parameters{
+		OprfCiphersuite: voprf.RistrettoSha512,
+		KDF:             hash.SHA512,
+		MAC:             hash.SHA512,
+		Hash:            hash.SHA512,
+		MHF:             mhf.Scrypt,
+		Mode:            Internal,
+		AKEGroup:        ciphersuite.Ristretto255Sha512,
+		NonceLen:        32,
+	}
 }
 
 // ClientRecord is a server-side structure enabling the storage of user relevant information.

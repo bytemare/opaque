@@ -23,7 +23,7 @@ type Client struct {
 	mode envelope.Mode
 }
 
-// NewClient returns a Server instantiation given the application Parameters.
+// NewClient returns a new Client instantiation given the application Parameters.
 func NewClient(p *Parameters) *Client {
 	ip := p.toInternal()
 

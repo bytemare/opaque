@@ -4,11 +4,6 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/mhf"
-	"github.com/bytemare/voprf"
-
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/message"
 
@@ -31,15 +26,7 @@ func TestFull(t *testing.T) {
 
 	modes := []opaque.Mode{opaque.Internal, opaque.External}
 
-	p := &opaque.Parameters{
-		OprfCiphersuite: voprf.RistrettoSha512,
-		KDF:             hash.SHA512,
-		MAC:             hash.SHA512,
-		Hash:            hash.SHA512,
-		MHF:             mhf.Scrypt,
-		AKEGroup:        ciphersuite.Ristretto255Sha512,
-		NonceLen:        32,
-	}
+	p := opaque.DefaultParams()
 
 	test := &testParams{
 		Parameters: p,
