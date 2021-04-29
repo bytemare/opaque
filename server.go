@@ -1,6 +1,7 @@
 package opaque
 
 import (
+	"fmt"
 	"github.com/bytemare/cryptotools/utils"
 	cred "github.com/bytemare/opaque/internal/message"
 
@@ -34,19 +35,19 @@ func (s *Server) KeyGen() (sk, pk []byte) {
 func (s *Server) evaluate(seed, blinded []byte) (m, k []byte, err error) {
 	oprf, err := s.OprfCiphersuite.Server(nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("oprf server setup: %w", err)
 	}
 
 	ku := oprf.HashToScalar(seed)
 
 	oprf, err = s.OprfCiphersuite.Server(ku.Bytes())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("oprf server setup with key: %w", err)
 	}
 
 	evaluation, err := oprf.Evaluate(blinded)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("oprf evaluation: %w", err)
 	}
 
 	return evaluation.Elements[0], oprf.PrivateKey(), nil
@@ -61,7 +62,7 @@ func (s *Server) oprfResponse(oprfSeed, id, element []byte) (m, k []byte, err er
 func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier, oprfSeed []byte) (r *message.RegistrationResponse, ku []byte, err error) {
 	z, ku, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(" RegistrationResponse: %w", err)
 	}
 
 	return &message.RegistrationResponse{
@@ -73,7 +74,7 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []by
 func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, record *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*cred.CredentialResponse, error) {
 	z, _, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oprfResponse: %w", err)
 	}
 
 	// maskingNonce := utils.RandomBytes(32) // todo testing
@@ -93,7 +94,7 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, rec
 func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload, creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
 	response, err := s.credentialResponse(ke1.CredentialRequest, pks, upload, id, oprfSeed, creds.MaskingNonce)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(" credentialResponse: %w", err)
 	}
 
 	if creds.Idc == nil {
@@ -107,7 +108,7 @@ func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byt
 	// id, sk, peerID, peerPK - (creds, peerPK)
 	ke2, err := s.Ake.Response(creds.Ids, sks, creds.Idc, upload.PublicKey, serverInfo, ke1, response)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(" AKE response: %w", err)
 	}
 
 	return ke2, nil

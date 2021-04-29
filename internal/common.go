@@ -2,6 +2,7 @@ package internal
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/voprf"
@@ -141,7 +142,7 @@ func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 
 	cresp, offset, err := p.deserializeCredentialResponse(input)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding credential response: %w", err)
 	}
 
 	nonceS := input[offset : offset+p.NonceLen]
@@ -151,7 +152,7 @@ func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 
 	einfo, length, err := encode.DecodeVector(input[offset:])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding einfo: %w", err)
 	}
 
 	mac := input[offset+length:]

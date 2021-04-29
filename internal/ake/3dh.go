@@ -2,6 +2,7 @@ package ake
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
@@ -113,17 +114,17 @@ func deriveKeys(h *internal.KDF, ikm, context []byte) (keys *Keys, sessionSecret
 func decodeKeys(g group.Group, secret, peerEpk, peerPk []byte) (sk group.Scalar, epk, pk group.Element, err error) {
 	sk, err = g.NewScalar().Decode(secret)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("decoding secret key: %w", err)
 	}
 
 	epk, err = g.NewElement().Decode(peerEpk)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("decoding peer ephemeral public key: %w", err)
 	}
 
 	pk, err = g.NewElement().Decode(peerPk)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("decoding peer public key: %w", err)
 	}
 
 	return sk, epk, pk, nil

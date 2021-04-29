@@ -13,9 +13,9 @@ import (
 
 var (
 	errEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
-	errCorruptEnvelope = errors.New("envelope corrupted")
-	errInvalidEnvLength = errors.New("envelope of invalid length")
-	errInvalidSK = errors.New("invalid private key")
+	errCorruptEnvelope    = errors.New("envelope corrupted")
+	errInvalidEnvLength   = errors.New("envelope of invalid length")
+	errInvalidSK          = errors.New("invalid private key")
 )
 
 type Credentials struct {

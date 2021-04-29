@@ -93,11 +93,13 @@ func (p *Parameters) String() string {
 		p.OprfCiphersuite, p.KDF, p.MAC, p.Hash, p.MHF, p.Mode, p.AKEGroup, p.NonceLen)
 }
 
+var errInvalidLength = errors.New("invalid length")
+
 // DeserializeParameters decodes the input and returns a Parameter structure. This assumes that the encoded parameters
 // are valid, and will not be checked.
 func DeserializeParameters(encoded []byte) (*Parameters, error) {
 	if len(encoded) != 8 {
-		return nil, errors.New("invalid length")
+		return nil, errInvalidLength
 	}
 
 	return &Parameters{
@@ -129,19 +131,19 @@ func (c *ClientRecord) Serialize() []byte {
 func DeserializeClientRecord(encoded []byte, p *internal.Parameters) (*ClientRecord, error) {
 	ci, offset1, err := encode.DecodeVector(encoded)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding credential identifier: %w", err)
 	}
 
 	idc, offset2, err := encode.DecodeVector(encoded[offset1:])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding client identifier: %w", err)
 	}
 
 	p.Init()
 
 	upload, err := p.DeserializeRegistrationUpload(encoded[offset1+offset2:])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding client upload: %w", err)
 	}
 
 	return &ClientRecord{

@@ -14,6 +14,10 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
+var (
+	errInvalidMaskedLength = errors.New("invalid masked response length")
+)
+
 // Client represents an OPAQUE Client, exposing its functions and holding its state.
 type Client struct {
 	Core *core.Core
@@ -52,7 +56,7 @@ func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest 
 func (c *Client) RegistrationFinalize(skc []byte, creds *envelope.Credentials, resp *message.RegistrationResponse) (*message.RegistrationUpload, []byte, error) {
 	envU, pkc, maskingKey, exportKey, err := c.Core.BuildEnvelope(c.mode, resp.Data, resp.Pks, skc, creds)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("building envelope: %w", err)
 	}
 
 	return &message.RegistrationUpload{
@@ -76,7 +80,7 @@ func (c *Client) AuthenticationInit(password, clientInfo []byte) *message.KE1 {
 func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte, *envelope.Envelope, error) {
 	envSize := envelope.Size(c.mode, c.NonceLen, c.Core.MAC.Size(), c.AKEGroup)
 	if len(maskedResponse) != internal.PointLength[c.AKEGroup]+envSize {
-		return nil, nil, errors.New("invalid masked response length")
+		return nil, nil, errInvalidMaskedLength
 	}
 
 	crPad := c.Core.KDF.Expand(maskingKey, utils.Concatenate(0, maskingNonce, []byte(internal.TagCredentialResponsePad)), internal.PointLength[c.AKEGroup]+envSize)
@@ -87,7 +91,7 @@ func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte
 
 	env, _, err := envelope.DeserializeEnvelope(e, c.mode, c.NonceLen, c.Core.MAC.Size(), internal.ScalarLength[c.AKEGroup])
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("deserializing envelope: %w", err)
 	}
 
 	return pks, env, nil
@@ -106,12 +110,12 @@ func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*mes
 
 	pks, env, err := c.unmask(ke2.MaskingNonce, maskingKey, ke2.MaskedResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("unmasking response: %w", err)
 	}
 
 	skc, pkc, exportKey, err := c.Core.RecoverSecret(c.mode, idc, ids, pks, randomizedPwd, env)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("recover secret: %w", err)
 	}
 
 	creds := &envelope.Credentials{
@@ -130,7 +134,7 @@ func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*mes
 	// id, sk, peerID, peerPK - (creds, peerPK)
 	ke3, _, err := c.Ake.Finalize(creds.Idc, skc, creds.Ids, pks, c.Ke1, ke2)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(" AKE finalization: %w", err)
 	}
 
 	return ke3, exportKey, nil
