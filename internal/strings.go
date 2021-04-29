@@ -1,3 +1,4 @@
+// Package internal provides structures and functions to operate OPAQUE that are not part of the public API.
 package internal
 
 const (

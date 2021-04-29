@@ -1,3 +1,4 @@
+// Package encode provides encoding utilities.
 package encode
 
 import (

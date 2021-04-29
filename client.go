@@ -3,20 +3,16 @@ package opaque
 import (
 	"errors"
 	"fmt"
-	cred "github.com/bytemare/opaque/internal/message"
-
-	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/core"
 	"github.com/bytemare/opaque/internal/core/envelope"
+	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
 
-var (
-	errInvalidMaskedLength = errors.New("invalid masked response length")
-)
+var errInvalidMaskedLength = errors.New("invalid masked response length")
 
 // Client represents an OPAQUE Client, exposing its functions and holding its state.
 type Client struct {
@@ -32,7 +28,7 @@ func NewClient(p *Parameters) *Client {
 	ip := p.toInternal()
 
 	return &Client{
-		Core:       core.NewCore(ip),
+		Core:       core.New(ip),
 		Ake:        ake.NewClient(ip),
 		Parameters: ip,
 		mode:       envelope.Mode(p.Mode),
@@ -53,7 +49,8 @@ func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest 
 // RegistrationFinalize returns a RegistrationUpload message given the server's RegistrationResponse and credentials. If
 // the envelope mode is internal, then the skc private key argument is ignored and can be set to nil. For the external
 // mode, skc must be the client's private key for the AKE.
-func (c *Client) RegistrationFinalize(skc []byte, creds *envelope.Credentials, resp *message.RegistrationResponse) (*message.RegistrationUpload, []byte, error) {
+func (c *Client) RegistrationFinalize(skc []byte, creds *envelope.Credentials,
+	resp *message.RegistrationResponse) (*message.RegistrationUpload, []byte, error) {
 	envU, pkc, maskingKey, exportKey, err := c.Core.BuildEnvelope(c.mode, resp.Data, resp.Pks, skc, creds)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building envelope: %w", err)
@@ -83,7 +80,9 @@ func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte
 		return nil, nil, errInvalidMaskedLength
 	}
 
-	crPad := c.Core.KDF.Expand(maskingKey, utils.Concatenate(0, maskingNonce, []byte(internal.TagCredentialResponsePad)), internal.PointLength[c.AKEGroup]+envSize)
+	crPad := c.Core.KDF.Expand(maskingKey,
+		internal.Concat(maskingNonce, internal.TagCredentialResponsePad),
+		internal.PointLength[c.AKEGroup]+envSize)
 	clear := internal.Xor(crPad, maskedResponse)
 
 	pks := clear[:internal.PointLength[c.AKEGroup]]

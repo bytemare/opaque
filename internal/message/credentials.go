@@ -1,3 +1,4 @@
+// Package message provides the internal credential recovery messages.
 package message
 
 import "github.com/bytemare/cryptotools/utils"

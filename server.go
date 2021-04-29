@@ -2,12 +2,11 @@ package opaque
 
 import (
 	"fmt"
-	"github.com/bytemare/cryptotools/utils"
-	cred "github.com/bytemare/opaque/internal/message"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/core/envelope"
+	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -59,7 +58,8 @@ func (s *Server) oprfResponse(oprfSeed, id, element []byte) (m, k []byte, err er
 }
 
 // RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given identifiers.
-func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier, oprfSeed []byte) (r *message.RegistrationResponse, ku []byte, err error) {
+func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier,
+	oprfSeed []byte) (r *message.RegistrationResponse, ku []byte, err error) {
 	z, ku, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf(" RegistrationResponse: %w", err)
@@ -71,7 +71,8 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []by
 	}, ku, nil
 }
 
-func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, record *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*cred.CredentialResponse, error) {
+func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, record *message.RegistrationUpload,
+	id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*cred.CredentialResponse, error) {
 	z, _, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
 		return nil, fmt.Errorf("oprfResponse: %w", err)
@@ -79,8 +80,12 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, rec
 
 	// maskingNonce := utils.RandomBytes(32) // todo testing
 	env := record.Envelope
-	crPad := s.KDF.Expand(record.MaskingKey, utils.Concatenate(len(maskingNonce)+len([]byte(internal.TagCredentialResponsePad)), maskingNonce, []byte(internal.TagCredentialResponsePad)), len(pks)+len(env))
+	crPad := s.KDF.Expand(record.MaskingKey,
+		internal.Concat(maskingNonce, internal.TagCredentialResponsePad),
+		len(pks)+len(env))
+
 	clear := append(pks, env...)
+
 	maskedResponse := internal.Xor(crPad, clear)
 
 	return &cred.CredentialResponse{
@@ -91,7 +96,8 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, rec
 }
 
 // AuthenticationInit responds to a KE1 message with a KE2 message given server credentials and client record.
-func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload, creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
+func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload,
+	creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
 	response, err := s.credentialResponse(ke1.CredentialRequest, pks, upload, id, oprfSeed, creds.MaskingNonce)
 	if err != nil {
 		return nil, fmt.Errorf(" credentialResponse: %w", err)

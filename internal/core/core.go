@@ -1,3 +1,4 @@
+// Package core links OPAQUE's OPRF client functions to envelope creation and key recovery.
 package core
 
 import (
@@ -9,12 +10,15 @@ import (
 	"github.com/bytemare/opaque/internal/core/envelope"
 )
 
+// Core holds the Client state between the key derivation steps,
+// and exposes envelope creation and key recovery functions.
 type Core struct {
 	Oprf *voprf.Client
 	*internal.Parameters
 }
 
-func NewCore(parameters *internal.Parameters) *Core {
+// New returns a pointer to an instantiated Core structure.
+func New(parameters *internal.Parameters) *Core {
 	oprf, err := parameters.OprfCiphersuite.Client(nil)
 	if err != nil {
 		panic(err)
@@ -26,15 +30,18 @@ func NewCore(parameters *internal.Parameters) *Core {
 	}
 }
 
+// OprfStart initiates the OPRF by blinding the password.
 func (c *Core) OprfStart(password []byte) []byte {
 	return c.Oprf.Blind(password)
 }
 
+// OprfFinalize terminates the OPRF by unblind the evaluated data.
 func (c *Core) OprfFinalize(data []byte) ([]byte, error) {
 	ev := &voprf.Evaluation{Elements: [][]byte{data}}
 	return c.Oprf.Finalize(ev)
 }
 
+// BuildEnvelope returns the client's Envelope, the masking key for the registration, and the additional export key.
 func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, pks, skc []byte,
 	creds *envelope.Credentials) (env *envelope.Envelope, pkc, maskingKey, exportKey []byte, err error) {
 	unblinded, err := c.OprfFinalize(evaluation)
@@ -50,6 +57,7 @@ func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, pks, skc []byte,
 	return env, pkc, maskingKey, exportKey, nil
 }
 
+// RecoverSecret returns the client's private and public key given its envelope, and the additional export key.
 func (c *Core) RecoverSecret(mode envelope.Mode, idc, ids, pks,
 	randomizedPwd []byte, envU *envelope.Envelope) (skc, pkc, exportKey []byte, err error) {
 	creds := &envelope.Credentials{

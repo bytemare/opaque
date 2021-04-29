@@ -1,7 +1,7 @@
+// Package ake provides high-level functions for the 3DH AKE.
 package ake
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/bytemare/cryptotools/encoding"
@@ -14,11 +14,6 @@ import (
 	"github.com/bytemare/opaque/internal/encode"
 
 	"github.com/bytemare/opaque/message"
-)
-
-var (
-	ErrAkeInvalidServerMac = errors.New("invalid server mac")
-	ErrAkeInvalidClientMac = errors.New("invalid client mac")
 )
 
 func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {

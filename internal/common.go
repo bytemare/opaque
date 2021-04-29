@@ -110,14 +110,14 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 
 	creq, offset, err := p.DeserializeCredentialRequest(input)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("deserializing the credential crequest: %w", err)
 	}
 
 	nonceU := input[offset : offset+p.NonceLen]
 
 	info, offset2, err := encode.DecodeVector(input[offset+p.NonceLen:])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("decoding the client info: %w", err)
 	}
 
 	offset = offset + p.NonceLen + offset2
