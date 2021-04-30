@@ -1,30 +1,24 @@
 package opaque
 
 import (
-	"github.com/bytemare/cryptotools/utils"
+	"fmt"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/core/envelope"
+	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
 
+// Server represents an OPAQUE Server, exposing its functions and holding its state.
 type Server struct {
 	*internal.Parameters
 	Ake *ake.Server
 }
 
+// NewServer returns a Server instantiation given the application Parameters.
 func NewServer(p *Parameters) *Server {
-	ip := &internal.Parameters{
-		OprfCiphersuite: p.OprfCiphersuite,
-		KDF:             &internal.KDF{H: p.KDF.Get()},
-		MAC:             &internal.Mac{Hash: p.MAC.Get()},
-		Hash:            &internal.Hash{H: p.Hash.Get()},
-		MHF:             &internal.MHF{MHF: p.MHF.Get()},
-		AKEGroup:        p.AKEGroup,
-		NonceLen:        p.NonceLen,
-		EnvelopeSize:    envelope.Size(envelope.Mode(p.Mode), p.NonceLen, p.MAC.Size(), p.AKEGroup),
-	}
-	ip.Init()
+	ip := p.toInternal()
 
 	return &Server{
 		Parameters: ip,
@@ -32,35 +26,43 @@ func NewServer(p *Parameters) *Server {
 	}
 }
 
-func (s *Server) evaluate(seed, blinded []byte) (element, k []byte, err error) {
+// KeyGen returns a key pair in the AKE group.
+func (s *Server) KeyGen() (sk, pk []byte) {
+	return ake.KeyGen(s.Ake.AKEGroup)
+}
+
+func (s *Server) evaluate(seed, blinded []byte) (m, k []byte, err error) {
 	oprf, err := s.OprfCiphersuite.Server(nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("oprf server setup: %w", err)
 	}
 
 	ku := oprf.HashToScalar(seed)
+
 	oprf, err = s.OprfCiphersuite.Server(ku.Bytes())
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("oprf server setup with key: %w", err)
 	}
 
 	evaluation, err := oprf.Evaluate(blinded)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("oprf evaluation: %w", err)
 	}
 
 	return evaluation.Elements[0], oprf.PrivateKey(), nil
 }
 
-func (s *Server) oprfResponse(oprfSeed, id, element []byte) ([]byte, []byte, error) {
+func (s *Server) oprfResponse(oprfSeed, id, element []byte) (m, k []byte, err error) {
 	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, internal.OprfKey), internal.ScalarLength[s.OprfCiphersuite.Group()])
 	return s.evaluate(seed, element)
 }
 
-func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier, oprfSeed []byte) (*message.RegistrationResponse, []byte, error) {
+// RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given identifiers.
+func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier,
+	oprfSeed []byte) (r *message.RegistrationResponse, ku []byte, err error) {
 	z, ku, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf(" RegistrationResponse: %w", err)
 	}
 
 	return &message.RegistrationResponse{
@@ -69,29 +71,36 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []by
 	}, ku, nil
 }
 
-func (s *Server) credentialResponse(req *message.CredentialRequest, pks []byte, record *message.RegistrationUpload, id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*message.CredentialResponse, error) {
+func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, record *message.RegistrationUpload,
+	id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*cred.CredentialResponse, error) {
 	z, _, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("oprfResponse: %w", err)
 	}
 
 	// maskingNonce := utils.RandomBytes(32) // todo testing
 	env := record.Envelope
-	crPad := s.KDF.Expand(record.MaskingKey, utils.Concatenate(len(maskingNonce)+len([]byte(internal.TagCredentialResponsePad)), maskingNonce, []byte(internal.TagCredentialResponsePad)), len(pks)+len(env))
+	crPad := s.KDF.Expand(record.MaskingKey,
+		internal.Concat(maskingNonce, internal.TagCredentialResponsePad),
+		len(pks)+len(env))
+
 	clear := append(pks, env...)
+
 	maskedResponse := internal.Xor(crPad, clear)
 
-	return &message.CredentialResponse{
+	return &cred.CredentialResponse{
 		Data:           internal.PadPoint(z, s.OprfCiphersuite.Group()),
 		MaskingNonce:   maskingNonce,
 		MaskedResponse: maskedResponse,
 	}, nil
 }
 
-func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload, creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
+// AuthenticationInit responds to a KE1 message with a KE2 message given server credentials and client record.
+func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload,
+	creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
 	response, err := s.credentialResponse(ke1.CredentialRequest, pks, upload, id, oprfSeed, creds.MaskingNonce)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(" credentialResponse: %w", err)
 	}
 
 	if creds.Idc == nil {
@@ -105,20 +114,19 @@ func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byt
 	// id, sk, peerID, peerPK - (creds, peerPK)
 	ke2, err := s.Ake.Response(creds.Ids, sks, creds.Idc, upload.PublicKey, serverInfo, ke1, response)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf(" AKE response: %w", err)
 	}
 
 	return ke2, nil
 }
 
+// AuthenticationFinalize returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
 func (s *Server) AuthenticationFinalize(ke3 *message.KE3) error {
 	return s.Ake.Finalize(ke3)
 }
 
-func (s *Server) KeyGen() (sk, pk []byte) {
-	return ake.KeyGen(s.Ake.AKEGroup)
-}
-
+// SessionKey returns the session key if the previous calls to AuthenticationInit() and AuthenticationFinalize() were
+// successful.
 func (s *Server) SessionKey() []byte {
 	return s.Ake.SessionKey()
 }

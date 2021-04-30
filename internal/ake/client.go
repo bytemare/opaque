@@ -2,12 +2,16 @@ package ake
 
 import (
 	"crypto/hmac"
+	"errors"
 
 	"github.com/bytemare/cryptotools/group"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encode"
 	"github.com/bytemare/opaque/message"
 )
+
+var errAkeInvalidServerMac = errors.New("invalid server mac")
 
 type Client struct {
 	*Ake
@@ -18,10 +22,12 @@ type Client struct {
 func NewClient(parameters *internal.Parameters) *Client {
 	return &Client{
 		Ake: &Ake{
-			Parameters: parameters,
-			Group:      parameters.AKEGroup.Get(nil),
-			keys:       &keys{},
+			Parameters:    parameters,
+			Group:         parameters.AKEGroup.Get(nil),
+			keys:          &keys{},
+			SessionSecret: nil,
 		},
+		NonceU: nil,
 	}
 }
 
@@ -68,7 +74,7 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 
 	expected := c.MAC.MAC(keys.ServerMacKey, transcript2)
 	if !hmac.Equal(expected, ke2.Mac) {
-		return nil, nil, ErrAkeInvalidServerMac
+		return nil, nil, errAkeInvalidServerMac
 	}
 
 	var serverInfo []byte

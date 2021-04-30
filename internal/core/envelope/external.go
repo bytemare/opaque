@@ -1,9 +1,8 @@
 package envelope
 
 import (
-	"errors"
-
 	"github.com/bytemare/cryptotools/group"
+
 	"github.com/bytemare/opaque/internal"
 )
 
@@ -11,49 +10,49 @@ type externalInnerEnvelope struct {
 	encrypted []byte
 }
 
-func (e externalInnerEnvelope) Serialize() []byte {
+func (e externalInnerEnvelope) serialize() []byte {
 	return e.encrypted
 }
 
-func deserializeExternalInnerEnvelope(inner []byte, Nsk int) *externalInnerEnvelope {
-	if len(inner) != Nsk {
+func deserializeExternalInnerEnvelope(inner []byte, nsk int) *externalInnerEnvelope {
+	if len(inner) != nsk {
 		panic("invalid inner envelope")
 	}
 
 	return &externalInnerEnvelope{inner}
 }
 
-type ExternalMode struct {
+type externalMode struct {
 	Nsk int
 	group.Group
 	*internal.KDF
 }
 
-func (e *ExternalMode) RecoverPublicKey(privateKey group.Scalar) group.Element {
+func (e *externalMode) recoverPublicKey(privateKey group.Scalar) group.Element {
 	return e.Base().Mult(privateKey)
 }
 
-func (e *ExternalMode) BuildInnerEnvelope(randomizedPwd, nonce, skc []byte) (innerEnvelope, pk []byte) {
+func (e *externalMode) buildInnerEnvelope(randomizedPwd, nonce, skc []byte) (innerEnvelope, pk []byte) {
 	scalar, err := e.NewScalar().Decode(skc)
 	if err != nil {
-		panic(errors.New("invalid private key"))
+		panic(errInvalidSK)
 	}
 
 	pkc := e.Base().Mult(scalar).Bytes()
 	pad := e.Expand(randomizedPwd, internal.Concat(nonce, internal.TagPad), len(skc))
 
-	return externalInnerEnvelope{internal.Xor(skc, pad)}.Serialize(), pkc
+	return externalInnerEnvelope{internal.Xor(skc, pad)}.serialize(), pkc
 }
 
-func (e *ExternalMode) RecoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (skc, pkc []byte) {
+func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (skc, pkc []byte) {
 	inner := deserializeExternalInnerEnvelope(innerEnvelope, e.Nsk)
 	pad := e.Expand(randomizedPwd, internal.Concat(nonce, internal.TagPad), len(inner.encrypted))
 	skc = internal.Xor(inner.encrypted, pad)
 
 	sk, err := e.NewScalar().Decode(skc)
 	if err != nil {
-		panic(errors.New("invalid private key"))
+		panic(errInvalidSK)
 	}
 
-	return skc, e.RecoverPublicKey(sk).Bytes()
+	return skc, e.recoverPublicKey(sk).Bytes()
 }

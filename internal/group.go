@@ -6,16 +6,18 @@ import (
 )
 
 const (
-	p256PointLength  = 33
-	p256ScalarLength = 32
-	p384PointLength  = 49
-	p384ScalarLength = 48
-	p521PointLength  = 67
-	p521ScalarLength = 66
+	ristrettoPointLength  = 32
+	ristrettoScalarLength = 32
+	p256PointLength       = 33
+	p256ScalarLength      = 32
+	p384PointLength       = 49
+	p384ScalarLength      = 48
+	p521PointLength       = 67
+	p521ScalarLength      = 66
 )
 
 var ScalarLength = map[ciphersuite.Identifier]int{
-	ciphersuite.Ristretto255Sha512: 32,
+	ciphersuite.Ristretto255Sha512: ristrettoPointLength,
 	// ciphersuite.Decaf448Shake256: 56,
 	ciphersuite.P256Sha256: p256ScalarLength,
 	ciphersuite.P384Sha512: p384ScalarLength,
@@ -23,7 +25,7 @@ var ScalarLength = map[ciphersuite.Identifier]int{
 }
 
 var PointLength = map[ciphersuite.Identifier]int{
-	ciphersuite.Ristretto255Sha512: 32,
+	ciphersuite.Ristretto255Sha512: ristrettoScalarLength,
 	// ciphersuite.Decaf448Shake256: 56,
 	ciphersuite.P256Sha256: p256PointLength,
 	ciphersuite.P384Sha512: p384PointLength,

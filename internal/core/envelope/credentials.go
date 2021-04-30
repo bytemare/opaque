@@ -2,6 +2,7 @@ package envelope
 
 import (
 	"github.com/bytemare/cryptotools/utils"
+
 	"github.com/bytemare/opaque/internal/encode"
 )
 

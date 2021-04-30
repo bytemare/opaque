@@ -1,22 +1,23 @@
+// Package internal provides structures and functions to operate OPAQUE that are not part of the public API.
 package internal
 
 const (
-	// Envelope
+	// Envelope tags.
 
 	TagAuthKey    = "AuthKey"
 	TagExportKey  = "ExportKey"
 	TagMaskingKey = "MaskingKey"
 
-	// Internal Mode
+	// Internal Mode tags.
 
 	H2sDST = "OPAQUE-HashToScalar"
 	SkDST  = "PrivateKey"
 
-	// External Mode
+	// External Mode tags.
 
 	TagPad = "Pad"
 
-	// 3DH
+	// 3DH tags.
 
 	Tag3DH        = "3DH"
 	LabelPrefix   = "OPAQUE-"
@@ -27,11 +28,11 @@ const (
 	TagEncServer  = "HandshakeKey"
 	EncryptionTag = "EncryptionPad"
 
-	// Client
+	// Client tags.
 
 	TagCredentialResponsePad = "CredentialResponsePad"
 
-	// Server
+	// Server tags.
 
 	OprfKey = "OprfKey"
 )

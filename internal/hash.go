@@ -5,10 +5,10 @@ import (
 	"github.com/bytemare/cryptotools/mhf"
 )
 
-func Concat(nonce []byte, tag string) []byte {
-	t := []byte(tag)
-	e := make([]byte, 0, len(nonce)+len(t))
-	e = append(e, nonce...)
+func Concat(a []byte, b string) []byte {
+	t := []byte(b)
+	e := make([]byte, 0, len(a)+len(t))
+	e = append(e, a...)
 	e = append(e, t...)
 
 	return e

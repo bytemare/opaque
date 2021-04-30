@@ -1,22 +1,19 @@
+// Package ake provides high-level functions for the 3DH AKE.
 package ake
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/utils"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encode"
 
 	"github.com/bytemare/opaque/message"
-)
-
-var (
-	ErrAkeInvalidServerMac = errors.New("invalid server mac")
-	ErrAkeInvalidClientMac = errors.New("invalid client mac")
 )
 
 func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
@@ -71,7 +68,10 @@ func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) []byte
 
 func buildLabel(length int, label, context []byte) []byte {
 	// todo : the encodings here assume every length fits into a 1-byte encoding
-	return utils.Concatenate(0, encoding.I2OSP(length, 2), encode.EncodeVectorLen(append([]byte(internal.LabelPrefix), label...), 1), encode.EncodeVectorLen(context, 1))
+	return utils.Concatenate(0,
+		encoding.I2OSP(length, 2),
+		encode.EncodeVectorLen(append([]byte(internal.LabelPrefix), label...), 1),
+		encode.EncodeVectorLen(context, 1))
 }
 
 func expand(h *internal.KDF, secret, hkdfLabel []byte) []byte {
@@ -94,32 +94,32 @@ func newInfo(h *hash.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []
 	_, _ = h.Write(utils.Concatenate(0, []byte(internal.Tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
 }
 
-func deriveKeys(h *internal.KDF, ikm, context []byte) (*Keys, []byte) {
+func deriveKeys(h *internal.KDF, ikm, context []byte) (keys *Keys, sessionSecret []byte) {
 	prk := h.Extract(nil, ikm)
-	k := &Keys{}
-	k.HandshakeSecret = deriveSecret(h, prk, []byte(internal.TagHandshake), context)
-	sessionSecret := deriveSecret(h, prk, []byte(internal.TagSession), context)
-	k.ServerMacKey = expandLabel(h, k.HandshakeSecret, []byte(internal.TagMacServer), nil)
-	k.ClientMacKey = expandLabel(h, k.HandshakeSecret, []byte(internal.TagMacClient), nil)
-	k.HandshakeEncryptKey = expandLabel(h, k.HandshakeSecret, []byte(internal.TagEncServer), nil)
+	keys = &Keys{}
+	keys.HandshakeSecret = deriveSecret(h, prk, []byte(internal.TagHandshake), context)
+	sessionSecret = deriveSecret(h, prk, []byte(internal.TagSession), context)
+	keys.ServerMacKey = expandLabel(h, keys.HandshakeSecret, []byte(internal.TagMacServer), nil)
+	keys.ClientMacKey = expandLabel(h, keys.HandshakeSecret, []byte(internal.TagMacClient), nil)
+	keys.HandshakeEncryptKey = expandLabel(h, keys.HandshakeSecret, []byte(internal.TagEncServer), nil)
 
-	return k, sessionSecret
+	return keys, sessionSecret
 }
 
-func decodeKeys(g group.Group, secret, peerEpk, peerPk []byte) (group.Scalar, group.Element, group.Element, error) {
-	sk, err := g.NewScalar().Decode(secret)
+func decodeKeys(g group.Group, secret, peerEpk, peerPk []byte) (sk group.Scalar, epk, pk group.Element, err error) {
+	sk, err = g.NewScalar().Decode(secret)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("decoding secret key: %w", err)
 	}
 
-	epk, err := g.NewElement().Decode(peerEpk)
+	epk, err = g.NewElement().Decode(peerEpk)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("decoding peer ephemeral public key: %w", err)
 	}
 
-	pk, err := g.NewElement().Decode(peerPk)
+	pk, err = g.NewElement().Decode(peerPk)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("decoding peer public key: %w", err)
 	}
 
 	return sk, epk, pk, nil

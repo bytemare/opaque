@@ -1,3 +1,4 @@
+// Package envelope provides utility functions and structures allowing credential management.
 package envelope
 
 import (
@@ -7,10 +8,16 @@ import (
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"
+
 	"github.com/bytemare/opaque/internal"
 )
 
-var ErrEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
+var (
+	errEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
+	errCorruptEnvelope    = errors.New("envelope corrupted")
+	errInvalidEnvLength   = errors.New("envelope of invalid length")
+	errInvalidSK          = errors.New("invalid private key")
+)
 
 type Credentials struct {
 	Idc, Ids                    []byte
@@ -38,8 +45,9 @@ func (e *Envelope) Serialize() []byte {
 	return utils.Concatenate(0, e.Nonce, e.InnerEnvelope, e.AuthTag)
 }
 
-func Size(mode Mode, Nn, Nm int, id ciphersuite.Identifier) int {
+func Size(mode Mode, nn, nm int, id ciphersuite.Identifier) int {
 	var innerSize int
+
 	switch mode {
 	case Internal:
 		innerSize = 0
@@ -49,29 +57,29 @@ func Size(mode Mode, Nn, Nm int, id ciphersuite.Identifier) int {
 		panic("invalid envelope mode")
 	}
 
-	return Nn + Nm + innerSize
+	return nn + nm + innerSize
 }
 
-func DeserializeEnvelope(data []byte, mode Mode, Nn, Nm, Nsk int) (*Envelope, int, error) {
-	baseLen := Nn + Nm
+func DeserializeEnvelope(data []byte, mode Mode, nn, nm, nsk int) (*Envelope, int, error) {
+	baseLen := nn + nm
 
 	if len(data) < baseLen {
-		return nil, 0, errors.New("envelope corrupted")
+		return nil, 0, errCorruptEnvelope
 	}
 
-	if mode == External && len(data) != baseLen+Nsk {
-		return nil, 0, errors.New("envelope of invalid length")
+	if mode == External && len(data) != baseLen+nsk {
+		return nil, 0, errInvalidEnvLength
 	}
 
-	nonce := data[:Nn]
+	nonce := data[:nn]
 	innerLen := 0
 
 	if mode == External {
-		innerLen = Nsk
+		innerLen = nsk
 	}
 
-	inner := data[Nn : Nn+innerLen]
-	tag := data[Nn+innerLen:]
+	inner := data[nn : nn+innerLen]
+	tag := data[nn+innerLen:]
 
 	return &Envelope{
 		Nonce:         nonce,
@@ -80,33 +88,34 @@ func DeserializeEnvelope(data []byte, mode Mode, Nn, Nm, Nsk int) (*Envelope, in
 	}, baseLen + len(inner), nil
 }
 
-type InnerEnvelope interface {
-	BuildInnerEnvelope(randomizedPwd, nonce, skc []byte) (innerEnvelope, pk []byte)
-	RecoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (skc, pkc []byte)
-}
-
-type Mailer struct {
-	*internal.Parameters
-}
-
-func (m *Mailer) inner(mode Mode) InnerEnvelope {
-	var inner InnerEnvelope
-	switch mode {
-	case Internal:
-		inner = &InternalMode{m.AKEGroup, m.KDF}
-	case External:
-		inner = &ExternalMode{internal.ScalarLength[m.AKEGroup], m.AKEGroup.Get(nil), m.KDF}
-	default:
-		panic("invalid mode")
-	}
-
-	return inner
+type innerEnvelope interface {
+	buildInnerEnvelope(randomizedPwd, nonce, skc []byte) (innerEnvelope, pk []byte)
+	recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (skc, pkc []byte)
 }
 
 func BuildPRK(p *internal.Parameters, unblinded []byte) []byte {
 	// hardened := p.Harden(unblinded, nil)
 	hardened := unblinded
 	return p.KDF.Extract(nil, hardened)
+}
+
+type Mailer struct {
+	*internal.Parameters
+}
+
+func (m *Mailer) inner(mode Mode) innerEnvelope {
+	var inner innerEnvelope
+
+	switch mode {
+	case Internal:
+		inner = &internalMode{m.AKEGroup, m.KDF}
+	case External:
+		inner = &externalMode{internal.ScalarLength[m.AKEGroup], m.AKEGroup.Get(nil), m.KDF}
+	default:
+		panic("invalid mode")
+	}
+
+	return inner
 }
 
 func (m *Mailer) buildKeys(randomizedPwd, nonce []byte) (authKey, exportKey []byte) {
@@ -116,11 +125,12 @@ func (m *Mailer) buildKeys(randomizedPwd, nonce []byte) (authKey, exportKey []by
 	return
 }
 
-func (m *Mailer) AuthTag(authKey, nonce, inner, ctc []byte) []byte {
+func (m *Mailer) authTag(authKey, nonce, inner, ctc []byte) []byte {
 	return m.MAC.MAC(authKey, utils.Concatenate(0, nonce, inner, ctc))
 }
 
-func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte, creds *Credentials) (envelope *Envelope, publicKey, exportKey []byte) {
+func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte,
+	creds *Credentials) (envelope *Envelope, publicKey, exportKey []byte) {
 	// todo for testing only
 	nonce := creds.EnvelopeNonce
 	if nonce == nil {
@@ -128,9 +138,9 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte, creds
 	}
 
 	authKey, exportKey := m.buildKeys(randomizedPwd, nonce)
-	inner, pkc := m.inner(mode).BuildInnerEnvelope(randomizedPwd, nonce, skc)
+	inner, pkc := m.inner(mode).buildInnerEnvelope(randomizedPwd, nonce, skc)
 	ctc := CreateCleartextCredentials(pkc, pks, creds)
-	tag := m.AuthTag(authKey, nonce, inner, ctc.Serialize())
+	tag := m.authTag(authKey, nonce, inner, ctc.Serialize())
 
 	envelope = &Envelope{
 		Nonce:         nonce,
@@ -141,14 +151,15 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte, creds
 	return envelope, pkc, exportKey
 }
 
-func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, pks []byte, creds *Credentials, envelope *Envelope) (skc, pkc, exportKey []byte, err error) {
+func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, pks []byte, creds *Credentials,
+	envelope *Envelope) (skc, pkc, exportKey []byte, err error) {
 	authKey, exportKey := m.buildKeys(randomizedPwd, envelope.Nonce)
-	skc, pkc = m.inner(mode).RecoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
+	skc, pkc = m.inner(mode).recoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
 	ctc := CreateCleartextCredentials(pkc, pks, creds)
 
-	expectedTag := m.AuthTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
+	expectedTag := m.authTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
 	if !hmac.Equal(expectedTag, envelope.AuthTag) {
-		return nil, nil, nil, ErrEnvelopeInvalidTag
+		return nil, nil, nil, errEnvelopeInvalidTag
 	}
 
 	return skc, pkc, exportKey, nil
