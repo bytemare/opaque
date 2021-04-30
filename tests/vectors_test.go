@@ -143,7 +143,7 @@ func (v *vector) test(t *testing.T) {
 	regReq := client.RegistrationInit(input.Password)
 
 	if !bytes.Equal(out.RegistrationRequest, regReq.Serialize()) {
-		t.Fatal("registration requests do not match")
+		t.Fatalf("registration requests do not match\n%v\n%v", hex.EncodeToString(out.RegistrationRequest), hex.EncodeToString(regReq.Serialize()))
 	}
 
 	// Server
