@@ -433,6 +433,10 @@ func TestOpaqueVectors(t *testing.T) {
 					continue
 				}
 
+				if tv.Config.Group != "ristretto255" {
+					continue
+				}
+
 				t.Run(fmt.Sprintf("%s - %s - %s", tv.Config.Name, tv.Config.EnvelopeMode, tv.Config.Group), tv.test)
 			}
 			return nil
