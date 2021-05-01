@@ -16,6 +16,7 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
+// KeyGen returns private and public keys in the grouo.
 func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
 	g := id.Get(nil)
 	scalar := g.NewScalar().Random()
@@ -24,17 +25,10 @@ func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
 	return internal.SerializeScalar(scalar, id), internal.SerializePoint(publicKey, id)
 }
 
-type Keys struct {
-	ServerMacKey, ClientMacKey []byte
-	HandshakeSecret            []byte
-	HandshakeEncryptKey        []byte
-	SessionSecret              []byte
-}
-
 type keys struct {
-	Esk   group.Scalar  // todo: only useful in testing (except for client), to force value
-	Epk   group.Element // todo: only useful in testing, to force value
-	*Keys               // todo: only useful in testing, to verify values
+	serverMacKey, clientMacKey []byte
+	handshakeSecret            []byte
+	handshakeEncryptKey        []byte
 }
 
 type Ake struct {
@@ -43,27 +37,28 @@ type Ake struct {
 	SessionSecret []byte
 
 	// Todo: For testing only, delete
-	*keys
+	Epk group.Element
 }
 
 // todo: Only useful in testing, to force values
 //  Note := there's no effect if esk, epk, and nonce have already been set in a previous call
-func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) []byte {
-	if a.Esk == nil {
-		if scalar != nil {
-			a.Esk = scalar
-		} else {
-			a.Esk = a.NewScalar().Random()
-		}
+func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) (group.Scalar, group.Element, []byte) {
+	var s group.Scalar
+	var p group.Element
+
+	if scalar != nil {
+		s = scalar
+	} else {
+		s = a.NewScalar().Random()
 	}
 
-	a.Epk = a.Base().Mult(a.Esk)
+	p = a.Base().Mult(s)
 
-	if len(nonce) != 0 {
-		return nonce
+	if len(nonce) == 0 {
+		nonce = utils.RandomBytes(nonceLen)
 	}
 
-	return utils.RandomBytes(nonceLen)
+	return s, p, nonce
 }
 
 func buildLabel(length int, label, context []byte) []byte {
@@ -94,16 +89,16 @@ func newInfo(h *hash.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []
 	_, _ = h.Write(utils.Concatenate(0, []byte(internal.Tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
 }
 
-func deriveKeys(h *internal.KDF, ikm, context []byte) (keys *Keys, sessionSecret []byte) {
+func deriveKeys(h *internal.KDF, ikm, context []byte) (k *keys, sessionSecret []byte) {
 	prk := h.Extract(nil, ikm)
-	keys = &Keys{}
-	keys.HandshakeSecret = deriveSecret(h, prk, []byte(internal.TagHandshake), context)
+	k = &keys{}
+	k.handshakeSecret = deriveSecret(h, prk, []byte(internal.TagHandshake), context)
 	sessionSecret = deriveSecret(h, prk, []byte(internal.TagSession), context)
-	keys.ServerMacKey = expandLabel(h, keys.HandshakeSecret, []byte(internal.TagMacServer), nil)
-	keys.ClientMacKey = expandLabel(h, keys.HandshakeSecret, []byte(internal.TagMacClient), nil)
-	keys.HandshakeEncryptKey = expandLabel(h, keys.HandshakeSecret, []byte(internal.TagEncServer), nil)
+	k.serverMacKey = expandLabel(h, k.handshakeSecret, []byte(internal.TagMacServer), nil)
+	k.clientMacKey = expandLabel(h, k.handshakeSecret, []byte(internal.TagMacClient), nil)
+	k.handshakeEncryptKey = expandLabel(h, k.handshakeSecret, []byte(internal.TagEncServer), nil)
 
-	return keys, sessionSecret
+	return k, sessionSecret
 }
 
 func decodeKeys(g group.Group, secret, peerEpk, peerPk []byte) (sk group.Scalar, epk, pk group.Element, err error) {

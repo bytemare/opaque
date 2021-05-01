@@ -15,7 +15,7 @@ var errAkeInvalidServerMac = errors.New("invalid server mac")
 
 type Client struct {
 	*Ake
-	// Esk   group.Scalar
+	Esk    group.Scalar
 	NonceU []byte // todo: only useful in testing, to force value
 }
 
@@ -24,7 +24,6 @@ func NewClient(parameters *internal.Parameters) *Client {
 		Ake: &Ake{
 			Parameters:    parameters,
 			Group:         parameters.AKEGroup.Get(nil),
-			keys:          &keys{},
 			SessionSecret: nil,
 		},
 		NonceU: nil,
@@ -34,7 +33,9 @@ func NewClient(parameters *internal.Parameters) *Client {
 // todo: Only useful in testing, to force values
 //  Note := there's no effect if esk, epk, and nonce have already been set in a previous call
 func (c *Client) Initialize(esk group.Scalar, nonce []byte, nonceLen int) {
-	nonce = c.Ake.Initialize(esk, nonce, nonceLen)
+	s, p, nonce := c.Ake.Initialize(esk, nonce, nonceLen)
+	c.Esk = s
+	c.Epk = p
 
 	if c.NonceU == nil {
 		c.NonceU = nonce
@@ -72,7 +73,7 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 	_, _ = transcriptHasher.Write(encode.EncodeVector(ke2.Einfo))
 	transcript2 := transcriptHasher.Sum(nil)
 
-	expected := c.MAC.MAC(keys.ServerMacKey, transcript2)
+	expected := c.MAC.MAC(keys.serverMacKey, transcript2)
 	if !hmac.Equal(expected, ke2.Mac) {
 		return nil, nil, errAkeInvalidServerMac
 	}
@@ -80,18 +81,18 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 	var serverInfo []byte
 
 	if len(ke2.Einfo) != 0 {
-		pad := c.KDF.Expand(keys.HandshakeEncryptKey, []byte(internal.EncryptionTag), len(ke2.Einfo))
+		pad := c.KDF.Expand(keys.handshakeEncryptKey, []byte(internal.EncryptionTag), len(ke2.Einfo))
 		serverInfo = internal.Xor(pad, ke2.Einfo)
 	}
 
 	_, _ = transcriptHasher.Write(ke2.Mac)
 	transcript3 := transcriptHasher.Sum(nil)
-	c.Keys = keys
 	c.SessionSecret = sessionSecret
 
-	return &message.KE3{Mac: c.MAC.MAC(keys.ClientMacKey, transcript3)}, serverInfo, nil
+	return &message.KE3{Mac: c.MAC.MAC(keys.clientMacKey, transcript3)}, serverInfo, nil
 }
 
+// SessionKey returns the secret shared session key if a previous call to Finalize() was successful.
 func (c *Client) SessionKey() []byte {
 	return c.SessionSecret
 }
