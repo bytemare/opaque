@@ -87,7 +87,7 @@ type intermediates struct {
 	HandshakeEncryptKey ByteToHex `json:"handshake_encrypt_key"` //
 	HandshakeSecret     ByteToHex `json:"handshake_secret"`      //
 	MaskingKey          ByteToHex `json:"masking_key"`
-	RandomPWD           ByteToHex `json:"random_pwd"`     //
+	RandomPWD           ByteToHex `json:"randomized_pwd"` //
 	ServerMacKey        ByteToHex `json:"server_mac_key"` //
 }
 
