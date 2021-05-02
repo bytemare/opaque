@@ -2,7 +2,9 @@
 package opaque
 
 import (
+	"errors"
 	"fmt"
+
 	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
@@ -11,6 +13,8 @@ import (
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
+
+var errAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")
 
 // Server represents an OPAQUE Server, exposing its functions and holding its state.
 type Server struct {
@@ -128,7 +132,11 @@ func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byt
 
 // AuthenticationFinalize returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
 func (s *Server) AuthenticationFinalize(ke3 *message.KE3) error {
-	return s.Ake.Finalize(ke3)
+	if !s.Ake.Finalize(ke3) {
+		return errAkeInvalidClientMac
+	}
+
+	return nil
 }
 
 // SessionKey returns the session key if the previous calls to AuthenticationInit() and AuthenticationFinalize() were

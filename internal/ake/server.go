@@ -2,8 +2,6 @@ package ake
 
 import (
 	"crypto/hmac"
-	"errors"
-
 	"github.com/bytemare/cryptotools/group"
 
 	"github.com/bytemare/opaque/internal"
@@ -11,8 +9,6 @@ import (
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
-
-var errAkeInvalidClientMac = errors.New("invalid client mac")
 
 // Server h
 type Server struct {
@@ -80,10 +76,10 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 	transcript2 := transcriptHasher.Sum()
 	mac := s.MAC.MAC(keys.serverMacKey, transcript2)
 
-	s.SessionSecret = sessionSecret
 	transcriptHasher.Write(mac)
 	transcript3 := transcriptHasher.Sum()
 	s.ClientMac = s.MAC.MAC(keys.clientMacKey, transcript3)
+	s.SessionSecret = sessionSecret
 
 	return &message.KE2{
 		CredentialResponse: response,
@@ -95,12 +91,8 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 }
 
 // Finalize verifies the authentication tag contained in ke3.
-func (s *Server) Finalize(ke3 *message.KE3) error {
-	if !hmac.Equal(s.ClientMac, ke3.Mac) {
-		return errAkeInvalidClientMac
-	}
-
-	return nil
+func (s *Server) Finalize(ke3 *message.KE3) bool {
+	return hmac.Equal(s.ClientMac, ke3.Mac)
 }
 
 // SessionKey returns the secret shared session key if a previous call to Finalize() was successful.
