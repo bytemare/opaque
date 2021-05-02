@@ -84,7 +84,7 @@ jobs:
             -Dsonar.organization=bytemare-github
             -Dsonar.projectKey=bytemare_opaque
             -Dsonar.coverage.exclusions=**/*_test.go
-            -Dsonar.go.coverage.reportPaths=./opaque-coverage.out
+            -Dsonar.go.coverage.reportPaths=./coverage.out
             -Dsonar.test.exclusions=tests/**
             -Dsonar.tests=tests/
             -Dsonar.verbose=true
