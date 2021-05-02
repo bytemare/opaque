@@ -4,10 +4,10 @@ on:
     tags:
       - v*
     branches:
-      - [ main ]
+      - main
   pull_request:
     branches:
-      - [ main ]
+      - main
 
 jobs:
   analyze:
