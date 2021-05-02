@@ -34,7 +34,7 @@ func NewServer(parameters *internal.Parameters) *Server {
 }
 
 // SetValues - testing: integrated to support testing, to force values.
-// There's no effect if esk, epk, and nonce have already been set in a previous call
+// There's no effect if esk, epk, and nonce have already been set in a previous call.
 func (s *Server) SetValues(esk group.Scalar, nonce []byte, nonceLen int) group.Element {
 	es, p, nonce := s.ake.setValues(esk, nonce, nonceLen)
 	s.Esk = es
@@ -65,9 +65,9 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 	}
 
 	nonce := s.NonceS
-	transcriptHasher := s.Hash.H
+	transcriptHasher := s.Hash
 	newInfo(transcriptHasher, ke1, idu, ids, response.Serialize(), nonce, epk.Bytes())
-	keys, sessionSecret := deriveKeys(s.KDF, ikm, transcriptHasher.Sum(nil))
+	keys, sessionSecret := deriveKeys(s.KDF, ikm, transcriptHasher.Sum())
 
 	var einfo []byte
 
@@ -76,13 +76,13 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 		einfo = internal.Xor(pad, serverInfo)
 	}
 
-	_, _ = transcriptHasher.Write(encode.EncodeVector(einfo))
-	transcript2 := transcriptHasher.Sum(nil)
+	transcriptHasher.Write(encode.EncodeVector(einfo))
+	transcript2 := transcriptHasher.Sum()
 	mac := s.MAC.MAC(keys.serverMacKey, transcript2)
 
 	s.SessionSecret = sessionSecret
-	_, _ = transcriptHasher.Write(mac)
-	transcript3 := transcriptHasher.Sum(nil)
+	transcriptHasher.Write(mac)
+	transcript3 := transcriptHasher.Sum()
 	s.ClientMac = s.MAC.MAC(keys.clientMacKey, transcript3)
 
 	return &message.KE2{

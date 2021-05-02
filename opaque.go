@@ -51,7 +51,7 @@ func (p *Parameters) toInternal() *internal.Parameters {
 	ip := &internal.Parameters{
 		OprfCiphersuite: p.OprfCiphersuite,
 		KDF:             &internal.KDF{H: p.KDF.Get()},
-		MAC:             &internal.Mac{Hash: p.MAC.Get()},
+		MAC:             &internal.Mac{H: p.MAC.Get()},
 		Hash:            &internal.Hash{H: p.Hash.Get()},
 		MHF:             &internal.MHF{MHF: p.MHF.Get()},
 		AKEGroup:        p.AKEGroup,

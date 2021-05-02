@@ -7,7 +7,6 @@ import (
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
@@ -80,10 +79,10 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func newInfo(h *hash.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []byte) {
+func newInfo(h *internal.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []byte) {
 	cp := encode.EncodeVectorLen(idu, 2)
 	sp := encode.EncodeVectorLen(ids, 2)
-	_, _ = h.Write(utils.Concatenate(0, []byte(internal.Tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
+	h.Write(utils.Concatenate(0, []byte(internal.Tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
 }
 
 func deriveKeys(h *internal.KDF, ikm, context []byte) (k *keys, sessionSecret []byte) {

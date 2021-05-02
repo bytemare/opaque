@@ -31,15 +31,15 @@ func (k *KDF) Size() int {
 }
 
 type Mac struct {
-	*hash.Hash
+	H *hash.Hash
 }
 
 func (m *Mac) MAC(key, message []byte) []byte {
-	return m.Hmac(message, key)
+	return m.H.Hmac(message, key)
 }
 
 func (m *Mac) Size() int {
-	return m.OutputSize()
+	return m.H.OutputSize()
 }
 
 type Hash struct {
@@ -52,6 +52,14 @@ func (h *Hash) Hash(message []byte) []byte {
 
 func (h *Hash) Size() int {
 	return h.H.OutputSize()
+}
+
+func (h *Hash) Sum() []byte {
+	return h.H.Sum(nil)
+}
+
+func (h *Hash) Write(p []byte) {
+	_, _ = h.H.Write(p)
 }
 
 type MHF struct {

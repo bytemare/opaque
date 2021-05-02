@@ -68,11 +68,11 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 		return nil, nil, err
 	}
 
-	transcriptHasher := c.Hash.H
+	transcriptHasher := c.Hash
 	newInfo(transcriptHasher, ke1, idu, ids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS)
-	keys, sessionSecret := deriveKeys(c.KDF, ikm, transcriptHasher.Sum(nil))
-	_, _ = transcriptHasher.Write(encode.EncodeVector(ke2.Einfo))
-	transcript2 := transcriptHasher.Sum(nil)
+	keys, sessionSecret := deriveKeys(c.KDF, ikm, transcriptHasher.Sum())
+	transcriptHasher.Write(encode.EncodeVector(ke2.Einfo))
+	transcript2 := transcriptHasher.Sum()
 
 	expected := c.MAC.MAC(keys.serverMacKey, transcript2)
 	if !hmac.Equal(expected, ke2.Mac) {
@@ -86,8 +86,8 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 		serverInfo = internal.Xor(pad, ke2.Einfo)
 	}
 
-	_, _ = transcriptHasher.Write(ke2.Mac)
-	transcript3 := transcriptHasher.Sum(nil)
+	transcriptHasher.Write(ke2.Mac)
+	transcript3 := transcriptHasher.Sum()
 	c.SessionSecret = sessionSecret
 
 	return &message.KE3{Mac: c.MAC.MAC(keys.clientMacKey, transcript3)}, serverInfo, nil
