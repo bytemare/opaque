@@ -201,3 +201,6 @@ issues:
 
 run:
   tests: false
+
+output:
+  format: github-actions
