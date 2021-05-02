@@ -14,14 +14,14 @@ import (
 var errAkeInvalidServerMac = errors.New("invalid server mac")
 
 type Client struct {
-	*Ake
+	*ake
 	Esk    group.Scalar
-	NonceU []byte // todo: only useful in testing, to force value
+	NonceU []byte // testing: integrated to support testing, to force values.
 }
 
 func NewClient(parameters *internal.Parameters) *Client {
 	return &Client{
-		Ake: &Ake{
+		ake: &ake{
 			Parameters:    parameters,
 			Group:         parameters.AKEGroup.Get(nil),
 			SessionSecret: nil,
@@ -30,25 +30,26 @@ func NewClient(parameters *internal.Parameters) *Client {
 	}
 }
 
-// todo: Only useful in testing, to force values
-//  Note := there's no effect if esk, epk, and nonce have already been set in a previous call
-func (c *Client) Initialize(esk group.Scalar, nonce []byte, nonceLen int) {
-	s, p, nonce := c.Ake.Initialize(esk, nonce, nonceLen)
+// SetValues - testing: integrated to support testing, to force values.
+// There's no effect if esk, epk, and nonce have already been set in a previous call
+func (c *Client) SetValues(esk group.Scalar, nonce []byte, nonceLen int) group.Element {
+	s, p, nonce := c.ake.setValues(esk, nonce, nonceLen)
 	c.Esk = s
-	c.Epk = p
 
 	if c.NonceU == nil {
 		c.NonceU = nonce
 	}
+
+	return p
 }
 
 func (c *Client) Start(clientInfo []byte) *message.KE1 {
-	c.Initialize(nil, nil, 32)
+	epk := c.SetValues(nil, nil, 32)
 
 	return &message.KE1{
 		NonceU:     c.NonceU,
 		ClientInfo: clientInfo,
-		EpkU:       internal.SerializePoint(c.Epk, c.AKEGroup),
+		EpkU:       internal.SerializePoint(epk, c.AKEGroup),
 	}
 }
 

@@ -16,34 +16,34 @@ var errAkeInvalidClientMac = errors.New("invalid client mac")
 
 // Server h
 type Server struct {
-	*Ake
+	*ake
 	ClientMac []byte
 
-	// todo: only useful in testing, to force value
-
+	// testing: integrated to support testing, to force values.
 	Esk    group.Scalar
 	NonceS []byte
 }
 
 func NewServer(parameters *internal.Parameters) *Server {
 	return &Server{
-		Ake: &Ake{
+		ake: &ake{
 			Parameters: parameters,
 			Group:      parameters.AKEGroup.Get(nil),
 		},
 	}
 }
 
-// todo: Only useful in testing, to force values
-//  Note := there's no effect if esk, epk, and nonce have already been set in a previous call
-func (s *Server) Initialize(esk group.Scalar, nonce []byte, nonceLen int) {
-	es, p, nonce := s.Ake.Initialize(esk, nonce, nonceLen)
+// SetValues - testing: integrated to support testing, to force values.
+// There's no effect if esk, epk, and nonce have already been set in a previous call
+func (s *Server) SetValues(esk group.Scalar, nonce []byte, nonceLen int) group.Element {
+	es, p, nonce := s.ake.setValues(esk, nonce, nonceLen)
 	s.Esk = es
-	s.Epk = p
 
 	if s.NonceS == nil {
 		s.NonceS = nonce
 	}
+
+	return p
 }
 
 func (s *Server) ikm(sks, epku, pku []byte) ([]byte, error) {
@@ -57,7 +57,7 @@ func (s *Server) ikm(sks, epku, pku []byte) ([]byte, error) {
 
 // Response produces a 3DH server response message.
 func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
-	s.Initialize(nil, nil, 32)
+	epk := s.SetValues(nil, nil, 32)
 
 	ikm, err := s.ikm(sk, ke1.EpkU, pku)
 	if err != nil {
@@ -66,7 +66,7 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 
 	nonce := s.NonceS
 	transcriptHasher := s.Hash.H
-	newInfo(transcriptHasher, ke1, idu, ids, response.Serialize(), nonce, s.Epk.Bytes())
+	newInfo(transcriptHasher, ke1, idu, ids, response.Serialize(), nonce, epk.Bytes())
 	keys, sessionSecret := deriveKeys(s.KDF, ikm, transcriptHasher.Sum(nil))
 
 	var einfo []byte
@@ -88,7 +88,7 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 	return &message.KE2{
 		CredentialResponse: response,
 		NonceS:             nonce,
-		EpkS:               internal.SerializePoint(s.Epk, s.AKEGroup),
+		EpkS:               internal.SerializePoint(epk, s.AKEGroup),
 		Einfo:              einfo,
 		Mac:                mac,
 	}, nil

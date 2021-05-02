@@ -213,7 +213,7 @@ func (v *vector) test(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.Ake.Initialize(esk, input.ClientNonce, 32)
+	client.Ake.SetValues(esk, input.ClientNonce, 32)
 	KE1 := client.AuthenticationInit(input.Password, input.ClientInfo)
 
 	if !bytes.Equal(out.KE1, KE1.Serialize()) {
@@ -277,7 +277,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, ke1 *message.KE1,
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.Ake.Initialize(sks, v.Inputs.ServerNonce, 32)
+	s.Ake.SetValues(sks, v.Inputs.ServerNonce, 32)
 
 	KE2, err := s.AuthenticationInit(ke1, v.Inputs.ServerInfo, serverPrivateKey, serverPublicKey, upload, creds, id, oprfSeed)
 	if err != nil {

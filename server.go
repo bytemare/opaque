@@ -3,6 +3,7 @@ package opaque
 
 import (
 	"fmt"
+	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
@@ -79,7 +80,11 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, rec
 		return nil, fmt.Errorf("oprfResponse: %w", err)
 	}
 
-	// maskingNonce := utils.RandomBytes(32) // todo testing
+	// testing: integrated to support testing, to force values.
+	if len(maskingNonce) == 0 {
+		maskingNonce = utils.RandomBytes(32)
+	}
+
 	env := record.Envelope
 	crPad := s.KDF.Expand(record.MaskingKey,
 		internal.Concat(maskingNonce, internal.TagCredentialResponsePad),

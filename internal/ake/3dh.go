@@ -31,18 +31,15 @@ type keys struct {
 	handshakeEncryptKey        []byte
 }
 
-type Ake struct {
+type ake struct {
 	*internal.Parameters
 	group.Group
 	SessionSecret []byte
-
-	// Todo: For testing only, delete
-	Epk group.Element
 }
 
-// todo: Only useful in testing, to force values
-//  Note := there's no effect if esk, epk, and nonce have already been set in a previous call
-func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) (group.Scalar, group.Element, []byte) {
+// setValues - testing: integrated to support testing, to force values.
+// There's no effect if esk, epk, and nonce have already been set in a previous call
+func (a *ake) setValues(scalar group.Scalar, nonce []byte, nonceLen int) (group.Scalar, group.Element, []byte) {
 	var s group.Scalar
 	var p group.Element
 

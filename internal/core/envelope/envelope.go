@@ -21,7 +21,7 @@ var (
 
 type Credentials struct {
 	Idc, Ids                    []byte
-	EnvelopeNonce, MaskingNonce []byte // todo: for testing only
+	EnvelopeNonce, MaskingNonce []byte // testing: integrated to support testing
 }
 
 type Mode byte
@@ -131,7 +131,7 @@ func (m *Mailer) authTag(authKey, nonce, inner, ctc []byte) []byte {
 
 func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte,
 	creds *Credentials) (envelope *Envelope, publicKey, exportKey []byte) {
-	// todo for testing only
+	// testing: integrated to support testing
 	nonce := creds.EnvelopeNonce
 	if nonce == nil {
 		nonce = utils.RandomBytes(m.NonceLen)
