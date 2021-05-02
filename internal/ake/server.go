@@ -32,14 +32,16 @@ func NewServer(parameters *internal.Parameters) *Server {
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
 func (s *Server) SetValues(esk group.Scalar, nonce []byte, nonceLen int) group.Element {
-	es, p, nonce := s.ake.setValues(esk, nonce, nonceLen)
-	s.Esk = es
+	es, nonce := s.ake.setValues(esk, nonce, nonceLen)
+	if s.Esk == nil || (esk != nil && s.Esk != es) {
+		s.Esk = es
+	}
 
 	if s.NonceS == nil {
 		s.NonceS = nonce
 	}
 
-	return p
+	return s.ake.Base().Mult(s.Esk)
 }
 
 func (s *Server) ikm(sks, epku, pku []byte) ([]byte, error) {

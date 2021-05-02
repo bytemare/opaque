@@ -217,11 +217,7 @@ func (v *vector) test(t *testing.T) {
 	KE1 := client.AuthenticationInit(input.Password, input.ClientInfo)
 
 	if !bytes.Equal(out.KE1, KE1.Serialize()) {
-		dKE1, err := server.DeserializeKE1(out.KE1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Fatalf("KE1 do not match\n%v\n%v", dKE1, KE1)
+		t.Fatalf("KE1 do not match")
 	}
 
 	// Server

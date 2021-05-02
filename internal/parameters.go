@@ -3,7 +3,6 @@ package internal
 import (
 	"errors"
 	"fmt"
-
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/voprf"
 
@@ -14,7 +13,7 @@ import (
 
 var (
 	errInvalidSize          = errors.New("invalid message size")
-	errInvalidMEssageLength = errors.New("invalid message length")
+	errInvalidMessageLength = errors.New("invalid message length")
 	errCredReqShort         = errors.New("CredentialRequest too short")
 	errInvalidCredRespShort = errors.New("CredentialResponse too short")
 	errInvalidEpkuLength    = errors.New("invalid epku length")
@@ -63,7 +62,7 @@ func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.Reg
 
 func (p *Parameters) DeserializeRegistrationUpload(input []byte) (*message.RegistrationUpload, error) {
 	if len(input) != p.AkePointLength+p.Hash.Size()+p.EnvelopeSize {
-		return nil, errInvalidMEssageLength
+		return nil, errInvalidMessageLength
 	}
 
 	pku := input[:p.AkePointLength]
@@ -104,7 +103,7 @@ func (p *Parameters) DeserializeCredentialResponse(input []byte) (*cred.Credenti
 }
 
 func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
-	if len(input) != p.OPRFPointLength+p.NonceLen+2+p.AkePointLength {
+	if len(input) < p.OPRFPointLength+p.NonceLen+2+p.AkePointLength {
 		return nil, errInvalidSize
 	}
 
@@ -168,7 +167,7 @@ func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 
 func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
 	if len(input) != p.MAC.Size() {
-		return nil, errInvalidMEssageLength
+		return nil, errInvalidMessageLength
 	}
 
 	return &message.KE3{Mac: input}, nil
