@@ -139,7 +139,7 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte,
 
 	authKey, exportKey := m.buildKeys(randomizedPwd, nonce)
 	inner, pkc := m.inner(mode).buildInnerEnvelope(randomizedPwd, nonce, skc)
-	ctc := CreateCleartextCredentials(pkc, pks, creds)
+	ctc := CreateCleartextCredentials(pkc, pks, creds.Idc, creds.Ids)
 	tag := m.authTag(authKey, nonce, inner, ctc.Serialize())
 
 	envelope = &Envelope{
@@ -151,11 +151,11 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte,
 	return envelope, pkc, exportKey
 }
 
-func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, pks []byte, creds *Credentials,
+func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, pks, idc, ids []byte,
 	envelope *Envelope) (skc, pkc, exportKey []byte, err error) {
 	authKey, exportKey := m.buildKeys(randomizedPwd, envelope.Nonce)
 	skc, pkc = m.inner(mode).recoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
-	ctc := CreateCleartextCredentials(pkc, pks, creds)
+	ctc := CreateCleartextCredentials(pkc, pks, idc, ids)
 
 	expectedTag := m.authTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
 	if !hmac.Equal(expectedTag, envelope.AuthTag) {

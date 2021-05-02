@@ -25,12 +25,11 @@ func (c *CleartextCredentials) Serialize() []byte {
 	return utils.Concatenate(0, c.Pks, u, s)
 }
 
-func CreateCleartextCredentials(pkc, pks []byte, credentials *Credentials) *CleartextCredentials {
+func CreateCleartextCredentials(pkc, pks, idc, ids []byte) *CleartextCredentials {
 	if pks == nil {
 		panic("nil pks")
 	}
 
-	idc := credentials.Idc
 	if idc == nil {
 		if pkc == nil {
 			panic("nil pkc")
@@ -39,7 +38,6 @@ func CreateCleartextCredentials(pkc, pks []byte, credentials *Credentials) *Clea
 		idc = pkc
 	}
 
-	ids := credentials.Ids
 	if ids == nil {
 		ids = pks
 	}

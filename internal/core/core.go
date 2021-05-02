@@ -56,16 +56,3 @@ func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, pks, skc []byte,
 
 	return env, pkc, maskingKey, exportKey, nil
 }
-
-// RecoverSecret returns the client's private and public key given its envelope, and the additional export key.
-func (c *Core) RecoverSecret(mode envelope.Mode, idc, ids, pks,
-	randomizedPwd []byte, envU *envelope.Envelope) (skc, pkc, exportKey []byte, err error) {
-	creds := &envelope.Credentials{
-		Idc: idc,
-		Ids: ids,
-	}
-
-	m := &envelope.Mailer{Parameters: c.Parameters}
-
-	return m.RecoverEnvelope(mode, randomizedPwd, pks, creds, envU)
-}

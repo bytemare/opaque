@@ -38,10 +38,7 @@ type ake struct {
 
 // setValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call
-func (a *ake) setValues(scalar group.Scalar, nonce []byte, nonceLen int) (group.Scalar, group.Element, []byte) {
-	var s group.Scalar
-	var p group.Element
-
+func (a *ake) setValues(scalar group.Scalar, nonce []byte, nonceLen int) (s group.Scalar, p group.Element, n []byte) {
 	if scalar != nil {
 		s = scalar
 	} else {

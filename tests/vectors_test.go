@@ -217,7 +217,11 @@ func (v *vector) test(t *testing.T) {
 	KE1 := client.AuthenticationInit(input.Password, input.ClientInfo)
 
 	if !bytes.Equal(out.KE1, KE1.Serialize()) {
-		t.Fatal("KE1 do not match")
+		dKE1, err := server.DeserializeKE1(out.KE1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Fatalf("KE1 do not match\n%v\n%v", dKE1, KE1)
 	}
 
 	// Server
@@ -432,6 +436,11 @@ func TestOpaqueVectors(t *testing.T) {
 				if tv.Config.Group == "decaf448" {
 					continue
 				}
+
+				if tv.Config.Group != "ristretto255" {
+					continue
+				}
+
 
 				t.Run(fmt.Sprintf("%s - %s - %s", tv.Config.Name, tv.Config.EnvelopeMode, tv.Config.Group), tv.test)
 			}
