@@ -1,0 +1,90 @@
+name: OPAQUE
+on:
+  push:
+    tags:
+      - v*
+    branches:
+      - [ main ]
+  pull_request:
+    branches:
+      - [ main ]
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        GOVER: [ '1.16', '1.15', '1.14', '1.13', '1.12' ]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Setup Go-${{ matrix.GOVER }}
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.GOVER }}
+
+      # Linting
+      - name: Linting
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: latest
+          args: --config=./.github/.golangci.yml ./...
+
+      # CodeQL
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v1
+        with:
+          languages: 'go'
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v1
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v1
+
+      # Testing
+      - name: Testing
+        run: go test -v -count=1 ./...
+
+  coverage:
+    name: Coverage
+    needs: [ analyze ]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.16'
+
+      # Coverage
+      - name: Run coverage
+        run: go test -v -race -covermode=atomic -coverpkg=./... -coverprofile=./coverage.out ./tests/...
+
+      # SonarCloud
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=bytemare-github
+            -Dsonar.projectKey=bytemare_opaque
+            -Dsonar.coverage.exclusions=**/*_test.go
+            -Dsonar.go.coverage.reportPaths=./opaque-coverage.out
+            -Dsonar.test.exclusions=tests/**
+            -Dsonar.tests=tests/
+            -Dsonar.verbose=true
