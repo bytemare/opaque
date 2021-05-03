@@ -1,0 +1,4 @@
+blank_issues_enabled: false
+- name: Questions, feature requests, and more 💬
+  url: https://github.com/bytemare/opaque/discussions
+  about: Do you need help? Did you make something with OPAQUE? Do you have an idea? Tell us about it!
