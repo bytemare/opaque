@@ -28,13 +28,13 @@ func NewServer(p *Parameters) *Server {
 
 	return &Server{
 		Parameters: ip,
-		Ake:        ake.NewServer(ip),
+		Ake:        ake.NewServer(),
 	}
 }
 
 // KeyGen returns a key pair in the AKE group.
 func (s *Server) KeyGen() (sk, pk []byte) {
-	return ake.KeyGen(s.Ake.AKEGroup)
+	return ake.KeyGen(s.AKEGroup)
 }
 
 func (s *Server) evaluate(seed, blinded []byte) (m, k []byte, err error) {
@@ -122,7 +122,7 @@ func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byt
 	}
 
 	// id, sk, peerID, peerPK - (creds, peerPK)
-	ke2, err := s.Ake.Response(creds.Ids, sks, creds.Idc, upload.PublicKey, serverInfo, ke1, response)
+	ke2, err := s.Ake.Response(s.Parameters, creds.Ids, sks, creds.Idc, upload.PublicKey, serverInfo, ke1, response)
 	if err != nil {
 		return nil, fmt.Errorf(" AKE response: %w", err)
 	}

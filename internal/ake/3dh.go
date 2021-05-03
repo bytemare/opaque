@@ -3,13 +3,14 @@ package ake
 
 import (
 	"fmt"
+
 	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encode"
-
 	"github.com/bytemare/opaque/message"
 )
 
@@ -35,12 +36,12 @@ type ake struct {
 }
 
 // setValues - testing: integrated to support testing, to force values.
-// There's no effect if esk, epk, and nonce have already been set in a previous call
-func (a *ake) setValues(scalar group.Scalar, nonce []byte, nonceLen int) (s group.Scalar, n []byte) {
+// There's no effect if esk, epk, and nonce have already been set in a previous call.
+func setValues(p *internal.Parameters, scalar group.Scalar, nonce []byte, nonceLen int) (s group.Scalar, n []byte) {
 	if scalar != nil {
 		s = scalar
 	} else {
-		s = a.NewScalar().Random()
+		s = p.AKEGroup.Get(nil).NewScalar().Random()
 	}
 
 	if len(nonce) == 0 {

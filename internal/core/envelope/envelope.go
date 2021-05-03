@@ -94,7 +94,7 @@ type innerEnvelope interface {
 }
 
 func BuildPRK(p *internal.Parameters, unblinded []byte) []byte {
-	// hardened := p.Harden(unblinded, nil)
+	// testing: commented out to support testing. hardened := p.Harden(unblinded, nil)
 	hardened := unblinded
 	return p.KDF.Extract(nil, hardened)
 }

@@ -114,6 +114,7 @@ func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*mes
 	}
 
 	m := &envelope.Mailer{Parameters: c.Parameters}
+
 	skc, pkc, exportKey, err := m.RecoverEnvelope(c.mode, randomizedPwd, pks, idc, ids, env)
 	if err != nil {
 		return nil, nil, fmt.Errorf("recover secret: %w", err)

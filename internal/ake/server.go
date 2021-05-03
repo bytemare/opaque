@@ -2,6 +2,7 @@ package ake
 
 import (
 	"crypto/hmac"
+
 	"github.com/bytemare/cryptotools/group"
 
 	"github.com/bytemare/opaque/internal"
@@ -10,83 +11,81 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
-// Server h
+// Server exposes the server's AKE functions and holds its state.
 type Server struct {
-	*ake
-	ClientMac []byte
+	clientMac     []byte
+	sessionSecret []byte
 
 	// testing: integrated to support testing, to force values.
-	Esk    group.Scalar
-	NonceS []byte
+	esk    group.Scalar
+	nonceS []byte
 }
 
-func NewServer(parameters *internal.Parameters) *Server {
-	return &Server{
-		ake: &ake{
-			Parameters: parameters,
-			Group:      parameters.AKEGroup.Get(nil),
-		},
-	}
+func NewServer() *Server {
+	return &Server{}
 }
 
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
-func (s *Server) SetValues(esk group.Scalar, nonce []byte, nonceLen int) group.Element {
-	es, nonce := s.ake.setValues(esk, nonce, nonceLen)
-	if s.Esk == nil || (esk != nil && s.Esk != es) {
-		s.Esk = es
+func (s *Server) SetValues(p *internal.Parameters, esk group.Scalar, nonce []byte, nonceLen int) group.Element {
+	es, nonce := setValues(p, esk, nonce, nonceLen)
+	if s.esk == nil || (esk != nil && s.esk != es) {
+		s.esk = es
 	}
 
-	if s.NonceS == nil {
-		s.NonceS = nonce
+	if s.nonceS == nil {
+		s.nonceS = nonce
 	}
 
-	return s.ake.Base().Mult(s.Esk)
+	return p.AKEGroup.Get(nil).Base().Mult(s.esk)
 }
 
-func (s *Server) ikm(sks, epku, pku []byte) ([]byte, error) {
-	sk, epk, gpk, err := decodeKeys(s.Group, sks, epku, pku)
+func (s *Server) ikm(g group.Group, sks, epku, pku []byte) ([]byte, error) {
+	sk, epk, gpk, err := decodeKeys(g, sks, epku, pku)
 	if err != nil {
 		return nil, err
 	}
 
-	return k3dh(epk, s.Esk, epk, sk, gpk, s.Esk), nil
+	return k3dh(epk, s.esk, epk, sk, gpk, s.esk), nil
 }
 
 // Response produces a 3DH server response message.
-func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
-	epk := s.SetValues(nil, nil, 32)
+func (s *Server) Response(p *internal.Parameters, ids, sk, idu, pku, serverInfo []byte,
+	ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
+	epk := s.SetValues(p, nil, nil, 32)
 
-	ikm, err := s.ikm(sk, ke1.EpkU, pku)
+	g := p.AKEGroup.Get(nil)
+
+	ikm, err := s.ikm(g, sk, ke1.EpkU, pku)
 	if err != nil {
 		return nil, err
 	}
 
-	nonce := s.NonceS
-	transcriptHasher := s.Hash
+	nonce := s.nonceS
+	transcriptHasher := p.Hash
 	newInfo(transcriptHasher, ke1, idu, ids, response.Serialize(), nonce, epk.Bytes())
-	keys, sessionSecret := deriveKeys(s.KDF, ikm, transcriptHasher.Sum())
+	keys, sessionSecret := deriveKeys(p.KDF, ikm, transcriptHasher.Sum())
 
 	var einfo []byte
 
 	if len(serverInfo) != 0 {
-		pad := s.KDF.Expand(keys.handshakeEncryptKey, []byte(internal.EncryptionTag), len(serverInfo))
+		pad := p.KDF.Expand(keys.handshakeEncryptKey, []byte(internal.EncryptionTag), len(serverInfo))
 		einfo = internal.Xor(pad, serverInfo)
 	}
 
 	transcriptHasher.Write(encode.EncodeVector(einfo))
 	transcript2 := transcriptHasher.Sum()
-	mac := s.MAC.MAC(keys.serverMacKey, transcript2)
+	mac := p.MAC.MAC(keys.serverMacKey, transcript2)
 
 	transcriptHasher.Write(mac)
 	transcript3 := transcriptHasher.Sum()
-	s.ClientMac = s.MAC.MAC(keys.clientMacKey, transcript3)
-	s.SessionSecret = sessionSecret
+	s.clientMac = p.MAC.MAC(keys.clientMacKey, transcript3)
+	s.sessionSecret = sessionSecret
 
 	return &message.KE2{
 		CredentialResponse: response,
 		NonceS:             nonce,
-		EpkS:               internal.SerializePoint(epk, s.AKEGroup),
+		EpkS:               internal.SerializePoint(epk, p.AKEGroup),
 		Einfo:              einfo,
 		Mac:                mac,
 	}, nil
@@ -94,10 +93,10 @@ func (s *Server) Response(ids, sk, idu, pku, serverInfo []byte, ke1 *message.KE1
 
 // Finalize verifies the authentication tag contained in ke3.
 func (s *Server) Finalize(ke3 *message.KE3) bool {
-	return hmac.Equal(s.ClientMac, ke3.Mac)
+	return hmac.Equal(s.clientMac, ke3.Mac)
 }
 
 // SessionKey returns the secret shared session key if a previous call to Finalize() was successful.
 func (s *Server) SessionKey() []byte {
-	return s.SessionSecret
+	return s.sessionSecret
 }

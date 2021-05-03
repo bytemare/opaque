@@ -3,6 +3,7 @@ package ake
 import (
 	"crypto/hmac"
 	"errors"
+
 	"github.com/bytemare/cryptotools/group"
 
 	"github.com/bytemare/opaque/internal"
@@ -30,9 +31,9 @@ func NewClient(parameters *internal.Parameters) *Client {
 }
 
 // SetValues - testing: integrated to support testing, to force values.
-// There's no effect if esk, epk, and nonce have already been set in a previous call
-func (c *Client) SetValues(esk group.Scalar, nonce []byte, nonceLen int) group.Element {
-	s, nonce := c.ake.setValues(esk, nonce, nonceLen)
+// There's no effect if esk, epk, and nonce have already been set in a previous call.
+func (c *Client) SetValues(p *internal.Parameters, esk group.Scalar, nonce []byte, nonceLen int) group.Element {
+	s, nonce := setValues(p, esk, nonce, nonceLen)
 	if c.Esk == nil || (esk != nil && c.Esk != s) {
 		c.Esk = s
 	}
@@ -45,7 +46,7 @@ func (c *Client) SetValues(esk group.Scalar, nonce []byte, nonceLen int) group.E
 }
 
 func (c *Client) Start(clientInfo []byte) *message.KE1 {
-	epk := c.SetValues(nil, nil, 32)
+	epk := c.SetValues(c.ake.Parameters, nil, nil, 32)
 
 	return &message.KE1{
 		NonceU:     c.NonceU,

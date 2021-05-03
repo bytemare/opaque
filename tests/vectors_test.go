@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/bytemare/opaque/internal"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -213,7 +214,7 @@ func (v *vector) test(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.Ake.SetValues(esk, input.ClientNonce, 32)
+	client.Ake.SetValues(client.Parameters, esk, input.ClientNonce, 32)
 	KE1 := client.AuthenticationInit(input.Password, input.ClientInfo)
 
 	if !bytes.Equal(out.KE1, KE1.Serialize()) {
@@ -234,7 +235,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_ = v.loginResponse(t, server, KE1, serverCredentials, cupload, opaque.CredentialIdentifier(input.CredentialIdentifier), input.OprfSeed, input.ServerPrivateKey, input.ServerPublicKey)
+	_ = v.loginResponse(t, client.Parameters, server, KE1, serverCredentials, cupload, opaque.CredentialIdentifier(input.CredentialIdentifier), input.OprfSeed, input.ServerPrivateKey, input.ServerPublicKey)
 
 	// Client
 	cke2, err := client.DeserializeKE2(out.KE2)
@@ -272,12 +273,12 @@ func (v *vector) test(t *testing.T) {
 	}
 }
 
-func (v *vector) loginResponse(t *testing.T, s *opaque.Server, ke1 *message.KE1, creds *envelope.Credentials, upload *message.RegistrationUpload, id opaque.CredentialIdentifier, oprfSeed, serverPrivateKey, serverPublicKey []byte) *message.KE2 {
-	sks, err := s.Ake.Group.NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
+func (v *vector) loginResponse(t *testing.T, p *internal.Parameters, s *opaque.Server, ke1 *message.KE1, creds *envelope.Credentials, upload *message.RegistrationUpload, id opaque.CredentialIdentifier, oprfSeed, serverPrivateKey, serverPublicKey []byte) *message.KE2 {
+	sks, err := p.AKEGroup.Get(nil).NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.Ake.SetValues(sks, v.Inputs.ServerNonce, 32)
+	s.Ake.SetValues(p, sks, v.Inputs.ServerNonce, 32)
 
 	KE2, err := s.AuthenticationInit(ke1, v.Inputs.ServerInfo, serverPrivateKey, serverPublicKey, upload, creds, id, oprfSeed)
 	if err != nil {
@@ -300,7 +301,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, ke1 *message.KE1,
 	//	t.Fatal("HandshakeEncryptKeys do not match")
 	//}
 
-	if !bytes.Equal(v.Outputs.SessionKey, s.Ake.SessionSecret) {
+	if !bytes.Equal(v.Outputs.SessionKey, s.Ake.SessionKey()) {
 		t.Fatalf("SessionKey do not match : %v", s.Ake.SessionKey())
 	}
 
@@ -436,7 +437,6 @@ func TestOpaqueVectors(t *testing.T) {
 				if tv.Config.Group != "ristretto255" {
 					continue
 				}
-
 
 				t.Run(fmt.Sprintf("%s - %s - %s", tv.Config.Name, tv.Config.EnvelopeMode, tv.Config.Group), tv.test)
 			}

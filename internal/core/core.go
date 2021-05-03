@@ -38,7 +38,13 @@ func (c *Core) OprfStart(password []byte) []byte {
 // OprfFinalize terminates the OPRF by unblind the evaluated data.
 func (c *Core) OprfFinalize(data []byte) ([]byte, error) {
 	ev := &voprf.Evaluation{Elements: [][]byte{data}}
-	return c.Oprf.Finalize(ev)
+
+	u, err := c.Oprf.Finalize(ev)
+	if err != nil {
+		err = fmt.Errorf("oprf finalization: %w", err)
+	}
+
+	return u, err
 }
 
 // BuildEnvelope returns the client's Envelope, the masking key for the registration, and the additional export key.

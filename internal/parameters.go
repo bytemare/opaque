@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/voprf"
 
