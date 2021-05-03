@@ -1,12 +1,11 @@
+// Package ake provides high-level functions for the 3DH AKE.
 package ake
 
 import (
-	"crypto/hmac"
-
 	"github.com/bytemare/cryptotools/group"
 
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encode"
+	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
@@ -73,7 +72,7 @@ func (s *Server) Response(p *internal.Parameters, ids, sk, idu, pku, serverInfo 
 		einfo = internal.Xor(pad, serverInfo)
 	}
 
-	transcriptHasher.Write(encode.EncodeVector(einfo))
+	transcriptHasher.Write(encoding.EncodeVector(einfo))
 	transcript2 := transcriptHasher.Sum()
 	mac := p.MAC.MAC(keys.serverMacKey, transcript2)
 
@@ -92,8 +91,8 @@ func (s *Server) Response(p *internal.Parameters, ids, sk, idu, pku, serverInfo 
 }
 
 // Finalize verifies the authentication tag contained in ke3.
-func (s *Server) Finalize(ke3 *message.KE3) bool {
-	return hmac.Equal(s.clientMac, ke3.Mac)
+func (s *Server) Finalize(p *internal.Parameters, ke3 *message.KE3) bool {
+	return p.MAC.Equal(s.clientMac, ke3.Mac)
 }
 
 // SessionKey returns the secret shared session key if a previous call to Finalize() was successful.

@@ -1,18 +1,19 @@
+// Package ake provides high-level functions for the 3DH AKE.
 package ake
 
 import (
-	"crypto/hmac"
 	"errors"
 
 	"github.com/bytemare/cryptotools/group"
 
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encode"
+	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/message"
 )
 
 var errAkeInvalidServerMac = errors.New("invalid server mac")
 
+// Client exposes the client's AKE functions and holds its state.
 type Client struct {
 	*ake
 	Esk    group.Scalar
@@ -73,11 +74,11 @@ func (c *Client) Finalize(idu, skc, ids, pks []byte, ke1 *message.KE1, ke2 *mess
 	transcriptHasher := c.Hash
 	newInfo(transcriptHasher, ke1, idu, ids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS)
 	keys, sessionSecret := deriveKeys(c.KDF, ikm, transcriptHasher.Sum())
-	transcriptHasher.Write(encode.EncodeVector(ke2.Einfo))
+	transcriptHasher.Write(encoding.EncodeVector(ke2.Einfo))
 	transcript2 := transcriptHasher.Sum()
 
 	expected := c.MAC.MAC(keys.serverMacKey, transcript2)
-	if !hmac.Equal(expected, ke2.Mac) {
+	if !c.MAC.Equal(expected, ke2.Mac) {
 		return nil, nil, errAkeInvalidServerMac
 	}
 

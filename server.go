@@ -132,7 +132,7 @@ func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byt
 
 // AuthenticationFinalize returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
 func (s *Server) AuthenticationFinalize(ke3 *message.KE3) error {
-	if !s.Ake.Finalize(ke3) {
+	if !s.Ake.Finalize(s.Parameters, ke3) {
 		return errAkeInvalidClientMac
 	}
 

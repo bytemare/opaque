@@ -1,9 +1,10 @@
+// Package envelope provides utility functions and structures allowing credential management.
 package envelope
 
 import (
 	"github.com/bytemare/cryptotools/utils"
 
-	"github.com/bytemare/opaque/internal/encode"
+	"github.com/bytemare/opaque/internal/encoding"
 )
 
 type CleartextCredentials struct {
@@ -15,11 +16,11 @@ type CleartextCredentials struct {
 func (c *CleartextCredentials) Serialize() []byte {
 	var u, s []byte
 	if c.Idc != nil {
-		u = encode.EncodeVector(c.Idc)
+		u = encoding.EncodeVector(c.Idc)
 	}
 
 	if c.Ids != nil {
-		s = encode.EncodeVector(c.Ids)
+		s = encoding.EncodeVector(c.Ids)
 	}
 
 	return utils.Concatenate(0, c.Pks, u, s)

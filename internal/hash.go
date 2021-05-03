@@ -1,6 +1,9 @@
+// Package internal provides structures and functions to operate OPAQUE that are not part of the public API.
 package internal
 
 import (
+	"crypto/hmac"
+
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 )
@@ -22,8 +25,8 @@ func (k *KDF) Extract(salt, ikm []byte) []byte {
 	return k.H.HKDFExtract(ikm, salt)
 }
 
-func (k *KDF) Expand(data, info []byte, length int) []byte {
-	return k.H.HKDFExpand(data, info, length)
+func (k *KDF) Expand(key, info []byte, length int) []byte {
+	return k.H.HKDFExpand(key, info, length)
 }
 
 func (k *KDF) Size() int {
@@ -32,6 +35,10 @@ func (k *KDF) Size() int {
 
 type Mac struct {
 	H *hash.Hash
+}
+
+func (m *Mac) Equal(a, b []byte) bool {
+	return hmac.Equal(a, b)
 }
 
 func (m *Mac) MAC(key, message []byte) []byte {

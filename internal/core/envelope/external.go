@@ -1,3 +1,4 @@
+// Package envelope provides utility functions and structures allowing credential management.
 package envelope
 
 import (

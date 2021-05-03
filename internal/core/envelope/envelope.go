@@ -26,6 +26,7 @@ type Credentials struct {
 
 type Mode byte
 
+// Internal and External define the Envelope modes.
 const (
 	Internal Mode = iota + 1
 	External

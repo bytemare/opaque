@@ -1,15 +1,10 @@
-// Package encode provides encoding utilities.
-package encode
+// Package encoding provides encoding utilities.
+package encoding
 
 import (
 	"errors"
 
 	"github.com/bytemare/cryptotools/encoding"
-)
-
-const (
-	MaxEncoding1 = 1
-	MaxEncoding2 = 2
 )
 
 var (
@@ -18,19 +13,27 @@ var (
 	errTotalLength  = errors.New("insufficient total length for decoding")
 )
 
+func OS2IP(in []byte) int {
+	return encoding.OS2IP(in)
+}
+
+func I2OSP(value, length int) []byte {
+	return encoding.I2OSP(value, length)
+}
+
 func EncodeVectorLen(in []byte, length int) []byte {
 	switch length {
-	case MaxEncoding1:
-		return append(encoding.I2OSP(len(in), MaxEncoding1), in...)
-	case MaxEncoding2:
-		return append(encoding.I2OSP(len(in), MaxEncoding2), in...)
+	case 1:
+		return append(encoding.I2OSP(len(in), 1), in...)
+	case 2:
+		return append(encoding.I2OSP(len(in), 2), in...)
 	default:
 		panic(errI2OSPLength)
 	}
 }
 
 func EncodeVector(in []byte) []byte {
-	return EncodeVectorLen(in, MaxEncoding2)
+	return EncodeVectorLen(in, 2)
 }
 
 func decodeVectorLen(in []byte, size int) (data []byte, offset int, err error) {
@@ -49,5 +52,5 @@ func decodeVectorLen(in []byte, size int) (data []byte, offset int, err error) {
 }
 
 func DecodeVector(in []byte) (data []byte, offset int, err error) {
-	return decodeVectorLen(in, MaxEncoding2)
+	return decodeVectorLen(in, 2)
 }

@@ -5,20 +5,16 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/cryptotools/hash"
+	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/cryptotools/utils"
+	"github.com/bytemare/voprf"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/core/envelope"
-	"github.com/bytemare/opaque/internal/encode"
-
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-
+	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/message"
-
-	"github.com/bytemare/cryptotools/encoding"
-	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/mhf"
-	"github.com/bytemare/voprf"
 )
 
 // Mode designates OPAQUE's envelope mode.
@@ -139,17 +135,17 @@ type ClientRecord struct {
 // Serialize returns the byte encoding of the ClientRecord.
 func (c *ClientRecord) Serialize() []byte {
 	return utils.Concatenate(0,
-		encode.EncodeVector(c.CredentialIdentifier), encode.EncodeVector(c.ClientIdentity), c.RegistrationUpload.Serialize())
+		encoding.EncodeVector(c.CredentialIdentifier), encoding.EncodeVector(c.ClientIdentity), c.RegistrationUpload.Serialize())
 }
 
 // DeserializeClientRecord decodes the input ClientRecord given the application parameters.
 func DeserializeClientRecord(encoded []byte, p *internal.Parameters) (*ClientRecord, error) {
-	ci, offset1, err := encode.DecodeVector(encoded)
+	ci, offset1, err := encoding.DecodeVector(encoded)
 	if err != nil {
 		return nil, fmt.Errorf("decoding credential identifier: %w", err)
 	}
 
-	idc, offset2, err := encode.DecodeVector(encoded[offset1:])
+	idc, offset2, err := encoding.DecodeVector(encoded[offset1:])
 	if err != nil {
 		return nil, fmt.Errorf("decoding client identifier: %w", err)
 	}
