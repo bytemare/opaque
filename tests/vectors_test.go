@@ -141,7 +141,7 @@ func (v *vector) test(t *testing.T) {
 	regReq := client.RegistrationInit(input.Password)
 
 	if !bytes.Equal(out.RegistrationRequest, regReq.Serialize()) {
-		t.Fatalf("registration requests do not match\n%v\n%v", hex.EncodeToString(out.RegistrationRequest), hex.EncodeToString(regReq.Serialize()))
+		t.Fatalf("registration requests do not match\nwant: %v\ngot : %v", hex.EncodeToString(out.RegistrationRequest), hex.EncodeToString(regReq.Serialize()))
 	}
 
 	// Server
@@ -428,10 +428,6 @@ func TestOpaqueVectors(t *testing.T) {
 
 				// Decaf448 not supported, yet
 				if tv.Config.Group == "decaf448" {
-					continue
-				}
-
-				if tv.Config.Group != "ristretto255" {
 					continue
 				}
 
