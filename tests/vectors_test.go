@@ -114,7 +114,7 @@ func (v *vector) test(t *testing.T) {
 	}
 
 	p := &opaque.Parameters{
-		OprfCiphersuite: voprf.Ciphersuite(v.Config.OPRF[1]),
+		OprfCiphersuite: opaque.Ciphersuite(v.Config.OPRF[1]),
 		Hash:            hashToHash(v.Config.Hash),
 		KDF:             kdfToHash(v.Config.KDF),
 		MAC:             macToHash(v.Config.MAC),
@@ -136,7 +136,7 @@ func (v *vector) test(t *testing.T) {
 
 	// Client
 	client := p.Client()
-	oprfClient := buildOPRFClient(p.OprfCiphersuite, input.BlindRegistration)
+	oprfClient := buildOPRFClient(voprf.Ciphersuite(p.OprfCiphersuite), input.BlindRegistration)
 	client.Core.Oprf = oprfClient
 	regReq := client.RegistrationInit(input.Password)
 
@@ -206,7 +206,7 @@ func (v *vector) test(t *testing.T) {
 
 	// Client
 	client = p.Client()
-	client.Core.Oprf = buildOPRFClient(p.OprfCiphersuite, input.BlindLogin)
+	client.Core.Oprf = buildOPRFClient(voprf.Ciphersuite(p.OprfCiphersuite), input.BlindLogin)
 	esk, err := client.Ake.Group.NewScalar().Decode(input.ClientPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)

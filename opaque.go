@@ -28,12 +28,29 @@ const (
 	External
 )
 
+// Ciphersuite identifies the OPRF compatible cipher suite to be used.
+type Ciphersuite voprf.Ciphersuite
+
+const (
+	// RistrettoSha512 is the OPRF cipher suite of the Ristretto255 group and SHA-512.
+	RistrettoSha512 = Ciphersuite(voprf.RistrettoSha512)
+
+	// P256Sha256 is the OPRF cipher suite of the NIST P-256 group and SHA-256.
+	P256Sha256 = Ciphersuite(voprf.P256Sha256)
+
+	// P384Sha512 is the OPRF cipher suite of the NIST P-384 group and SHA-512.
+	P384Sha512 = Ciphersuite(voprf.P384Sha512)
+
+	// P521Sha512 is the OPRF cipher suite of the NIST P-512 group and SHA-512.
+	P521Sha512 = Ciphersuite(voprf.P521Sha512)
+)
+
 // CredentialIdentifier designates the server's internal unique identifier of the user entry.
 type CredentialIdentifier []byte
 
 // Parameters represents an OPAQUE configuration.
 type Parameters struct {
-	OprfCiphersuite voprf.Ciphersuite      `json:"oprf"`
+	OprfCiphersuite Ciphersuite            `json:"oprf"`
 	KDF             hash.Hashing           `json:"kdf"`
 	MAC             hash.Hashing           `json:"mac"`
 	Hash            hash.Hashing           `json:"hash"`
@@ -45,7 +62,7 @@ type Parameters struct {
 
 func (p *Parameters) toInternal() *internal.Parameters {
 	ip := &internal.Parameters{
-		OprfCiphersuite: p.OprfCiphersuite,
+		OprfCiphersuite: voprf.Ciphersuite(p.OprfCiphersuite),
 		KDF:             &internal.KDF{H: p.KDF.Get()},
 		MAC:             &internal.Mac{H: p.MAC.Get()},
 		Hash:            &internal.Hash{H: p.Hash.Get()},
@@ -87,7 +104,7 @@ func (p *Parameters) Server() *Server {
 // String returns a string representation of the parameter set.
 func (p *Parameters) String() string {
 	return fmt.Sprintf("%s-%s-%s-%s-%s-%v-%s-%d",
-		p.OprfCiphersuite, p.KDF, p.MAC, p.Hash, p.MHF, p.Mode, p.AKEGroup, p.NonceLen)
+		voprf.Ciphersuite(p.OprfCiphersuite), p.KDF, p.MAC, p.Hash, p.MHF, p.Mode, p.AKEGroup, p.NonceLen)
 }
 
 var errInvalidLength = errors.New("invalid length")
@@ -100,7 +117,7 @@ func DeserializeParameters(encoded []byte) (*Parameters, error) {
 	}
 
 	return &Parameters{
-		OprfCiphersuite: voprf.Ciphersuite(encoded[0]),
+		OprfCiphersuite: Ciphersuite(encoded[0]),
 		KDF:             hash.Hashing(encoded[1]),
 		MAC:             hash.Hashing(encoded[2]),
 		Hash:            hash.Hashing(encoded[3]),
@@ -114,7 +131,7 @@ func DeserializeParameters(encoded []byte) (*Parameters, error) {
 // DefaultParams returns a default configuration with strong parameters.
 func DefaultParams() *Parameters {
 	return &Parameters{
-		OprfCiphersuite: voprf.RistrettoSha512,
+		OprfCiphersuite: RistrettoSha512,
 		KDF:             hash.SHA512,
 		MAC:             hash.SHA512,
 		Hash:            hash.SHA512,
