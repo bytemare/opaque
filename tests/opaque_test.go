@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/bytemare/opaque"
-	"github.com/bytemare/opaque/message"
-
-	"github.com/bytemare/opaque/internal/core/envelope"
-
 	"github.com/bytemare/cryptotools/utils"
+
+	"github.com/bytemare/opaque"
+	"github.com/bytemare/opaque/internal/core/envelope"
+	"github.com/bytemare/opaque/message"
 )
 
 const dbgErr = "Mode %v: %v"

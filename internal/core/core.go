@@ -38,7 +38,13 @@ func (c *Core) OprfStart(password []byte) []byte {
 // OprfFinalize terminates the OPRF by unblind the evaluated data.
 func (c *Core) OprfFinalize(data []byte) ([]byte, error) {
 	ev := &voprf.Evaluation{Elements: [][]byte{data}}
-	return c.Oprf.Finalize(ev)
+
+	u, err := c.Oprf.Finalize(ev)
+	if err != nil {
+		err = fmt.Errorf("oprf finalization: %w", err)
+	}
+
+	return u, err
 }
 
 // BuildEnvelope returns the client's Envelope, the masking key for the registration, and the additional export key.
@@ -55,17 +61,4 @@ func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, pks, skc []byte,
 	maskingKey = m.KDF.Expand(randomizedPwd, []byte(internal.TagMaskingKey), m.KDF.Size())
 
 	return env, pkc, maskingKey, exportKey, nil
-}
-
-// RecoverSecret returns the client's private and public key given its envelope, and the additional export key.
-func (c *Core) RecoverSecret(mode envelope.Mode, idc, ids, pks,
-	randomizedPwd []byte, envU *envelope.Envelope) (skc, pkc, exportKey []byte, err error) {
-	creds := &envelope.Credentials{
-		Idc: idc,
-		Ids: ids,
-	}
-
-	m := &envelope.Mailer{Parameters: c.Parameters}
-
-	return m.RecoverEnvelope(mode, randomizedPwd, pks, creds, envU)
 }

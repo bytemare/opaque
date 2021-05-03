@@ -1,6 +1,7 @@
 // Package internal provides structures and functions to operate OPAQUE that are not part of the public API.
 package internal
 
+// These strings are the static tags and labels used throughout the protocol.
 const (
 	// Envelope tags.
 

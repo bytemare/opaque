@@ -1,4 +1,4 @@
-// Package opaque provides an easy to use OPAQUE implementation.
+// Package opaque implements the OPAQUE PAKE protocol.
 //
 // OPAQUE is an asymmetric Password Authenticated Key Exchange (PAKE).
 //

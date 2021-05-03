@@ -21,11 +21,12 @@ var (
 
 type Credentials struct {
 	Idc, Ids                    []byte
-	EnvelopeNonce, MaskingNonce []byte // todo: for testing only
+	EnvelopeNonce, MaskingNonce []byte // testing: integrated to support testing
 }
 
 type Mode byte
 
+// Internal and External define the Envelope modes.
 const (
 	Internal Mode = iota + 1
 	External
@@ -94,7 +95,7 @@ type innerEnvelope interface {
 }
 
 func BuildPRK(p *internal.Parameters, unblinded []byte) []byte {
-	// hardened := p.Harden(unblinded, nil)
+	// testing: commented out to support testing. hardened := p.Harden(unblinded, nil)
 	hardened := unblinded
 	return p.KDF.Extract(nil, hardened)
 }
@@ -131,7 +132,7 @@ func (m *Mailer) authTag(authKey, nonce, inner, ctc []byte) []byte {
 
 func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte,
 	creds *Credentials) (envelope *Envelope, publicKey, exportKey []byte) {
-	// todo for testing only
+	// testing: integrated to support testing
 	nonce := creds.EnvelopeNonce
 	if nonce == nil {
 		nonce = utils.RandomBytes(m.NonceLen)
@@ -139,7 +140,7 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte,
 
 	authKey, exportKey := m.buildKeys(randomizedPwd, nonce)
 	inner, pkc := m.inner(mode).buildInnerEnvelope(randomizedPwd, nonce, skc)
-	ctc := CreateCleartextCredentials(pkc, pks, creds)
+	ctc := CreateCleartextCredentials(pkc, pks, creds.Idc, creds.Ids)
 	tag := m.authTag(authKey, nonce, inner, ctc.Serialize())
 
 	envelope = &Envelope{
@@ -151,11 +152,11 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte,
 	return envelope, pkc, exportKey
 }
 
-func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, pks []byte, creds *Credentials,
+func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, pks, idc, ids []byte,
 	envelope *Envelope) (skc, pkc, exportKey []byte, err error) {
 	authKey, exportKey := m.buildKeys(randomizedPwd, envelope.Nonce)
 	skc, pkc = m.inner(mode).recoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
-	ctc := CreateCleartextCredentials(pkc, pks, creds)
+	ctc := CreateCleartextCredentials(pkc, pks, idc, ids)
 
 	expectedTag := m.authTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
 	if !hmac.Equal(expectedTag, envelope.AuthTag) {

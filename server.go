@@ -1,7 +1,11 @@
+// Package opaque implements the OPAQUE PAKE protocol.
 package opaque
 
 import (
+	"errors"
 	"fmt"
+
+	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
@@ -9,6 +13,8 @@ import (
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
+
+var errAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")
 
 // Server represents an OPAQUE Server, exposing its functions and holding its state.
 type Server struct {
@@ -22,13 +28,13 @@ func NewServer(p *Parameters) *Server {
 
 	return &Server{
 		Parameters: ip,
-		Ake:        ake.NewServer(ip),
+		Ake:        ake.NewServer(),
 	}
 }
 
 // KeyGen returns a key pair in the AKE group.
 func (s *Server) KeyGen() (sk, pk []byte) {
-	return ake.KeyGen(s.Ake.AKEGroup)
+	return ake.KeyGen(s.AKEGroup)
 }
 
 func (s *Server) evaluate(seed, blinded []byte) (m, k []byte, err error) {
@@ -78,7 +84,11 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, rec
 		return nil, fmt.Errorf("oprfResponse: %w", err)
 	}
 
-	// maskingNonce := utils.RandomBytes(32) // todo testing
+	// testing: integrated to support testing, to force values.
+	if len(maskingNonce) == 0 {
+		maskingNonce = utils.RandomBytes(32)
+	}
+
 	env := record.Envelope
 	crPad := s.KDF.Expand(record.MaskingKey,
 		internal.Concat(maskingNonce, internal.TagCredentialResponsePad),
@@ -112,7 +122,7 @@ func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byt
 	}
 
 	// id, sk, peerID, peerPK - (creds, peerPK)
-	ke2, err := s.Ake.Response(creds.Ids, sks, creds.Idc, upload.PublicKey, serverInfo, ke1, response)
+	ke2, err := s.Ake.Response(s.Parameters, creds.Ids, sks, creds.Idc, upload.PublicKey, serverInfo, ke1, response)
 	if err != nil {
 		return nil, fmt.Errorf(" AKE response: %w", err)
 	}
@@ -122,7 +132,11 @@ func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byt
 
 // AuthenticationFinalize returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
 func (s *Server) AuthenticationFinalize(ke3 *message.KE3) error {
-	return s.Ake.Finalize(ke3)
+	if !s.Ake.Finalize(s.Parameters, ke3) {
+		return errAkeInvalidClientMac
+	}
+
+	return nil
 }
 
 // SessionKey returns the session key if the previous calls to AuthenticationInit() and AuthenticationFinalize() were

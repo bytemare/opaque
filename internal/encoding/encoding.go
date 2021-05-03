@@ -1,5 +1,5 @@
-// Package encode provides encoding utilities.
-package encode
+// Package encoding provides encoding utilities.
+package encoding
 
 import (
 	"errors"
@@ -12,6 +12,14 @@ var (
 	errHeaderLength = errors.New("insufficient header length for decoding")
 	errTotalLength  = errors.New("insufficient total length for decoding")
 )
+
+func OS2IP(in []byte) int {
+	return encoding.OS2IP(in)
+}
+
+func I2OSP(value, length int) []byte {
+	return encoding.I2OSP(value, length)
+}
 
 func EncodeVectorLen(in []byte, length int) []byte {
 	switch length {

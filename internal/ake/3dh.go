@@ -4,18 +4,16 @@ package ake
 import (
 	"fmt"
 
-	"github.com/bytemare/cryptotools/encoding"
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encode"
-
+	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/message"
 )
 
+// KeyGen returns private and public keys in the grouo.
 func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
 	g := id.Get(nil)
 	scalar := g.NewScalar().Random()
@@ -24,58 +22,42 @@ func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
 	return internal.SerializeScalar(scalar, id), internal.SerializePoint(publicKey, id)
 }
 
-type Keys struct {
-	ServerMacKey, ClientMacKey []byte
-	HandshakeSecret            []byte
-	HandshakeEncryptKey        []byte
-	SessionSecret              []byte
-}
-
 type keys struct {
-	Esk   group.Scalar  // todo: only useful in testing (except for client), to force value
-	Epk   group.Element // todo: only useful in testing, to force value
-	*Keys               // todo: only useful in testing, to verify values
+	serverMacKey, clientMacKey []byte
+	handshakeSecret            []byte
+	handshakeEncryptKey        []byte
 }
 
-type Ake struct {
+type ake struct {
 	*internal.Parameters
 	group.Group
 	SessionSecret []byte
-
-	// Todo: For testing only, delete
-	*keys
 }
 
-// todo: Only useful in testing, to force values
-//  Note := there's no effect if esk, epk, and nonce have already been set in a previous call
-func (a *Ake) Initialize(scalar group.Scalar, nonce []byte, nonceLen int) []byte {
-	if a.Esk == nil {
-		if scalar != nil {
-			a.Esk = scalar
-		} else {
-			a.Esk = a.NewScalar().Random()
-		}
+// setValues - testing: integrated to support testing, to force values.
+// There's no effect if esk, epk, and nonce have already been set in a previous call.
+func setValues(p *internal.Parameters, scalar group.Scalar, nonce []byte, nonceLen int) (s group.Scalar, n []byte) {
+	if scalar != nil {
+		s = scalar
+	} else {
+		s = p.AKEGroup.Get(nil).NewScalar().Random()
 	}
 
-	a.Epk = a.Base().Mult(a.Esk)
-
-	if len(nonce) != 0 {
-		return nonce
+	if len(nonce) == 0 {
+		nonce = utils.RandomBytes(nonceLen)
 	}
 
-	return utils.RandomBytes(nonceLen)
+	return s, nonce
 }
 
 func buildLabel(length int, label, context []byte) []byte {
-	// todo : the encodings here assume every length fits into a 1-byte encoding
 	return utils.Concatenate(0,
 		encoding.I2OSP(length, 2),
-		encode.EncodeVectorLen(append([]byte(internal.LabelPrefix), label...), 1),
-		encode.EncodeVectorLen(context, 1))
+		encoding.EncodeVectorLen(append([]byte(internal.LabelPrefix), label...), 1),
+		encoding.EncodeVectorLen(context, 1))
 }
 
 func expand(h *internal.KDF, secret, hkdfLabel []byte) []byte {
-	// todo : If len(label) > 12, the hash function might have additional iterations.
 	return h.Expand(secret, hkdfLabel, h.Size())
 }
 
@@ -88,22 +70,22 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func newInfo(h *hash.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []byte) {
-	cp := encode.EncodeVectorLen(idu, 2)
-	sp := encode.EncodeVectorLen(ids, 2)
-	_, _ = h.Write(utils.Concatenate(0, []byte(internal.Tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
+func newInfo(h *internal.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []byte) {
+	cp := encoding.EncodeVectorLen(idu, 2)
+	sp := encoding.EncodeVectorLen(ids, 2)
+	h.Write(utils.Concatenate(0, []byte(internal.Tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
 }
 
-func deriveKeys(h *internal.KDF, ikm, context []byte) (keys *Keys, sessionSecret []byte) {
+func deriveKeys(h *internal.KDF, ikm, context []byte) (k *keys, sessionSecret []byte) {
 	prk := h.Extract(nil, ikm)
-	keys = &Keys{}
-	keys.HandshakeSecret = deriveSecret(h, prk, []byte(internal.TagHandshake), context)
+	k = &keys{}
+	k.handshakeSecret = deriveSecret(h, prk, []byte(internal.TagHandshake), context)
 	sessionSecret = deriveSecret(h, prk, []byte(internal.TagSession), context)
-	keys.ServerMacKey = expandLabel(h, keys.HandshakeSecret, []byte(internal.TagMacServer), nil)
-	keys.ClientMacKey = expandLabel(h, keys.HandshakeSecret, []byte(internal.TagMacClient), nil)
-	keys.HandshakeEncryptKey = expandLabel(h, keys.HandshakeSecret, []byte(internal.TagEncServer), nil)
+	k.serverMacKey = expandLabel(h, k.handshakeSecret, []byte(internal.TagMacServer), nil)
+	k.clientMacKey = expandLabel(h, k.handshakeSecret, []byte(internal.TagMacClient), nil)
+	k.handshakeEncryptKey = expandLabel(h, k.handshakeSecret, []byte(internal.TagEncServer), nil)
 
-	return keys, sessionSecret
+	return k, sessionSecret
 }
 
 func decodeKeys(g group.Group, secret, peerEpk, peerPk []byte) (sk group.Scalar, epk, pk group.Element, err error) {

@@ -1,3 +1,4 @@
+// Package opaque implements the OPAQUE PAKE protocol.
 package opaque
 
 import (
@@ -112,7 +113,9 @@ func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*mes
 		return nil, nil, fmt.Errorf("unmasking response: %w", err)
 	}
 
-	skc, pkc, exportKey, err := c.Core.RecoverSecret(c.mode, idc, ids, pks, randomizedPwd, env)
+	m := &envelope.Mailer{Parameters: c.Parameters}
+
+	skc, pkc, exportKey, err := m.RecoverEnvelope(c.mode, randomizedPwd, pks, idc, ids, env)
 	if err != nil {
 		return nil, nil, fmt.Errorf("recover secret: %w", err)
 	}
