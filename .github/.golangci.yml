@@ -36,7 +36,6 @@ linters:
     - ifshort
     - importas
     - ineffassign
-    - interfacer
     - lll
     - makezero
     - maligned
@@ -52,7 +51,6 @@ linters:
     - predeclared
     - revive
     - rowserrcheck
-    - scopelint
     - sqlclosecheck
     - staticcheck
     - structcheck
@@ -120,7 +118,13 @@ linters-settings:
   gomnd:
     settings:
       mnd:
-        checks: argument,case,condition,operation,return,assign
+        checks:
+          - argument
+          - case
+          - condition
+          - operation
+          - return
+          - assign
   govet:
     check-shadowing: true
 
@@ -189,6 +193,17 @@ issues:
         - errcheck
         - dupl
         - gosec
+    - path: internal
+      text: "should have comment or be unexported"
+      linters:
+        - golint
+    - path: internal
+      text: "should have comment (or a comment on this block) or be unexported"
+      linters:
+        - golint
+    - path: internal/hash.go
+      linters:
+        - errcheck
 
   max-issues-per-linter: 0
   max-same-issues: 0
