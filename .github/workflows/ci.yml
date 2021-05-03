@@ -52,7 +52,7 @@ jobs:
 
       # Testing
       - name: Testing
-        run: go test -v -count=1 ./...
+        run: go test -v tests/opaque_test.go
 
   coverage:
     name: Coverage
@@ -71,7 +71,7 @@ jobs:
 
       # Coverage
       - name: Run coverage
-        run: go test -v -race -covermode=atomic -coverpkg=./... -coverprofile=./coverage.out ./tests/...
+        run: go test -v -race -covermode=atomic -coverpkg=./... -coverprofile=./coverage.out tests/opaque_test.go
 
       # SonarCloud
       - name: SonarCloud Scan
