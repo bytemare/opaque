@@ -4,17 +4,30 @@
 [![codecov](https://codecov.io/gh/bytemare/opaque/branch/main/graph/badge.svg?token=5bQfB0OctA)](https://codecov.io/gh/bytemare/opaque)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbytemare%2Fopaque.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbytemare%2Fopaque?ref=badge_shield)
 
-This package implements the OPAQUE protocol. It allows for password based mutual public key client-server authentication. Only the client ever knows the password.
+This package implements the [OPAQUE](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque/) password-authenticated key exchange protocol:
+it enables a client to authenticate to a server without ever revealing its password, with strong security guarantees,
+and to derive a nice shared session secret.
 
-It follows the latest commits and discussions in the ongoing draft: https://github.com/cfrg/draft-irtf-cfrg-opaque
+You can learn more about the protocol on [the CFRG project page](https://github.com/cfrg/draft-irtf-cfrg-opaque).
 
-!!! WARNING : THIS IMPLEMENTATION IS PROOF OF CONCEPT AND BASED ON THE LATEST INTERNET DRAFT. THERE ARE ABSOLUTELY NO WARRANTIES. !!!
+Minor versions of this package match the CFRG draft version, the master branch implements the latest changes of the project. 
 
-This is active work in progress.
+```Go
+  import "github.com/bytemare/opaque"
+```
 
-Test vectors can be found in the __tests__ directory.
+## Usage
 
-Run example and tests
-````
-$ go test -v
-````
+You can find the documentation and usage examples in [the project wiki](https://github.com/bytemare/opaque/wiki) and the [package doc](https://pkg.go.dev/github.com/bytemare/opaque). 
+
+## Versioning
+
+[SemVer](http://semver.org/) is used for versioning. For the versions available, see the [tags on this repository](https://github.com/bytemare/opaque/tags).
+
+## Contributing
+
+Please read [CONTRIBUTING.md](.github/CONTRIBUTING.md) for details on the code of conduct, and the process for submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
