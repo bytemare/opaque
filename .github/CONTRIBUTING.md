@@ -16,8 +16,8 @@
 
 🎉 That's awesome! Pull requests are welcome!
 
-* Fork this repo from `main`, and ensure your fork is up-to-date with it when submitting the PR. 
-* If changes are significant, or impact the API, please [open an issue](https://github.com/bytemare/opaque) beforehand, so we can discuss this.
+* Please [open an issue](https://github.com/bytemare/opaque) beforehand, so we can discuss this.
+* Fork this repo from `main`, and ensure your fork is up-to-date with it when submitting the PR.
 * If your changes impact the documentation, please update it accordingly.
 * If you added code that impact tests, please add tests with relevant coverage and test cases. Bonus points for fuzzing.
 * 🛠️ Make sure the test suite passes.
