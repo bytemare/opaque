@@ -4,9 +4,9 @@
 [![codecov](https://codecov.io/gh/bytemare/opaque/branch/main/graph/badge.svg?token=5bQfB0OctA)](https://codecov.io/gh/bytemare/opaque)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbytemare%2Fopaque.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbytemare%2Fopaque?ref=badge_shield)
 
-This package implements the [OPAQUE](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque/) password-authenticated key exchange protocol:
+This package implements the [OPAQUE](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque/) asymmetric password-authenticated key exchange protocol:
 it enables a client to authenticate to a server without ever revealing its password, with strong security guarantees,
-and to derive a nice shared session secret.
+and to share a nice session secret with the server.
 
 You can learn more about the protocol on [the CFRG project page](https://github.com/cfrg/draft-irtf-cfrg-opaque).
 
@@ -18,7 +18,7 @@ Minor versions of this package match the CFRG draft version, the master branch i
 
 ## Usage
 
-You can find the documentation and usage examples in [the project wiki](https://github.com/bytemare/opaque/wiki) and the [package doc](https://pkg.go.dev/github.com/bytemare/opaque). 
+You can find the documentation and usage examples in [the project wiki](https://github.com/bytemare/opaque/wiki) and [the package doc](https://pkg.go.dev/github.com/bytemare/opaque). 
 
 ## Versioning
 
