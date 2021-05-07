@@ -35,6 +35,15 @@ jobs:
           version: latest
           args: --config=./.github/.golangci.yml ./...
 
+      # Testing
+      - name: Testing
+        run: go test -v ./...
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
       # CodeQL
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v1
@@ -45,9 +54,18 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v1
 
-      # Testing
-      - name: Testing
-        run: go test -v ./...
+      # Snyk
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/golang@master
+        continue-on-error: true # To make sure that SARIF upload gets called
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --sarif-file-output=snyk.sarif
+      - name: Upload result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: snyk.sarif
 
   coverage:
     name: Coverage
