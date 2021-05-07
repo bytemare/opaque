@@ -1,4 +1,4 @@
-package tests
+package opaque_test
 
 //
 //import (
