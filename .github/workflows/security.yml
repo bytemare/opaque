@@ -9,7 +9,7 @@
 # the `language` matrix defined below to confirm you have the correct set of
 # supported CodeQL languages.
 #
-name: "Security"
+name: "CodeQL"
 
 on:
   push:
@@ -69,8 +69,11 @@ jobs:
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v1
-    
-    # Snyk
+
+  snyk:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master
     - name: Run Snyk to check for vulnerabilities
       uses: snyk/actions/golang@master
       continue-on-error: true # To make sure that SARIF upload gets called
