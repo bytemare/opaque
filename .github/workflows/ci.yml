@@ -46,16 +46,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # CodeQL
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v1
-        with:
-          languages: 'go'
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v1
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v1
-
       # Snyk
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/golang@master
