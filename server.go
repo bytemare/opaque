@@ -1,4 +1,3 @@
-// Package opaque implements the OPAQUE PAKE protocol.
 package opaque
 
 import (
