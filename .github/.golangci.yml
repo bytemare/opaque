@@ -183,7 +183,7 @@ issues:
   # it can be disabled by `exclude-use-default: false`. To list all
   # excluded by default patterns execute `golangci-lint run --help`
   exclude:
-    - 'declaration of "err" shadows declaration at'
+    - "should have a package comment, unless it's in another file for this package"
 
   exclude-rules:
     # Exclude some linters from running on tests files.
