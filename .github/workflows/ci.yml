@@ -52,7 +52,7 @@ jobs:
 
       # Testing
       - name: Testing
-        run: go test -v tests/opaque_test.go
+        run: go test -v ./...
 
   coverage:
     name: Coverage
