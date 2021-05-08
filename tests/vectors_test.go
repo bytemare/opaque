@@ -212,7 +212,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.Ake.SetValues(client.Parameters, esk, input.ClientNonce, 32)
-	KE1 := client.AuthenticationInit(input.Password, input.ClientInfo)
+	KE1 := client.Init(input.Password, input.ClientInfo)
 
 	if !bytes.Equal(out.KE1, KE1.Serialize()) {
 		t.Fatalf("KE1 do not match")
@@ -240,7 +240,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ke3, exportKey, err := client.AuthenticationFinalize(input.ClientIdentity, input.ServerIdentity, cke2)
+	ke3, exportKey, err := client.Finish(input.ClientIdentity, input.ServerIdentity, cke2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,7 +261,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal("KE3 do not match")
 	}
 
-	if err := server.AuthenticationFinalize(ke3); err != nil {
+	if err := server.Finish(ke3); err != nil {
 		t.Fatal(err)
 	}
 
@@ -277,7 +277,7 @@ func (v *vector) loginResponse(t *testing.T, p *internal.Parameters, s *opaque.S
 	}
 	s.Ake.SetValues(p, sks, v.Inputs.ServerNonce, 32)
 
-	KE2, err := s.AuthenticationInit(ke1, v.Inputs.ServerInfo, serverPrivateKey, serverPublicKey, upload, creds, id, oprfSeed)
+	KE2, err := s.Init(ke1, v.Inputs.ServerInfo, serverPrivateKey, serverPublicKey, upload, creds, id, oprfSeed)
 	if err != nil {
 		t.Fatal(err)
 	}

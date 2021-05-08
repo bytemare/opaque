@@ -63,9 +63,9 @@ func (c *Client) RegistrationFinalize(skc []byte, creds *envelope.Credentials,
 	}, exportKey, nil
 }
 
-// AuthenticationInit initiates the authentication process, returning a KE1 message blinding the given password.
+// Init initiates the authentication process, returning a KE1 message blinding the given password.
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
-func (c *Client) AuthenticationInit(password, clientInfo []byte) *message.KE1 {
+func (c *Client) Init(password, clientInfo []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
 	credReq := &cred.CredentialRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
 	c.Ke1 = c.Ake.Start(clientInfo)
@@ -96,9 +96,9 @@ func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte
 	return pks, env, nil
 }
 
-// AuthenticationFinalize returns a KE3 message given the server's KE2 response message and the identities. If the idc
+// Finish returns a KE3 message given the server's KE2 response message and the identities. If the idc
 // or ids parameters are nil, the client and server's public keys are taken as identities for both.
-func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*message.KE3, []byte, error) {
+func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (*message.KE3, []byte, error) {
 	unblinded, err := c.Core.OprfFinalize(ke2.Data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
@@ -141,7 +141,7 @@ func (c *Client) AuthenticationFinalize(idc, ids []byte, ke2 *message.KE2) (*mes
 	return ke3, exportKey, nil
 }
 
-// SessionKey returns the session key if the previous call to AuthenticationFinalize() was successful.
+// SessionKey returns the session key if the previous call to Finish() was successful.
 func (c *Client) SessionKey() []byte {
 	return c.Ake.SessionKey()
 }

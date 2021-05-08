@@ -108,9 +108,9 @@ func (p *Configuration) String() string {
 
 var errInvalidLength = errors.New("invalid length")
 
-// DeserializeParameters decodes the input and returns a Parameter structure. This assumes that the encoded parameters
+// DeserializeConfiguration decodes the input and returns a Parameter structure. This assumes that the encoded parameters
 // are valid, and will not be checked.
-func DeserializeParameters(encoded []byte) (*Configuration, error) {
+func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	if len(encoded) != 8 {
 		return nil, errInvalidLength
 	}
@@ -127,8 +127,8 @@ func DeserializeParameters(encoded []byte) (*Configuration, error) {
 	}, nil
 }
 
-// DefaultParams returns a default configuration with strong parameters.
-func DefaultParams() *Configuration {
+// DefaultConfiguration returns a default configuration with strong parameters.
+func DefaultConfiguration() *Configuration {
 	return &Configuration{
 		OprfCiphersuite: RistrettoSha512,
 		KDF:             hash.SHA512,

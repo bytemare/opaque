@@ -25,7 +25,7 @@ func TestFull(t *testing.T) {
 
 	modes := []opaque.Mode{opaque.Internal, opaque.External}
 
-	p := opaque.DefaultParams()
+	p := opaque.DefaultConfiguration()
 
 	test := &testParams{
 		Configuration: p,
@@ -115,7 +115,7 @@ func testRegistration(t *testing.T, p *testParams) (*message.RegistrationUpload,
 func testAuthentication(t *testing.T, p *testParams, record *message.RegistrationUpload) []byte {
 	// Client
 	client := p.Client()
-	ke1 := client.AuthenticationInit(p.password, nil)
+	ke1 := client.Init(p.password, nil)
 
 	m4s := ke1.Serialize()
 
@@ -133,7 +133,7 @@ func testAuthentication(t *testing.T, p *testParams, record *message.Registratio
 		t.Fatalf(dbgErr, p.Mode, err)
 	}
 
-	ke2, err := server.AuthenticationInit(m4, nil, p.serverSecretKey, p.serverPublicKey, record, serverCreds, p.userID, p.oprfSeed)
+	ke2, err := server.Init(m4, nil, p.serverSecretKey, p.serverPublicKey, record, serverCreds, p.userID, p.oprfSeed)
 	if err != nil {
 		t.Fatalf(dbgErr, p.Mode, err)
 	}
@@ -146,7 +146,7 @@ func testAuthentication(t *testing.T, p *testParams, record *message.Registratio
 		t.Fatalf(dbgErr, p.Mode, err)
 	}
 
-	ke3, exportKeyLogin, err := client.AuthenticationFinalize(p.username, p.serverID, m5)
+	ke3, exportKeyLogin, err := client.Finish(p.username, p.serverID, m5)
 	if err != nil {
 		t.Fatalf(dbgErr, p.Mode, err)
 	}
@@ -159,7 +159,7 @@ func testAuthentication(t *testing.T, p *testParams, record *message.Registratio
 		t.Fatalf(dbgErr, p.Mode, err)
 	}
 
-	if err := server.AuthenticationFinalize(m6); err != nil {
+	if err := server.Finish(m6); err != nil {
 		t.Fatalf(dbgErr, p.Mode, err)
 	}
 

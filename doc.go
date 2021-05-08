@@ -37,7 +37,7 @@ On Registration, the protocol allows the client to derive an `export_key` secret
 
 ## Security
 
-### Supported Ciphersuites and Parameters
+### Supported Ciphersuites and Configuration
 
 ### Client Enumeration Protection
 

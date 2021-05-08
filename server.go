@@ -104,8 +104,8 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, rec
 	}, nil
 }
 
-// AuthenticationInit responds to a KE1 message with a KE2 message given server credentials and client record.
-func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload,
+// Init responds to a KE1 message with a KE2 message given server credentials and client record.
+func (s *Server) Init(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload,
 	creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
 	response, err := s.credentialResponse(ke1.CredentialRequest, pks, upload, id, oprfSeed, creds.MaskingNonce)
 	if err != nil {
@@ -129,8 +129,8 @@ func (s *Server) AuthenticationInit(ke1 *message.KE1, serverInfo, sks, pks []byt
 	return ke2, nil
 }
 
-// AuthenticationFinalize returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
-func (s *Server) AuthenticationFinalize(ke3 *message.KE3) error {
+// Finish returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
+func (s *Server) Finish(ke3 *message.KE3) error {
 	if !s.Ake.Finalize(s.Parameters, ke3) {
 		return errAkeInvalidClientMac
 	}
@@ -138,7 +138,7 @@ func (s *Server) AuthenticationFinalize(ke3 *message.KE3) error {
 	return nil
 }
 
-// SessionKey returns the session key if the previous calls to AuthenticationInit() and AuthenticationFinalize() were
+// SessionKey returns the session key if the previous calls to Init() and Finish() were
 // successful.
 func (s *Server) SessionKey() []byte {
 	return s.Ake.SessionKey()
