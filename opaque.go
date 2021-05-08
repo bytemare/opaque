@@ -47,8 +47,8 @@ const (
 // CredentialIdentifier designates the server's internal unique identifier of the user entry.
 type CredentialIdentifier []byte
 
-// Parameters represents an OPAQUE configuration.
-type Parameters struct {
+// Configuration represents an OPAQUE configuration.
+type Configuration struct {
 	OprfCiphersuite Ciphersuite            `json:"oprf"`
 	KDF             hash.Hashing           `json:"kdf"`
 	MAC             hash.Hashing           `json:"mac"`
@@ -59,7 +59,7 @@ type Parameters struct {
 	NonceLen        int                    `json:"nn"`
 }
 
-func (p *Parameters) toInternal() *internal.Parameters {
+func (p *Configuration) toInternal() *internal.Parameters {
 	ip := &internal.Parameters{
 		OprfCiphersuite: voprf.Ciphersuite(p.OprfCiphersuite),
 		KDF:             &internal.KDF{H: p.KDF.Get()},
@@ -75,8 +75,8 @@ func (p *Parameters) toInternal() *internal.Parameters {
 	return ip
 }
 
-// Serialize returns the byte encoding of the Parameters structure.
-func (p *Parameters) Serialize() []byte {
+// Serialize returns the byte encoding of the Configuration structure.
+func (p *Configuration) Serialize() []byte {
 	b := make([]byte, 8)
 	b[0] = byte(p.OprfCiphersuite)
 	b[1] = byte(p.KDF)
@@ -90,18 +90,18 @@ func (p *Parameters) Serialize() []byte {
 	return b
 }
 
-// Client returns a newly instantiated Client from the Parameters.
-func (p *Parameters) Client() *Client {
+// Client returns a newly instantiated Client from the Configuration.
+func (p *Configuration) Client() *Client {
 	return NewClient(p)
 }
 
-// Server returns a newly instantiated Server from the Parameters.
-func (p *Parameters) Server() *Server {
+// Server returns a newly instantiated Server from the Configuration.
+func (p *Configuration) Server() *Server {
 	return NewServer(p)
 }
 
 // String returns a string representation of the parameter set.
-func (p *Parameters) String() string {
+func (p *Configuration) String() string {
 	return fmt.Sprintf("%s-%s-%s-%s-%s-%v-%s-%d",
 		voprf.Ciphersuite(p.OprfCiphersuite), p.KDF, p.MAC, p.Hash, p.MHF, p.Mode, p.AKEGroup, p.NonceLen)
 }
@@ -110,12 +110,12 @@ var errInvalidLength = errors.New("invalid length")
 
 // DeserializeParameters decodes the input and returns a Parameter structure. This assumes that the encoded parameters
 // are valid, and will not be checked.
-func DeserializeParameters(encoded []byte) (*Parameters, error) {
+func DeserializeParameters(encoded []byte) (*Configuration, error) {
 	if len(encoded) != 8 {
 		return nil, errInvalidLength
 	}
 
-	return &Parameters{
+	return &Configuration{
 		OprfCiphersuite: Ciphersuite(encoded[0]),
 		KDF:             hash.Hashing(encoded[1]),
 		MAC:             hash.Hashing(encoded[2]),
@@ -128,8 +128,8 @@ func DeserializeParameters(encoded []byte) (*Parameters, error) {
 }
 
 // DefaultParams returns a default configuration with strong parameters.
-func DefaultParams() *Parameters {
-	return &Parameters{
+func DefaultParams() *Configuration {
+	return &Configuration{
 		OprfCiphersuite: RistrettoSha512,
 		KDF:             hash.SHA512,
 		MAC:             hash.SHA512,

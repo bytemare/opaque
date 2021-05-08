@@ -19,7 +19,7 @@ package opaque_test
 //	idu := []byte("user")
 //	ids := []byte("server")
 //
-//	p := &opaque.Parameters{
+//	p := &opaque.Configuration{
 //		OprfCiphersuite: voprf.RistrettoSha512,
 //		KDF:             hash.SHA512,
 //		MAC:             hash.SHA512,
@@ -69,7 +69,7 @@ package opaque_test
 //	username := []byte("client")
 //	password := []byte("password")
 //
-//	p := &opaque.Parameters{
+//	p := &opaque.Configuration{
 //		OprfCiphersuite: voprf.RistrettoSha512,
 //		KDF:             hash.SHA512,
 //		MAC:             hash.SHA512,
@@ -116,7 +116,7 @@ package opaque_test
 //func receiveRequestFromClient() []byte {
 //	password := []byte("password")
 //
-//	p := &Parameters{
+//	p := &Configuration{
 //		OprfCiphersuite: voprf.RistrettoSha512,
 //		Hash:            hash.SHA256,
 //		AKE:             ake.TripleDH,
@@ -172,7 +172,7 @@ package opaque_test
 //	username := []byte("user")
 //	ids := []byte("server")
 //
-//	p := &Parameters{
+//	p := &Configuration{
 //		OprfCiphersuite: voprf.RistrettoSha512,
 //		Hash:            hash.SHA256,
 //		AKE:             ake.TripleDH,

@@ -21,8 +21,8 @@ type Server struct {
 	Ake *ake.Server
 }
 
-// NewServer returns a Server instantiation given the application Parameters.
-func NewServer(p *Parameters) *Server {
+// NewServer returns a Server instantiation given the application Configuration.
+func NewServer(p *Configuration) *Server {
 	ip := p.toInternal()
 
 	return &Server{

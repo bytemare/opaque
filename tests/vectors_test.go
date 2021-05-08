@@ -113,7 +113,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	p := &opaque.Parameters{
+	p := &opaque.Configuration{
 		OprfCiphersuite: opaque.Ciphersuite(v.Config.OPRF[1]),
 		Hash:            hashToHash(v.Config.Hash),
 		KDF:             kdfToHash(v.Config.KDF),

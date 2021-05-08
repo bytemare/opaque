@@ -14,7 +14,7 @@ import (
 const dbgErr = "Mode %v: %v"
 
 type testParams struct {
-	*opaque.Parameters
+	*opaque.Configuration
 	username, userID, serverID, password, serverSecretKey, serverPublicKey, oprfSeed []byte
 }
 
@@ -28,12 +28,12 @@ func TestFull(t *testing.T) {
 	p := opaque.DefaultParams()
 
 	test := &testParams{
-		Parameters: p,
-		username:   username,
-		userID:     opaque.CredentialIdentifier(utils.RandomBytes(32)),
-		serverID:   ids,
-		password:   password,
-		oprfSeed:   utils.RandomBytes(32),
+		Configuration: p,
+		username:      username,
+		userID:        opaque.CredentialIdentifier(utils.RandomBytes(32)),
+		serverID:      ids,
+		password:      password,
+		oprfSeed:      utils.RandomBytes(32),
 	}
 
 	for _, mode := range modes {
