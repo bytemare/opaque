@@ -22,14 +22,14 @@ func (i *internalMode) deriveAkeKeyPair(seed []byte) (group.Scalar, group.Elemen
 	return sk, i.Get(nil).Base().Mult(sk)
 }
 
-func (i *internalMode) buildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, pkc []byte) {
+func (i *internalMode) buildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, clientPublicKey []byte) {
 	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength[i.Identifier])
 	_, pk := i.deriveAkeKeyPair(seed)
 
 	return nil, internal.SerializePoint(pk, i.Identifier)
 }
 
-func (i *internalMode) recoverKeys(randomizedPwd, nonce, _ []byte) (skc, pkc []byte) {
+func (i *internalMode) recoverKeys(randomizedPwd, nonce, _ []byte) (clientSecretKey, clientPublicKey []byte) {
 	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength[i.Identifier])
 	sk, pk := i.deriveAkeKeyPair(seed)
 

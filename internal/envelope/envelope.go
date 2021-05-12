@@ -90,8 +90,8 @@ func DeserializeEnvelope(data []byte, mode Mode, nn, nm, nsk int) (*Envelope, in
 }
 
 type innerEnvelope interface {
-	buildInnerEnvelope(randomizedPwd, nonce, skc []byte) (innerEnvelope, pk []byte)
-	recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (skc, pkc []byte)
+	buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte)
+	recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey, clientPublicKey []byte)
 }
 
 func BuildPRK(p *internal.Parameters, unblinded []byte) []byte {
@@ -130,7 +130,7 @@ func (m *Mailer) authTag(authKey, nonce, inner, ctc []byte) []byte {
 	return m.MAC.MAC(authKey, utils.Concatenate(0, nonce, inner, ctc))
 }
 
-func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte,
+func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, serverPublicKey, clientSecretKey []byte,
 	creds *Credentials) (envelope *Envelope, publicKey, exportKey []byte) {
 	// testing: integrated to support testing
 	nonce := creds.EnvelopeNonce
@@ -139,8 +139,8 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte,
 	}
 
 	authKey, exportKey := m.buildKeys(randomizedPwd, nonce)
-	inner, pkc := m.inner(mode).buildInnerEnvelope(randomizedPwd, nonce, skc)
-	ctc := CreateCleartextCredentials(pkc, pks, creds.Idc, creds.Ids)
+	inner, clientPublicKey := m.inner(mode).buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey)
+	ctc := CreateCleartextCredentials(clientPublicKey, serverPublicKey, creds.Idc, creds.Ids)
 	tag := m.authTag(authKey, nonce, inner, ctc.Serialize())
 
 	envelope = &Envelope{
@@ -149,19 +149,19 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, pks, skc []byte,
 		AuthTag:       tag,
 	}
 
-	return envelope, pkc, exportKey
+	return envelope, clientPublicKey, exportKey
 }
 
-func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, pks, idc, ids []byte,
-	envelope *Envelope) (skc, pkc, exportKey []byte, err error) {
+func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, serverPublicKey, idc, ids []byte,
+	envelope *Envelope) (clientSecretKey, clientPublicKey, exportKey []byte, err error) {
 	authKey, exportKey := m.buildKeys(randomizedPwd, envelope.Nonce)
-	skc, pkc = m.inner(mode).recoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
-	ctc := CreateCleartextCredentials(pkc, pks, idc, ids)
+	clientSecretKey, clientPublicKey = m.inner(mode).recoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
+	ctc := CreateCleartextCredentials(clientPublicKey, serverPublicKey, idc, ids)
 
 	expectedTag := m.authTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
 	if !hmac.Equal(expectedTag, envelope.AuthTag) {
 		return nil, nil, nil, errEnvelopeInvalidTag
 	}
 
-	return skc, pkc, exportKey, nil
+	return clientSecretKey, clientPublicKey, exportKey, nil
 }

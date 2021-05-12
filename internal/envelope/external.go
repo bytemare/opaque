@@ -33,27 +33,27 @@ func (e *externalMode) recoverPublicKey(privateKey group.Scalar) group.Element {
 	return e.Base().Mult(privateKey)
 }
 
-func (e *externalMode) buildInnerEnvelope(randomizedPwd, nonce, skc []byte) (innerEnvelope, pk []byte) {
-	scalar, err := e.NewScalar().Decode(skc)
+func (e *externalMode) buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte) {
+	scalar, err := e.NewScalar().Decode(clientSecretKey)
 	if err != nil {
 		panic(errInvalidSK)
 	}
 
-	pkc := e.Base().Mult(scalar).Bytes()
-	pad := e.Expand(randomizedPwd, internal.Concat(nonce, internal.TagPad), len(skc))
+	clientPublicKey := e.Base().Mult(scalar).Bytes()
+	pad := e.Expand(randomizedPwd, internal.Concat(nonce, internal.TagPad), len(clientSecretKey))
 
-	return externalInnerEnvelope{internal.Xor(skc, pad)}.serialize(), pkc
+	return externalInnerEnvelope{internal.Xor(clientSecretKey, pad)}.serialize(), clientPublicKey
 }
 
-func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (skc, pkc []byte) {
+func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey, clientPublicKey []byte) {
 	inner := deserializeExternalInnerEnvelope(innerEnvelope, e.Nsk)
 	pad := e.Expand(randomizedPwd, internal.Concat(nonce, internal.TagPad), len(inner.encrypted))
-	skc = internal.Xor(inner.encrypted, pad)
+	clientSecretKey = internal.Xor(inner.encrypted, pad)
 
-	sk, err := e.NewScalar().Decode(skc)
+	sk, err := e.NewScalar().Decode(clientSecretKey)
 	if err != nil {
 		panic(errInvalidSK)
 	}
 
-	return skc, e.recoverPublicKey(sk).Bytes()
+	return clientSecretKey, e.recoverPublicKey(sk).Bytes()
 }
