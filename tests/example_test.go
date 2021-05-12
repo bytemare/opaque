@@ -1,241 +1,251 @@
 package opaque_test
 
-//
-//import (
-//	"github.com/bytemare/cryptotools/encoding"
-//	"github.com/bytemare/cryptotools/group/ciphersuite"
-//	"github.com/bytemare/cryptotools/hash"
-//	"github.com/bytemare/cryptotools/mhf"
-//	"github.com/bytemare/cryptotools/utils"
-//	"github.com/bytemare/opaque"
-//	"github.com/bytemare/opaque/internal/core/envelope"
-//	"github.com/bytemare/opaque/message"
-//	"github.com/bytemare/voprf"
-//)
-//
-//var exampleTestClient *opaque.Client
-//
-//func receiveResponseFromServer(rreq []byte) []byte {
-//	idu := []byte("user")
-//	ids := []byte("server")
-//
-//	p := &opaque.Configuration{
-//		OprfCiphersuite: voprf.RistrettoSha512,
-//		KDF:             hash.SHA512,
-//		MAC:             hash.SHA512,
-//		Hash:            hash.SHA512,
-//		MHF:             mhf.Scrypt,
-//		Mode: 			 envelope.Internal,
-//		AKEGroup:        ciphersuite.Ristretto255Sha512,
-//		NonceLen:        32,
-//	}
-//
-//	server := p.Server()
-//	serverSecretKey, serverPublicKey := p.Server().KeyGen()
-//
-//	// Set up the server.
-//	m1, err := server.DeserializeRegistrationRequest(rreq)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	respReg, _, err := server.RegistrationResponse(m1, serverPublicKey, p.userID, p.oprfSeed)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	// Evaluate the request and respond.
-//	resp, err := server.RegistrationResponse(req, enc)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	encResp, err := enc.Encode(resp)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	creds := &message.customCleartextCredentials{
-//		Pks: akeKeys.PublicKey,
-//		Idu: idu,
-//		Ids: ids,
-//	}
-//
-//	return encResp, creds
-//}
-//
-//func ExampleClient_registration() {
-//	ids := []byte("server")
-//	username := []byte("client")
-//	password := []byte("password")
-//
-//	p := &opaque.Configuration{
-//		OprfCiphersuite: voprf.RistrettoSha512,
-//		KDF:             hash.SHA512,
-//		MAC:             hash.SHA512,
-//		Hash:            hash.SHA512,
-//		MHF:             mhf.Scrypt,
-//		Mode: 			 envelope.Internal,
-//		AKEGroup:        ciphersuite.Ristretto255Sha512,
-//		NonceLen:        32,
-//	}
-//
-//	clientCreds := &envelope.Credentials{
-//		Idc: username,
-//		Ids: ids,
-//	}
-//
-//	// Set up the client
-//	client := p.Client()
-//
-//	// Prepare the registration request
-//	reg := client.RegistrationInit(password)
-//	message1 := reg.Serialize()
-//
-//	// message1 must be send to the server. The server part is not covered here, this is a mock function.
-//	encodedResp := receiveResponseFromServer(message1)
-//
-//	// deserialize the server response
-//	regResp, err := client.DeserializeRegistrationResponse(encodedResp)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	// Finalize the registration for the client
-//	upload, _, err := client.RegistrationFinalize(nil, clientCreds, regResp)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	// Send the upload message securely to the server
-//
-//	_ = upload.Serialize()
-//	// Output:
-//}
-//
-//func receiveRequestFromClient() []byte {
-//	password := []byte("password")
-//
-//	p := &Configuration{
-//		OprfCiphersuite: voprf.RistrettoSha512,
-//		Hash:            hash.SHA256,
-//		AKE:             ake.TripleDH,
-//		Encoding:        encoding.JSON,
-//		MHF:             mhf.Argon2id.DefaultParameters(),
-//	}
-//
-//	// Set up the client
-//	exampleTestClient = p.Client()
-//
-//	// Prepare the registration request
-//	req := exampleTestClient.RegistrationInit(password)
-//
-//	encReq, err := p.Encoding.Encode(req)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	return encReq
-//}
-//
-//func receiveUploadFromClient(encodedResp []byte, creds message.cleartextCredentials) []byte {
-//	enc := encoding.JSON
-//
-//	r, err := enc.Decode(encodedResp, &message.RegistrationResponse{})
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	resp, ok := r.(*message.RegistrationResponse)
-//	if !ok {
-//		panic("")
-//	}
-//
-//	// Create a secret and public key for the client.
-//	clientAkeSecretKey, clientAkePublicKey := exampleTestClient.AkeKeyGen()
-//
-//	// Finalize the registration for the client, and send the output to the server.
-//	upload, _, err := exampleTestClient.RegistrationFinalize(clientAkeSecretKey, clientAkePublicKey, creds, resp, enc)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	encodedUpload, err := enc.Encode(upload)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	return encodedUpload
-//}
-//
-//func ExampleServer_registration() {
-//	username := []byte("user")
-//	ids := []byte("server")
-//
-//	p := &Configuration{
-//		OprfCiphersuite: voprf.RistrettoSha512,
-//		Hash:            hash.SHA256,
-//		AKE:             ake.TripleDH,
-//		Encoding:        encoding.JSON,
-//	}
-//
-//	// This can be set up before protocol execution
-//	oprfKeys := p.OprfCiphersuite.KeyGen()
-//	akeKeys := p.OprfCiphersuite.KeyGen()
-//
-//	// Receive the request from the client and decode it.
-//	encodedReq := receiveRequestFromClient()
-//
-//	r, err := p.Encoding.Decode(encodedReq, &message.RegistrationRequest{})
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	req, ok := r.(*message.RegistrationRequest)
-//	if !ok {
-//		panic("")
-//	}
-//
-//	// Set up the server.
-//	server := NewServer(p.OprfCiphersuite, p.Hash, p.AKE, oprfKeys.SecretKey, akeKeys.SecretKey, akeKeys.PublicKey)
-//
-//	// Evaluate the request and respond.
-//	resp, err := server.RegistrationResponse(req, p.Encoding)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	encResp, err := p.Encoding.Encode(resp)
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	// Receive the client envelope.
-//	creds := &message.customCleartextCredentials{
-//		Mode: envelope.CustomIdentifier,
-//		Pks:  akeKeys.PublicKey,
-//		Idu:  utils.RandomBytes(32),
-//		Ids:  ids,
-//	}
-//	encodedUpload := receiveUploadFromClient(encResp, creds)
-//
-//	up, err := p.Encoding.Decode(encodedUpload, &message.RegistrationUpload{})
-//	if err != nil {
-//		panic(err)
-//	}
-//
-//	upload, ok := up.(*message.RegistrationUpload)
-//	if !ok {
-//		panic("")
-//	}
-//
-//	// Identifiers are not covered in OPAQUE. One way to deal with them is to have a human readable "display username"
-//	// that can be changed, and an immutable user identifier.
-//	userRecord, akeRecord, err := server.RegistrationFinalize(username, creds.Idu, creds.Ids, p, upload, p.Encoding)
-//	if err != nil {
-//		panic(err)
-//	}
-//	poc.Users[string(username)] = userRecord
-//	poc.AkeRecords[string(akeRecord.ID)] = akeRecord
-//	// Output:
-//}
+import (
+	"bytes"
+	"fmt"
+	"log"
+	"reflect"
+
+	"github.com/bytemare/cryptotools/hash"
+	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/cryptotools/utils"
+
+	"github.com/bytemare/opaque"
+)
+
+func isSame(a, b *opaque.Configuration) bool {
+	return reflect.DeepEqual(a, b)
+}
+
+func ExampleConfiguration() {
+	// Note that applications must use the same configuration throughout their lifecycle, and be the same on both client
+	// and server. The two following configurations are the same, and are recommended.
+
+	defaultConf := opaque.DefaultConfiguration()
+
+	customConf := &opaque.Configuration{
+		OprfGroup: opaque.RistrettoSha512,
+		KDF:       hash.SHA512,
+		MAC:       hash.SHA512,
+		Hash:      hash.SHA512,
+		MHF:       mhf.Scrypt,
+		Mode:      opaque.Internal,
+		AKEGroup:  opaque.RistrettoSha512,
+		NonceLen:  32,
+	}
+
+	if !isSame(defaultConf, customConf) {
+		log.Fatalln("Oh no! Configurations differ!")
+	}
+
+	// A configuration can be hardcoded in an app with this 8-byte array, and decoded at runtime.
+	encoded := defaultConf.Serialize()
+
+	conf, err := opaque.DeserializeConfiguration(encoded)
+	if err != nil {
+		log.Fatalln("Oh no! Decoding the configurations failed!")
+	}
+
+	if !isSame(defaultConf, conf) {
+		log.Fatalln("Oh no! Something went wrong in decoding the configuration!")
+	}
+
+	fmt.Println("OPAQUE configuration is easy!")
+
+	// Output: OPAQUE configuration is easy!
+}
+
+func ExampleClient() {
+	// First, load or instantiate a configuration.
+	conf := opaque.DefaultConfiguration()
+
+	client := conf.Client()
+
+	if client == nil {
+		log.Fatalln("Oh no! Something went wrong setting up the client!")
+	}
+
+	fmt.Println("OPAQUE configuration is easy!")
+
+	// Output: OPAQUE configuration is easy!
+}
+
+func ExampleServer() {
+	// First, load or instantiate a configuration.
+	conf := opaque.DefaultConfiguration()
+
+	server := conf.Server()
+
+	if server == nil {
+		log.Fatalln("Oh no! Something went wrong setting up the server!")
+	}
+
+	fmt.Println("OPAQUE configuration is easy!")
+
+	// Output: OPAQUE configuration is easy!
+}
+
+var (
+	exampleClientRecord                               *opaque.ClientRecord
+	secretOprfSeed, serverPrivateKey, serverPublicKey []byte
+)
+
+func ExampleRegistration() {
+	// We assume the server is already set up with the following values. secret* values are internal secret to the server.
+	// They can be unique for all clients, and must be the same for a client between registration and login. It's safe
+	// to use these same values across clients as long as they remain secret.
+	secretOprfSeed = utils.RandomBytes(32)
+	serverPrivateKey, serverPublicKey = opaque.DefaultConfiguration().Server().KeyGen()
+
+	// Secret client information.
+	password := []byte("password")
+
+	// Information shared by both client and server.
+	serverID := []byte("server")
+	clientID := []byte("client")
+	conf := opaque.DefaultConfiguration()
+
+	// Runtime setup
+	client := conf.Client()
+	server := conf.Server()
+
+	// Client starts, serializes the message, and sends it to the server.
+	c1 := client.RegistrationInit(password)
+	c1s := c1.Serialize()
+
+	// The server receives the encoded message, decodes it, interprets it, and returns its response.
+	s1, err := server.DeserializeRegistrationRequest(c1s)
+	if err != nil {
+		panic(err)
+	}
+
+	// clientID must absolutely be unique among all clients.
+	credID := utils.RandomBytes(64)
+	s2, err := server.RegistrationResponse(s1, serverPublicKey, credID, secretOprfSeed)
+	if err != nil {
+		panic(err)
+	}
+
+	// The server responds with its serialized response.
+	s2s := s2.Serialize()
+
+	// The client deserializes the responses, and sends back its final client record containing the envelope.
+	c2, err := client.DeserializeRegistrationResponse(s2s)
+	if err != nil {
+		panic(err)
+	}
+
+	clientCreds := &opaque.Credentials{
+		Client: clientID,
+		Server: serverID,
+	}
+
+	// We're using the internal mode, so we don't have to provide a private key here.
+	// This also spits out a client-only secret export_key, that the client can use for other purposes (e.g. encrypt
+	// information to store on the server, and that the server can't decrypt). We don't use in the example here.
+	c3, _, err := client.RegistrationFinalize(nil, clientCreds, c2)
+	if err != nil {
+		panic(err)
+	}
+
+	c3s := c3.Serialize()
+
+	// Server registers the client upload
+	upload, err := server.DeserializeRegistrationUpload(c3s)
+	if err != nil {
+		panic(err)
+	}
+
+	exampleClientRecord = &opaque.ClientRecord{
+		CredentialIdentifier: credID,
+		ClientIdentity:       clientID,
+		RegistrationUpload:   upload,
+	}
+
+	if exampleClientRecord.RegistrationUpload != nil {
+		fmt.Println("OPAQUE registration is easy!")
+	} else {
+		log.Fatalln("Oh no! Something went wrong storing the client record.")
+	}
+
+	// Output: OPAQUE registration is easy!
+}
+
+func ExampleLoginKeyExchange() {
+	// For the purpose of this demo, we consider the following registration has already happened.
+	ExampleRegistration()
+
+	// Secret client information.
+	password := []byte("password")
+
+	// Information shared by both client and server.
+	serverID := []byte("server")
+	clientID := []byte("client")
+	conf := opaque.DefaultConfiguration()
+
+	// Run time setup
+	client := conf.Client()
+	server := conf.Server()
+
+	// The client initiates the ball and sends the serialized ke1 to the server
+	ke1 := client.Init(password, nil)
+	message1 := ke1.Serialize()
+
+	// The server interprets ke1, and sends back ke2
+	ke1s, err := server.DeserializeKE1(message1)
+	if err != nil {
+		panic(err)
+	}
+
+	ke2, err := server.Init(ke1s, nil, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed,
+		exampleClientRecord)
+	if err != nil {
+		panic(err)
+	}
+
+	message2 := ke2.Serialize()
+
+	// The client interprets ke2. If the everything went fine, the server is considered trustworthy and the client
+	// can use the shared session key and secret export key.
+	ke2c, err := client.DeserializeKE2(message2)
+	if err != nil {
+		panic(err)
+	}
+
+	// In this example, we don't use the secret export key. The client sends the serialized ke3 to the server.
+	ke3, _, err := client.Finish(clientID, serverID, ke2c)
+	if err != nil {
+		panic(err)
+	}
+
+	clientSessionKey := client.SessionKey()
+	if clientSessionKey == nil {
+		log.Fatalln("Oh no! Something went wrong!")
+	}
+
+	message3 := ke3.Serialize()
+
+	// The server must absolutely validate this last message to authenticate the client and continue. If this message
+	// does not return successfully, the server must not send any secret or sensitive information and immediately cease
+	// the connection.
+	ke3s, err := server.DeserializeKE3(message3)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := server.Finish(ke3s); err != nil {
+		panic(err)
+	}
+
+	// If server.Finish() returns successfully, we can trust the client and safely extract the shared session key.
+	serverSessionKey := server.SessionKey()
+
+	// The following test does not exist in the real world and simply proves the point that the keys match.
+	if !bytes.Equal(clientSessionKey, serverSessionKey) {
+		log.Fatalln("Oh no! Abort! The shared session keys don't match!")
+	}
+
+	fmt.Println("OPAQUE is much awesome!")
+	// Output: OPAQUE registration is easy!
+	// OPAQUE is much awesome!
+}
