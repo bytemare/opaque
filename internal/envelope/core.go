@@ -1,4 +1,3 @@
-// Package core links OPAQUE's OPRF client functions to envelope creation and key recovery.
 package envelope
 
 import (
