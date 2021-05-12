@@ -48,8 +48,8 @@ func (c *Core) OprfFinalize(data []byte) ([]byte, error) {
 }
 
 // BuildEnvelope returns the client's Envelope, the masking key for the registration, and the additional export key.
-func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, pks, skc []byte,
-	creds *envelope.Credentials) (env *envelope.Envelope, pkc, maskingKey, exportKey []byte, err error) {
+func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, serverPublicKey, clientSecretKey []byte,
+	creds *envelope.Credentials) (env *envelope.Envelope, clientPublicKey, maskingKey, exportKey []byte, err error) {
 	unblinded, err := c.OprfFinalize(evaluation)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
@@ -57,8 +57,8 @@ func (c *Core) BuildEnvelope(mode envelope.Mode, evaluation, pks, skc []byte,
 
 	randomizedPwd := envelope.BuildPRK(c.Parameters, unblinded)
 	m := &envelope.Mailer{Parameters: c.Parameters}
-	env, pkc, exportKey = m.CreateEnvelope(mode, randomizedPwd, pks, skc, creds)
+	env, clientPublicKey, exportKey = m.CreateEnvelope(mode, randomizedPwd, serverPublicKey, clientSecretKey, creds)
 	maskingKey = m.KDF.Expand(randomizedPwd, []byte(internal.TagMaskingKey), m.KDF.Size())
 
-	return env, pkc, maskingKey, exportKey, nil
+	return env, clientPublicKey, maskingKey, exportKey, nil
 }
