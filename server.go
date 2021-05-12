@@ -8,7 +8,6 @@ import (
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
-	"github.com/bytemare/opaque/internal/core/envelope"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
@@ -32,53 +31,53 @@ func NewServer(p *Configuration) *Server {
 }
 
 // KeyGen returns a key pair in the AKE group.
-func (s *Server) KeyGen() (sk, pk []byte) {
+func (s *Server) KeyGen() (secretKey, publicKey []byte) {
 	return ake.KeyGen(s.AKEGroup)
 }
 
-func (s *Server) evaluate(seed, blinded []byte) (m, k []byte, err error) {
+func (s *Server) evaluate(seed, blinded []byte) (m []byte, err error) {
 	oprf, err := s.OprfCiphersuite.Server(nil)
 	if err != nil {
-		return nil, nil, fmt.Errorf("oprf server setup: %w", err)
+		return nil, fmt.Errorf("oprf server setup: %w", err)
 	}
 
 	ku := oprf.HashToScalar(seed)
 
 	oprf, err = s.OprfCiphersuite.Server(ku.Bytes())
 	if err != nil {
-		return nil, nil, fmt.Errorf("oprf server setup with key: %w", err)
+		return nil, fmt.Errorf("oprf server setup with key: %w", err)
 	}
 
 	evaluation, err := oprf.Evaluate(blinded)
 	if err != nil {
-		return nil, nil, fmt.Errorf("oprf evaluation: %w", err)
+		return nil, fmt.Errorf("oprf evaluation: %w", err)
 	}
 
-	return evaluation.Elements[0], oprf.PrivateKey(), nil
+	return evaluation.Elements[0], nil
 }
 
-func (s *Server) oprfResponse(oprfSeed, id, element []byte) (m, k []byte, err error) {
-	seed := s.KDF.Expand(oprfSeed, internal.Concat(id, internal.OprfKey), internal.ScalarLength[s.OprfCiphersuite.Group()])
+func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element []byte) (m []byte, err error) {
+	seed := s.KDF.Expand(oprfSeed, internal.Concat(credentialIdentifier, internal.OprfKey), internal.ScalarLength[s.OprfCiphersuite.Group()])
 	return s.evaluate(seed, element)
 }
 
 // RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given identifiers.
-func (s *Server) RegistrationResponse(req *message.RegistrationRequest, pks []byte, id CredentialIdentifier,
-	oprfSeed []byte) (r *message.RegistrationResponse, ku []byte, err error) {
-	z, ku, err := s.oprfResponse(oprfSeed, id, req.Data)
+func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
+	serverPublicKey, id, oprfSeed []byte) (*message.RegistrationResponse, error) {
+	z, err := s.oprfResponse(oprfSeed, id, req.Data)
 	if err != nil {
-		return nil, nil, fmt.Errorf(" RegistrationResponse: %w", err)
+		return nil, fmt.Errorf(" RegistrationResponse: %w", err)
 	}
 
 	return &message.RegistrationResponse{
 		Data: internal.PadPoint(z, s.OprfCiphersuite.Group()),
-		Pks:  pks,
-	}, ku, nil
+		Pks:  serverPublicKey,
+	}, nil
 }
 
-func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, record *message.RegistrationUpload,
-	id CredentialIdentifier, oprfSeed, maskingNonce []byte) (*cred.CredentialResponse, error) {
-	z, _, err := s.oprfResponse(oprfSeed, id, req.Data)
+func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey []byte, record *message.RegistrationUpload,
+	credentialIdentifier, oprfSeed, maskingNonce []byte) (*cred.CredentialResponse, error) {
+	z, err := s.oprfResponse(oprfSeed, credentialIdentifier, req.Data)
 	if err != nil {
 		return nil, fmt.Errorf("oprfResponse: %w", err)
 	}
@@ -91,9 +90,9 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, rec
 	env := record.Envelope
 	crPad := s.KDF.Expand(record.MaskingKey,
 		internal.Concat(maskingNonce, internal.TagCredentialResponsePad),
-		len(pks)+len(env))
+		len(serverPublicKey)+len(env))
 
-	clear := append(pks, env...)
+	clear := append(serverPublicKey, env...)
 
 	maskedResponse := internal.Xor(crPad, clear)
 
@@ -105,23 +104,36 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, pks []byte, rec
 }
 
 // Init responds to a KE1 message with a KE2 message given server credentials and client record.
-func (s *Server) Init(ke1 *message.KE1, serverInfo, sks, pks []byte, upload *message.RegistrationUpload,
-	creds *envelope.Credentials, id CredentialIdentifier, oprfSeed []byte) (*message.KE2, error) {
-	response, err := s.credentialResponse(ke1.CredentialRequest, pks, upload, id, oprfSeed, creds.MaskingNonce)
+func (s *Server) Init(ke1 *message.KE1, serverInfo, serverID, sks, serverPublicKey, oprfSeed []byte,
+	record *ClientRecord) (*message.KE2, error) {
+	response, err := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
+		record.RegistrationUpload, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce)
 	if err != nil {
 		return nil, fmt.Errorf(" credentialResponse: %w", err)
 	}
 
-	if creds.Idc == nil {
-		creds.Idc = upload.PublicKey
+	idc := record.ClientIdentity
+	ids := serverID
+
+	if idc == nil {
+		idc = record.PublicKey
 	}
 
-	if creds.Ids == nil {
-		creds.Ids = pks
+	if ids == nil {
+		ids = serverPublicKey
 	}
 
-	// id, sk, peerID, peerPK - (creds, peerPK)
-	ke2, err := s.Ake.Response(s.Parameters, creds.Ids, sks, creds.Idc, upload.PublicKey, serverInfo, ke1, response)
+	// Force idu/ids to pubkeys if one is not defined
+	//
+	//  if idc == nil || ids == nil {
+	//  	idc = upload.PublicKey
+	//
+	//  	if serverPublicKey == nil {panic(nil)}
+	//
+	//  	ids = serverPublicKey
+	//  }
+
+	ke2, err := s.Ake.Response(s.Parameters, ids, sks, idc, record.PublicKey, serverInfo, ke1, response)
 	if err != nil {
 		return nil, fmt.Errorf(" AKE response: %w", err)
 	}
