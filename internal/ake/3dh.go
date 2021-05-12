@@ -2,6 +2,7 @@
 package ake
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/bytemare/cryptotools/group"
@@ -13,7 +14,16 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
-// KeyGen returns private and public keys in the grouo.
+var errInvalidSelector = errors.New("invalid selector (must be either client or server)")
+
+type selector bool
+
+const (
+	client selector = true
+	server selector = false
+)
+
+// KeyGen returns private and public keys in the group.
 func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
 	g := id.Get(nil)
 	scalar := g.NewScalar().Random()
@@ -28,19 +38,13 @@ type keys struct {
 	handshakeEncryptKey        []byte
 }
 
-type ake struct {
-	*internal.Parameters
-	group.Group
-	SessionSecret []byte
-}
-
 // setValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
-func setValues(p *internal.Parameters, scalar group.Scalar, nonce []byte, nonceLen int) (s group.Scalar, n []byte) {
+func setValues(g group.Group, scalar group.Scalar, nonce []byte, nonceLen int) (s group.Scalar, n []byte) {
 	if scalar != nil {
 		s = scalar
 	} else {
-		s = p.AKEGroup.Get(nil).NewScalar().Random()
+		s = g.NewScalar().Random()
 	}
 
 	if len(nonce) == 0 {
@@ -113,4 +117,67 @@ func k3dh(p1 group.Element, s1 group.Scalar, p2 group.Element, s2 group.Scalar, 
 	e3 := p3.Mult(s3)
 
 	return utils.Concatenate(0, e1.Bytes(), e2.Bytes(), e3.Bytes())
+}
+
+func ikm(s selector, g group.Group, esk group.Scalar, secretKey, peerEpk, peerPublicKey []byte) ([]byte, error) {
+	sk, epk, gpk, err := decodeKeys(g, secretKey, peerEpk, peerPublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	switch s {
+	case client:
+		return k3dh(epk, esk, gpk, esk, epk, sk), nil
+	case server:
+		return k3dh(epk, esk, epk, sk, gpk, esk), nil
+	}
+
+	panic(errInvalidSelector)
+}
+
+func cryptInfo(p *internal.Parameters, key, info []byte) (out []byte) {
+	if len(info) != 0 {
+		pad := p.KDF.Expand(key, []byte(internal.EncryptionTag), len(info))
+		out = internal.Xor(pad, info)
+	}
+
+	return out
+}
+
+func getServerMac(p *internal.Parameters, key, einfo []byte) []byte {
+	p.Hash.Write(encoding.EncodeVector(einfo))
+	return p.MAC.MAC(key, p.Hash.Sum()) // transcript2
+}
+
+type output struct {
+	info, serverMac, clientMac []byte
+}
+
+func core3DH(s selector, p *internal.Parameters, esk group.Scalar, secretKey, peerEpk, peerPublicKey,
+	epks, idu, ids, nonceS, credResp, info []byte, ke1 *message.KE1) (*output, []byte, error) {
+	ikm, err := ikm(s, p.AKEGroup.Get(nil), esk, secretKey, peerEpk, peerPublicKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	newInfo(p.Hash, ke1, idu, ids, credResp, nonceS, epks)
+	keys, sessionSecret := deriveKeys(p.KDF, ikm, p.Hash.Sum())
+
+	st := &output{}
+	st.info = cryptInfo(p, keys.handshakeEncryptKey, info)
+
+	switch s {
+	case client:
+		st.serverMac = getServerMac(p, keys.serverMacKey, info)
+	case server:
+		st.serverMac = getServerMac(p, keys.serverMacKey, st.info)
+	default:
+		panic(errInvalidSelector)
+	}
+
+	p.Hash.Write(st.serverMac)
+	transcript3 := p.Hash.Sum()
+	st.clientMac = p.MAC.MAC(keys.clientMacKey, transcript3)
+
+	return st, sessionSecret, nil
 }
