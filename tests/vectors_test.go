@@ -294,7 +294,7 @@ func (v *vector) loginResponse(t *testing.T, p *internal.Parameters, s *opaque.S
 	//}
 
 	if !bytes.Equal(v.Outputs.SessionKey, s.Ake.SessionKey()) {
-		t.Logf("Server SessionKey do not match:\n%v\n%v", v.Outputs.SessionKey, s.Ake.SessionKey())
+		t.Fatalf("Server SessionKey do not match:\n%v\n%v", v.Outputs.SessionKey, s.Ake.SessionKey())
 	}
 
 	draftKE2, err := s.DeserializeKE2(v.Outputs.KE2)
@@ -327,15 +327,15 @@ func (v *vector) loginResponse(t *testing.T, p *internal.Parameters, s *opaque.S
 	}
 
 	if !bytes.Equal(draftKE2.Einfo, KE2.Einfo) {
-		t.Logf("einfo do not match")
+		t.Fatalf("einfo do not match")
 	}
 
 	if !bytes.Equal(draftKE2.Mac, KE2.Mac) {
-		t.Logf("server macs do not match")
+		t.Fatalf("server macs do not match")
 	}
 
 	if !bytes.Equal(v.Outputs.KE2, KE2.Serialize()) {
-		t.Logf("KE2 do not match")
+		t.Fatalf("KE2 do not match")
 	}
 
 	return KE2
@@ -443,9 +443,9 @@ func TestOpaqueVectors(t *testing.T) {
 					continue
 				}
 
-				if tv.Config.Group != "ristretto255" {
-					continue
-				}
+				//if tv.Config.Group != "ristretto255" {
+				//	continue
+				//}
 
 				t.Run(fmt.Sprintf("%s - %s - %s", tv.Config.Name, tv.Config.EnvelopeMode, tv.Config.Group), tv.test)
 			}
