@@ -84,17 +84,11 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 
 	// testing: integrated to support testing, to force values.
 	if len(maskingNonce) == 0 {
-		maskingNonce = utils.RandomBytes(32)
+		maskingNonce = utils.RandomBytes(s.Parameters.NonceLen)
 	}
 
-	env := record.Envelope
-	crPad := s.KDF.Expand(record.MaskingKey,
-		internal.Concat(maskingNonce, internal.TagCredentialResponsePad),
-		len(serverPublicKey)+len(env))
-
-	clear := append(serverPublicKey, env...)
-
-	maskedResponse := internal.Xor(crPad, clear)
+	clear := internal.Concat(serverPublicKey, string(record.Envelope))
+	maskedResponse := s.MaskResponse(record.MaskingKey, maskingNonce, clear)
 
 	return &cred.CredentialResponse{
 		Data:           internal.PadPoint(z, s.OprfCiphersuite.Group()),
@@ -106,6 +100,8 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 // Init responds to a KE1 message with a KE2 message given server credentials and client record.
 func (s *Server) Init(ke1 *message.KE1, serverInfo, serverID, sks, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord) (*message.KE2, error) {
+	if serverPublicKey == nil {panic(nil)}
+
 	response, err := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
 		record.RegistrationUpload, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce)
 	if err != nil {
@@ -127,8 +123,6 @@ func (s *Server) Init(ke1 *message.KE1, serverInfo, serverID, sks, serverPublicK
 	//
 	//  if idc == nil || ids == nil {
 	//  	idc = upload.PublicKey
-	//
-	//  	if serverPublicKey == nil {panic(nil)}
 	//
 	//  	ids = serverPublicKey
 	//  }

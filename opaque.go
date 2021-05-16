@@ -3,6 +3,7 @@ package opaque
 import (
 	"errors"
 	"fmt"
+	"github.com/bytemare/opaque/internal/envelope"
 
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
-	"github.com/bytemare/opaque/internal/envelope"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -99,9 +99,9 @@ func (c *Configuration) toInternal() *internal.Parameters {
 		MHF:             &internal.MHF{MHF: c.MHF.Get()},
 		AKEGroup:        cs,
 		NonceLen:        c.NonceLen,
-		EnvelopeSize:    envelope.Size(envelope.Mode(c.Mode), c.NonceLen, c.MAC.Size(), cs),
 	}
 	ip.Init()
+	ip.EnvelopeSize = envelope.Size(envelope.Mode(c.Mode), ip)
 
 	return ip
 }

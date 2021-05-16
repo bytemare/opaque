@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
@@ -46,19 +45,19 @@ func (e *Envelope) Serialize() []byte {
 	return utils.Concatenate(0, e.Nonce, e.InnerEnvelope, e.AuthTag)
 }
 
-func Size(mode Mode, nn, nm int, id ciphersuite.Identifier) int {
+func Size(mode Mode, p *internal.Parameters) int {
 	var innerSize int
 
 	switch mode {
 	case Internal:
 		innerSize = 0
 	case External:
-		innerSize = internal.ScalarLength[id]
+		innerSize = internal.ScalarLength[p.AKEGroup]
 	default:
 		panic("invalid envelope mode")
 	}
 
-	return nn + nm + innerSize
+	return p.NonceLen + p.MAC.Size() + innerSize
 }
 
 func DeserializeEnvelope(data []byte, mode Mode, nn, nm, nsk int) (*Envelope, int, error) {

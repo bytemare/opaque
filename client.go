@@ -81,15 +81,12 @@ func (c *Client) Init(password, clientInfo []byte) *message.KE1 {
 }
 
 func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte, *envelope.Envelope, error) {
-	envSize := envelope.Size(c.mode, c.NonceLen, c.Core.MAC.Size(), c.AKEGroup)
+	envSize := c.Parameters.EnvelopeSize
 	if len(maskedResponse) != internal.PointLength[c.AKEGroup]+envSize {
 		return nil, nil, errInvalidMaskedLength
 	}
 
-	crPad := c.Core.KDF.Expand(maskingKey,
-		internal.Concat(maskingNonce, internal.TagCredentialResponsePad),
-		internal.PointLength[c.AKEGroup]+envSize)
-	clear := internal.Xor(crPad, maskedResponse)
+	clear := c.MaskResponse(maskingKey, maskingNonce, maskedResponse)
 
 	serverPublicKey := clear[:internal.PointLength[c.AKEGroup]]
 	e := clear[internal.PointLength[c.AKEGroup]:]

@@ -174,3 +174,8 @@ func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
 
 	return &message.KE3{Mac: input}, nil
 }
+
+func (p *Parameters) MaskResponse(key, nonce, in []byte) []byte {
+	pad := p.KDF.Expand(key, Concat(nonce, TagCredentialResponsePad), PointLength[p.AKEGroup]+p.EnvelopeSize)
+	return Xor(pad, in)
+}
