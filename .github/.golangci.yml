@@ -201,6 +201,10 @@ issues:
       text: "should have comment (or a comment on this block) or be unexported"
       linters:
         - golint
+    - path: internal
+      text: " should have comment or be unexported"
+      linters:
+        - revive
     - path: internal/hash.go
       linters:
         - errcheck
@@ -217,5 +221,5 @@ issues:
 run:
   tests: false
 
-output:
-  format: github-actions
+#utput:
+# format: github-actions
