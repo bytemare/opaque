@@ -100,7 +100,9 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 // Init responds to a KE1 message with a KE2 message given server credentials and client record.
 func (s *Server) Init(ke1 *message.KE1, serverInfo, serverID, sks, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord) (*message.KE2, error) {
-	if serverPublicKey == nil {panic(nil)}
+	if serverPublicKey == nil {
+		panic(nil)
+	}
 
 	response, err := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
 		record.RegistrationUpload, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce)

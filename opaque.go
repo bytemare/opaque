@@ -3,7 +3,6 @@ package opaque
 import (
 	"errors"
 	"fmt"
-	"github.com/bytemare/opaque/internal/envelope"
 
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/envelope"
 	"github.com/bytemare/opaque/message"
 )
 
