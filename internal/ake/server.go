@@ -50,27 +50,29 @@ func (s *Server) SetValues(cs ciphersuite.Identifier, esk group.Scalar, nonce []
 }
 
 // Response produces a 3DH server response message.
-func (s *Server) Response(p *internal.Parameters, ids, sk, idu, pku, serverInfo []byte,
+func (s *Server) Response(p *internal.Parameters, serverIdentity, serverSecretKey, clientIdentity, clientPublicKey, serverInfo []byte,
 	ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
 	epk := s.SetValues(p.AKEGroup, nil, nil, p.NonceLen)
 	nonce := s.nonceS
+	k := &coreKeys{s.esk, serverSecretKey, ke1.EpkU, clientPublicKey}
 
-	output, sessionSecret, err := core3DH(server, p, s.esk, sk, ke1.EpkU, pku, epk.Bytes(),
-		idu, ids, nonce, response.Serialize(), serverInfo, ke1)
+	ke2 := &message.KE2{
+		CredentialResponse: response,
+		NonceS:             nonce,
+		EpkS:               internal.SerializePoint(epk, p.AKEGroup),
+	}
+
+	output, sessionSecret, err := core3DH(server, p, k, clientIdentity, serverIdentity, serverInfo, ke1, ke2)
 	if err != nil {
 		return nil, err
 	}
 
 	s.sessionSecret = sessionSecret
 	s.clientMac = output.clientMac
+	ke2.Einfo = output.info
+	ke2.Mac = output.serverMac
 
-	return &message.KE2{
-		CredentialResponse: response,
-		NonceS:             nonce,
-		EpkS:               internal.SerializePoint(epk, p.AKEGroup),
-		Einfo:              output.info,
-		Mac:                output.serverMac,
-	}, nil
+	return ke2, nil
 }
 
 // Finalize verifies the authentication tag contained in ke3.

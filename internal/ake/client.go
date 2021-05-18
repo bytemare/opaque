@@ -62,10 +62,11 @@ func (c *Client) Start(cs ciphersuite.Identifier, clientInfo []byte) *message.KE
 
 // Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions
 // returns a KE3 message, and the server_info is one was sent.
-func (c *Client) Finalize(p *internal.Parameters, idu, clientSecretKey, ids, serverPublicKey []byte,
+func (c *Client) Finalize(p *internal.Parameters, clientIdentity, clientSecretKey, serverIdentity, serverPublicKey []byte,
 	ke1 *message.KE1, ke2 *message.KE2) (*message.KE3, []byte, error) {
-	st, sessionSecret, err := core3DH(client, p, c.esk, clientSecretKey, ke2.EpkS, serverPublicKey, ke2.EpkS,
-		idu, ids, ke2.NonceS, ke2.CredentialResponse.Serialize(), ke2.Einfo, ke1)
+	k := &coreKeys{c.esk, clientSecretKey, ke2.EpkS, serverPublicKey}
+
+	st, sessionSecret, err := core3DH(client, p, k, clientIdentity, serverIdentity, ke2.Einfo, ke1, ke2)
 	if err != nil {
 		return nil, nil, err
 	}

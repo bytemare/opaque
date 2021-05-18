@@ -161,14 +161,19 @@ type output struct {
 	info, serverMac, clientMac []byte
 }
 
-func core3DH(s selector, p *internal.Parameters, esk group.Scalar, secretKey, peerEpk, peerPublicKey,
-	epks, idu, ids, nonceS, credResp, info []byte, ke1 *message.KE1) (*output, []byte, error) {
-	ikm, err := ikm(s, p.AKEGroup.Get(nil), esk, secretKey, peerEpk, peerPublicKey)
+type coreKeys struct {
+	esk                               group.Scalar
+	secretKey, peerEpk, peerPublicKey []byte
+}
+
+func core3DH(s selector, p *internal.Parameters, k *coreKeys, idu, ids, info []byte,
+	ke1 *message.KE1, ke2 *message.KE2) (*output, []byte, error) {
+	ikm, err := ikm(s, p.AKEGroup.Get(nil), k.esk, k.secretKey, k.peerEpk, k.peerPublicKey)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	newInfo(p.Hash, ke1, idu, ids, credResp, nonceS, epks)
+	newInfo(p.Hash, ke1, idu, ids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS)
 	keys, sessionSecret := deriveKeys(p.KDF, ikm, p.Hash.Sum())
 
 	st := &output{}
