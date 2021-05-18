@@ -138,16 +138,6 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 		ids = serverPublicKey
 	}
 
-	// Force idu/ids to pubkeys if one is not defined
-	//
-	// if idc == nil || ids == nil {
-	// 	idc = upload.PublicKey
-	//
-	// 	if serverPublicKey == nil {panic(nil)}
-	//
-	// 	ids = serverPublicKey
-	// }
-
 	ke3, _, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, serverPublicKey, c.Ke1, ke2)
 	if err != nil {
 		return nil, nil, fmt.Errorf(" AKE finalization: %w", err)

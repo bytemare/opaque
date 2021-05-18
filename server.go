@@ -106,7 +106,7 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 }
 
 // Init responds to a KE1 message with a KE2 message given server credentials and client record.
-func (s *Server) Init(ke1 *message.KE1, serverInfo, serverID, sks, serverPublicKey, oprfSeed []byte,
+func (s *Server) Init(ke1 *message.KE1, serverInfo, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord) (*message.KE2, error) {
 	if serverPublicKey == nil {
 		panic(nil)
@@ -118,26 +118,17 @@ func (s *Server) Init(ke1 *message.KE1, serverInfo, serverID, sks, serverPublicK
 		return nil, fmt.Errorf(" credentialResponse: %w", err)
 	}
 
-	idc := record.ClientIdentity
-	ids := serverID
+	clientIdentity := record.ClientIdentity
 
-	if idc == nil {
-		idc = record.PublicKey
+	if clientIdentity == nil {
+		clientIdentity = record.PublicKey
 	}
 
-	if ids == nil {
-		ids = serverPublicKey
+	if serverIdentity == nil {
+		serverIdentity = serverPublicKey
 	}
 
-	// Force idu/ids to pubkeys if one is not defined
-	//
-	//  if idc == nil || ids == nil {
-	//  	idc = upload.PublicKey
-	//
-	//  	ids = serverPublicKey
-	//  }
-
-	ke2, err := s.Ake.Response(s.Parameters, ids, sks, idc, record.PublicKey, serverInfo, ke1, response)
+	ke2, err := s.Ake.Response(s.Parameters, serverIdentity, serverSecretKey, clientIdentity, record.PublicKey, serverInfo, ke1, response)
 	if err != nil {
 		return nil, fmt.Errorf(" AKE response: %w", err)
 	}
