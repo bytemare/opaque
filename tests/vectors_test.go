@@ -195,7 +195,7 @@ func (v *vector) test(t *testing.T) {
 	//}
 
 	if !bytes.Equal(check.Envelope, upload.Envelope) {
-		t.Fatalf("envelopes do not match\nexpected %v,\nngot %v", check.Envelope, upload.Envelope)
+		t.Fatalf("envelopes do not match\nexpected %v,\ngot %v", check.Envelope, upload.Envelope)
 	}
 
 	if !bytes.Equal(out.RegistrationUpload, upload.Serialize()) {

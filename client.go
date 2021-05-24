@@ -32,6 +32,10 @@ type Client struct {
 
 // NewClient returns a new Client instantiation given the application Configuration.
 func NewClient(p *Configuration) *Client {
+	if p == nil {
+		p = DefaultConfiguration()
+	}
+
 	ip := p.toInternal()
 
 	return &Client{

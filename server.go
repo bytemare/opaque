@@ -30,6 +30,10 @@ type Server struct {
 
 // NewServer returns a Server instantiation given the application Configuration.
 func NewServer(p *Configuration) *Server {
+	if p == nil {
+		p = DefaultConfiguration()
+	}
+
 	ip := p.toInternal()
 
 	return &Server{
@@ -71,8 +75,8 @@ func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element []byte) (m
 
 // RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given identifiers.
 func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
-	serverPublicKey, id, oprfSeed []byte) (*message.RegistrationResponse, error) {
-	z, err := s.oprfResponse(oprfSeed, id, req.Data)
+	serverPublicKey, credentialIdentifier, oprfSeed []byte) (*message.RegistrationResponse, error) {
+	z, err := s.oprfResponse(oprfSeed, credentialIdentifier, req.Data)
 	if err != nil {
 		return nil, fmt.Errorf(" RegistrationResponse: %w", err)
 	}
