@@ -31,7 +31,7 @@ func (c *CleartextCredentials) Serialize() []byte {
 		s = encoding.EncodeVector(c.Ids)
 	}
 
-	return utils.Concatenate(0, c.Pks, u, s)
+	return utils.Concatenate(0, c.Pks, s, u)
 }
 
 func CreateCleartextCredentials(clientPublicKey, pks, idc, ids []byte) *CleartextCredentials {
