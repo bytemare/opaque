@@ -59,14 +59,14 @@ type config struct {
 	MHF          string    `json:"MHF"`
 	Name         string    `json:"Name"`
 	OPRF         ByteToHex `json:"OPRF"`
-	Info		 ByteToHex `json:"Info"`
+	Context		 ByteToHex `json:"Context"`
 }
 
 type inputs struct {
 	BlindLogin            ByteToHex `json:"blind_login"`
 	BlindRegistration     ByteToHex `json:"blind_registration"`
 	ClientIdentity        ByteToHex `json:"client_identity,omitempty"`
-	Info            	  ByteToHex `json:"info"`
+	Context            	  ByteToHex `json:"context"`
 	ClientKeyshare        ByteToHex `json:"client_keyshare"`
 	ClientNonce           ByteToHex `json:"client_nonce"`
 	ClientPrivateKey      ByteToHex `json:"client_private_key"`
@@ -128,7 +128,7 @@ func (v *vector) test(t *testing.T) {
 		MHF:       mhf.Scrypt,
 		Mode:      opaque.Mode(mode[0]),
 		AKEGroup:  groupToGroup(v.Config.Group),
-		Info: []byte(v.Config.Info),
+		Context:   []byte(v.Config.Context),
 		NonceLen:  32,
 	}
 

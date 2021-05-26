@@ -21,6 +21,15 @@ var (
 	errTotalLength  = errors.New("insufficient total length for decoding")
 )
 
+func Concat(a []byte, b string) []byte {
+	t := []byte(b)
+	e := make([]byte, 0, len(a)+len(t))
+	e = append(e, a...)
+	e = append(e, t...)
+
+	return e
+}
+
 func OS2IP(in []byte) int {
 	return encoding.OS2IP(in)
 }

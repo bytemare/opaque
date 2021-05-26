@@ -11,6 +11,7 @@ package ake
 
 import (
 	"errors"
+	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
@@ -55,7 +56,7 @@ func (c *Client) Start(cs ciphersuite.Identifier) *message.KE1 {
 
 	return &message.KE1{
 		NonceU: c.NonceU,
-		EpkU:   internal.SerializePoint(epk, cs),
+		EpkU:   encoding.PadPoint(epk.Bytes(), cs),
 	}
 }
 

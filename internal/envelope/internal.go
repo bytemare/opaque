@@ -12,6 +12,7 @@ package envelope
 import (
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/opaque/internal"
 )
@@ -31,15 +32,15 @@ func (i *internalMode) deriveAkeKeyPair(seed []byte) (group.Scalar, group.Elemen
 }
 
 func (i *internalMode) buildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, clientPublicKey []byte) {
-	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength[i.Identifier])
+	seed := i.Expand(randomizedPwd, encoding.Concat(nonce, internal.SkDST), encoding.ScalarLength[i.Identifier])
 	_, pk := i.deriveAkeKeyPair(seed)
 
-	return nil, internal.SerializePoint(pk, i.Identifier)
+	return nil, encoding.SerializePoint(pk, i.Identifier)
 }
 
-func (i *internalMode) recoverKeys(randomizedPwd, nonce, _ []byte) (clientSecretKey, clientPublicKey []byte) {
-	seed := i.Expand(randomizedPwd, internal.Concat(nonce, internal.SkDST), internal.ScalarLength[i.Identifier])
+func (i *internalMode) recoverKeys(randomizedPwd, nonce, _ []byte) (clientSecretKey []byte, clientPublicKey group.Element) {
+	seed := i.Expand(randomizedPwd, encoding.Concat(nonce, internal.SkDST), encoding.ScalarLength[i.Identifier])
 	sk, pk := i.deriveAkeKeyPair(seed)
 
-	return sk.Bytes(), pk.Bytes()
+	return sk.Bytes(), pk
 }

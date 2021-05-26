@@ -11,6 +11,7 @@ package envelope
 
 import (
 	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/opaque/internal"
 )
@@ -47,15 +48,15 @@ func (e *externalMode) buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey 
 		panic(errInvalidSK)
 	}
 
-	clientPublicKey := e.Base().Mult(scalar).Bytes()
-	pad := e.Expand(randomizedPwd, internal.Concat(nonce, internal.TagPad), len(clientSecretKey))
+	clientPublicKey := e.Base().Mult(scalar)
+	pad := e.Expand(randomizedPwd, encoding.Concat(nonce, internal.TagPad), len(clientSecretKey))
 
-	return externalInnerEnvelope{internal.Xor(clientSecretKey, pad)}.serialize(), clientPublicKey
+	return externalInnerEnvelope{internal.Xor(clientSecretKey, pad)}.serialize(), clientPublicKey.Bytes()
 }
 
-func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey, clientPublicKey []byte) {
+func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey []byte, clientPublicKey group.Element) {
 	inner := deserializeExternalInnerEnvelope(innerEnvelope, e.Nsk)
-	pad := e.Expand(randomizedPwd, internal.Concat(nonce, internal.TagPad), len(inner.encrypted))
+	pad := e.Expand(randomizedPwd, encoding.Concat(nonce, internal.TagPad), len(inner.encrypted))
 	clientSecretKey = internal.Xor(inner.encrypted, pad)
 
 	sk, err := e.NewScalar().Decode(clientSecretKey)
@@ -63,5 +64,5 @@ func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (
 		panic(errInvalidSK)
 	}
 
-	return clientSecretKey, e.recoverPublicKey(sk).Bytes()
+	return clientSecretKey, e.recoverPublicKey(sk)
 }

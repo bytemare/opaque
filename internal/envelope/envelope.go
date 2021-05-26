@@ -13,6 +13,8 @@ import (
 	"crypto/hmac"
 	"errors"
 	"fmt"
+	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/cryptotools/utils"
 
@@ -60,7 +62,7 @@ func Size(mode Mode, p *internal.Parameters) int {
 	case Internal:
 		innerSize = 0
 	case External:
-		innerSize = internal.ScalarLength[p.AKEGroup]
+		innerSize = encoding.ScalarLength[p.AKEGroup]
 	default:
 		panic("invalid envelope mode")
 	}
@@ -98,7 +100,7 @@ func DeserializeEnvelope(data []byte, mode Mode, nn, nm, nsk int) (*Envelope, in
 
 type innerEnvelope interface {
 	buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte)
-	recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey, clientPublicKey []byte)
+	recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey []byte, clientPublicKey group.Element)
 }
 
 func BuildPRK(p *internal.Parameters, unblinded []byte) []byte {
@@ -118,7 +120,7 @@ func (m *Mailer) inner(mode Mode) innerEnvelope {
 	case Internal:
 		inner = &internalMode{m.AKEGroup, m.KDF}
 	case External:
-		inner = &externalMode{internal.ScalarLength[m.AKEGroup], m.AKEGroup.Get(nil), m.KDF}
+		inner = &externalMode{encoding.ScalarLength[m.AKEGroup], m.AKEGroup.Get(nil), m.KDF}
 	default:
 		panic("invalid mode")
 	}
@@ -127,8 +129,8 @@ func (m *Mailer) inner(mode Mode) innerEnvelope {
 }
 
 func (m *Mailer) buildKeys(randomizedPwd, nonce []byte) (authKey, exportKey []byte) {
-	authKey = m.KDF.Expand(randomizedPwd, internal.Concat(nonce, internal.TagAuthKey), m.KDF.Size())
-	exportKey = m.KDF.Expand(randomizedPwd, internal.Concat(nonce, internal.TagExportKey), m.KDF.Size())
+	authKey = m.KDF.Expand(randomizedPwd, encoding.Concat(nonce, internal.TagAuthKey), m.KDF.Size())
+	exportKey = m.KDF.Expand(randomizedPwd, encoding.Concat(nonce, internal.TagExportKey), m.KDF.Size())
 
 	return
 }
@@ -160,10 +162,10 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, serverPublicKey, clien
 }
 
 func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, serverPublicKey, idc, ids []byte,
-	envelope *Envelope) (clientSecretKey, clientPublicKey, exportKey []byte, err error) {
+	envelope *Envelope) (clientSecretKey []byte, clientPublicKey group.Element, exportKey []byte, err error) {
 	authKey, exportKey := m.buildKeys(randomizedPwd, envelope.Nonce)
 	clientSecretKey, clientPublicKey = m.inner(mode).recoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
-	ctc := CreateCleartextCredentials(clientPublicKey, serverPublicKey, idc, ids)
+	ctc := CreateCleartextCredentials(clientPublicKey.Bytes(), serverPublicKey, idc, ids)
 
 	expectedTag := m.authTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
 	if !hmac.Equal(expectedTag, envelope.AuthTag) {

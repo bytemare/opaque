@@ -98,8 +98,8 @@ type Configuration struct {
 	// AKEGroup identifies the prime-order group to use in the AKE.
 	AKEGroup Group `json:"group"`
 
-	// Info is optional shared information to include in the AKE transcript.
-	Info []byte
+	// Context is optional shared information to include in the AKE transcript.
+	Context []byte
 
 	// NonceLen identifies the length to use for nonces. 32 is the recommended value.
 	NonceLen int `json:"nn"`
@@ -115,11 +115,11 @@ func (c *Configuration) toInternal() *internal.Parameters {
 		Hash:            &internal.Hash{H: c.Hash.Get()},
 		MHF:             &internal.MHF{MHF: c.MHF.Get()},
 		NonceLen:        c.NonceLen,
-		OPRFPointLength: internal.PointLength[cs.Group()],
-		AkePointLength:  internal.PointLength[g],
+		OPRFPointLength: encoding.PointLength[cs.Group()],
+		AkePointLength:  encoding.PointLength[g],
 		OprfCiphersuite: cs,
 		AKEGroup:        g,
-		Info:            c.Info,
+		Context:         c.Context,
 	}
 	ip.EnvelopeSize = envelope.Size(envelope.Mode(c.Mode), ip)
 

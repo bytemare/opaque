@@ -12,6 +12,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/voprf"
@@ -39,16 +40,15 @@ type Parameters struct {
 	AkePointLength  int
 	OprfCiphersuite voprf.Ciphersuite
 	AKEGroup        ciphersuite.Identifier
-	Info            []byte
+	Context         []byte
 }
 
 func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.RegistrationRequest, error) {
-	r := &message.RegistrationRequest{Data: input}
-	if len(r.Data) != p.OPRFPointLength {
+	if len(input) != p.OPRFPointLength {
 		return nil, errInvalidSize
 	}
 
-	return r, nil
+	return &message.RegistrationRequest{Data: input}, nil
 }
 
 func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.RegistrationResponse, error) {
@@ -78,12 +78,12 @@ func (p *Parameters) DeserializeRegistrationUpload(input []byte) (*message.Regis
 	}, nil
 }
 
-func (p *Parameters) DeserializeCredentialRequest(input []byte) (*cred.CredentialRequest, int, error) {
-	if len(input) <= p.OPRFPointLength {
-		return nil, 0, errCredReqShort
+func (p *Parameters) DeserializeCredentialRequest(input []byte) (*cred.CredentialRequest, error) {
+	if len(input) != p.OPRFPointLength {
+		return nil, errCredReqShort
 	}
 
-	return &cred.CredentialRequest{Data: input[:p.OPRFPointLength]}, p.OPRFPointLength, nil
+	return &cred.CredentialRequest{Data: input[:p.OPRFPointLength]}, nil
 }
 
 func (p *Parameters) deserializeCredentialResponse(input []byte) (*cred.CredentialResponse, int, error) {
@@ -109,18 +109,17 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 		return nil, errInvalidSize
 	}
 
-	creq, offset, err := p.DeserializeCredentialRequest(input)
+	creq, err := p.DeserializeCredentialRequest(input[:p.OPRFPointLength])
 	if err != nil {
 		return nil, fmt.Errorf("deserializing the credential crequest: %w", err)
 	}
 
-	nonceU := input[offset : offset+p.NonceLen]
-	epku := input[offset+p.NonceLen:]
+	nonceU := input[p.OPRFPointLength : p.OPRFPointLength+p.NonceLen]
 
 	return &message.KE1{
 		CredentialRequest: creq,
 		NonceU:            nonceU,
-		EpkU:              epku,
+		EpkU:              input[p.OPRFPointLength+p.NonceLen:],
 	}, nil
 }
 
@@ -157,6 +156,6 @@ func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
 }
 
 func (p *Parameters) MaskResponse(key, nonce, in []byte) []byte {
-	pad := p.KDF.Expand(key, Concat(nonce, TagCredentialResponsePad), PointLength[p.AKEGroup]+p.EnvelopeSize)
+	pad := p.KDF.Expand(key, encoding.Concat(nonce, TagCredentialResponsePad), encoding.PointLength[p.AKEGroup]+p.EnvelopeSize)
 	return Xor(pad, in)
 }

@@ -11,6 +11,7 @@ package opaque
 import (
 	"errors"
 	"fmt"
+	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/cryptotools/utils"
 
@@ -69,7 +70,7 @@ func (s *Server) evaluate(seed, blinded []byte) (m []byte, err error) {
 }
 
 func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element []byte) (m []byte, err error) {
-	seed := s.KDF.Expand(oprfSeed, internal.Concat(credentialIdentifier, internal.OprfKey), internal.ScalarLength[s.OprfCiphersuite.Group()])
+	seed := s.KDF.Expand(oprfSeed, encoding.Concat(credentialIdentifier, internal.OprfKey), encoding.ScalarLength[s.OprfCiphersuite.Group()])
 	return s.evaluate(seed, element)
 }
 
@@ -82,7 +83,7 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
 	}
 
 	return &message.RegistrationResponse{
-		Data: internal.PadPoint(z, s.OprfCiphersuite.Group()),
+		Data: encoding.PadPoint(z, s.OprfCiphersuite.Group()),
 		Pks:  serverPublicKey,
 	}, nil
 }
@@ -99,11 +100,11 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 		maskingNonce = utils.RandomBytes(s.Parameters.NonceLen)
 	}
 
-	clear := internal.Concat(serverPublicKey, string(record.Envelope))
+	clear := encoding.Concat(serverPublicKey, string(record.Envelope))
 	maskedResponse := s.MaskResponse(record.MaskingKey, maskingNonce, clear)
 
 	return &cred.CredentialResponse{
-		Data:           internal.PadPoint(z, s.OprfCiphersuite.Group()),
+		Data:           encoding.PadPoint(z, s.OprfCiphersuite.Group()),
 		MaskingNonce:   maskingNonce,
 		MaskedResponse: maskedResponse,
 	}, nil

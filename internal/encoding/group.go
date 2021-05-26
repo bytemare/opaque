@@ -6,8 +6,8 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-// Package internal provides structures and functions to operate OPAQUE that are not part of the public API.
-package internal
+// Package encoding provides encoding utilities.
+package encoding
 
 import (
 	"github.com/bytemare/cryptotools/group"

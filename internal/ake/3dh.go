@@ -36,7 +36,7 @@ func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
 	scalar := g.NewScalar().Random()
 	publicKey := g.Base().Mult(scalar)
 
-	return internal.SerializeScalar(scalar, id), internal.SerializePoint(publicKey, id)
+	return encoding.SerializeScalar(scalar, id), encoding.SerializePoint(publicKey, id)
 }
 
 type keys struct {
@@ -82,7 +82,7 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 func initTranscript(p *internal.Parameters, idc, ids []byte, ke1 *message.KE1, ke2 *message.KE2) {
 	cp := encoding.EncodeVectorLen(idc, 2)
 	sp := encoding.EncodeVectorLen(ids, 2)
-	p.Hash.Write(utils.Concatenate(0, []byte(internal.VersionTag), encoding.EncodeVector(p.Info),
+	p.Hash.Write(utils.Concatenate(0, []byte(internal.VersionTag), encoding.EncodeVector(p.Context),
 		cp, ke1.Serialize(),
 		sp, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS))
 }

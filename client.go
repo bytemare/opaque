@@ -11,6 +11,7 @@ package opaque
 import (
 	"errors"
 	"fmt"
+	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
@@ -54,7 +55,7 @@ func (c *Client) KeyGen() (secretKey, publicKey []byte) {
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
 func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest {
 	m := c.Core.OprfStart(password)
-	return &message.RegistrationRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
+	return &message.RegistrationRequest{Data: m}
 }
 
 // RegistrationFinalize returns a RegistrationUpload message given the server's RegistrationResponse and credentials. If
@@ -85,7 +86,7 @@ func (c *Client) RegistrationFinalize(clientSecretKey []byte, creds *Credentials
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) Init(password []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
-	credReq := &cred.CredentialRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
+	credReq := &cred.CredentialRequest{Data: encoding.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
 	c.Ke1 = c.Ake.Start(c.Parameters.AKEGroup)
 	c.Ke1.CredentialRequest = credReq
 
@@ -94,16 +95,16 @@ func (c *Client) Init(password []byte) *message.KE1 {
 
 func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte, *envelope.Envelope, error) {
 	envSize := c.Parameters.EnvelopeSize
-	if len(maskedResponse) != internal.PointLength[c.AKEGroup]+envSize {
+	if len(maskedResponse) != encoding.PointLength[c.AKEGroup]+envSize {
 		return nil, nil, errInvalidMaskedLength
 	}
 
 	clear := c.MaskResponse(maskingKey, maskingNonce, maskedResponse)
 
-	serverPublicKey := clear[:internal.PointLength[c.AKEGroup]]
-	e := clear[internal.PointLength[c.AKEGroup]:]
+	serverPublicKey := clear[:encoding.PointLength[c.AKEGroup]]
+	e := clear[encoding.PointLength[c.AKEGroup]:]
 
-	env, _, err := envelope.DeserializeEnvelope(e, c.mode, c.NonceLen, c.Core.MAC.Size(), internal.ScalarLength[c.AKEGroup])
+	env, _, err := envelope.DeserializeEnvelope(e, c.mode, c.NonceLen, c.Core.MAC.Size(), encoding.ScalarLength[c.AKEGroup])
 	if err != nil {
 		return nil, nil, fmt.Errorf("deserializing envelope: %w", err)
 	}
@@ -135,7 +136,7 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 	}
 
 	if idc == nil {
-		idc = clientPublicKey
+		idc = clientPublicKey.Bytes()
 	}
 
 	if ids == nil {

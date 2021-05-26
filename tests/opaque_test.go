@@ -32,7 +32,7 @@ func TestFull(t *testing.T) {
 	modes := []opaque.Mode{opaque.Internal, opaque.External}
 
 	p := opaque.DefaultConfiguration()
-	p.Info = []byte("OPAQUETest")
+	p.Context = []byte("OPAQUETest")
 
 	test := &testParams{
 		Configuration: p,

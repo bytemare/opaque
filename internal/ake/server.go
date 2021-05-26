@@ -12,6 +12,7 @@ package ake
 import (
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/opaque/internal"
 	cred "github.com/bytemare/opaque/internal/message"
@@ -59,7 +60,7 @@ func (s *Server) Response(p *internal.Parameters, serverIdentity, serverSecretKe
 	ke2 := &message.KE2{
 		CredentialResponse: response,
 		NonceS:             nonce,
-		EpkS:               internal.SerializePoint(epk, p.AKEGroup),
+		EpkS:               encoding.PadPoint(epk.Bytes(), p.AKEGroup),
 	}
 
 	macs, sessionSecret, err := core3DH(server, p, k, clientIdentity, serverIdentity, ke1, ke2)
