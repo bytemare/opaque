@@ -16,7 +16,6 @@ import (
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/voprf"
 
-	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
@@ -26,7 +25,6 @@ var (
 	errInvalidMessageLength = errors.New("invalid message length")
 	errCredReqShort         = errors.New(" CredentialRequest too short")
 	errInvalidCredRespShort = errors.New(" CredentialResponse too short")
-	errInvalidEpkuLength    = errors.New("invalid epku length")
 	errShortMessage         = errors.New("message is too short")
 )
 
@@ -113,7 +111,7 @@ func (p *Parameters) DeserializeCredentialResponse(input []byte) (*cred.Credenti
 }
 
 func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
-	if len(input) < p.OPRFPointLength+p.NonceLen+2+p.AkePointLength {
+	if len(input) != p.OPRFPointLength+p.NonceLen+p.AkePointLength {
 		return nil, errInvalidSize
 	}
 
@@ -123,29 +121,17 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 	}
 
 	nonceU := input[offset : offset+p.NonceLen]
-
-	info, offset2, err := encoding.DecodeVector(input[offset+p.NonceLen:])
-	if err != nil {
-		return nil, fmt.Errorf("decoding the client info: %w", err)
-	}
-
-	offset = offset + p.NonceLen + offset2
-	epku := input[offset:]
-
-	if len(epku) != p.AkePointLength {
-		return nil, errInvalidEpkuLength
-	}
+	epku := input[offset+p.NonceLen:]
 
 	return &message.KE1{
 		CredentialRequest: creq,
 		NonceU:            nonceU,
-		ClientInfo:        info,
 		EpkU:              epku,
 	}, nil
 }
 
 func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
-	if len(input) < p.OPRFPointLength+p.NonceLen+p.AkePointLength+p.EnvelopeSize+p.NonceLen+p.AkePointLength+p.MAC.Size() {
+	if len(input) != p.OPRFPointLength+p.NonceLen+p.AkePointLength+p.EnvelopeSize+p.NonceLen+p.AkePointLength+p.MAC.Size() {
 		return nil, errShortMessage
 	}
 
@@ -158,19 +144,12 @@ func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 	offset += p.NonceLen
 	epks := input[offset : offset+p.AkePointLength]
 	offset += p.AkePointLength
-
-	einfo, length, err := encoding.DecodeVector(input[offset:])
-	if err != nil {
-		return nil, fmt.Errorf("decoding einfo: %w", err)
-	}
-
-	mac := input[offset+length:]
+	mac := input[offset:]
 
 	return &message.KE2{
 		CredentialResponse: cresp,
 		NonceS:             nonceS,
 		EpkS:               epks,
-		Einfo:              einfo,
 		Mac:                mac,
 	}, nil
 }

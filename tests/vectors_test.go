@@ -214,7 +214,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.Ake.SetValues(client.Parameters.AKEGroup, esk, input.ClientNonce, 32)
-	KE1 := client.Init(input.Password, input.ClientInfo)
+	KE1 := client.Init(input.Password)
 
 	if !bytes.Equal(out.KE1, KE1.Serialize()) {
 		t.Fatalf("KE1 do not match")
@@ -280,7 +280,7 @@ func (v *vector) loginResponse(t *testing.T, p *internal.Parameters, s *opaque.S
 	}
 	s.Ake.SetValues(p.AKEGroup, sks, v.Inputs.ServerNonce, 32)
 
-	KE2, err := s.Init(ke1, v.Inputs.ServerInfo, serverID, serverPrivateKey, serverPublicKey, oprfSeed, record)
+	KE2, err := s.Init(ke1, serverID, serverPrivateKey, serverPublicKey, oprfSeed, record)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,10 +332,6 @@ func (v *vector) loginResponse(t *testing.T, p *internal.Parameters, s *opaque.S
 
 	if !bytes.Equal(draftKE2.EpkS, KE2.EpkS) {
 		t.Fatal("epks do not match")
-	}
-
-	if !bytes.Equal(draftKE2.Einfo, KE2.Einfo) {
-		t.Fatalf("einfo do not match")
 	}
 
 	if !bytes.Equal(draftKE2.Mac, KE2.Mac) {

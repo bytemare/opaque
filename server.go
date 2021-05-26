@@ -110,7 +110,7 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 }
 
 // Init responds to a KE1 message with a KE2 message given server credentials and client record.
-func (s *Server) Init(ke1 *message.KE1, serverInfo, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
+func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord) (*message.KE2, error) {
 	if serverPublicKey == nil {
 		panic(nil)
@@ -132,7 +132,7 @@ func (s *Server) Init(ke1 *message.KE1, serverInfo, serverIdentity, serverSecret
 		serverIdentity = serverPublicKey
 	}
 
-	ke2, err := s.Ake.Response(s.Parameters, serverIdentity, serverSecretKey, clientIdentity, record.PublicKey, serverInfo, ke1, response)
+	ke2, err := s.Ake.Response(s.Parameters, serverIdentity, serverSecretKey, clientIdentity, record.PublicKey, ke1, response)
 	if err != nil {
 		return nil, fmt.Errorf(" AKE response: %w", err)
 	}

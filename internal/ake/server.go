@@ -50,7 +50,7 @@ func (s *Server) SetValues(cs ciphersuite.Identifier, esk group.Scalar, nonce []
 }
 
 // Response produces a 3DH server response message.
-func (s *Server) Response(p *internal.Parameters, serverIdentity, serverSecretKey, clientIdentity, clientPublicKey, serverInfo []byte,
+func (s *Server) Response(p *internal.Parameters, serverIdentity, serverSecretKey, clientIdentity, clientPublicKey []byte,
 	ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
 	epk := s.SetValues(p.AKEGroup, nil, nil, p.NonceLen)
 	nonce := s.nonceS
@@ -62,15 +62,14 @@ func (s *Server) Response(p *internal.Parameters, serverIdentity, serverSecretKe
 		EpkS:               internal.SerializePoint(epk, p.AKEGroup),
 	}
 
-	output, sessionSecret, err := core3DH(server, p, k, clientIdentity, serverIdentity, serverInfo, ke1, ke2)
+	macs, sessionSecret, err := core3DH(server, p, k, clientIdentity, serverIdentity, ke1, ke2)
 	if err != nil {
 		return nil, err
 	}
 
 	s.sessionSecret = sessionSecret
-	s.clientMac = output.clientMac
-	ke2.Einfo = output.info
-	ke2.Mac = output.serverMac
+	s.clientMac = macs.clientMac
+	ke2.Mac = macs.serverMac
 
 	return ke2, nil
 }
