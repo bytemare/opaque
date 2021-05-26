@@ -12,9 +12,9 @@ package ake
 import (
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )

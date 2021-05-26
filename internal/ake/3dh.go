@@ -12,6 +12,7 @@ package ake
 import (
 	"errors"
 	"fmt"
+
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"

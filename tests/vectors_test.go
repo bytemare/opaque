@@ -59,14 +59,14 @@ type config struct {
 	MHF          string    `json:"MHF"`
 	Name         string    `json:"Name"`
 	OPRF         ByteToHex `json:"OPRF"`
-	Context		 ByteToHex `json:"Context"`
+	Context      ByteToHex `json:"Context"`
 }
 
 type inputs struct {
 	BlindLogin            ByteToHex `json:"blind_login"`
 	BlindRegistration     ByteToHex `json:"blind_registration"`
 	ClientIdentity        ByteToHex `json:"client_identity,omitempty"`
-	Context            	  ByteToHex `json:"context"`
+	Context               ByteToHex `json:"context"`
 	ClientKeyshare        ByteToHex `json:"client_keyshare"`
 	ClientNonce           ByteToHex `json:"client_nonce"`
 	ClientPrivateKey      ByteToHex `json:"client_private_key"`
@@ -86,14 +86,14 @@ type inputs struct {
 }
 
 type intermediates struct {
-	AuthKey             ByteToHex `json:"auth_key"`       //
-	ClientMacKey        ByteToHex `json:"client_mac_key"` //
-	ClientPublicKey     ByteToHex `json:"client_public_key"`
-	Envelope            ByteToHex `json:"envelope"`              //
-	HandshakeSecret     ByteToHex `json:"handshake_secret"`      //
-	MaskingKey          ByteToHex `json:"masking_key"`
-	RandomPWD           ByteToHex `json:"randomized_pwd"` //
-	ServerMacKey        ByteToHex `json:"server_mac_key"` //
+	AuthKey         ByteToHex `json:"auth_key"`       //
+	ClientMacKey    ByteToHex `json:"client_mac_key"` //
+	ClientPublicKey ByteToHex `json:"client_public_key"`
+	Envelope        ByteToHex `json:"envelope"`         //
+	HandshakeSecret ByteToHex `json:"handshake_secret"` //
+	MaskingKey      ByteToHex `json:"masking_key"`
+	RandomPWD       ByteToHex `json:"randomized_pwd"` //
+	ServerMacKey    ByteToHex `json:"server_mac_key"` //
 }
 
 type outputs struct {

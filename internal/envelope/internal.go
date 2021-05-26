@@ -12,9 +12,9 @@ package envelope
 import (
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encoding"
 )
 
 type internalMode struct {

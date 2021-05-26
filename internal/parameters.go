@@ -12,11 +12,11 @@ package internal
 import (
 	"errors"
 	"fmt"
-	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/voprf"
 
+	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )

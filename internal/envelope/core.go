@@ -10,6 +10,7 @@ package envelope
 
 import (
 	"fmt"
+
 	"github.com/bytemare/voprf"
 
 	"github.com/bytemare/opaque/internal"

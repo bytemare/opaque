@@ -13,12 +13,12 @@ import (
 	"crypto/hmac"
 	"errors"
 	"fmt"
-	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/opaque/internal/encoding"
 
+	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encoding"
 )
 
 var (

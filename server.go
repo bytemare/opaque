@@ -11,12 +11,12 @@ package opaque
 import (
 	"errors"
 	"fmt"
-	"github.com/bytemare/opaque/internal/encoding"
 
 	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
+	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
