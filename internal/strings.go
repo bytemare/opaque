@@ -28,14 +28,12 @@ const (
 
 	// 3DH tags.
 
-	Tag3DH        = "3DH"
-	LabelPrefix   = "OPAQUE-"
-	TagHandshake  = "HandshakeSecret"
-	TagSession    = "SessionKey"
-	TagMacServer  = "ServerMAC"
-	TagMacClient  = "ClientMAC"
-	TagEncServer  = "HandshakeKey"
-	EncryptionTag = "EncryptionPad"
+	VersionTag   = "RFCXXXX"
+	LabelPrefix  = "OPAQUE-"
+	TagHandshake = "HandshakeSecret"
+	TagSession   = "SessionKey"
+	TagMacServer = "ServerMAC"
+	TagMacClient = "ClientMAC"
 
 	// Client tags.
 

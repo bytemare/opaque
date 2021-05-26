@@ -196,7 +196,7 @@ func ExampleLoginKeyExchange() {
 	server := conf.Server()
 
 	// The client initiates the ball and sends the serialized ke1 to the server
-	ke1 := client.Init(password, nil)
+	ke1 := client.Init(password)
 	message1 := ke1.Serialize()
 
 	// The server interprets ke1, and sends back ke2
@@ -205,7 +205,7 @@ func ExampleLoginKeyExchange() {
 		panic(err)
 	}
 
-	ke2, err := server.Init(ke1s, nil, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed,
+	ke2, err := server.Init(ke1s, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed,
 		exampleClientRecord)
 	if err != nil {
 		panic(err)

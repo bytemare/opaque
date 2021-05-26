@@ -50,34 +50,33 @@ func (c *Client) SetValues(cs ciphersuite.Identifier, esk group.Scalar, nonce []
 }
 
 // Start initiates the 3DH protocol, and returns a KE1 message with clientInfo.
-func (c *Client) Start(cs ciphersuite.Identifier, clientInfo []byte) *message.KE1 {
+func (c *Client) Start(cs ciphersuite.Identifier) *message.KE1 {
 	epk := c.SetValues(cs, nil, nil, 32)
 
 	return &message.KE1{
-		NonceU:     c.NonceU,
-		ClientInfo: clientInfo,
-		EpkU:       internal.SerializePoint(epk, cs),
+		NonceU: c.NonceU,
+		EpkU:   internal.SerializePoint(epk, cs),
 	}
 }
 
 // Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions
-// returns a KE3 message, and the server_info is one was sent.
+// returns a KE3 message.
 func (c *Client) Finalize(p *internal.Parameters, clientIdentity, clientSecretKey, serverIdentity, serverPublicKey []byte,
-	ke1 *message.KE1, ke2 *message.KE2) (*message.KE3, []byte, error) {
+	ke1 *message.KE1, ke2 *message.KE2) (*message.KE3, error) {
 	k := &coreKeys{c.esk, clientSecretKey, ke2.EpkS, serverPublicKey}
 
-	st, sessionSecret, err := core3DH(client, p, k, clientIdentity, serverIdentity, ke2.Einfo, ke1, ke2)
+	macs, sessionSecret, err := core3DH(client, p, k, clientIdentity, serverIdentity, ke1, ke2)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	if !p.MAC.Equal(st.serverMac, ke2.Mac) {
-		return nil, nil, errAkeInvalidServerMac
+	if !p.MAC.Equal(macs.serverMac, ke2.Mac) {
+		return nil, errAkeInvalidServerMac
 	}
 
 	c.sessionSecret = sessionSecret
 
-	return &message.KE3{Mac: st.clientMac}, st.info, nil
+	return &message.KE3{Mac: macs.clientMac}, nil
 }
 
 // SessionKey returns the secret shared session key if a previous call to Finalize() was successful.

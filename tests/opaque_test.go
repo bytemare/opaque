@@ -32,6 +32,7 @@ func TestFull(t *testing.T) {
 	modes := []opaque.Mode{opaque.Internal, opaque.External}
 
 	p := opaque.DefaultConfiguration()
+	p.Info = []byte("OPAQUETest")
 
 	test := &testParams{
 		Configuration: p,
@@ -126,7 +127,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord) []byte {
 	// Client
 	client := p.Client()
-	ke1 := client.Init(p.password, nil)
+	ke1 := client.Init(p.password)
 
 	m4s := ke1.Serialize()
 
@@ -138,7 +139,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 		t.Fatalf(dbgErr, p.Mode, err)
 	}
 
-	ke2, err := server.Init(m4, nil, p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed, record)
+	ke2, err := server.Init(m4, p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed, record)
 	if err != nil {
 		t.Fatalf(dbgErr, p.Mode, err)
 	}

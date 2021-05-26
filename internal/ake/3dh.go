@@ -12,7 +12,6 @@ package ake
 import (
 	"errors"
 	"fmt"
-
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"
@@ -42,8 +41,6 @@ func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
 
 type keys struct {
 	serverMacKey, clientMacKey []byte
-	handshakeSecret            []byte
-	handshakeEncryptKey        []byte
 }
 
 // setValues - testing: integrated to support testing, to force values.
@@ -82,20 +79,21 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func newInfo(h *internal.Hash, ke1 *message.KE1, idu, ids, response, nonceS, epks []byte) {
-	cp := encoding.EncodeVectorLen(idu, 2)
+func initTranscript(p *internal.Parameters, idc, ids []byte, ke1 *message.KE1, ke2 *message.KE2) {
+	cp := encoding.EncodeVectorLen(idc, 2)
 	sp := encoding.EncodeVectorLen(ids, 2)
-	h.Write(utils.Concatenate(0, []byte(internal.Tag3DH), cp, ke1.Serialize(), sp, response, nonceS, epks))
+	p.Hash.Write(utils.Concatenate(0, []byte(internal.VersionTag), encoding.EncodeVector(p.Info),
+		cp, ke1.Serialize(),
+		sp, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS))
 }
 
 func deriveKeys(h *internal.KDF, ikm, context []byte) (k *keys, sessionSecret []byte) {
 	prk := h.Extract(nil, ikm)
 	k = &keys{}
-	k.handshakeSecret = deriveSecret(h, prk, []byte(internal.TagHandshake), context)
+	handshakeSecret := deriveSecret(h, prk, []byte(internal.TagHandshake), context)
 	sessionSecret = deriveSecret(h, prk, []byte(internal.TagSession), context)
-	k.serverMacKey = expandLabel(h, k.handshakeSecret, []byte(internal.TagMacServer), nil)
-	k.clientMacKey = expandLabel(h, k.handshakeSecret, []byte(internal.TagMacClient), nil)
-	k.handshakeEncryptKey = expandLabel(h, k.handshakeSecret, []byte(internal.TagEncServer), nil)
+	k.serverMacKey = expandLabel(h, handshakeSecret, []byte(internal.TagMacServer), nil)
+	k.clientMacKey = expandLabel(h, handshakeSecret, []byte(internal.TagMacClient), nil)
 
 	return k, sessionSecret
 }
@@ -143,22 +141,12 @@ func ikm(s selector, g group.Group, esk group.Scalar, secretKey, peerEpk, peerPu
 	panic(errInvalidSelector)
 }
 
-func cryptInfo(p *internal.Parameters, key, info []byte) (out []byte) {
-	if len(info) != 0 {
-		pad := p.KDF.Expand(key, []byte(internal.EncryptionTag), len(info))
-		out = internal.Xor(pad, info)
-	}
-
-	return out
-}
-
-func getServerMac(p *internal.Parameters, key, einfo []byte) []byte {
-	p.Hash.Write(encoding.EncodeVector(einfo))
+func serverMAC(p *internal.Parameters, key []byte) []byte {
 	return p.MAC.MAC(key, p.Hash.Sum()) // transcript2
 }
 
-type output struct {
-	info, serverMac, clientMac []byte
+type macs struct {
+	serverMac, clientMac []byte
 }
 
 type coreKeys struct {
@@ -166,31 +154,22 @@ type coreKeys struct {
 	secretKey, peerEpk, peerPublicKey []byte
 }
 
-func core3DH(s selector, p *internal.Parameters, k *coreKeys, idu, ids, info []byte,
-	ke1 *message.KE1, ke2 *message.KE2) (*output, []byte, error) {
+func core3DH(s selector, p *internal.Parameters, k *coreKeys, idu, ids []byte,
+	ke1 *message.KE1, ke2 *message.KE2) (*macs, []byte, error) {
 	ikm, err := ikm(s, p.AKEGroup.Get(nil), k.esk, k.secretKey, k.peerEpk, k.peerPublicKey)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	newInfo(p.Hash, ke1, idu, ids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS)
+	initTranscript(p, idu, ids, ke1, ke2)
 	keys, sessionSecret := deriveKeys(p.KDF, ikm, p.Hash.Sum())
 
-	st := &output{}
-	st.info = cryptInfo(p, keys.handshakeEncryptKey, info)
-
-	switch s {
-	case client:
-		st.serverMac = getServerMac(p, keys.serverMacKey, info)
-	case server:
-		st.serverMac = getServerMac(p, keys.serverMacKey, st.info)
-	default:
-		panic(errInvalidSelector)
+	m := &macs{
+		serverMac: serverMAC(p, keys.serverMacKey),
 	}
-
-	p.Hash.Write(st.serverMac)
+	p.Hash.Write(m.serverMac)
 	transcript3 := p.Hash.Sum()
-	st.clientMac = p.MAC.MAC(keys.clientMacKey, transcript3)
+	m.clientMac = p.MAC.MAC(keys.clientMacKey, transcript3)
 
-	return st, sessionSecret, nil
+	return m, sessionSecret, nil
 }

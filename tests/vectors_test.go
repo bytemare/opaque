@@ -59,13 +59,14 @@ type config struct {
 	MHF          string    `json:"MHF"`
 	Name         string    `json:"Name"`
 	OPRF         ByteToHex `json:"OPRF"`
+	Info		 ByteToHex `json:"Info"`
 }
 
 type inputs struct {
 	BlindLogin            ByteToHex `json:"blind_login"`
 	BlindRegistration     ByteToHex `json:"blind_registration"`
 	ClientIdentity        ByteToHex `json:"client_identity,omitempty"`
-	ClientInfo            ByteToHex `json:"client_info"`
+	Info            	  ByteToHex `json:"info"`
 	ClientKeyshare        ByteToHex `json:"client_keyshare"`
 	ClientNonce           ByteToHex `json:"client_nonce"`
 	ClientPrivateKey      ByteToHex `json:"client_private_key"`
@@ -77,7 +78,6 @@ type inputs struct {
 	OprfSeed              ByteToHex `json:"oprf_seed"`
 	Password              ByteToHex `json:"password"`
 	ServerIdentity        ByteToHex `json:"server_identity,omitempty"`
-	ServerInfo            ByteToHex `json:"server_info"`
 	ServerKeyshare        ByteToHex `json:"server_keyshare"`
 	ServerNonce           ByteToHex `json:"server_nonce"`
 	ServerPrivateKey      ByteToHex `json:"server_private_key"`
@@ -90,7 +90,6 @@ type intermediates struct {
 	ClientMacKey        ByteToHex `json:"client_mac_key"` //
 	ClientPublicKey     ByteToHex `json:"client_public_key"`
 	Envelope            ByteToHex `json:"envelope"`              //
-	HandshakeEncryptKey ByteToHex `json:"handshake_encrypt_key"` //
 	HandshakeSecret     ByteToHex `json:"handshake_secret"`      //
 	MaskingKey          ByteToHex `json:"masking_key"`
 	RandomPWD           ByteToHex `json:"randomized_pwd"` //
@@ -129,6 +128,7 @@ func (v *vector) test(t *testing.T) {
 		MHF:       mhf.Scrypt,
 		Mode:      opaque.Mode(mode[0]),
 		AKEGroup:  groupToGroup(v.Config.Group),
+		Info: []byte(v.Config.Info),
 		NonceLen:  32,
 	}
 
@@ -214,7 +214,7 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal(err)
 	}
 	client.Ake.SetValues(client.Parameters.AKEGroup, esk, input.ClientNonce, 32)
-	KE1 := client.Init(input.Password, input.ClientInfo)
+	KE1 := client.Init(input.Password)
 
 	if !bytes.Equal(out.KE1, KE1.Serialize()) {
 		t.Fatalf("KE1 do not match")
@@ -280,7 +280,7 @@ func (v *vector) loginResponse(t *testing.T, p *internal.Parameters, s *opaque.S
 	}
 	s.Ake.SetValues(p.AKEGroup, sks, v.Inputs.ServerNonce, 32)
 
-	KE2, err := s.Init(ke1, v.Inputs.ServerInfo, serverID, serverPrivateKey, serverPublicKey, oprfSeed, record)
+	KE2, err := s.Init(ke1, serverID, serverPrivateKey, serverPublicKey, oprfSeed, record)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,10 +332,6 @@ func (v *vector) loginResponse(t *testing.T, p *internal.Parameters, s *opaque.S
 
 	if !bytes.Equal(draftKE2.EpkS, KE2.EpkS) {
 		t.Fatal("epks do not match")
-	}
-
-	if !bytes.Equal(draftKE2.Einfo, KE2.Einfo) {
-		t.Fatalf("einfo do not match")
 	}
 
 	if !bytes.Equal(draftKE2.Mac, KE2.Mac) {

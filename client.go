@@ -83,10 +83,10 @@ func (c *Client) RegistrationFinalize(clientSecretKey []byte, creds *Credentials
 
 // Init initiates the authentication process, returning a KE1 message blinding the given password.
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
-func (c *Client) Init(password, clientInfo []byte) *message.KE1 {
+func (c *Client) Init(password []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
 	credReq := &cred.CredentialRequest{Data: internal.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
-	c.Ke1 = c.Ake.Start(c.Parameters.AKEGroup, clientInfo)
+	c.Ke1 = c.Ake.Start(c.Parameters.AKEGroup)
 	c.Ke1.CredentialRequest = credReq
 
 	return c.Ke1
@@ -142,7 +142,7 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 		ids = serverPublicKey
 	}
 
-	ke3, _, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, serverPublicKey, c.Ke1, ke2)
+	ke3, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, serverPublicKey, c.Ke1, ke2)
 	if err != nil {
 		return nil, nil, fmt.Errorf(" AKE finalization: %w", err)
 	}
