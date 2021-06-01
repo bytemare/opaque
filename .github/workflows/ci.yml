@@ -56,7 +56,7 @@ jobs:
 
       # Coverage
       - name: Run coverage
-        run: go test -v -race -covermode=atomic -coverpkg=./... -coverprofile=./coverage.out tests/opaque_test.go
+        run: go test -v -race -covermode=atomic -coverpkg=./... -coverprofile=./coverage.out tests/*_test.go
 
       # Codecov
       - name: Codecov

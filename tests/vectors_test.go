@@ -441,16 +441,6 @@ func TestOpaqueVectors(t *testing.T) {
 			}
 
 			for _, tv := range v {
-
-				// Decaf448 not supported, yet
-				if tv.Config.Group == "decaf448" {
-					continue
-				}
-
-				//if tv.Config.Group != "ristretto255" {
-				//	continue
-				//}
-
 				t.Run(fmt.Sprintf("%s - %s - %s", tv.Config.Name, tv.Config.EnvelopeMode, tv.Config.Group), tv.test)
 			}
 			return nil
