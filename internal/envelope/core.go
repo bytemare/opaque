@@ -41,7 +41,7 @@ func (c *Core) OprfStart(password []byte) []byte {
 	return c.Oprf.Blind(password)
 }
 
-// OprfFinalize terminates the OPRF by unblind the evaluated data.
+// OprfFinalize terminates the OPRF by unblinding the evaluated data.
 func (c *Core) OprfFinalize(data []byte) ([]byte, error) {
 	ev := &voprf.Evaluation{Elements: [][]byte{data}}
 
