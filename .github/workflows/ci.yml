@@ -9,7 +9,7 @@ on:
     branches:
       - main
 
-  jobs:
+jobs:
   lint-and-test:
     name: Lint and Test
     runs-on: ubuntu-latest
