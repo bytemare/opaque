@@ -10,8 +10,8 @@ on:
       - main
 
 jobs:
-  analyze:
-    name: Analyze
+  lint-and-test:
+    name: Lint and Test
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -39,10 +39,10 @@ jobs:
       - name: Testing
         run: go test -v ./...
 
-  coverage:
-    name: Coverage
-    needs: [ analyze ]
-    if: github.event_name == 'push'
+  analyze:
+    name: Analyze
+    needs: [ lint-and-test ]
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -56,10 +56,25 @@ jobs:
 
       # Coverage
       - name: Run coverage
-        run: go test -v -race -covermode=atomic -coverpkg=./... -coverprofile=./coverage.out tests/*_test.go
+        run: make cover
 
       # Codecov
       - name: Codecov
         uses: codecov/codecov-action@v1
         with:
           file: ./coverage.out
+
+      # Sonar
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=bytemare_opaque
+            -Dsonar.organization=bytemare-github
+            -Dsonar.go.coverage.reportPaths=./coverage.out
+            -Dsonar.test.exclusions=tests/**
+            -Dsonar.tests=tests/
+            -Dsonar.verbose=true
