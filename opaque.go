@@ -201,3 +201,10 @@ type ClientRecord struct {
 	// testing
 	TestMaskNonce []byte
 }
+
+// GetFakeEnvelope returns a byte array filled with 0s the length of a legitimate envelope size in the configuration's mode.
+// This fake envelope byte array is used in the client enumeration mitigation scheme.
+func GetFakeEnvelope(c *Configuration) []byte {
+	l := c.toInternal().EnvelopeSize
+	return make([]byte, l)
+}

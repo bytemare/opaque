@@ -24,7 +24,6 @@ import (
 	"github.com/bytemare/voprf"
 
 	"github.com/bytemare/opaque"
-	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -51,7 +50,9 @@ func (j *ByteToHex) UnmarshalJSON(b []byte) error {
 */
 
 type config struct {
+	Context      ByteToHex `json:"Context"`
 	EnvelopeMode string    `json:"EnvelopeMode"`
+	Fake         string    `json:"Fake"`
 	Group        string    `json:"Group"`
 	Hash         string    `json:"Hash"`
 	KDF          string    `json:"KDF"`
@@ -59,7 +60,6 @@ type config struct {
 	MHF          string    `json:"MHF"`
 	Name         string    `json:"Name"`
 	OPRF         ByteToHex `json:"OPRF"`
-	Context      ByteToHex `json:"Context"`
 }
 
 type inputs struct {
@@ -83,6 +83,9 @@ type inputs struct {
 	ServerPrivateKey      ByteToHex `json:"server_private_key"`
 	ServerPrivateKeyshare ByteToHex `json:"server_private_keyshare"`
 	ServerPublicKey       ByteToHex `json:"server_public_key"`
+	KE1                   ByteToHex `json:"KE1"`               // Used for fake credentials tests
+	ClientPublicKey       ByteToHex `json:"client_public_key"` // Used for fake credentials tests
+	MaskingKey            ByteToHex `json:"masking_key"`       // Used for fake credentials tests
 }
 
 type intermediates struct {
@@ -114,50 +117,25 @@ type vector struct {
 	Outputs       outputs       `json:"outputs"`
 }
 
-func (v *vector) test(t *testing.T) {
-	mode, err := hex.DecodeString(v.Config.EnvelopeMode)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	p := &opaque.Configuration{
-		OprfGroup: opaque.Group(v.Config.OPRF[1]),
-		Hash:      hashToHash(v.Config.Hash),
-		KDF:       kdfToHash(v.Config.KDF),
-		MAC:       macToHash(v.Config.MAC),
-		MHF:       mhf.Scrypt,
-		Mode:      opaque.Mode(mode[0]),
-		AKEGroup:  groupToGroup(v.Config.Group),
-		Context:   []byte(v.Config.Context),
-		NonceLen:  32,
-	}
-
-	input := v.Inputs
-	check := v.Intermediates
-	out := v.Outputs
-
-	/*
-		Registration
-	*/
-
+func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	// Client
 	client := p.Client()
-	oprfClient := buildOPRFClient(voprf.Ciphersuite(p.OprfGroup), input.BlindRegistration)
+	oprfClient := buildOPRFClient(voprf.Ciphersuite(p.OprfGroup), v.Inputs.BlindRegistration)
 	client.Core.Oprf = oprfClient
-	regReq := client.RegistrationInit(input.Password)
+	regReq := client.RegistrationInit(v.Inputs.Password)
 
-	if !bytes.Equal(out.RegistrationRequest, regReq.Serialize()) {
-		t.Fatalf("registration requests do not match\nwant: %v\ngot : %v", hex.EncodeToString(out.RegistrationRequest), hex.EncodeToString(regReq.Serialize()))
+	if !bytes.Equal(v.Outputs.RegistrationRequest, regReq.Serialize()) {
+		t.Fatalf("registration requests do not match\nwant: %v\ngot : %v", hex.EncodeToString(v.Outputs.RegistrationRequest), hex.EncodeToString(regReq.Serialize()))
 	}
 
 	// Server
 	server := p.Server()
-	regResp, err := server.RegistrationResponse(regReq, input.ServerPublicKey, input.CredentialIdentifier, input.OprfSeed)
+	regResp, err := server.RegistrationResponse(regReq, v.Inputs.ServerPublicKey, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	vRegResp, err := client.DeserializeRegistrationResponse(out.RegistrationResponse)
+	vRegResp, err := client.DeserializeRegistrationResponse(v.Outputs.RegistrationResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,23 +148,23 @@ func (v *vector) test(t *testing.T) {
 		t.Fatal("registration response serverPublicKey do not match")
 	}
 
-	if !bytes.Equal(out.RegistrationResponse, regResp.Serialize()) {
+	if !bytes.Equal(v.Outputs.RegistrationResponse, regResp.Serialize()) {
 		t.Fatal("registration responses do not match")
 	}
 
 	// Client
 	clientCredentials := &opaque.Credentials{
-		Client:       input.ClientIdentity,
-		Server:       input.ServerIdentity,
-		TestEnvNonce: input.EnvelopeNonce,
+		Client:       v.Inputs.ClientIdentity,
+		Server:       v.Inputs.ServerIdentity,
+		TestEnvNonce: v.Inputs.EnvelopeNonce,
 	}
 
-	upload, exportKey, err := client.RegistrationFinalize(input.ClientPrivateKey, clientCredentials, regResp)
+	upload, exportKey, err := client.RegistrationFinalize(v.Inputs.ClientPrivateKey, clientCredentials, regResp)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(out.ExportKey, exportKey) {
+	if !bytes.Equal(v.Outputs.ExportKey, exportKey) {
 		t.Fatal("exportKey do not match")
 	}
 
@@ -194,56 +172,70 @@ func (v *vector) test(t *testing.T) {
 	//	t.Fatal("Client PublicKey do not match")
 	//}
 
-	if !bytes.Equal(check.Envelope, upload.Envelope) {
-		t.Fatalf("envelopes do not match\nexpected %v,\ngot %v", check.Envelope, upload.Envelope)
+	if !bytes.Equal(v.Intermediates.Envelope, upload.Envelope) {
+		t.Fatalf("envelopes do not match\nexpected %v,\ngot %v", v.Intermediates.Envelope, upload.Envelope)
 	}
 
-	if !bytes.Equal(out.RegistrationUpload, upload.Serialize()) {
+	if !bytes.Equal(v.Outputs.RegistrationUpload, upload.Serialize()) {
 		t.Fatalf("registration upload do not match")
 	}
+}
 
-	/*
-		Login
-	*/
-
+func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	// Client
-	client = p.Client()
-	client.Core.Oprf = buildOPRFClient(voprf.Ciphersuite(p.OprfGroup), input.BlindLogin)
-	esk, err := client.AKEGroup.Get(nil).NewScalar().Decode(input.ClientPrivateKeyshare)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client.Ake.SetValues(client.Parameters.AKEGroup, esk, input.ClientNonce, 32)
-	KE1 := client.Init(input.Password)
+	client := p.Client()
 
-	if !bytes.Equal(out.KE1, KE1.Serialize()) {
-		t.Fatalf("KE1 do not match")
+	if !isFake(v.Config.Fake) {
+		client.Core.Oprf = buildOPRFClient(voprf.Ciphersuite(p.OprfGroup), v.Inputs.BlindLogin)
+		esk, err := client.AKEGroup.Get(nil).NewScalar().Decode(v.Inputs.ClientPrivateKeyshare)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		client.Ake.SetValues(client.Parameters.AKEGroup, esk, v.Inputs.ClientNonce, 32)
+		KE1 := client.Init(v.Inputs.Password)
+
+		if !bytes.Equal(v.Outputs.KE1, KE1.Serialize()) {
+			t.Fatalf("KE1 do not match")
+		}
 	}
 
 	// Server
-	server = p.Server()
+	server := p.Server()
 
-	cupload, err := client.DeserializeRegistrationUpload(out.RegistrationUpload)
-	if err != nil {
-		t.Fatal(err)
+	record := &opaque.ClientRecord{}
+	if !isFake(v.Config.Fake) {
+		cupload, err := server.DeserializeRegistrationUpload(v.Outputs.RegistrationUpload)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		record.RegistrationUpload = cupload
+	} else {
+		record.RegistrationUpload = &message.RegistrationUpload{
+			PublicKey:  v.Inputs.ClientPublicKey,
+			MaskingKey: v.Inputs.MaskingKey,
+			Envelope:   opaque.GetFakeEnvelope(p),
+		}
 	}
 
-	record := &opaque.ClientRecord{
-		CredentialIdentifier: input.CredentialIdentifier,
-		ClientIdentity:       input.ClientIdentity,
-		RegistrationUpload:   cupload,
-		TestMaskNonce:        input.MaskingNonce,
-	}
+	record.CredentialIdentifier = v.Inputs.CredentialIdentifier
+	record.ClientIdentity = v.Inputs.ClientIdentity
+	record.TestMaskNonce = v.Inputs.MaskingNonce
 
-	_ = v.loginResponse(t, client.Parameters, server, KE1, record, input.ServerIdentity, input.OprfSeed, input.ServerPrivateKey, input.ServerPublicKey)
+	v.loginResponse(t, server, record)
+
+	if isFake(v.Config.Fake) {
+		return
+	}
 
 	// Client
-	cke2, err := client.DeserializeKE2(out.KE2)
+	cke2, err := client.DeserializeKE2(v.Outputs.KE2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ke3, exportKey, err := client.Finish(input.ClientIdentity, input.ServerIdentity, cke2)
+	ke3, exportKey, err := client.Finish(v.Inputs.ClientIdentity, v.Inputs.ServerIdentity, cke2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,14 +265,52 @@ func (v *vector) test(t *testing.T) {
 	}
 }
 
-func (v *vector) loginResponse(t *testing.T, p *internal.Parameters, s *opaque.Server, ke1 *message.KE1, record *opaque.ClientRecord, serverID, oprfSeed, serverPrivateKey, serverPublicKey []byte) *message.KE2 {
-	sks, err := p.AKEGroup.Get(nil).NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
+func (v *vector) test(t *testing.T) {
+	mode, err := hex.DecodeString(v.Config.EnvelopeMode)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.Ake.SetValues(p.AKEGroup, sks, v.Inputs.ServerNonce, 32)
 
-	KE2, err := s.Init(ke1, serverID, serverPrivateKey, serverPublicKey, oprfSeed, record)
+	p := &opaque.Configuration{
+		OprfGroup: opaque.Group(v.Config.OPRF[1]),
+		Hash:      hashToHash(v.Config.Hash),
+		KDF:       kdfToHash(v.Config.KDF),
+		MAC:       macToHash(v.Config.MAC),
+		MHF:       mhf.Scrypt,
+		Mode:      opaque.Mode(mode[0]),
+		AKEGroup:  groupToGroup(v.Config.Group),
+		Context:   []byte(v.Config.Context),
+		NonceLen:  32,
+	}
+
+	// Registration
+	if !isFake(v.Config.Fake) {
+		v.testRegistration(p, t)
+	}
+
+	// Login
+	v.testLogin(p, t)
+}
+
+func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.ClientRecord) {
+	sks, err := s.Parameters.AKEGroup.Get(nil).NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Ake.SetValues(s.Parameters.AKEGroup, sks, v.Inputs.ServerNonce, 32)
+
+	var ke1 *message.KE1
+	if isFake(v.Config.Fake) {
+		ke1, err = s.DeserializeKE1(v.Inputs.KE1)
+	} else {
+		ke1, err = s.DeserializeKE1(v.Outputs.KE1)
+	}
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ke2, err := s.Init(ke1, v.Inputs.ServerIdentity, v.Inputs.ServerPrivateKey, v.Inputs.ServerPublicKey, v.Inputs.OprfSeed, record)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,52 +327,46 @@ func (v *vector) loginResponse(t *testing.T, p *internal.Parameters, s *opaque.S
 	//	t.Fatal("ClientMacs do not match")
 	//}
 
-	//if !bytes.Equal(v.Intermediates.HandshakeEncryptKey, s.Ake.HandshakeEncryptKey) {
-	//	t.Fatal("HandshakeEncryptKeys do not match")
-	//}
-
-	if !bytes.Equal(v.Outputs.SessionKey, s.Ake.SessionKey()) {
-		t.Fatalf("Server SessionKey do not match:\n%v\n%v", v.Outputs.SessionKey, s.Ake.SessionKey())
-	}
-
-	draftKE2, err := s.DeserializeKE2(v.Outputs.KE2)
+	vectorKE2, err := s.DeserializeKE2(v.Outputs.KE2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(draftKE2.CredentialResponse.Serialize(), KE2.CredentialResponse.Serialize()) {
-		t.Fatal("CredResp do not match")
-	}
-
-	if !bytes.Equal(draftKE2.CredentialResponse.Data, KE2.CredentialResponse.Data) {
+	if !bytes.Equal(vectorKE2.CredentialResponse.Data, ke2.CredentialResponse.Data) {
 		t.Fatal("data do not match")
 	}
 
-	if !bytes.Equal(draftKE2.CredentialResponse.MaskingNonce, KE2.CredentialResponse.MaskingNonce) {
+	if !bytes.Equal(vectorKE2.CredentialResponse.MaskingNonce, ke2.CredentialResponse.MaskingNonce) {
 		t.Fatal("serverPublicKey do not match")
 	}
 
-	if !bytes.Equal(draftKE2.CredentialResponse.MaskedResponse, KE2.CredentialResponse.MaskedResponse) {
-		t.Fatal("envu do not match")
+	if !bytes.Equal(vectorKE2.CredentialResponse.MaskedResponse, ke2.CredentialResponse.MaskedResponse) {
+		t.Fatal("MaskedResponse do not match")
 	}
 
-	if !bytes.Equal(draftKE2.NonceS, KE2.NonceS) {
+	if !bytes.Equal(vectorKE2.CredentialResponse.Serialize(), ke2.CredentialResponse.Serialize()) {
+		t.Fatal("CredResp do not match")
+	}
+
+	if !bytes.Equal(vectorKE2.NonceS, ke2.NonceS) {
 		t.Fatal("nonces do not match")
 	}
 
-	if !bytes.Equal(draftKE2.EpkS, KE2.EpkS) {
+	if !bytes.Equal(vectorKE2.EpkS, ke2.EpkS) {
 		t.Fatal("epks do not match")
 	}
 
-	if !bytes.Equal(draftKE2.Mac, KE2.Mac) {
+	if !bytes.Equal(vectorKE2.Mac, ke2.Mac) {
 		t.Fatalf("server macs do not match")
 	}
 
-	if !bytes.Equal(v.Outputs.KE2, KE2.Serialize()) {
+	if !bytes.Equal(v.Outputs.KE2, ke2.Serialize()) {
 		t.Fatalf("KE2 do not match")
 	}
 
-	return KE2
+	if !isFake(v.Config.Fake) && !bytes.Equal(v.Outputs.SessionKey, s.Ake.SessionKey()) {
+		t.Fatalf("Server SessionKey do not match:\n%v\n%v", v.Outputs.SessionKey, s.Ake.SessionKey())
+	}
 }
 
 func buildOPRFClient(cs voprf.Ciphersuite, blind []byte) *voprf.Client {
@@ -364,6 +388,17 @@ func buildOPRFClient(cs voprf.Ciphersuite, blind []byte) *voprf.Client {
 	}
 
 	return c
+}
+
+func isFake(f string) bool {
+	switch f {
+	case "True":
+		return true
+	case "False":
+		return false
+	default:
+		panic("'Fake' parameter not recognised")
+	}
 }
 
 func hashToHash(h string) hash.Hashing {
@@ -441,7 +476,7 @@ func TestOpaqueVectors(t *testing.T) {
 			}
 
 			for _, tv := range v {
-				t.Run(fmt.Sprintf("%s - %s - %s", tv.Config.Name, tv.Config.EnvelopeMode, tv.Config.Group), tv.test)
+				t.Run(fmt.Sprintf("%s - %s - %s - Fake:%s", tv.Config.Name, tv.Config.EnvelopeMode, tv.Config.Group, tv.Config.Fake), tv.test)
 			}
 			return nil
 		}); err != nil {
