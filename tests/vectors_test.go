@@ -83,9 +83,9 @@ type inputs struct {
 	ServerPrivateKey      ByteToHex `json:"server_private_key"`
 	ServerPrivateKeyshare ByteToHex `json:"server_private_keyshare"`
 	ServerPublicKey       ByteToHex `json:"server_public_key"`
-	KE1                   ByteToHex `json:"KE1"` // Used for fake credentials tests
+	KE1                   ByteToHex `json:"KE1"`               // Used for fake credentials tests
 	ClientPublicKey       ByteToHex `json:"client_public_key"` // Used for fake credentials tests
-	MaskingKey       	  ByteToHex `json:"masking_key"` // Used for fake credentials tests
+	MaskingKey            ByteToHex `json:"masking_key"`       // Used for fake credentials tests
 }
 
 type intermediates struct {

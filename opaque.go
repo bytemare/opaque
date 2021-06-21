@@ -206,5 +206,5 @@ type ClientRecord struct {
 // This fake envelope byte array is used in the client enumeration mitigation scheme.
 func GetFakeEnvelope(c *Configuration) []byte {
 	l := c.toInternal().EnvelopeSize
-	return make([]byte, l, l)
+	return make([]byte, l)
 }

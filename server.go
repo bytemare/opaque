@@ -11,6 +11,7 @@ package opaque
 import (
 	"errors"
 	"fmt"
+
 	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
