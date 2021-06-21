@@ -12,11 +12,9 @@ package ake
 import (
 	"errors"
 	"fmt"
-
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/utils"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/message"
@@ -38,10 +36,6 @@ func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
 	publicKey := g.Base().Mult(scalar)
 
 	return encoding.SerializeScalar(scalar, id), encoding.SerializePoint(publicKey, id)
-}
-
-type keys struct {
-	serverMacKey, clientMacKey []byte
 }
 
 // setValues - testing: integrated to support testing, to force values.
@@ -81,16 +75,20 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 }
 
 func initTranscript(p *internal.Parameters, idc, ids []byte, ke1 *message.KE1, ke2 *message.KE2) {
-	cp := encoding.EncodeVectorLen(idc, 2)
-	sp := encoding.EncodeVectorLen(ids, 2)
+	sidc := encoding.EncodeVectorLen(idc, 2)
+	sids := encoding.EncodeVectorLen(ids, 2)
 	p.Hash.Write(utils.Concatenate(0, []byte(internal.VersionTag), encoding.EncodeVector(p.Context),
-		cp, ke1.Serialize(),
-		sp, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS))
+		sidc, ke1.Serialize(),
+		sids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS))
 }
 
-func deriveKeys(h *internal.KDF, ikm, context []byte) (k *keys, sessionSecret []byte) {
+type macKeys struct {
+	serverMacKey, clientMacKey []byte
+}
+
+func deriveKeys(h *internal.KDF, ikm, context []byte) (k *macKeys, sessionSecret []byte) {
 	prk := h.Extract(nil, ikm)
-	k = &keys{}
+	k = &macKeys{}
 	handshakeSecret := deriveSecret(h, prk, []byte(internal.TagHandshake), context)
 	sessionSecret = deriveSecret(h, prk, []byte(internal.TagSession), context)
 	k.serverMacKey = expandLabel(h, handshakeSecret, []byte(internal.TagMacServer), nil)
@@ -142,10 +140,6 @@ func ikm(s selector, g group.Group, esk group.Scalar, secretKey, peerEpk, peerPu
 	panic(errInvalidSelector)
 }
 
-func serverMAC(p *internal.Parameters, key []byte) []byte {
-	return p.MAC.MAC(key, p.Hash.Sum()) // transcript2
-}
-
 type macs struct {
 	serverMac, clientMac []byte
 }
@@ -163,10 +157,9 @@ func core3DH(s selector, p *internal.Parameters, k *coreKeys, idu, ids []byte,
 	}
 
 	initTranscript(p, idu, ids, ke1, ke2)
-	keys, sessionSecret := deriveKeys(p.KDF, ikm, p.Hash.Sum())
-
+	keys, sessionSecret := deriveKeys(p.KDF, ikm, p.Hash.Sum()) // preamble
 	m := &macs{
-		serverMac: serverMAC(p, keys.serverMacKey),
+		serverMac: p.MAC.MAC(keys.serverMacKey, p.Hash.Sum()), // transcript2
 	}
 	p.Hash.Write(m.serverMac)
 	transcript3 := p.Hash.Sum()

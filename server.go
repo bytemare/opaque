@@ -11,7 +11,6 @@ package opaque
 import (
 	"errors"
 	"fmt"
-
 	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
@@ -139,6 +138,12 @@ func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverP
 	}
 
 	return ke2, nil
+}
+
+// FakeCredentials allows a server to prevent client enumeration by sending back a faked response.
+func (s *Server) FakeCredentials(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
+	record *ClientRecord) (*message.KE2, error) {
+	return s.Init(ke1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed, record)
 }
 
 // Finish returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
