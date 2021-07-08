@@ -150,10 +150,9 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	}
 
 	// Server
-	server := p.Server()
-
 	var m5s []byte
 	{
+		server := p.Server()
 		m4, err := server.DeserializeKE1(m4s)
 		if err != nil {
 			t.Fatalf(dbgErr, p.Mode, err)
@@ -190,6 +189,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	// Server
 	var serverKey []byte
 	{
+		server := p.Server()
 		m6, err := server.DeserializeKE3(m6s)
 		if err != nil {
 			t.Fatalf(dbgErr, p.Mode, err)
