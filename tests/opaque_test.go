@@ -77,11 +77,10 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 	}
 
 	// Server
-	server := p.Server()
-
 	var m2s []byte
 	var credID []byte
 	{
+		server := p.Server()
 		m1, err := server.DeserializeRegistrationRequest(m1s)
 		if err != nil {
 			t.Fatalf(dbgErr, p.Mode, err)
@@ -126,6 +125,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 
 	// Server
 	{
+		server := p.Server()
 		m3, err := server.DeserializeRegistrationUpload(m3s)
 		if err != nil {
 			t.Fatalf(dbgErr, p.Mode, err)
