@@ -10,8 +10,11 @@
 package ake
 
 import (
+	"errors"
+
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -73,6 +76,29 @@ func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverS
 	ke2.Mac = macs.serverMac
 
 	return ke2, nil
+}
+
+// SerializeState will return a []byte with the given capacity containing
+// internal state of the Server.
+func (s *Server) SerializeState(size int) []byte {
+	return utils.Concatenate(size, s.clientMac, s.sessionSecret)
+}
+
+// DeserializeState will set internal state onto the server. `size` should the
+// output of internal.Parameters.MAC.Size()
+func (s *Server) DeserializeState(data []byte, size int) error {
+	if len(s.clientMac) != 0 || len(s.sessionSecret) != 0 {
+		return errors.New("existing state is not nil")
+	}
+
+	if len(data) != size*2 {
+		return errors.New("invalid byte length")
+	}
+
+	s.clientMac = data[:size]
+	s.sessionSecret = data[size:]
+
+	return nil
 }
 
 // Finalize verifies the authentication tag contained in ke3.
