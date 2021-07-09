@@ -10,11 +10,7 @@ package opaque_test
 
 import (
 	"bytes"
-	"encoding/gob"
-	"fmt"
-	"reflect"
 	"testing"
-	"unsafe"
 
 	"github.com/bytemare/cryptotools/utils"
 
@@ -169,7 +165,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 			t.Fatalf(dbgErr, p.Mode, err)
 		}
 
-		state = serializeAkeServerState(server.Ake)
+		state = server.Ake.SerializeState(server.MAC.Size())
 
 		m5s = ke2.Serialize()
 	}
@@ -203,7 +199,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 			t.Fatalf(dbgErr, p.Mode, err)
 		}
 
-		if err := deserializeAkeServerState(state, server.Ake); err != nil {
+		if err := server.Ake.DeserializeState(state, server.MAC.Size()); err != nil {
 			t.Fatalf(dbgErr, p.Mode, err)
 		}
 
@@ -292,47 +288,3 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 //	}
 //}
 //
-
-func serializeAkeServerState(v interface{}) []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-
-	rv := reflect.ValueOf(v)
-	// if it's a pointer, then derefence
-	if rv.Kind() == reflect.Ptr {
-		rv = rv.Elem()
-	}
-
-	enc.EncodeValue(rv.FieldByName("clientMac"))
-	enc.EncodeValue(rv.FieldByName("sessionSecret"))
-
-	return buf.Bytes()
-}
-
-func deserializeAkeServerState(data []byte, v interface{}) error {
-	dec := gob.NewDecoder(bytes.NewBuffer(data))
-
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
-		return fmt.Errorf("cannot decode onto non-pointer %s", reflect.TypeOf(v))
-	}
-	if rv.IsNil() {
-		return fmt.Errorf("cannot decode onto nil")
-	}
-
-	rv = rv.Elem()
-
-	for _, name := range []string{"clientMac", "sessionSecret"} {
-		var b []byte
-		err := dec.Decode(&b)
-		if err != nil {
-			return err
-		}
-
-		addr := rv.FieldByName(name).UnsafeAddr()
-		val := (*[]byte)(unsafe.Pointer(addr))
-		*val = b
-	}
-
-	return nil
-}
