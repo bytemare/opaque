@@ -168,7 +168,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 			t.Fatalf(dbgErr, p.Mode, err)
 		}
 
-		state = serializeAkeServerState(server.Ake)
+		state = server.Ake.SerializeState(server.MAC.Size())
 
 		m5s = ke2.Serialize()
 	}
@@ -202,7 +202,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 			t.Fatalf(dbgErr, p.Mode, err)
 		}
 
-		if err := deserializeAkeServerState(state, server.Ake); err != nil {
+		if err := server.Ake.DeserializeState(state, server.MAC.Size()); err != nil {
 			t.Fatalf(dbgErr, p.Mode, err)
 		}
 
