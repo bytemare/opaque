@@ -13,7 +13,8 @@ import (
 	"errors"
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/voprf"
+
+	"github.com/bytemare/opaque/internal/oprf"
 
 	"github.com/bytemare/opaque/internal/tag"
 
@@ -33,7 +34,7 @@ type Parameters struct {
 	EnvelopeSize    int
 	OPRFPointLength int
 	AkePointLength  int
-	OprfCiphersuite voprf.Ciphersuite
+	OprfCiphersuite oprf.Ciphersuite
 	AKEGroup        ciphersuite.Identifier
 	Context         []byte
 }

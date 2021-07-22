@@ -77,7 +77,7 @@ func (c *Client) RegistrationFinalize(clientSecretKey []byte, creds *Credentials
 		MaskingNonce:  creds.TestMaskNonce,
 	}
 
-	// this check is very important
+	// this check is very important: it verifies the server's public key validity in the group.
 	if _, err = c.AKEGroup.Get().NewElement().Decode(resp.Pks); err != nil {
 		return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
 	}

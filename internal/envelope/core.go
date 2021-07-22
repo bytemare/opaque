@@ -11,7 +11,7 @@ package envelope
 import (
 	"fmt"
 
-	"github.com/bytemare/voprf"
+	"github.com/bytemare/opaque/internal/oprf"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/tag"
@@ -20,7 +20,7 @@ import (
 // Core holds the Client state between the key derivation steps,
 // and exposes envelope creation and key recovery functions.
 type Core struct {
-	Oprf *voprf.Client
+	Oprf *oprf.Client
 	*internal.Parameters
 }
 
@@ -39,8 +39,7 @@ func (c *Core) OprfStart(password []byte) []byte {
 
 // OprfFinalize terminates the OPRF by unblinding the evaluated data.
 func (c *Core) OprfFinalize(data []byte) ([]byte, error) {
-	ev := &voprf.Evaluation{Elements: [][]byte{data}}
-	return c.Oprf.Finalize(ev)
+	return c.Oprf.Finalize(data)
 }
 
 // BuildEnvelope returns the client's Envelope, the masking key for the registration, and the additional export key.

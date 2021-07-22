@@ -21,7 +21,8 @@ import (
 
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
-	"github.com/bytemare/voprf"
+
+	"github.com/bytemare/opaque/internal/oprf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/message"
@@ -120,7 +121,7 @@ type vector struct {
 func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	// Client
 	client := p.Client()
-	oprfClient := buildOPRFClient(voprf.Ciphersuite(p.OprfGroup), v.Inputs.BlindRegistration)
+	oprfClient := buildOPRFClient(oprf.Ciphersuite(p.OprfGroup), v.Inputs.BlindRegistration)
 	client.Core.Oprf = oprfClient
 	regReq := client.RegistrationInit(v.Inputs.Password)
 
@@ -169,10 +170,6 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 		t.Fatal("exportKey do not match")
 	}
 
-	//if !bytes.Equal(check.ClientPublicKey, upload.PublicKey) {
-	//	t.Fatal("Client PublicKey do not match")
-	//}
-
 	if !bytes.Equal(v.Intermediates.Envelope, upload.Envelope) {
 		t.Fatalf("envelopes do not match\nexpected %v,\ngot %v", v.Intermediates.Envelope, upload.Envelope)
 	}
@@ -187,7 +184,7 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	client := p.Client()
 
 	if !isFake(v.Config.Fake) {
-		client.Core.Oprf = buildOPRFClient(voprf.Ciphersuite(p.OprfGroup), v.Inputs.BlindLogin)
+		client.Core.Oprf = buildOPRFClient(oprf.Ciphersuite(p.OprfGroup), v.Inputs.BlindLogin)
 		esk, err := client.AKEGroup.Get().NewScalar().Decode(v.Inputs.ClientPrivateKeyshare)
 		if err != nil {
 			t.Fatal(err)
@@ -370,20 +367,14 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 	}
 }
 
-func buildOPRFClient(cs voprf.Ciphersuite, blind []byte) *voprf.Client {
-	s := voprf.State{
-		Ciphersuite: cs,
-		Mode:        voprf.Base,
-		Blinding:    voprf.Multiplicative,
-		Blind:       make([][]byte, 1),
-	}
-	s.Blind[0] = blind
-
-	c := cs.Client()
-
-	if err := c.Import(&s); err != nil {
+func buildOPRFClient(cs oprf.Ciphersuite, blind []byte) *oprf.Client {
+	b, err := cs.Group().Get().NewScalar().Decode(blind)
+	if err != nil {
 		panic(err)
 	}
+
+	c := cs.Client()
+	c.SetBlind(b)
 
 	return c
 }

@@ -23,7 +23,8 @@ import (
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/voprf"
+
+	"github.com/bytemare/opaque/internal/oprf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
@@ -83,7 +84,7 @@ func TestDeserializeRegistrationUpload(t *testing.T) {
 
 func TestDeserializeKE1(t *testing.T) {
 	c := opaque.DefaultConfiguration()
-	group := voprf.Ciphersuite(c.OprfGroup).Group()
+	group := oprf.Ciphersuite(c.OprfGroup).Group()
 	ke1Length := encoding.PointLength[group] + c.NonceLen + encoding.PointLength[group]
 
 	server := c.Server()
@@ -148,7 +149,7 @@ func TestDeserializeConfiguration(t *testing.T) {
 func TestNilConfiguration(t *testing.T) {
 	def := opaque.DefaultConfiguration()
 
-	cs := voprf.Ciphersuite(def.OprfGroup)
+	cs := oprf.Ciphersuite(def.OprfGroup)
 	g := cs.Group()
 	defaultConfiguration := &internal.Parameters{
 		KDF:             &internal.KDF{H: def.KDF.Get()},
@@ -172,13 +173,6 @@ func TestNilConfiguration(t *testing.T) {
 	if reflect.DeepEqual(c.Parameters, defaultConfiguration) {
 		t.Errorf("client did not default to correct configuration")
 	}
-}
-
-func TestConfigurationStringers(t *testing.T) {
-	/*
-		1. group.String()
-		2. Configuration.string()
-	*/
 }
 
 // helper functions
@@ -278,7 +272,7 @@ func getBadElement(t *testing.T, c configuration) []byte {
 	if c.Conf.OprfGroup == opaque.RistrettoSha512 {
 		return getBadRistrettoElement()
 	} else {
-		return getBadNistElement(t, voprf.Ciphersuite(c.Conf.OprfGroup).Group())
+		return getBadNistElement(t, oprf.Ciphersuite(c.Conf.OprfGroup).Group())
 	}
 }
 
@@ -286,7 +280,7 @@ func getBadScalar(t *testing.T, c configuration) []byte {
 	if c.Conf.OprfGroup == opaque.RistrettoSha512 {
 		return getBadRistrettoScalar()
 	} else {
-		return getBadNistScalar(t, voprf.Ciphersuite(c.Conf.OprfGroup).Group(), c.Curve)
+		return getBadNistScalar(t, oprf.Ciphersuite(c.Conf.OprfGroup).Group(), c.Curve)
 	}
 }
 
@@ -348,7 +342,7 @@ func TestServer_BadRegistrationRequest(t *testing.T) {
 	*/
 	credId := utils.RandomBytes(32)
 	seed := utils.RandomBytes(32)
-	terr := " RegistrationResponse: oprf evaluation: "
+	terr := " RegistrationResponse: can't evaluate input : "
 
 	for i, e := range confs {
 		badRequest := &message.RegistrationRequest{Data: getBadElement(t, e)}
@@ -412,7 +406,7 @@ func TestServerInit_InvalidData(t *testing.T) {
 		client := conf.Conf.Client()
 		ke1 := client.Init([]byte("yo"))
 		ke1.CredentialRequest.Data = getBadElement(t, conf)
-		expected := " credentialResponse: oprfResponse: oprf evaluation: OPRF can't evaluate input :"
+		expected := " credentialResponse: oprfResponse: can't evaluate input :"
 		if _, err := server.Init(ke1, nil, sk, pk, seed, rec); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on bad oprf request - got %s", err)
 		}

@@ -52,18 +52,7 @@ func (s *Server) KeyGen() (secretKey, publicKey []byte) {
 
 func (s *Server) evaluate(seed, blinded []byte) (m []byte, err error) {
 	ku := s.OprfCiphersuite.Group().Get().HashToScalar(seed, []byte(tag.DeriveKeyPair))
-
-	oprf, err := s.OprfCiphersuite.Server(ku.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("oprf server setup with key: %w", err)
-	}
-
-	evaluation, err := oprf.Evaluate(blinded)
-	if err != nil {
-		return nil, fmt.Errorf("oprf evaluation: %w", err)
-	}
-
-	return evaluation.Elements[0], nil
+	return s.OprfCiphersuite.Server(ku).Evaluate(blinded)
 }
 
 func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element []byte) (m []byte, err error) {
