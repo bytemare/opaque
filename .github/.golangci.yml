@@ -65,7 +65,7 @@ linters:
     - varcheck
     - wastedassign
     - whitespace
-    - wrapcheck
+    #- wrapcheck
     - wsl
     #- exhaustive
     #- exhaustivestruct
@@ -222,4 +222,4 @@ run:
   tests: false
 
 output:
- format: github-actions
+ #format: github-actions

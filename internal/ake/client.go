@@ -36,7 +36,7 @@ func NewClient() *Client {
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
 func (c *Client) SetValues(cs ciphersuite.Identifier, esk group.Scalar, nonce []byte, nonceLen int) group.Element {
-	g := cs.Get(nil)
+	g := cs.Get()
 
 	s, nonce := setValues(g, esk, nonce, nonceLen)
 	if c.esk == nil || (esk != nil && c.esk != s) {
@@ -62,7 +62,7 @@ func (c *Client) Start(cs ciphersuite.Identifier) *message.KE1 {
 
 // Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions
 // returns a KE3 message.
-func (c *Client) Finalize(p *internal.Parameters, clientIdentity, clientSecretKey, serverIdentity, serverPublicKey []byte,
+func (c *Client) Finalize(p *internal.Parameters, clientIdentity []byte, clientSecretKey group.Scalar, serverIdentity, serverPublicKey []byte,
 	ke1 *message.KE1, ke2 *message.KE2) (*message.KE3, error) {
 	k := &coreKeys{c.esk, clientSecretKey, ke2.EpkS, serverPublicKey}
 

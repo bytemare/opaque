@@ -15,20 +15,7 @@ import (
 	"github.com/bytemare/cryptotools/encoding"
 )
 
-var (
-	errI2OSPLength  = errors.New("requested size is too big")
-	errHeaderLength = errors.New("insufficient header length for decoding")
-	errTotalLength  = errors.New("insufficient total length for decoding")
-)
-
-func Concat(a []byte, b string) []byte {
-	t := []byte(b)
-	e := make([]byte, 0, len(a)+len(t))
-	e = append(e, a...)
-	e = append(e, t...)
-
-	return e
-}
+var ErrI2OSPLength = errors.New("requested size is too big")
 
 func OS2IP(in []byte) int {
 	return encoding.OS2IP(in)
@@ -45,29 +32,10 @@ func EncodeVectorLen(in []byte, length int) []byte {
 	case 2:
 		return append(encoding.I2OSP(len(in), 2), in...)
 	default:
-		panic(errI2OSPLength)
+		panic(ErrI2OSPLength)
 	}
 }
 
 func EncodeVector(in []byte) []byte {
 	return EncodeVectorLen(in, 2)
-}
-
-func decodeVectorLen(in []byte, size int) (data []byte, offset int, err error) {
-	if len(in) < size {
-		return nil, 0, errHeaderLength
-	}
-
-	dataLen := encoding.OS2IP(in[0:size])
-	offset = size + dataLen
-
-	if len(in) < offset {
-		return nil, 0, errTotalLength
-	}
-
-	return in[size:offset], offset, nil
-}
-
-func DecodeVector(in []byte) (data []byte, offset int, err error) {
-	return decodeVectorLen(in, 2)
 }

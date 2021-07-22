@@ -42,10 +42,7 @@ var PointLength = map[ciphersuite.Identifier]int{
 }
 
 func SerializeScalar(s group.Scalar, c ciphersuite.Identifier) []byte {
-	length, ok := ScalarLength[c]
-	if !ok {
-		panic("invalid suite")
-	}
+	length := ScalarLength[c]
 
 	e := s.Bytes()
 
@@ -61,10 +58,7 @@ func SerializePoint(e group.Element, c ciphersuite.Identifier) []byte {
 }
 
 func PadPoint(point []byte, c ciphersuite.Identifier) []byte {
-	length, ok := PointLength[c]
-	if !ok {
-		panic("invalid suite")
-	}
+	length := PointLength[c]
 
 	for len(point) < length {
 		point = append([]byte{0x00}, point...)

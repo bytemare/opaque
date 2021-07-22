@@ -52,10 +52,6 @@ type Hash struct {
 	H *hash.Hash
 }
 
-func (h *Hash) Hash(message []byte) []byte {
-	return h.H.Hash(message)
-}
-
 func (h *Hash) Size() int {
 	return h.H.OutputSize()
 }

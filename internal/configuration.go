@@ -11,23 +11,18 @@ package internal
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/voprf"
+
+	"github.com/bytemare/opaque/internal/tag"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
 
-var (
-	errInvalidSize          = errors.New("invalid message size")
-	errInvalidMessageLength = errors.New("invalid message length")
-	errCredReqShort         = errors.New(" CredentialRequest too short")
-	errInvalidCredRespShort = errors.New(" CredentialResponse too short")
-	errShortMessage         = errors.New("message is too short")
-)
+var errInvalidMessageLength = errors.New("invalid message length")
 
 type Parameters struct {
 	KDF             *KDF
@@ -45,7 +40,7 @@ type Parameters struct {
 
 func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.RegistrationRequest, error) {
 	if len(input) != p.OPRFPointLength {
-		return nil, errInvalidSize
+		return nil, errInvalidMessageLength
 	}
 
 	return &message.RegistrationRequest{Data: input}, nil
@@ -53,7 +48,7 @@ func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.Regi
 
 func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.RegistrationResponse, error) {
 	if len(input) != p.OPRFPointLength+p.AkePointLength {
-		return nil, errInvalidSize
+		return nil, errInvalidMessageLength
 	}
 
 	return &message.RegistrationResponse{
@@ -78,42 +73,24 @@ func (p *Parameters) DeserializeRegistrationUpload(input []byte) (*message.Regis
 	}, nil
 }
 
-func (p *Parameters) DeserializeCredentialRequest(input []byte) (*cred.CredentialRequest, error) {
-	if len(input) != p.OPRFPointLength {
-		return nil, errCredReqShort
-	}
-
-	return &cred.CredentialRequest{Data: input[:p.OPRFPointLength]}, nil
+func (p *Parameters) deserializeCredentialRequest(input []byte) *cred.CredentialRequest {
+	return &cred.CredentialRequest{Data: input[:p.OPRFPointLength]}
 }
 
-func (p *Parameters) deserializeCredentialResponse(input []byte) (*cred.CredentialResponse, int, error) {
-	supposedLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize
-	if len(input) < supposedLength {
-		return nil, 0, errInvalidCredRespShort
-	}
-
+func (p *Parameters) deserializeCredentialResponse(input []byte, maxResponseLength int) *cred.CredentialResponse {
 	return &cred.CredentialResponse{
 		Data:           input[:p.OPRFPointLength],
 		MaskingNonce:   input[p.OPRFPointLength : p.OPRFPointLength+p.NonceLen],
-		MaskedResponse: input[p.OPRFPointLength+p.NonceLen : supposedLength],
-	}, supposedLength, nil
-}
-
-func (p *Parameters) DeserializeCredentialResponse(input []byte) (*cred.CredentialResponse, error) {
-	c, _, err := p.deserializeCredentialResponse(input)
-	return c, err
+		MaskedResponse: input[p.OPRFPointLength+p.NonceLen : maxResponseLength],
+	}
 }
 
 func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 	if len(input) != p.OPRFPointLength+p.NonceLen+p.AkePointLength {
-		return nil, errInvalidSize
+		return nil, errInvalidMessageLength
 	}
 
-	creq, err := p.DeserializeCredentialRequest(input[:p.OPRFPointLength])
-	if err != nil {
-		return nil, fmt.Errorf("deserializing the credential crequest: %w", err)
-	}
-
+	creq := p.deserializeCredentialRequest(input[:p.OPRFPointLength])
 	nonceU := input[p.OPRFPointLength : p.OPRFPointLength+p.NonceLen]
 
 	return &message.KE1{
@@ -124,17 +101,16 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 }
 
 func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
-	if len(input) != p.OPRFPointLength+p.NonceLen+p.AkePointLength+p.EnvelopeSize+p.NonceLen+p.AkePointLength+p.MAC.Size() {
-		return nil, errShortMessage
+	maxResponseLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize
+
+	if len(input) != maxResponseLength+p.NonceLen+p.AkePointLength+p.MAC.Size() {
+		return nil, errInvalidMessageLength
 	}
 
-	cresp, offset, err := p.deserializeCredentialResponse(input)
-	if err != nil {
-		return nil, fmt.Errorf("decoding credential response: %w", err)
-	}
+	cresp := p.deserializeCredentialResponse(input, maxResponseLength)
 
-	nonceS := input[offset : offset+p.NonceLen]
-	offset += p.NonceLen
+	nonceS := input[maxResponseLength : maxResponseLength+p.NonceLen]
+	offset := maxResponseLength + p.NonceLen
 	epks := input[offset : offset+p.AkePointLength]
 	offset += p.AkePointLength
 	mac := input[offset:]
@@ -155,7 +131,8 @@ func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
 	return &message.KE3{Mac: input}, nil
 }
 
+// MaskResponse is used to encrypt and decrypt the response in KE2.
 func (p *Parameters) MaskResponse(key, nonce, in []byte) []byte {
-	pad := p.KDF.Expand(key, encoding.Concat(nonce, TagCredentialResponsePad), encoding.PointLength[p.AKEGroup]+p.EnvelopeSize)
+	pad := p.KDF.Expand(key, encoding.SuffixString(nonce, tag.CredentialResponsePad), encoding.PointLength[p.AKEGroup]+p.EnvelopeSize)
 	return Xor(pad, in)
 }

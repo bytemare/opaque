@@ -4,7 +4,8 @@ COMMIT      := $(shell git rev-parse HEAD)
 .PHONY: lint
 lint:
 	@echo "Linting ..."
-	@golangci-lint run --config=./.github/.golangci.yml ./...
+	gofumports -w -local github.com/bytemare/opaque .
+	golangci-lint run --config=./.github/.golangci.yml ./...
 
 .PHONY: test
 test:

@@ -11,29 +11,16 @@ package envelope
 
 import (
 	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/cryptotools/group/ciphersuite"
+
+	"github.com/bytemare/opaque/internal/tag"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 )
 
-type externalInnerEnvelope struct {
-	encrypted []byte
-}
-
-func (e externalInnerEnvelope) serialize() []byte {
-	return e.encrypted
-}
-
-func deserializeExternalInnerEnvelope(inner []byte, nsk int) *externalInnerEnvelope {
-	if len(inner) != nsk {
-		panic("invalid inner envelope")
-	}
-
-	return &externalInnerEnvelope{inner}
-}
-
 type externalMode struct {
-	Nsk int
+	ciphersuite.Identifier
 	group.Group
 	*internal.KDF
 }
@@ -42,27 +29,29 @@ func (e *externalMode) recoverPublicKey(privateKey group.Scalar) group.Element {
 	return e.Base().Mult(privateKey)
 }
 
-func (e *externalMode) buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte) {
-	scalar, err := e.NewScalar().Decode(clientSecretKey)
-	if err != nil {
-		panic(errInvalidSK)
-	}
-
-	clientPublicKey := e.Base().Mult(scalar)
-	pad := e.Expand(randomizedPwd, encoding.Concat(nonce, internal.TagPad), len(clientSecretKey))
-
-	return externalInnerEnvelope{internal.Xor(clientSecretKey, pad)}.serialize(), clientPublicKey.Bytes()
+func (e *externalMode) crypt(randomizedPwd, nonce, input []byte) []byte {
+	pad := e.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.Pad), len(input))
+	return internal.Xor(input, pad)
 }
 
-func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey []byte, clientPublicKey group.Element) {
-	inner := deserializeExternalInnerEnvelope(innerEnvelope, e.Nsk)
-	pad := e.Expand(randomizedPwd, encoding.Concat(nonce, internal.TagPad), len(inner.encrypted))
-	clientSecretKey = internal.Xor(inner.encrypted, pad)
-
-	sk, err := e.NewScalar().Decode(clientSecretKey)
+func (e *externalMode) buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte, err error) {
+	scalar, err := e.NewScalar().Decode(clientSecretKey)
 	if err != nil {
-		panic(errInvalidSK)
+		return nil, nil, errBuildInvalidSK
 	}
 
-	return clientSecretKey, e.recoverPublicKey(sk)
+	clientPublicKey := e.recoverPublicKey(scalar)
+
+	return e.crypt(randomizedPwd, nonce, clientSecretKey), encoding.SerializePoint(clientPublicKey, e.Identifier), nil
+}
+
+func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (sk group.Scalar, clientPublicKey group.Element, err error) {
+	clientSecretKey := e.crypt(randomizedPwd, nonce, innerEnvelope)
+
+	sk, err = e.NewScalar().Decode(clientSecretKey)
+	if err != nil {
+		return nil, nil, errRecoverInvalidSK
+	}
+
+	return sk, e.recoverPublicKey(sk), nil
 }
