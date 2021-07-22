@@ -19,10 +19,9 @@ import (
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 
-	"github.com/bytemare/opaque/internal/oprf"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
 )
 

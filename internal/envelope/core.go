@@ -11,9 +11,8 @@ package envelope
 import (
 	"fmt"
 
-	"github.com/bytemare/opaque/internal/oprf"
-
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 )
 

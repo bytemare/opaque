@@ -40,7 +40,7 @@ func TestFull(t *testing.T) {
 		userID:        username,
 		serverID:      ids,
 		password:      password,
-		oprfSeed:      utils.RandomBytes(32),
+		oprfSeed:      internal.RandomBytes(32),
 	}
 
 	for _, mode := range modes {
@@ -80,7 +80,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 		t.Fatalf(dbgErr, p.Mode, err)
 	}
 
-	credID := utils.RandomBytes(32)
+	credID := internal.RandomBytes(32)
 	respReg, err := server.RegistrationResponse(m1, p.serverPublicKey, credID, p.oprfSeed)
 	if err != nil {
 		t.Fatalf(dbgErr, p.Mode, err)
@@ -194,7 +194,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 //		userID:        username,
 //		serverID:      ids,
 //		password:      password,
-//		oprfSeed:      utils.RandomBytes(32),
+//		oprfSeed:      internal.RandomBytes(32),
 //	}
 //
 //	for _, mode := range modes {

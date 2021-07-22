@@ -12,8 +12,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytemare/cryptotools/utils"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -83,7 +81,7 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 
 	// testing: integrated to support testing, to force values.
 	if len(maskingNonce) == 0 {
-		maskingNonce = utils.RandomBytes(s.Parameters.NonceLen)
+		maskingNonce = internal.RandomBytes(s.Parameters.NonceLen)
 	}
 
 	clear := encoding.Concat(serverPublicKey, record.Envelope)

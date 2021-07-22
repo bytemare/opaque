@@ -11,7 +11,6 @@ package message
 
 import (
 	"github.com/bytemare/opaque/internal/encoding"
-
 	"github.com/bytemare/opaque/internal/message"
 )
 
