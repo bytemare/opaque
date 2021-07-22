@@ -13,12 +13,10 @@ import (
 	"errors"
 
 	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/utils"
-
-	"github.com/bytemare/opaque/internal/tag"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/tag"
 )
 
 var (
@@ -96,7 +94,7 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, serverPublicKey, clien
 	// testing: integrated to support testing with set nonce
 	nonce := creds.EnvelopeNonce
 	if nonce == nil {
-		nonce = utils.RandomBytes(m.NonceLen)
+		nonce = internal.RandomBytes(m.NonceLen)
 	}
 
 	authKey, exportKey := m.buildKeys(randomizedPwd, nonce)

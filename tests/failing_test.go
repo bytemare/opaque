@@ -23,13 +23,13 @@ import (
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/cryptotools/utils"
-	"github.com/bytemare/voprf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/envelope"
 	message2 "github.com/bytemare/opaque/internal/message"
+	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
@@ -41,12 +41,12 @@ func TestDeserializeRegistrationRequest(t *testing.T) {
 
 	server := c.Server()
 	length := server.OPRFPointLength + 1
-	if _, err := server.DeserializeRegistrationRequest(utils.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.DeserializeRegistrationRequest(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	client := c.Client()
-	if _, err := client.DeserializeRegistrationRequest(utils.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.DeserializeRegistrationRequest(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
@@ -56,12 +56,12 @@ func TestDeserializeRegistrationResponse(t *testing.T) {
 
 	server := c.Server()
 	length := server.OPRFPointLength + server.AkePointLength + 1
-	if _, err := server.DeserializeRegistrationResponse(utils.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.DeserializeRegistrationResponse(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	client := c.Client()
-	if _, err := client.DeserializeRegistrationResponse(utils.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.DeserializeRegistrationResponse(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
@@ -71,28 +71,28 @@ func TestDeserializeRegistrationUpload(t *testing.T) {
 
 	server := c.Server()
 	length := server.AkePointLength + server.Hash.Size() + server.EnvelopeSize + 1
-	if _, err := server.DeserializeRegistrationUpload(utils.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.DeserializeRegistrationUpload(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	client := c.Client()
-	if _, err := client.DeserializeRegistrationUpload(utils.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.DeserializeRegistrationUpload(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
 
 func TestDeserializeKE1(t *testing.T) {
 	c := opaque.DefaultConfiguration()
-	group := voprf.Ciphersuite(c.OprfGroup).Group()
+	group := oprf.Ciphersuite(c.OprfGroup).Group()
 	ke1Length := encoding.PointLength[group] + c.NonceLen + encoding.PointLength[group]
 
 	server := c.Server()
-	if _, err := server.DeserializeKE1(utils.RandomBytes(ke1Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.DeserializeKE1(internal.RandomBytes(ke1Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	client := c.Client()
-	if _, err := client.DeserializeKE1(utils.RandomBytes(ke1Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.DeserializeKE1(internal.RandomBytes(ke1Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
@@ -102,13 +102,13 @@ func TestDeserializeKE2(t *testing.T) {
 
 	client := c.Client()
 	ke2Length := client.OPRFPointLength + 2*client.NonceLen + 2*client.AkePointLength + client.EnvelopeSize + client.MAC.Size()
-	if _, err := client.DeserializeKE2(utils.RandomBytes(ke2Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.DeserializeKE2(internal.RandomBytes(ke2Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	server := c.Server()
 	ke2Length = server.OPRFPointLength + 2*server.NonceLen + 2*server.AkePointLength + server.EnvelopeSize + server.MAC.Size()
-	if _, err := server.DeserializeKE2(utils.RandomBytes(ke2Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.DeserializeKE2(internal.RandomBytes(ke2Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
@@ -118,12 +118,12 @@ func TestDeserializeKE3(t *testing.T) {
 	ke3Length := c.MAC.Size()
 
 	server := c.Server()
-	if _, err := server.DeserializeKE3(utils.RandomBytes(ke3Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.DeserializeKE3(internal.RandomBytes(ke3Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	client := c.Client()
-	if _, err := client.DeserializeKE3(utils.RandomBytes(ke3Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.DeserializeKE3(internal.RandomBytes(ke3Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
@@ -131,8 +131,8 @@ func TestDeserializeKE3(t *testing.T) {
 // opaque.go
 
 func TestDeserializeConfiguration(t *testing.T) {
-	r7 := utils.RandomBytes(7)
-	r9 := utils.RandomBytes(9)
+	r7 := internal.RandomBytes(7)
+	r9 := internal.RandomBytes(9)
 
 	if _, err := opaque.DeserializeConfiguration(r7); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
 		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r7. want %q, got %q",
@@ -148,7 +148,7 @@ func TestDeserializeConfiguration(t *testing.T) {
 func TestNilConfiguration(t *testing.T) {
 	def := opaque.DefaultConfiguration()
 
-	cs := voprf.Ciphersuite(def.OprfGroup)
+	cs := oprf.Ciphersuite(def.OprfGroup)
 	g := cs.Group()
 	defaultConfiguration := &internal.Parameters{
 		KDF:             &internal.KDF{H: def.KDF.Get()},
@@ -172,13 +172,6 @@ func TestNilConfiguration(t *testing.T) {
 	if reflect.DeepEqual(c.Parameters, defaultConfiguration) {
 		t.Errorf("client did not default to correct configuration")
 	}
-}
-
-func TestConfigurationStringers(t *testing.T) {
-	/*
-		1. group.String()
-		2. Configuration.string()
-	*/
 }
 
 // helper functions
@@ -262,7 +255,7 @@ func getBadNistScalar(t *testing.T, ci ciphersuite.Identifier, curve elliptic.Cu
 
 func getBadNistElement(t *testing.T, ci ciphersuite.Identifier) []byte {
 	size := encoding.PointLength[ci]
-	element := utils.RandomBytes(size)
+	element := internal.RandomBytes(size)
 	// detag compression
 	element[0] = 4
 
@@ -278,7 +271,7 @@ func getBadElement(t *testing.T, c configuration) []byte {
 	if c.Conf.OprfGroup == opaque.RistrettoSha512 {
 		return getBadRistrettoElement()
 	} else {
-		return getBadNistElement(t, voprf.Ciphersuite(c.Conf.OprfGroup).Group())
+		return getBadNistElement(t, oprf.Ciphersuite(c.Conf.OprfGroup).Group())
 	}
 }
 
@@ -286,7 +279,7 @@ func getBadScalar(t *testing.T, c configuration) []byte {
 	if c.Conf.OprfGroup == opaque.RistrettoSha512 {
 		return getBadRistrettoScalar()
 	} else {
-		return getBadNistScalar(t, voprf.Ciphersuite(c.Conf.OprfGroup).Group(), c.Curve)
+		return getBadNistScalar(t, oprf.Ciphersuite(c.Conf.OprfGroup).Group(), c.Curve)
 	}
 }
 
@@ -346,9 +339,9 @@ func TestServer_BadRegistrationRequest(t *testing.T) {
 		Error in OPRF
 		- client blinded element invalid point encoding
 	*/
-	credId := utils.RandomBytes(32)
-	seed := utils.RandomBytes(32)
-	terr := " RegistrationResponse: oprf evaluation: "
+	credId := internal.RandomBytes(32)
+	seed := internal.RandomBytes(32)
+	terr := " RegistrationResponse: can't evaluate input : "
 
 	for i, e := range confs {
 		badRequest := &message.RegistrationRequest{Data: getBadElement(t, e)}
@@ -396,12 +389,12 @@ func TestServerInit_InvalidData(t *testing.T) {
 	/*
 		Invalid OPRF data in KE1
 	*/
-	seed := utils.RandomBytes(32)
+	seed := internal.RandomBytes(32)
 	rec := &opaque.ClientRecord{
-		CredentialIdentifier: utils.RandomBytes(32),
+		CredentialIdentifier: internal.RandomBytes(32),
 		ClientIdentity:       nil,
 		RegistrationUpload: &message.RegistrationUpload{
-			MaskingKey: utils.RandomBytes(32),
+			MaskingKey: internal.RandomBytes(32),
 		},
 		TestMaskNonce: nil,
 	}
@@ -412,7 +405,7 @@ func TestServerInit_InvalidData(t *testing.T) {
 		client := conf.Conf.Client()
 		ke1 := client.Init([]byte("yo"))
 		ke1.CredentialRequest.Data = getBadElement(t, conf)
-		expected := " credentialResponse: oprfResponse: oprf evaluation: OPRF can't evaluate input :"
+		expected := " credentialResponse: oprfResponse: can't evaluate input :"
 		if _, err := server.Init(ke1, nil, sk, pk, seed, rec); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on bad oprf request - got %s", err)
 		}
@@ -423,12 +416,12 @@ func TestServerInit_InvalidEPKU(t *testing.T) {
 	/*
 		Invalid EPKU in KE1
 	*/
-	seed := utils.RandomBytes(32)
+	seed := internal.RandomBytes(32)
 	rec := &opaque.ClientRecord{
-		CredentialIdentifier: utils.RandomBytes(32),
+		CredentialIdentifier: internal.RandomBytes(32),
 		ClientIdentity:       nil,
 		RegistrationUpload: &message.RegistrationUpload{
-			MaskingKey: utils.RandomBytes(32),
+			MaskingKey: internal.RandomBytes(32),
 		},
 		TestMaskNonce: nil,
 	}
@@ -451,12 +444,12 @@ func TestServerInit_InvalidPKU(t *testing.T) {
 	/*
 		Invalid PKU in KE1
 	*/
-	seed := utils.RandomBytes(32)
+	seed := internal.RandomBytes(32)
 	rec := &opaque.ClientRecord{
-		CredentialIdentifier: utils.RandomBytes(32),
+		CredentialIdentifier: internal.RandomBytes(32),
 		ClientIdentity:       nil,
 		RegistrationUpload: &message.RegistrationUpload{
-			MaskingKey: utils.RandomBytes(32),
+			MaskingKey: internal.RandomBytes(32),
 		},
 		TestMaskNonce: nil,
 	}
@@ -480,8 +473,8 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 		ke3 mac is invalid
 	*/
 	conf := opaque.DefaultConfiguration()
-	credId := utils.RandomBytes(32)
-	seed := utils.RandomBytes(32)
+	credId := internal.RandomBytes(32)
+	seed := internal.RandomBytes(32)
 	client := conf.Client()
 	server := conf.Server()
 	sk, pk := server.KeyGen()
@@ -503,8 +496,8 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 	/*
 		Empty and invalid server public key sent to client
 	*/
-	credID := utils.RandomBytes(32)
-	oprfSeed := utils.RandomBytes(32)
+	credID := internal.RandomBytes(32)
+	oprfSeed := internal.RandomBytes(32)
 
 	for _, conf := range confs {
 		client := conf.Conf.Client()
@@ -574,8 +567,8 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 	/*
 		The masked response is of invalid length.
 	*/
-	credID := utils.RandomBytes(32)
-	oprfSeed := utils.RandomBytes(32)
+	credID := internal.RandomBytes(32)
+	oprfSeed := internal.RandomBytes(32)
 
 	for _, conf := range confs {
 		client := conf.Conf.Client()
@@ -590,13 +583,13 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 		expected := "invalid masked response length"
 
 		// too short
-		ke2.MaskedResponse = utils.RandomBytes(goodLength - 1)
+		ke2.MaskedResponse = internal.RandomBytes(goodLength - 1)
 		if _, _, err := client.Finish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for short response - got %v", err)
 		}
 
 		// too long
-		ke2.MaskedResponse = utils.RandomBytes(goodLength + 1)
+		ke2.MaskedResponse = internal.RandomBytes(goodLength + 1)
 		if _, _, err := client.Finish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for long response - got %v", err)
 		}
@@ -607,8 +600,8 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 	/*
 		Invalid envelope tag
 	*/
-	credID := utils.RandomBytes(32)
-	oprfSeed := utils.RandomBytes(32)
+	credID := internal.RandomBytes(32)
+	oprfSeed := internal.RandomBytes(32)
 
 	for _, conf := range confs {
 		client := conf.Conf.Client()
@@ -625,7 +618,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		}
 
 		// tamper the envelope
-		env.AuthTag = utils.RandomBytes(client.MAC.Size())
+		env.AuthTag = internal.RandomBytes(client.MAC.Size())
 		clear := encoding.Concat(pks, env.Serialize())
 		ke2.MaskedResponse = server.MaskResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
 
@@ -641,8 +634,8 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 	/*
 		Invalid envelope tag
 	*/
-	credID := utils.RandomBytes(32)
-	oprfSeed := utils.RandomBytes(32)
+	credID := internal.RandomBytes(32)
+	oprfSeed := internal.RandomBytes(32)
 
 	for _, conf := range confs {
 		client := conf.Conf.Client()
@@ -689,8 +682,8 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 	/*
 		Invalid server ke2 mac
 	*/
-	credID := utils.RandomBytes(32)
-	oprfSeed := utils.RandomBytes(32)
+	credID := internal.RandomBytes(32)
+	oprfSeed := internal.RandomBytes(32)
 
 	for _, conf := range confs {
 		client := conf.Conf.Client()
@@ -701,7 +694,7 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 		ke1 := client.Init([]byte("yo"))
 		ke2, _ := server.Init(ke1, nil, sks, pks, oprfSeed, rec)
 
-		ke2.Mac = utils.RandomBytes(client.MAC.Size())
+		ke2.Mac = internal.RandomBytes(client.MAC.Size())
 		expected := " AKE finalization: invalid server mac"
 		if _, _, err := client.Finish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid epks encoding - got %q", err)
@@ -734,8 +727,8 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 //	/*
 //		External mode invalid secret key encoding
 //	*/
-//	credID := utils.RandomBytes(32)
-//	oprfSeed := utils.RandomBytes(32)
+//	credID := internal.RandomBytes(32)
+//	oprfSeed := internal.RandomBytes(32)
 //
 //	for _, conf := range confs {
 //		conf.Conf.Mode = opaque.External
@@ -765,8 +758,8 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 //	/*
 //		The key recovered from the envelope is an invalid scalar in the external mode.
 //	 */
-//	credID := utils.RandomBytes(32)
-//	oprfSeed := utils.RandomBytes(32)
+//	credID := internal.RandomBytes(32)
+//	oprfSeed := internal.RandomBytes(32)
 //
 //	for i, conf := range confs {
 //		log.Printf("%d", i)

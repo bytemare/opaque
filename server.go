@@ -12,8 +12,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytemare/cryptotools/utils"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -52,18 +50,7 @@ func (s *Server) KeyGen() (secretKey, publicKey []byte) {
 
 func (s *Server) evaluate(seed, blinded []byte) (m []byte, err error) {
 	ku := s.OprfCiphersuite.Group().Get().HashToScalar(seed, []byte(tag.DeriveKeyPair))
-
-	oprf, err := s.OprfCiphersuite.Server(ku.Bytes())
-	if err != nil {
-		return nil, fmt.Errorf("oprf server setup with key: %w", err)
-	}
-
-	evaluation, err := oprf.Evaluate(blinded)
-	if err != nil {
-		return nil, fmt.Errorf("oprf evaluation: %w", err)
-	}
-
-	return evaluation.Elements[0], nil
+	return s.OprfCiphersuite.Server(ku).Evaluate(blinded)
 }
 
 func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element []byte) (m []byte, err error) {
@@ -94,7 +81,7 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 
 	// testing: integrated to support testing, to force values.
 	if len(maskingNonce) == 0 {
-		maskingNonce = utils.RandomBytes(s.Parameters.NonceLen)
+		maskingNonce = internal.RandomBytes(s.Parameters.NonceLen)
 	}
 
 	clear := encoding.Concat(serverPublicKey, record.Envelope)

@@ -9,9 +9,7 @@
 // Package message provides the internal credential recovery messages.
 package message
 
-import (
-	"github.com/bytemare/opaque/internal/encoding"
-)
+import "github.com/bytemare/opaque/internal/encoding"
 
 type CredentialRequest struct {
 	Data []byte `json:"data"`

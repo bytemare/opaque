@@ -10,19 +10,31 @@
 package internal
 
 import (
+	cryptorand "crypto/rand"
 	"errors"
+	"fmt"
 
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/voprf"
-
-	"github.com/bytemare/opaque/internal/tag"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
+	"github.com/bytemare/opaque/internal/oprf"
+	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
 
 var errInvalidMessageLength = errors.New("invalid message length")
+
+// RandomBytes returns random bytes of length len (wrapper for crypto/rand).
+func RandomBytes(length int) []byte {
+	r := make([]byte, length)
+	if _, err := cryptorand.Read(r); err != nil {
+		// We can as well not panic and try again in a loop
+		panic(fmt.Errorf("unexpected error in generating random bytes : %w", err))
+	}
+
+	return r
+}
 
 type Parameters struct {
 	KDF             *KDF
@@ -33,7 +45,7 @@ type Parameters struct {
 	EnvelopeSize    int
 	OPRFPointLength int
 	AkePointLength  int
-	OprfCiphersuite voprf.Ciphersuite
+	OprfCiphersuite oprf.Ciphersuite
 	AKEGroup        ciphersuite.Identifier
 	Context         []byte
 }

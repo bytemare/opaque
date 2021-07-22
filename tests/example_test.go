@@ -11,12 +11,12 @@ package opaque_test
 import (
 	"bytes"
 	"fmt"
+	"github.com/bytemare/opaque/internal"
 	"log"
 	"reflect"
 
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
-	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque"
 )
@@ -102,7 +102,7 @@ func ExampleRegistration() {
 	// We assume the server is already set up with the following values. secret* values are internal secret to the server.
 	// They can be unique for all clients, and must be the same for a client between registration and login. It's safe
 	// to use these same values across clients as long as they remain secret.
-	secretOprfSeed = utils.RandomBytes(32)
+	secretOprfSeed = internal.RandomBytes(32)
 	serverPrivateKey, serverPublicKey = opaque.DefaultConfiguration().Server().KeyGen()
 
 	// Secret client information.
@@ -128,7 +128,7 @@ func ExampleRegistration() {
 	}
 
 	// clientID must absolutely be unique among all clients.
-	credID := utils.RandomBytes(64)
+	credID := internal.RandomBytes(64)
 	s2, err := server.RegistrationResponse(s1, serverPublicKey, credID, secretOprfSeed)
 	if err != nil {
 		panic(err)

@@ -12,14 +12,12 @@ package ake
 import (
 	"fmt"
 
-	"github.com/bytemare/opaque/internal/tag"
-
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -49,7 +47,7 @@ func setValues(g group.Group, scalar group.Scalar, nonce []byte, nonceLen int) (
 	}
 
 	if len(nonce) == 0 {
-		nonce = utils.RandomBytes(nonceLen)
+		nonce = internal.RandomBytes(nonceLen)
 	}
 
 	return s, nonce

@@ -18,10 +18,10 @@ package opaque
 import (
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
-	"github.com/bytemare/voprf"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -41,19 +41,19 @@ type Group byte
 
 const (
 	// RistrettoSha512 identifies the Ristretto255 group and SHA-512.
-	RistrettoSha512 = Group(voprf.RistrettoSha512)
+	RistrettoSha512 = Group(oprf.RistrettoSha512)
 
 	// decaf448Shake256 identifies the Decaf448 group and Shake-256.
 	// decaf448Shake256 = 2.
 
 	// P256Sha256 identifies the NIST P-256 group and SHA-256.
-	P256Sha256 = Group(voprf.P256Sha256)
+	P256Sha256 = Group(oprf.P256Sha256)
 
 	// P384Sha512 identifies the NIST P-384 group and SHA-512.
-	P384Sha512 = Group(voprf.P384Sha512)
+	P384Sha512 = Group(oprf.P384Sha512)
 
 	// P521Sha512 identifies the NIST P-512 group and SHA-512.
-	P521Sha512 = Group(voprf.P521Sha512)
+	P521Sha512 = Group(oprf.P521Sha512)
 )
 
 // Credentials holds the client and server ids (will certainly disappear in next versions°.
@@ -106,7 +106,7 @@ func envelopeSize(mode Mode, p *internal.Parameters) int {
 }
 
 func (c *Configuration) toInternal() *internal.Parameters {
-	cs := voprf.Ciphersuite(c.OprfGroup)
+	cs := oprf.Ciphersuite(c.OprfGroup)
 	g := cs.Group()
 
 	ip := &internal.Parameters{

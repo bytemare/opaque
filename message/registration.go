@@ -9,9 +9,7 @@
 // Package message provides message structures for the OPAQUE protocol.
 package message
 
-import (
-	"github.com/bytemare/opaque/internal/encoding"
-)
+import "github.com/bytemare/opaque/internal/encoding"
 
 // RegistrationRequest is the first message of the registration flow, created by the client and sent to the server.
 type RegistrationRequest struct {

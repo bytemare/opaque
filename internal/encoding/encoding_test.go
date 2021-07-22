@@ -8,9 +8,7 @@
 
 package encoding
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestEncodeVectorLenPanic(t *testing.T) {
 	/*
