@@ -6,9 +6,12 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-package encoding
+package opaque
 
-import "testing"
+import (
+	"github.com/bytemare/opaque/internal/encoding"
+	"testing"
+)
 
 func TestEncodeVectorLenPanic(t *testing.T) {
 	/*
@@ -18,6 +21,6 @@ func TestEncodeVectorLenPanic(t *testing.T) {
 		recover()
 	}()
 
-	EncodeVectorLen(nil, 3)
+	encoding.EncodeVectorLen(nil, 3)
 	t.Fatal("no panic with exceeding encoding length")
 }
