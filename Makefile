@@ -4,8 +4,13 @@ COMMIT      := $(shell git rev-parse HEAD)
 .PHONY: lint
 lint:
 	@echo "Linting ..."
-	gofumports -w -local github.com/bytemare/opaque .
-	golangci-lint run --config=./.github/.golangci.yml ./...
+	@gofumports -w -local github.com/bytemare/opaque .
+	@golangci-lint run --config=./.github/.golangci.yml ./...
+
+.PHONY: license
+license:
+	@echo "Checking License headers ..."
+	@addlicense -check -v -f .github/licence-header.tmpl *
 
 .PHONY: test
 test:
