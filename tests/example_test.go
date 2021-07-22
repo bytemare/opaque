@@ -11,9 +11,10 @@ package opaque_test
 import (
 	"bytes"
 	"fmt"
-	"github.com/bytemare/opaque/internal"
 	"log"
 	"reflect"
+
+	"github.com/bytemare/opaque/internal"
 
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
