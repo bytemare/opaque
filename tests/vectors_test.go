@@ -141,6 +141,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	}
 
 	if !bytes.Equal(vRegResp.Data, regResp.Data) {
+		t.Logf("%v\n%v", vRegResp.Data, regResp.Data)
 		t.Fatal("registration response data do not match")
 	}
 
@@ -187,7 +188,7 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 
 	if !isFake(v.Config.Fake) {
 		client.Core.Oprf = buildOPRFClient(voprf.Ciphersuite(p.OprfGroup), v.Inputs.BlindLogin)
-		esk, err := client.AKEGroup.Get(nil).NewScalar().Decode(v.Inputs.ClientPrivateKeyshare)
+		esk, err := client.AKEGroup.Get().NewScalar().Decode(v.Inputs.ClientPrivateKeyshare)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -293,7 +294,7 @@ func (v *vector) test(t *testing.T) {
 }
 
 func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.ClientRecord) {
-	sks, err := s.Parameters.AKEGroup.Get(nil).NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
+	sks, err := s.Parameters.AKEGroup.Get().NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,12 +379,9 @@ func buildOPRFClient(cs voprf.Ciphersuite, blind []byte) *voprf.Client {
 	}
 	s.Blind[0] = blind
 
-	c, err := cs.Client(nil)
-	if err != nil {
-		panic(err)
-	}
+	c := cs.Client()
 
-	if err = c.Import(&s); err != nil {
+	if err := c.Import(&s); err != nil {
 		panic(err)
 	}
 

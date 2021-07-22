@@ -16,16 +16,12 @@
 package opaque
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 	"github.com/bytemare/voprf"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
-	"github.com/bytemare/opaque/internal/envelope"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -59,11 +55,6 @@ const (
 	// P521Sha512 identifies the NIST P-512 group and SHA-512.
 	P521Sha512 = Group(voprf.P521Sha512)
 )
-
-// String implements the Stringer() interface for the Group.
-func (g *Group) String() string {
-	return voprf.Ciphersuite(*g).String()
-}
 
 // Credentials holds the client and server ids (will certainly disappear in next versions°.
 type Credentials struct {
@@ -105,6 +96,15 @@ type Configuration struct {
 	NonceLen int `json:"nn"`
 }
 
+func envelopeSize(mode Mode, p *internal.Parameters) int {
+	innerSize := 0
+	if mode == External {
+		innerSize = encoding.ScalarLength[p.AKEGroup]
+	}
+
+	return p.NonceLen + p.MAC.Size() + innerSize
+}
+
 func (c *Configuration) toInternal() *internal.Parameters {
 	cs := voprf.Ciphersuite(c.OprfGroup)
 	g := cs.Group()
@@ -115,13 +115,13 @@ func (c *Configuration) toInternal() *internal.Parameters {
 		Hash:            &internal.Hash{H: c.Hash.Get()},
 		MHF:             &internal.MHF{MHF: c.MHF.Get()},
 		NonceLen:        c.NonceLen,
-		OPRFPointLength: encoding.PointLength[cs.Group()],
+		OPRFPointLength: encoding.PointLength[g],
 		AkePointLength:  encoding.PointLength[g],
 		OprfCiphersuite: cs,
 		AKEGroup:        g,
 		Context:         c.Context,
 	}
-	ip.EnvelopeSize = envelope.Size(envelope.Mode(c.Mode), ip)
+	ip.EnvelopeSize = envelopeSize(c.Mode, ip)
 
 	return ip
 }
@@ -151,19 +151,11 @@ func (c *Configuration) Server() *Server {
 	return NewServer(c)
 }
 
-// String returns a string representation of the parameter set.
-func (c *Configuration) String() string {
-	return fmt.Sprintf("%s-%s-%s-%s-%s-%v-%s-%d",
-		c.OprfGroup.String(), c.KDF, c.MAC, c.Hash, c.MHF, c.Mode, c.AKEGroup.String(), c.NonceLen)
-}
-
-var errInvalidLength = errors.New("invalid length")
-
 // DeserializeConfiguration decodes the input and returns a Parameter structure. This assumes that the encoded parameters
 // are valid, and will not be checked.
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	if len(encoded) != 8 {
-		return nil, errInvalidLength
+		return nil, internal.ErrConfigurationInvalidLength
 	}
 
 	return &Configuration{

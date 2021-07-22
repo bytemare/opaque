@@ -17,10 +17,17 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/envelope"
 	cred "github.com/bytemare/opaque/internal/message"
+	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
 
-var errInvalidMaskedLength = errors.New("invalid masked response length")
+var (
+	// errInvalidMaskedLength happens when unmasking a masked response.
+	errInvalidMaskedLength = errors.New("invalid masked response length")
+
+	// errInvalidPKS happens when the server sends an invalid public key on registration.
+	errInvalidPKS = errors.New("invalid server public key")
+)
 
 // Client represents an OPAQUE Client, exposing its functions and holding its state.
 type Client struct {
@@ -70,6 +77,11 @@ func (c *Client) RegistrationFinalize(clientSecretKey []byte, creds *Credentials
 		MaskingNonce:  creds.TestMaskNonce,
 	}
 
+	// this check is very important
+	if _, err = c.AKEGroup.Get().NewElement().Decode(resp.Pks); err != nil {
+		return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
+	}
+
 	envU, clientPublicKey, maskingKey, exportKey, err := c.Core.BuildEnvelope(c.mode, resp.Data, resp.Pks, clientSecretKey, creds2)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building envelope: %w", err)
@@ -93,23 +105,26 @@ func (c *Client) Init(password []byte) *message.KE1 {
 	return c.Ke1
 }
 
-func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte, *envelope.Envelope, error) {
-	envSize := c.Parameters.EnvelopeSize
-	if len(maskedResponse) != encoding.PointLength[c.AKEGroup]+envSize {
-		return nil, nil, errInvalidMaskedLength
-	}
-
+// unmask assumes that maskedResponse has been checked to be of length pointLength + envelope size.
+func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte, *envelope.Envelope) {
 	clear := c.MaskResponse(maskingKey, maskingNonce, maskedResponse)
-
 	serverPublicKey := clear[:encoding.PointLength[c.AKEGroup]]
 	e := clear[encoding.PointLength[c.AKEGroup]:]
 
-	env, _, err := envelope.DeserializeEnvelope(e, c.mode, c.NonceLen, c.Core.MAC.Size(), encoding.ScalarLength[c.AKEGroup])
-	if err != nil {
-		return nil, nil, fmt.Errorf("deserializing envelope: %w", err)
+	// Deserialize
+	innerLen := 0
+
+	if c.mode == envelope.External {
+		innerLen = encoding.ScalarLength[c.AKEGroup]
 	}
 
-	return serverPublicKey, env, nil
+	env := &envelope.Envelope{
+		Nonce:         e[:c.NonceLen],
+		InnerEnvelope: e[c.NonceLen : c.NonceLen+innerLen],
+		AuthTag:       e[c.NonceLen+innerLen:],
+	}
+
+	return serverPublicKey, env
 }
 
 // Finish returns a KE3 message given the server's KE2 response message and the identities. If the idc
@@ -120,19 +135,21 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	randomizedPwd := envelope.BuildPRK(c.Parameters, unblinded)
-	maskingKey := c.Core.KDF.Expand(randomizedPwd, []byte(internal.TagMaskingKey), c.Core.Hash.Size())
-
-	serverPublicKey, env, err := c.unmask(ke2.MaskingNonce, maskingKey, ke2.MaskedResponse)
-	if err != nil {
-		return nil, nil, fmt.Errorf("unmasking response: %w", err)
+	// This test is very important as it avoids buffer overflows in subsequent parsing.
+	if len(ke2.MaskedResponse) != encoding.PointLength[c.AKEGroup]+c.EnvelopeSize {
+		return nil, nil, errInvalidMaskedLength
 	}
+
+	randomizedPwd := envelope.BuildPRK(c.Parameters, unblinded)
+	maskingKey := c.Core.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.Core.Hash.Size())
+
+	serverPublicKey, env := c.unmask(ke2.MaskingNonce, maskingKey, ke2.MaskedResponse)
 
 	m := &envelope.Mailer{Parameters: c.Parameters}
 
 	clientSecretKey, clientPublicKey, exportKey, err := m.RecoverEnvelope(c.mode, randomizedPwd, serverPublicKey, idc, ids, env)
 	if err != nil {
-		return nil, nil, fmt.Errorf("recover secret: %w", err)
+		return nil, nil, fmt.Errorf("recover envelope: %w", err)
 	}
 
 	if idc == nil {
@@ -154,4 +171,19 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 // SessionKey returns the session key if the previous call to Finish() was successful.
 func (c *Client) SessionKey() []byte {
 	return c.Ake.SessionKey()
+}
+
+// DeserializeKE1 takes a serialized KE1 message and returns a deserialized KE1 structure.
+func (c *Client) DeserializeKE1(ke1 []byte) (*message.KE1, error) {
+	return c.Parameters.DeserializeKE1(ke1)
+}
+
+// DeserializeKE2 takes a serialized KE2 message and returns a deserialized KE2 structure.
+func (c *Client) DeserializeKE2(ke2 []byte) (*message.KE2, error) {
+	return c.Parameters.DeserializeKE2(ke2)
+}
+
+// DeserializeKE3 takes a serialized KE3 message and returns a deserialized KE3 structure.
+func (c *Client) DeserializeKE3(ke3 []byte) (*message.KE3, error) {
+	return c.Parameters.DeserializeKE3(ke3)
 }

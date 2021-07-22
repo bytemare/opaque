@@ -36,7 +36,7 @@ func NewServer() *Server {
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
 func (s *Server) SetValues(cs ciphersuite.Identifier, esk group.Scalar, nonce []byte, nonceLen int) group.Element {
-	g := cs.Get(nil)
+	g := cs.Get()
 
 	es, nonce := setValues(g, esk, nonce, nonceLen)
 	if s.esk == nil || (esk != nil && s.esk != es) {
@@ -51,7 +51,7 @@ func (s *Server) SetValues(cs ciphersuite.Identifier, esk group.Scalar, nonce []
 }
 
 // Response produces a 3DH server response message.
-func (s *Server) Response(p *internal.Parameters, serverIdentity, serverSecretKey, clientIdentity, clientPublicKey []byte,
+func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverSecretKey group.Scalar, clientIdentity, clientPublicKey []byte,
 	ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
 	epk := s.SetValues(p.AKEGroup, nil, nil, p.NonceLen)
 	nonce := s.nonceS

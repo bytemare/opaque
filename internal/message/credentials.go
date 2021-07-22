@@ -9,7 +9,9 @@
 // Package message provides the internal credential recovery messages.
 package message
 
-import "github.com/bytemare/cryptotools/utils"
+import (
+	"github.com/bytemare/opaque/internal/encoding"
+)
 
 type CredentialRequest struct {
 	Data []byte `json:"data"`
@@ -28,5 +30,5 @@ type CredentialResponse struct {
 
 // Serialize returns the byte encoding of CredentialResponse.
 func (c *CredentialResponse) Serialize() []byte {
-	return utils.Concatenate(0, c.Data, c.MaskingNonce, c.MaskedResponse)
+	return encoding.Concat3(c.Data, c.MaskingNonce, c.MaskedResponse)
 }

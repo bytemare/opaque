@@ -18,10 +18,12 @@ import (
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
+	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
 
-var errAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")
+// ErrAkeInvalidClientMac indicates that the MAC contained in the KE3 message is not valid in the given session.
+var ErrAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")
 
 // Server represents an OPAQUE Server, exposing its functions and holding its state.
 type Server struct {
@@ -49,14 +51,9 @@ func (s *Server) KeyGen() (secretKey, publicKey []byte) {
 }
 
 func (s *Server) evaluate(seed, blinded []byte) (m []byte, err error) {
-	oprf, err := s.OprfCiphersuite.Server(nil)
-	if err != nil {
-		return nil, fmt.Errorf("oprf server setup: %w", err)
-	}
+	ku := s.OprfCiphersuite.Group().Get().HashToScalar(seed, []byte(tag.DeriveKeyPair))
 
-	ku := oprf.HashToScalar(seed)
-
-	oprf, err = s.OprfCiphersuite.Server(ku.Bytes())
+	oprf, err := s.OprfCiphersuite.Server(ku.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("oprf server setup with key: %w", err)
 	}
@@ -70,7 +67,7 @@ func (s *Server) evaluate(seed, blinded []byte) (m []byte, err error) {
 }
 
 func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element []byte) (m []byte, err error) {
-	seed := s.KDF.Expand(oprfSeed, encoding.Concat(credentialIdentifier, internal.OprfKey), encoding.ScalarLength[s.OprfCiphersuite.Group()])
+	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.OprfKey), encoding.ScalarLength[s.OprfCiphersuite.Group()])
 	return s.evaluate(seed, element)
 }
 
@@ -100,7 +97,7 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 		maskingNonce = utils.RandomBytes(s.Parameters.NonceLen)
 	}
 
-	clear := encoding.Concat(serverPublicKey, string(record.Envelope))
+	clear := encoding.Concat(serverPublicKey, record.Envelope)
 	maskedResponse := s.MaskResponse(record.MaskingKey, maskingNonce, clear)
 
 	return &cred.CredentialResponse{
@@ -113,8 +110,16 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 // Init responds to a KE1 message with a KE2 message given server credentials and client record.
 func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord) (*message.KE2, error) {
-	if serverPublicKey == nil {
-		panic(nil)
+	g := s.AKEGroup.Get()
+
+	_, err := g.NewElement().Decode(serverPublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid server public key: %w", err)
+	}
+
+	sks, err := g.NewScalar().Decode(serverSecretKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid server secret key: %w", err)
 	}
 
 	response, err := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
@@ -133,7 +138,7 @@ func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverP
 		serverIdentity = serverPublicKey
 	}
 
-	ke2, err := s.Ake.Response(s.Parameters, serverIdentity, serverSecretKey, clientIdentity, record.PublicKey, ke1, response)
+	ke2, err := s.Ake.Response(s.Parameters, serverIdentity, sks, clientIdentity, record.PublicKey, ke1, response)
 	if err != nil {
 		return nil, fmt.Errorf(" AKE response: %w", err)
 	}
@@ -141,16 +146,10 @@ func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverP
 	return ke2, nil
 }
 
-// FakeCredentials allows a server to prevent client enumeration by sending back a faked response.
-func (s *Server) FakeCredentials(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
-	record *ClientRecord) (*message.KE2, error) {
-	return s.Init(ke1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed, record)
-}
-
 // Finish returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
 func (s *Server) Finish(ke3 *message.KE3) error {
 	if !s.Ake.Finalize(s.Parameters, ke3) {
-		return errAkeInvalidClientMac
+		return ErrAkeInvalidClientMac
 	}
 
 	return nil
@@ -160,4 +159,34 @@ func (s *Server) Finish(ke3 *message.KE3) error {
 // successful.
 func (s *Server) SessionKey() []byte {
 	return s.Ake.SessionKey()
+}
+
+// DeserializeRegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized RegistrationRequest structure.
+func (s *Server) DeserializeRegistrationRequest(registrationRequest []byte) (*message.RegistrationRequest, error) {
+	return s.Parameters.DeserializeRegistrationRequest(registrationRequest)
+}
+
+// DeserializeRegistrationResponse takes a serialized RegistrationResponse message and returns a deserialized RegistrationResponse structure.
+func (s *Server) DeserializeRegistrationResponse(registrationResponse []byte) (*message.RegistrationResponse, error) {
+	return s.Parameters.DeserializeRegistrationResponse(registrationResponse)
+}
+
+// DeserializeRegistrationUpload takes a serialized RegistrationUpload message and returns a deserialized RegistrationUpload structure.
+func (s *Server) DeserializeRegistrationUpload(registrationUpload []byte) (*message.RegistrationUpload, error) {
+	return s.Parameters.DeserializeRegistrationUpload(registrationUpload)
+}
+
+// DeserializeKE1 takes a serialized KE1 message and returns a deserialized KE1 structure.
+func (s *Server) DeserializeKE1(ke1 []byte) (*message.KE1, error) {
+	return s.Parameters.DeserializeKE1(ke1)
+}
+
+// DeserializeKE2 takes a serialized KE2 message and returns a deserialized KE2 structure.
+func (s *Server) DeserializeKE2(ke2 []byte) (*message.KE2, error) {
+	return s.Parameters.DeserializeKE2(ke2)
+}
+
+// DeserializeKE3 takes a serialized KE3 message and returns a deserialized KE3 structure.
+func (s *Server) DeserializeKE3(ke3 []byte) (*message.KE3, error) {
+	return s.Parameters.DeserializeKE3(ke3)
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/tag"
 )
 
 type internalMode struct {
@@ -23,24 +24,24 @@ type internalMode struct {
 }
 
 func (i *internalMode) deriveSecretKey(seed []byte) group.Scalar {
-	return i.Get(nil).HashToScalar(seed, []byte(internal.H2sDST))
+	return i.Get().HashToScalar(seed, []byte(tag.H2sDST))
 }
 
 func (i *internalMode) deriveAkeKeyPair(seed []byte) (group.Scalar, group.Element) {
 	sk := i.deriveSecretKey(seed)
-	return sk, i.Get(nil).Base().Mult(sk)
+	return sk, i.Get().Base().Mult(sk)
 }
 
-func (i *internalMode) buildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, clientPublicKey []byte) {
-	seed := i.Expand(randomizedPwd, encoding.Concat(nonce, internal.SkDST), encoding.ScalarLength[i.Identifier])
+func (i *internalMode) buildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, clientPublicKey []byte, err error) {
+	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.SecretKeyDST), encoding.ScalarLength[i.Identifier])
 	_, pk := i.deriveAkeKeyPair(seed)
 
-	return nil, encoding.SerializePoint(pk, i.Identifier)
+	return nil, encoding.SerializePoint(pk, i.Identifier), nil
 }
 
-func (i *internalMode) recoverKeys(randomizedPwd, nonce, _ []byte) (clientSecretKey []byte, clientPublicKey group.Element) {
-	seed := i.Expand(randomizedPwd, encoding.Concat(nonce, internal.SkDST), encoding.ScalarLength[i.Identifier])
+func (i *internalMode) recoverKeys(randomizedPwd, nonce, _ []byte) (clientSecretKey group.Scalar, clientPublicKey group.Element, err error) {
+	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.SecretKeyDST), encoding.ScalarLength[i.Identifier])
 	sk, pk := i.deriveAkeKeyPair(seed)
 
-	return sk.Bytes(), pk
+	return sk, pk, nil
 }

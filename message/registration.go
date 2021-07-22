@@ -10,7 +10,7 @@
 package message
 
 import (
-	"github.com/bytemare/cryptotools/utils"
+	"github.com/bytemare/opaque/internal/encoding"
 )
 
 // RegistrationRequest is the first message of the registration flow, created by the client and sent to the server.
@@ -31,7 +31,7 @@ type RegistrationResponse struct {
 
 // Serialize returns the byte encoding of RegistrationResponse.
 func (r *RegistrationResponse) Serialize() []byte {
-	return utils.Concatenate(len(r.Data)+len(r.Pks), r.Data, r.Pks)
+	return encoding.Concat(r.Data, r.Pks)
 }
 
 // RegistrationUpload represents the client record sent as the last registration message by the client to the server.
@@ -43,5 +43,5 @@ type RegistrationUpload struct {
 
 // Serialize returns the byte encoding of RegistrationUpload.
 func (r *RegistrationUpload) Serialize() []byte {
-	return utils.Concatenate(0, r.PublicKey, r.MaskingKey, r.Envelope)
+	return encoding.Concat3(r.PublicKey, r.MaskingKey, r.Envelope)
 }

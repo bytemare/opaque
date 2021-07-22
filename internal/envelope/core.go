@@ -14,6 +14,7 @@ import (
 	"github.com/bytemare/voprf"
 
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/tag"
 )
 
 // Core holds the Client state between the key derivation steps,
@@ -25,13 +26,8 @@ type Core struct {
 
 // New returns a pointer to an instantiated Core structure.
 func New(parameters *internal.Parameters) *Core {
-	oprf, err := parameters.OprfCiphersuite.Client(nil)
-	if err != nil {
-		panic(err)
-	}
-
 	return &Core{
-		Oprf:       oprf,
+		Oprf:       parameters.OprfCiphersuite.Client(),
 		Parameters: parameters,
 	}
 }
@@ -44,13 +40,7 @@ func (c *Core) OprfStart(password []byte) []byte {
 // OprfFinalize terminates the OPRF by unblinding the evaluated data.
 func (c *Core) OprfFinalize(data []byte) ([]byte, error) {
 	ev := &voprf.Evaluation{Elements: [][]byte{data}}
-
-	u, err := c.Oprf.Finalize(ev)
-	if err != nil {
-		err = fmt.Errorf("oprf finalization: %w", err)
-	}
-
-	return u, err
+	return c.Oprf.Finalize(ev)
 }
 
 // BuildEnvelope returns the client's Envelope, the masking key for the registration, and the additional export key.
@@ -63,8 +53,13 @@ func (c *Core) BuildEnvelope(mode Mode, evaluation, serverPublicKey, clientSecre
 
 	randomizedPwd := BuildPRK(c.Parameters, unblinded)
 	m := &Mailer{Parameters: c.Parameters}
-	env, clientPublicKey, exportKey = m.CreateEnvelope(mode, randomizedPwd, serverPublicKey, clientSecretKey, creds)
-	maskingKey = m.KDF.Expand(randomizedPwd, []byte(internal.TagMaskingKey), m.KDF.Size())
+
+	env, clientPublicKey, exportKey, err = m.CreateEnvelope(mode, randomizedPwd, serverPublicKey, clientSecretKey, creds)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	maskingKey = m.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), m.KDF.Size())
 
 	return env, clientPublicKey, maskingKey, exportKey, nil
 }
