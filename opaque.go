@@ -19,6 +19,7 @@ import (
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
@@ -155,26 +156,26 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	}
 
 	return &Configuration{
-		Group: Group(encoded[0]),
-		KDF:       hash.Hashing(encoded[1]),
-		MAC:       hash.Hashing(encoded[2]),
-		Hash:      hash.Hashing(encoded[3]),
-		MHF:       mhf.Identifier(encoded[4]),
-		Mode:      Mode(encoded[5]),
-		NonceLen:  encoding.OS2IP(encoded[6:]),
+		Group:    Group(encoded[0]),
+		KDF:      hash.Hashing(encoded[1]),
+		MAC:      hash.Hashing(encoded[2]),
+		Hash:     hash.Hashing(encoded[3]),
+		MHF:      mhf.Identifier(encoded[4]),
+		Mode:     Mode(encoded[5]),
+		NonceLen: encoding.OS2IP(encoded[6:]),
 	}, nil
 }
 
 // DefaultConfiguration returns a default configuration with strong parameters.
 func DefaultConfiguration() *Configuration {
 	return &Configuration{
-		Group: RistrettoSha512,
-		KDF:       hash.SHA512,
-		MAC:       hash.SHA512,
-		Hash:      hash.SHA512,
-		MHF:       mhf.Scrypt,
-		Mode:      Internal,
-		NonceLen:  32,
+		Group:    RistrettoSha512,
+		KDF:      hash.SHA512,
+		MAC:      hash.SHA512,
+		Hash:     hash.SHA512,
+		MHF:      mhf.Scrypt,
+		Mode:     Internal,
+		NonceLen: 32,
 	}
 }
 

@@ -222,4 +222,4 @@ run:
   tests: false
 
 output:
- #format: github-actions
+ format: github-actions

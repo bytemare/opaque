@@ -25,7 +25,7 @@ type Core struct {
 // New returns a pointer to an instantiated Core structure.
 func New(id oprf.Ciphersuite) *Core {
 	return &Core{
-		Oprf:       id.Client(),
+		Oprf: id.Client(),
 	}
 }
 

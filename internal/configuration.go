@@ -13,6 +13,7 @@ import (
 	cryptorand "crypto/rand"
 	"errors"
 	"fmt"
+
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 
 	"github.com/bytemare/opaque/internal/encoding"
@@ -27,8 +28,7 @@ var errInvalidMessageLength = errors.New("invalid message length")
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
 func RandomBytes(length int) []byte {
 	r := make([]byte, length)
-	var err error
-	if _, err = cryptorand.Read(r); err != nil {
+	if _, err := cryptorand.Read(r); err != nil {
 		// We can as well not panic and try again in a loop
 		panic(fmt.Errorf("unexpected error in generating random bytes : %w", err))
 	}
@@ -47,7 +47,7 @@ type Parameters struct {
 	AkePointLength  int
 	Group           ciphersuite.Identifier
 	OPRF            oprf.Ciphersuite
-	Context []byte
+	Context         []byte
 }
 
 func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.RegistrationRequest, error) {

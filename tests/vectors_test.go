@@ -269,14 +269,14 @@ func (v *vector) test(t *testing.T) {
 	}
 
 	p := &opaque.Configuration{
-		Group: opaque.Group(v.Config.OPRF[1]),
-		Hash:      hashToHash(v.Config.Hash),
-		KDF:       kdfToHash(v.Config.KDF),
-		MAC:       macToHash(v.Config.MAC),
-		MHF:       mhf.Scrypt,
-		Mode:      opaque.Mode(mode[0]),
-		Context:   []byte(v.Config.Context),
-		NonceLen:  32,
+		Group:    opaque.Group(v.Config.OPRF[1]),
+		Hash:     hashToHash(v.Config.Hash),
+		KDF:      kdfToHash(v.Config.KDF),
+		MAC:      macToHash(v.Config.MAC),
+		MHF:      mhf.Scrypt,
+		Mode:     opaque.Mode(mode[0]),
+		Context:  []byte(v.Config.Context),
+		NonceLen: 32,
 	}
 
 	// Registration

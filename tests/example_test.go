@@ -33,13 +33,13 @@ func ExampleConfiguration() {
 	defaultConf := opaque.DefaultConfiguration()
 
 	customConf := &opaque.Configuration{
-		Group: opaque.RistrettoSha512,
-		KDF:       hash.SHA512,
-		MAC:       hash.SHA512,
-		Hash:      hash.SHA512,
-		MHF:       mhf.Scrypt,
-		Mode:      opaque.Internal,
-		NonceLen:  32,
+		Group:    opaque.RistrettoSha512,
+		KDF:      hash.SHA512,
+		MAC:      hash.SHA512,
+		Hash:     hash.SHA512,
+		MHF:      mhf.Scrypt,
+		Mode:     opaque.Internal,
+		NonceLen: 32,
 	}
 
 	if !isSame(defaultConf, customConf) {
