@@ -33,13 +33,12 @@ func ExampleConfiguration() {
 	defaultConf := opaque.DefaultConfiguration()
 
 	customConf := &opaque.Configuration{
-		OprfGroup: opaque.RistrettoSha512,
+		Group: opaque.RistrettoSha512,
 		KDF:       hash.SHA512,
 		MAC:       hash.SHA512,
 		Hash:      hash.SHA512,
 		MHF:       mhf.Scrypt,
 		Mode:      opaque.Internal,
-		AKEGroup:  opaque.RistrettoSha512,
 		NonceLen:  32,
 	}
 
@@ -52,7 +51,7 @@ func ExampleConfiguration() {
 
 	conf, err := opaque.DeserializeConfiguration(encoded)
 	if err != nil {
-		log.Fatalln("Oh no! Decoding the configurations failed!")
+		log.Fatalf("Oh no! Decoding the configurations failed! %v", err)
 	}
 
 	if !isSame(defaultConf, conf) {

@@ -20,14 +20,12 @@ import (
 // and exposes envelope creation and key recovery functions.
 type Core struct {
 	Oprf *oprf.Client
-	*internal.Parameters
 }
 
 // New returns a pointer to an instantiated Core structure.
-func New(parameters *internal.Parameters) *Core {
+func New(id oprf.Ciphersuite) *Core {
 	return &Core{
-		Oprf:       parameters.OprfCiphersuite.Client(),
-		Parameters: parameters,
+		Oprf:       id.Client(),
 	}
 }
 
@@ -42,15 +40,15 @@ func (c *Core) OprfFinalize(data []byte) ([]byte, error) {
 }
 
 // BuildEnvelope returns the client's Envelope, the masking key for the registration, and the additional export key.
-func (c *Core) BuildEnvelope(mode Mode, evaluation, serverPublicKey, clientSecretKey []byte,
+func (c *Core) BuildEnvelope(p *internal.Parameters, mode Mode, evaluation, serverPublicKey, clientSecretKey []byte,
 	creds *Credentials) (env *Envelope, clientPublicKey, maskingKey, exportKey []byte, err error) {
 	unblinded, err := c.OprfFinalize(evaluation)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	randomizedPwd := BuildPRK(c.Parameters, unblinded)
-	m := &Mailer{Parameters: c.Parameters}
+	randomizedPwd := BuildPRK(p, unblinded)
+	m := &Mailer{Parameters: p}
 
 	env, clientPublicKey, exportKey, err = m.CreateEnvelope(mode, randomizedPwd, serverPublicKey, clientSecretKey, creds)
 	if err != nil {

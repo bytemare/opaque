@@ -45,16 +45,16 @@ func NewServer(p *Configuration) *Server {
 
 // KeyGen returns a key pair in the AKE group.
 func (s *Server) KeyGen() (secretKey, publicKey []byte) {
-	return ake.KeyGen(s.AKEGroup)
+	return ake.KeyGen(s.Group)
 }
 
 func (s *Server) evaluate(seed, blinded []byte) (m []byte, err error) {
-	ku := s.OprfCiphersuite.Group().Get().HashToScalar(seed, []byte(tag.DeriveKeyPair))
-	return s.OprfCiphersuite.Server(ku).Evaluate(blinded)
+	ku := s.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair))
+	return s.OPRF.Server(ku).Evaluate(blinded)
 }
 
 func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element []byte) (m []byte, err error) {
-	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.OprfKey), encoding.ScalarLength[s.OprfCiphersuite.Group()])
+	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.OprfKey), encoding.ScalarLength[s.Group])
 	return s.evaluate(seed, element)
 }
 
@@ -67,7 +67,7 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
 	}
 
 	return &message.RegistrationResponse{
-		Data: encoding.PadPoint(z, s.OprfCiphersuite.Group()),
+		Data: encoding.PadPoint(z, s.Group),
 		Pks:  serverPublicKey,
 	}, nil
 }
@@ -88,7 +88,7 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 	maskedResponse := s.MaskResponse(record.MaskingKey, maskingNonce, clear)
 
 	return &cred.CredentialResponse{
-		Data:           encoding.PadPoint(z, s.OprfCiphersuite.Group()),
+		Data:           encoding.PadPoint(z, s.Group),
 		MaskingNonce:   maskingNonce,
 		MaskedResponse: maskedResponse,
 	}, nil
@@ -97,14 +97,12 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 // Init responds to a KE1 message with a KE2 message given server credentials and client record.
 func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord) (*message.KE2, error) {
-	g := s.AKEGroup.Get()
-
-	_, err := g.NewElement().Decode(serverPublicKey)
+	_, err := s.Group.NewElement().Decode(serverPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid server public key: %w", err)
 	}
 
-	sks, err := g.NewScalar().Decode(serverSecretKey)
+	sks, err := s.Group.NewScalar().Decode(serverSecretKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid server secret key: %w", err)
 	}

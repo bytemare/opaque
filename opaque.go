@@ -16,9 +16,9 @@
 package opaque
 
 import (
+	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
@@ -54,6 +54,8 @@ const (
 
 	// P521Sha512 identifies the NIST P-512 group and SHA-512.
 	P521Sha512 = Group(oprf.P521Sha512)
+
+	confLength = 7
 )
 
 // Credentials holds the client and server ids (will certainly disappear in next versions°.
@@ -65,8 +67,8 @@ type Credentials struct {
 // Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
 // as well as KDF, MAC, Hash should be the same.
 type Configuration struct {
-	// OprfGroup identifies the OPRF ciphersuite to be used.
-	OprfGroup Group `json:"oprf"`
+	// Group identifies the group and ciphersuite to use for the OPRF and AKE.
+	Group Group `json:"oprf"`
 
 	// KDF identifies the hash function to be used for key derivation (e.g. HKDF).
 	// Identifiers are defined in github.com/bytemare/cryptotools/hash.
@@ -86,9 +88,6 @@ type Configuration struct {
 	// Mode identifies the envelope mode to be used.
 	Mode Mode `json:"mode"`
 
-	// AKEGroup identifies the prime-order group to use in the AKE.
-	AKEGroup Group `json:"group"`
-
 	// Context is optional shared information to include in the AKE transcript.
 	Context []byte
 
@@ -99,16 +98,14 @@ type Configuration struct {
 func envelopeSize(mode Mode, p *internal.Parameters) int {
 	innerSize := 0
 	if mode == External {
-		innerSize = encoding.ScalarLength[p.AKEGroup]
+		innerSize = encoding.ScalarLength[p.Group]
 	}
 
 	return p.NonceLen + p.MAC.Size() + innerSize
 }
 
 func (c *Configuration) toInternal() *internal.Parameters {
-	cs := oprf.Ciphersuite(c.OprfGroup)
-	g := cs.Group()
-
+	g := ciphersuite.Identifier(c.Group)
 	ip := &internal.Parameters{
 		KDF:             &internal.KDF{H: c.KDF.Get()},
 		MAC:             &internal.Mac{H: c.MAC.Get()},
@@ -117,8 +114,8 @@ func (c *Configuration) toInternal() *internal.Parameters {
 		NonceLen:        c.NonceLen,
 		OPRFPointLength: encoding.PointLength[g],
 		AkePointLength:  encoding.PointLength[g],
-		OprfCiphersuite: cs,
-		AKEGroup:        g,
+		Group:           g,
+		OPRF:            oprf.Ciphersuite(g),
 		Context:         c.Context,
 	}
 	ip.EnvelopeSize = envelopeSize(c.Mode, ip)
@@ -128,15 +125,14 @@ func (c *Configuration) toInternal() *internal.Parameters {
 
 // Serialize returns the byte encoding of the Configuration structure.
 func (c *Configuration) Serialize() []byte {
-	b := make([]byte, 8)
-	b[0] = byte(c.OprfGroup)
+	b := make([]byte, confLength)
+	b[0] = byte(c.Group)
 	b[1] = byte(c.KDF)
 	b[2] = byte(c.MAC)
 	b[3] = byte(c.Hash)
 	b[4] = byte(c.MHF)
 	b[5] = byte(c.Mode)
-	b[6] = byte(c.AKEGroup)
-	b[7] = encoding.I2OSP(c.NonceLen, 1)[0]
+	b[6] = encoding.I2OSP(c.NonceLen, 1)[0]
 
 	return b
 }
@@ -154,32 +150,30 @@ func (c *Configuration) Server() *Server {
 // DeserializeConfiguration decodes the input and returns a Parameter structure. This assumes that the encoded parameters
 // are valid, and will not be checked.
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
-	if len(encoded) != 8 {
+	if len(encoded) != confLength {
 		return nil, internal.ErrConfigurationInvalidLength
 	}
 
 	return &Configuration{
-		OprfGroup: Group(encoded[0]),
+		Group: Group(encoded[0]),
 		KDF:       hash.Hashing(encoded[1]),
 		MAC:       hash.Hashing(encoded[2]),
 		Hash:      hash.Hashing(encoded[3]),
 		MHF:       mhf.Identifier(encoded[4]),
 		Mode:      Mode(encoded[5]),
-		AKEGroup:  Group(encoded[6]),
-		NonceLen:  encoding.OS2IP(encoded[7:]),
+		NonceLen:  encoding.OS2IP(encoded[6:]),
 	}, nil
 }
 
 // DefaultConfiguration returns a default configuration with strong parameters.
 func DefaultConfiguration() *Configuration {
 	return &Configuration{
-		OprfGroup: RistrettoSha512,
+		Group: RistrettoSha512,
 		KDF:       hash.SHA512,
 		MAC:       hash.SHA512,
 		Hash:      hash.SHA512,
 		MHF:       mhf.Scrypt,
 		Mode:      Internal,
-		AKEGroup:  RistrettoSha512,
 		NonceLen:  32,
 	}
 }

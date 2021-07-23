@@ -24,12 +24,12 @@ type internalMode struct {
 }
 
 func (i *internalMode) deriveSecretKey(seed []byte) group.Scalar {
-	return i.Get().HashToScalar(seed, []byte(tag.H2sDST))
+	return i.HashToScalar(seed, []byte(tag.H2sDST))
 }
 
 func (i *internalMode) deriveAkeKeyPair(seed []byte) (group.Scalar, group.Element) {
 	sk := i.deriveSecretKey(seed)
-	return sk, i.Get().Base().Mult(sk)
+	return sk, i.Base().Mult(sk)
 }
 
 func (i *internalMode) buildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, clientPublicKey []byte, err error) {

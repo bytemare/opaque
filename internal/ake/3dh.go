@@ -30,9 +30,8 @@ const (
 
 // KeyGen returns private and public keys in the group.
 func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
-	g := id.Get()
-	scalar := g.NewScalar().Random()
-	publicKey := g.Base().Mult(scalar)
+	scalar := id.NewScalar().Random()
+	publicKey := id.Base().Mult(scalar)
 
 	return encoding.SerializeScalar(scalar, id), encoding.SerializePoint(publicKey, id)
 }
@@ -143,7 +142,7 @@ type coreKeys struct {
 
 func core3DH(s selector, p *internal.Parameters, k *coreKeys, idu, ids []byte,
 	ke1 *message.KE1, ke2 *message.KE2) (*macs, []byte, error) {
-	ikm, err := ikm(s, p.AKEGroup.Get(), k.esk, k.secretKey, k.peerEpk, k.peerPublicKey)
+	ikm, err := ikm(s, p.Group, k.esk, k.secretKey, k.peerEpk, k.peerPublicKey)
 	if err != nil {
 		return nil, nil, err
 	}

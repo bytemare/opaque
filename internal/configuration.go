@@ -13,7 +13,6 @@ import (
 	cryptorand "crypto/rand"
 	"errors"
 	"fmt"
-
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 
 	"github.com/bytemare/opaque/internal/encoding"
@@ -28,7 +27,8 @@ var errInvalidMessageLength = errors.New("invalid message length")
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
 func RandomBytes(length int) []byte {
 	r := make([]byte, length)
-	if _, err := cryptorand.Read(r); err != nil {
+	var err error
+	if _, err = cryptorand.Read(r); err != nil {
 		// We can as well not panic and try again in a loop
 		panic(fmt.Errorf("unexpected error in generating random bytes : %w", err))
 	}
@@ -45,9 +45,9 @@ type Parameters struct {
 	EnvelopeSize    int
 	OPRFPointLength int
 	AkePointLength  int
-	OprfCiphersuite oprf.Ciphersuite
-	AKEGroup        ciphersuite.Identifier
-	Context         []byte
+	Group           ciphersuite.Identifier
+	OPRF            oprf.Ciphersuite
+	Context []byte
 }
 
 func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.RegistrationRequest, error) {
@@ -145,6 +145,6 @@ func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
 
 // MaskResponse is used to encrypt and decrypt the response in KE2.
 func (p *Parameters) MaskResponse(key, nonce, in []byte) []byte {
-	pad := p.KDF.Expand(key, encoding.SuffixString(nonce, tag.CredentialResponsePad), encoding.PointLength[p.AKEGroup]+p.EnvelopeSize)
+	pad := p.KDF.Expand(key, encoding.SuffixString(nonce, tag.CredentialResponsePad), encoding.PointLength[p.Group]+p.EnvelopeSize)
 	return Xor(pad, in)
 }

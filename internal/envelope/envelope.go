@@ -68,9 +68,9 @@ func (m *Mailer) inner(mode Mode) innerEnvelope {
 
 	switch mode {
 	case Internal:
-		inner = &internalMode{m.AKEGroup, m.KDF}
+		inner = &internalMode{m.Group, m.KDF}
 	case External:
-		inner = &externalMode{m.AKEGroup, m.AKEGroup.Get(), m.KDF}
+		inner = &externalMode{m.Group, m.KDF}
 	default:
 		panic("invalid mode")
 	}

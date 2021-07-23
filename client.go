@@ -47,7 +47,7 @@ func NewClient(p *Configuration) *Client {
 	ip := p.toInternal()
 
 	return &Client{
-		Core:       envelope.New(ip),
+		Core:       envelope.New(ip.OPRF),
 		Ake:        ake.NewClient(),
 		Parameters: ip,
 		mode:       envelope.Mode(p.Mode),
@@ -56,7 +56,7 @@ func NewClient(p *Configuration) *Client {
 
 // KeyGen returns a key pair in the AKE group. It can then be used for the external mode.
 func (c *Client) KeyGen() (secretKey, publicKey []byte) {
-	return ake.KeyGen(c.AKEGroup)
+	return ake.KeyGen(c.Group)
 }
 
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
@@ -78,11 +78,11 @@ func (c *Client) RegistrationFinalize(clientSecretKey []byte, creds *Credentials
 	}
 
 	// this check is very important: it verifies the server's public key validity in the group.
-	if _, err = c.AKEGroup.Get().NewElement().Decode(resp.Pks); err != nil {
+	if _, err = c.Group.NewElement().Decode(resp.Pks); err != nil {
 		return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
 	}
 
-	envU, clientPublicKey, maskingKey, exportKey, err := c.Core.BuildEnvelope(c.mode, resp.Data, resp.Pks, clientSecretKey, creds2)
+	envU, clientPublicKey, maskingKey, exportKey, err := c.Core.BuildEnvelope(c.Parameters, c.mode, resp.Data, resp.Pks, clientSecretKey, creds2)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building envelope: %w", err)
 	}
@@ -98,8 +98,8 @@ func (c *Client) RegistrationFinalize(clientSecretKey []byte, creds *Credentials
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) Init(password []byte) *message.KE1 {
 	m := c.Core.OprfStart(password)
-	credReq := &cred.CredentialRequest{Data: encoding.PadPoint(m, c.Parameters.OprfCiphersuite.Group())}
-	c.Ke1 = c.Ake.Start(c.Parameters.AKEGroup)
+	credReq := &cred.CredentialRequest{Data: encoding.PadPoint(m, c.Group)}
+	c.Ke1 = c.Ake.Start(c.Group)
 	c.Ke1.CredentialRequest = credReq
 
 	return c.Ke1
@@ -108,14 +108,14 @@ func (c *Client) Init(password []byte) *message.KE1 {
 // unmask assumes that maskedResponse has been checked to be of length pointLength + envelope size.
 func (c *Client) unmask(maskingNonce, maskingKey, maskedResponse []byte) ([]byte, *envelope.Envelope) {
 	clear := c.MaskResponse(maskingKey, maskingNonce, maskedResponse)
-	serverPublicKey := clear[:encoding.PointLength[c.AKEGroup]]
-	e := clear[encoding.PointLength[c.AKEGroup]:]
+	serverPublicKey := clear[:encoding.PointLength[c.Group]]
+	e := clear[encoding.PointLength[c.Group]:]
 
 	// Deserialize
 	innerLen := 0
 
 	if c.mode == envelope.External {
-		innerLen = encoding.ScalarLength[c.AKEGroup]
+		innerLen = encoding.ScalarLength[c.Group]
 	}
 
 	env := &envelope.Envelope{
@@ -136,12 +136,12 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 	}
 
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
-	if len(ke2.MaskedResponse) != encoding.PointLength[c.AKEGroup]+c.EnvelopeSize {
+	if len(ke2.MaskedResponse) != encoding.PointLength[c.Group]+c.EnvelopeSize {
 		return nil, nil, errInvalidMaskedLength
 	}
 
 	randomizedPwd := envelope.BuildPRK(c.Parameters, unblinded)
-	maskingKey := c.Core.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.Core.Hash.Size())
+	maskingKey := c.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.Hash.Size())
 
 	serverPublicKey, env := c.unmask(ke2.MaskingNonce, maskingKey, ke2.MaskedResponse)
 

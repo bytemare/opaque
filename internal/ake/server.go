@@ -35,10 +35,8 @@ func NewServer() *Server {
 
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
-func (s *Server) SetValues(cs ciphersuite.Identifier, esk group.Scalar, nonce []byte, nonceLen int) group.Element {
-	g := cs.Get()
-
-	es, nonce := setValues(g, esk, nonce, nonceLen)
+func (s *Server) SetValues(id ciphersuite.Identifier, esk group.Scalar, nonce []byte, nonceLen int) group.Element {
+	es, nonce := setValues(id, esk, nonce, nonceLen)
 	if s.esk == nil || (esk != nil && s.esk != es) {
 		s.esk = es
 	}
@@ -47,20 +45,20 @@ func (s *Server) SetValues(cs ciphersuite.Identifier, esk group.Scalar, nonce []
 		s.nonceS = nonce
 	}
 
-	return g.Base().Mult(s.esk)
+	return id.Base().Mult(s.esk)
 }
 
 // Response produces a 3DH server response message.
 func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverSecretKey group.Scalar, clientIdentity, clientPublicKey []byte,
 	ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
-	epk := s.SetValues(p.AKEGroup, nil, nil, p.NonceLen)
+	epk := s.SetValues(p.Group, nil, nil, p.NonceLen)
 	nonce := s.nonceS
 	k := &coreKeys{s.esk, serverSecretKey, ke1.EpkU, clientPublicKey}
 
 	ke2 := &message.KE2{
 		CredentialResponse: response,
 		NonceS:             nonce,
-		EpkS:               encoding.PadPoint(epk.Bytes(), p.AKEGroup),
+		EpkS:               encoding.PadPoint(epk.Bytes(), p.Group),
 	}
 
 	macs, sessionSecret, err := core3DH(server, p, k, clientIdentity, serverIdentity, ke1, ke2)

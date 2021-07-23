@@ -20,7 +20,6 @@ import (
 
 type externalMode struct {
 	ciphersuite.Identifier
-	group.Group
 	*internal.KDF
 }
 

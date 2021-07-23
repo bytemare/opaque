@@ -26,7 +26,7 @@ const (
 )
 
 // Ciphersuite identifies the OPRF compatible cipher suite to be used.
-type Ciphersuite byte
+type Ciphersuite ciphersuite.Identifier
 
 const (
 	// RistrettoSha512 is the OPRF cipher suite of the Ristretto255 group and SHA-512.
@@ -48,18 +48,14 @@ const (
 	hash2groupDSTPrefix = "HashToGroup-"
 )
 
-var (
-	suiteToHash = make(map[Ciphersuite]hash.Hashing)
-	oprfToGroup = make(map[Ciphersuite]ciphersuite.Identifier)
-)
+var suiteToHash = make(map[Ciphersuite]hash.Hashing)
 
-func (c Ciphersuite) register(g ciphersuite.Identifier, h hash.Hashing) {
+func (c Ciphersuite) register(h hash.Hashing) {
 	suiteToHash[c] = h
-	oprfToGroup[c] = g
 }
 
 func (c Ciphersuite) Group() ciphersuite.Identifier {
-	return oprfToGroup[c]
+	return ciphersuite.Identifier(c)
 }
 
 func (c Ciphersuite) hash() hash.Hashing {
@@ -92,12 +88,17 @@ func (o *oprf) dst(prefix string) []byte {
 	return dst
 }
 
+// DeriveKey returns a scalar mapped from the input.
+func (c Ciphersuite) DeriveKey(input, dst []byte) group.Scalar {
+	return c.Group().HashToScalar(input, dst)
+}
+
 // Client returns an OPRF client.
 func (c Ciphersuite) Client() *Client {
 	client := &Client{
 		oprf: &oprf{
 			id:            c,
-			group:         c.Group().Get(),
+			group:         c.Group(),
 			hash:          c.hash().Get(),
 			contextString: contextString(c),
 		},
@@ -111,7 +112,7 @@ func (c Ciphersuite) Server(privateKey group.Scalar) *Server {
 	return &Server{
 		oprf: &oprf{
 			id:            c,
-			group:         c.Group().Get(),
+			group:         c.Group(),
 			hash:          c.hash().Get(),
 			contextString: contextString(c),
 		},
@@ -120,8 +121,8 @@ func (c Ciphersuite) Server(privateKey group.Scalar) *Server {
 }
 
 func init() {
-	RistrettoSha512.register(ciphersuite.Ristretto255Sha512, hash.SHA512)
-	P256Sha256.register(ciphersuite.P256Sha256, hash.SHA256)
-	P384Sha512.register(ciphersuite.P384Sha512, hash.SHA512)
-	P521Sha512.register(ciphersuite.P521Sha512, hash.SHA512)
+	RistrettoSha512.register(hash.SHA512)
+	P256Sha256.register(hash.SHA256)
+	P384Sha512.register(hash.SHA512)
+	P521Sha512.register(hash.SHA512)
 }

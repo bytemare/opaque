@@ -120,7 +120,7 @@ type vector struct {
 func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	// Client
 	client := p.Client()
-	oprfClient := buildOPRFClient(oprf.Ciphersuite(p.OprfGroup), v.Inputs.BlindRegistration)
+	oprfClient := buildOPRFClient(oprf.Ciphersuite(p.Group), v.Inputs.BlindRegistration)
 	client.Core.Oprf = oprfClient
 	regReq := client.RegistrationInit(v.Inputs.Password)
 
@@ -183,13 +183,13 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	client := p.Client()
 
 	if !isFake(v.Config.Fake) {
-		client.Core.Oprf = buildOPRFClient(oprf.Ciphersuite(p.OprfGroup), v.Inputs.BlindLogin)
-		esk, err := client.AKEGroup.Get().NewScalar().Decode(v.Inputs.ClientPrivateKeyshare)
+		client.Core.Oprf = buildOPRFClient(oprf.Ciphersuite(p.Group), v.Inputs.BlindLogin)
+		esk, err := client.Group.NewScalar().Decode(v.Inputs.ClientPrivateKeyshare)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		client.Ake.SetValues(client.Parameters.AKEGroup, esk, v.Inputs.ClientNonce, 32)
+		client.Ake.SetValues(client.Parameters.Group, esk, v.Inputs.ClientNonce, 32)
 		KE1 := client.Init(v.Inputs.Password)
 
 		if !bytes.Equal(v.Outputs.KE1, KE1.Serialize()) {
@@ -269,13 +269,12 @@ func (v *vector) test(t *testing.T) {
 	}
 
 	p := &opaque.Configuration{
-		OprfGroup: opaque.Group(v.Config.OPRF[1]),
+		Group: opaque.Group(v.Config.OPRF[1]),
 		Hash:      hashToHash(v.Config.Hash),
 		KDF:       kdfToHash(v.Config.KDF),
 		MAC:       macToHash(v.Config.MAC),
 		MHF:       mhf.Scrypt,
 		Mode:      opaque.Mode(mode[0]),
-		AKEGroup:  groupToGroup(v.Config.Group),
 		Context:   []byte(v.Config.Context),
 		NonceLen:  32,
 	}
@@ -290,11 +289,11 @@ func (v *vector) test(t *testing.T) {
 }
 
 func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.ClientRecord) {
-	sks, err := s.Parameters.AKEGroup.Get().NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
+	sks, err := s.Parameters.Group.NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.Ake.SetValues(s.Parameters.AKEGroup, sks, v.Inputs.ServerNonce, 32)
+	s.Ake.SetValues(s.Parameters.Group, sks, v.Inputs.ServerNonce, 32)
 
 	var ke1 *message.KE1
 	if isFake(v.Config.Fake) {
@@ -367,7 +366,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 }
 
 func buildOPRFClient(cs oprf.Ciphersuite, blind []byte) *oprf.Client {
-	b, err := cs.Group().Get().NewScalar().Decode(blind)
+	b, err := cs.Group().NewScalar().Decode(blind)
 	if err != nil {
 		panic(err)
 	}

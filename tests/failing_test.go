@@ -82,7 +82,7 @@ func TestDeserializeRegistrationUpload(t *testing.T) {
 
 func TestDeserializeKE1(t *testing.T) {
 	c := opaque.DefaultConfiguration()
-	group := oprf.Ciphersuite(c.OprfGroup).Group()
+	group := ciphersuite.Identifier(c.Group)
 	ke1Length := encoding.PointLength[group] + c.NonceLen + encoding.PointLength[group]
 
 	server := c.Server()
@@ -130,15 +130,15 @@ func TestDeserializeKE3(t *testing.T) {
 // opaque.go
 
 func TestDeserializeConfiguration(t *testing.T) {
-	r7 := internal.RandomBytes(7)
-	r9 := internal.RandomBytes(9)
+	r6 := internal.RandomBytes(6)
+	r8 := internal.RandomBytes(8)
 
-	if _, err := opaque.DeserializeConfiguration(r7); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
+	if _, err := opaque.DeserializeConfiguration(r6); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
 		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r7. want %q, got %q",
 			internal.ErrConfigurationInvalidLength, err)
 	}
 
-	if _, err := opaque.DeserializeConfiguration(r9); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
+	if _, err := opaque.DeserializeConfiguration(r8); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
 		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r9. want %q, got %q",
 			internal.ErrConfigurationInvalidLength, err)
 	}
@@ -146,19 +146,17 @@ func TestDeserializeConfiguration(t *testing.T) {
 
 func TestNilConfiguration(t *testing.T) {
 	def := opaque.DefaultConfiguration()
-
-	cs := oprf.Ciphersuite(def.OprfGroup)
-	g := cs.Group()
+	g := ciphersuite.Identifier(def.Group)
 	defaultConfiguration := &internal.Parameters{
 		KDF:             &internal.KDF{H: def.KDF.Get()},
 		MAC:             &internal.Mac{H: def.MAC.Get()},
 		Hash:            &internal.Hash{H: def.Hash.Get()},
 		MHF:             &internal.MHF{MHF: def.MHF.Get()},
 		NonceLen:        def.NonceLen,
-		OPRFPointLength: encoding.PointLength[cs.Group()],
+		OPRFPointLength: encoding.PointLength[g],
 		AkePointLength:  encoding.PointLength[g],
-		OprfCiphersuite: cs,
-		AKEGroup:        g,
+		Group: g,
+		OPRF:        oprf.Ciphersuite(g),
 		Context:         def.Context,
 	}
 
@@ -187,39 +185,36 @@ var confs = []configuration{
 	},
 	{
 		Conf: &opaque.Configuration{
-			OprfGroup: opaque.P256Sha256,
+			Group: opaque.P256Sha256,
 			KDF:       hash.SHA256,
 			MAC:       hash.SHA256,
 			Hash:      hash.SHA256,
 			MHF:       mhf.Scrypt,
 			Mode:      opaque.Internal,
-			AKEGroup:  opaque.P256Sha256,
 			NonceLen:  32,
 		},
 		Curve: elliptic.P256(),
 	},
 	{
 		Conf: &opaque.Configuration{
-			OprfGroup: opaque.P384Sha512,
+			Group: opaque.P384Sha512,
 			KDF:       hash.SHA512,
 			MAC:       hash.SHA512,
 			Hash:      hash.SHA512,
 			MHF:       mhf.Scrypt,
 			Mode:      opaque.Internal,
-			AKEGroup:  opaque.P384Sha512,
 			NonceLen:  32,
 		},
 		Curve: elliptic.P384(),
 	},
 	{
 		Conf: &opaque.Configuration{
-			OprfGroup: opaque.P521Sha512,
+			Group: opaque.P521Sha512,
 			KDF:       hash.SHA512,
 			MAC:       hash.SHA512,
 			Hash:      hash.SHA512,
 			MHF:       mhf.Scrypt,
 			Mode:      opaque.Internal,
-			AKEGroup:  opaque.P521Sha512,
 			NonceLen:  32,
 		},
 		Curve: elliptic.P521(),
@@ -244,7 +239,7 @@ func getBadNistScalar(t *testing.T, ci ciphersuite.Identifier, curve elliptic.Cu
 	order := curve.Params().P
 	exceeded := order.Add(order, big.NewInt(2)).Bytes()
 
-	_, err := ci.Get().NewScalar().Decode(exceeded)
+	_, err := ci.NewScalar().Decode(exceeded)
 	if err == nil {
 		t.Errorf("Exceeding order did not yield an error for group %s", ci)
 	}
@@ -252,33 +247,33 @@ func getBadNistScalar(t *testing.T, ci ciphersuite.Identifier, curve elliptic.Cu
 	return exceeded
 }
 
-func getBadNistElement(t *testing.T, ci ciphersuite.Identifier) []byte {
-	size := encoding.PointLength[ci]
+func getBadNistElement(t *testing.T, id ciphersuite.Identifier) []byte {
+	size := encoding.PointLength[id]
 	element := internal.RandomBytes(size)
 	// detag compression
 	element[0] = 4
 
-	_, err := ci.Get().NewElement().Decode(element)
+	_, err := id.NewElement().Decode(element)
 	if err == nil {
-		t.Errorf("detagged compressed point did not yield an error for group %s", ci)
+		t.Errorf("detagged compressed point did not yield an error for group %s", id)
 	}
 
 	return element
 }
 
 func getBadElement(t *testing.T, c configuration) []byte {
-	if c.Conf.OprfGroup == opaque.RistrettoSha512 {
+	if c.Conf.Group == opaque.RistrettoSha512 {
 		return getBadRistrettoElement()
 	} else {
-		return getBadNistElement(t, oprf.Ciphersuite(c.Conf.OprfGroup).Group())
+		return getBadNistElement(t, oprf.Ciphersuite(c.Conf.Group).Group())
 	}
 }
 
 func getBadScalar(t *testing.T, c configuration) []byte {
-	if c.Conf.OprfGroup == opaque.RistrettoSha512 {
+	if c.Conf.Group == opaque.RistrettoSha512 {
 		return getBadRistrettoScalar()
 	} else {
-		return getBadNistScalar(t, oprf.Ciphersuite(c.Conf.OprfGroup).Group(), c.Curve)
+		return getBadNistScalar(t, oprf.Ciphersuite(c.Conf.Group).Group(), c.Curve)
 	}
 }
 
@@ -310,16 +305,16 @@ func getEnvelope(mode envelope.Mode, client *opaque.Client, ke2 *message.KE2) (*
 	}
 
 	randomizedPwd := envelope.BuildPRK(client.Parameters, unblinded)
-	maskingKey := client.Core.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), client.Core.Hash.Size())
+	maskingKey := client.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), client.Hash.Size())
 
 	clear := client.MaskResponse(maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
-	e := clear[encoding.PointLength[client.AKEGroup]:]
+	e := clear[encoding.PointLength[client.Group]:]
 
 	// Deserialize
 	innerLen := 0
 
 	if mode == envelope.External {
-		innerLen = encoding.ScalarLength[client.AKEGroup]
+		innerLen = encoding.ScalarLength[client.Group]
 	}
 
 	env := &envelope.Envelope{
@@ -532,7 +527,7 @@ func TestClientRegistrationFinalize_InvalidEvaluation(t *testing.T) {
 		client := conf.Conf.Client()
 		badr2 := &message.RegistrationResponse{
 			Data: getBadElement(t, conf),
-			Pks:  client.AKEGroup.Get().Base().Bytes(),
+			Pks:  client.Group.Base().Bytes(),
 		}
 
 		expected := "building envelope: finalizing OPRF : "
@@ -578,7 +573,7 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 		ke1 := client.Init([]byte("yo"))
 		ke2, _ := server.Init(ke1, nil, sks, pks, oprfSeed, rec)
 
-		goodLength := encoding.PointLength[client.AKEGroup] + client.EnvelopeSize
+		goodLength := encoding.PointLength[client.Group] + client.EnvelopeSize
 		expected := "invalid masked response length"
 
 		// too short

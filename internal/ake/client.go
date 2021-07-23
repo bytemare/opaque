@@ -35,10 +35,8 @@ func NewClient() *Client {
 
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
-func (c *Client) SetValues(cs ciphersuite.Identifier, esk group.Scalar, nonce []byte, nonceLen int) group.Element {
-	g := cs.Get()
-
-	s, nonce := setValues(g, esk, nonce, nonceLen)
+func (c *Client) SetValues(id ciphersuite.Identifier, esk group.Scalar, nonce []byte, nonceLen int) group.Element {
+	s, nonce := setValues(id, esk, nonce, nonceLen)
 	if c.esk == nil || (esk != nil && c.esk != s) {
 		c.esk = s
 	}
@@ -47,7 +45,7 @@ func (c *Client) SetValues(cs ciphersuite.Identifier, esk group.Scalar, nonce []
 		c.NonceU = nonce
 	}
 
-	return g.Base().Mult(c.esk)
+	return id.Base().Mult(c.esk)
 }
 
 // Start initiates the 3DH protocol, and returns a KE1 message with clientInfo.
