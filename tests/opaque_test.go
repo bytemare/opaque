@@ -10,11 +10,7 @@ package opaque_test
 
 import (
 	"bytes"
-	"encoding/gob"
-	"fmt"
-	"reflect"
 	"testing"
-	"unsafe"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
@@ -218,48 +214,4 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	}
 
 	return exportKeyLogin
-}
-
-func serializeAkeServerState(v interface{}) []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-
-	rv := reflect.ValueOf(v)
-	// if it's a pointer, then derefence
-	if rv.Kind() == reflect.Ptr {
-		rv = rv.Elem()
-	}
-
-	enc.EncodeValue(rv.FieldByName("clientMac"))
-	enc.EncodeValue(rv.FieldByName("sessionSecret"))
-
-	return buf.Bytes()
-}
-
-func deserializeAkeServerState(data []byte, v interface{}) error {
-	dec := gob.NewDecoder(bytes.NewBuffer(data))
-
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Ptr {
-		return fmt.Errorf("cannot decode onto non-pointer %s", reflect.TypeOf(v))
-	}
-	if rv.IsNil() {
-		return fmt.Errorf("cannot decode onto nil")
-	}
-
-	rv = rv.Elem()
-
-	for _, name := range []string{"clientMac", "sessionSecret"} {
-		var b []byte
-		err := dec.Decode(&b)
-		if err != nil {
-			return err
-		}
-
-		addr := rv.FieldByName(name).UnsafeAddr()
-		val := (*[]byte)(unsafe.Pointer(addr))
-		*val = b
-	}
-
-	return nil
 }
