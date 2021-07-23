@@ -21,6 +21,8 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
+var errAkeStateNotEmpty = errors.New("existing state is not empty")
+
 // Server exposes the server's AKE functions and holds its state.
 type Server struct {
 	clientMac     []byte
@@ -89,14 +91,15 @@ func (s *Server) SerializeState() []byte {
 }
 
 // SetState will set the given clientMac and sessionSecret in the server's
-// internal state
+// internal state.
 func (s *Server) SetState(clientMac, sessionSecret []byte) error {
 	if len(s.clientMac) != 0 || len(s.sessionSecret) != 0 {
-		return errors.New("existing state is not empty")
+		return errAkeStateNotEmpty
 	}
 
 	s.clientMac = clientMac
 	s.sessionSecret = sessionSecret
+
 	return nil
 }
 

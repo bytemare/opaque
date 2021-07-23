@@ -20,8 +20,13 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
-// ErrAkeInvalidClientMac indicates that the MAC contained in the KE3 message is not valid in the given session.
-var ErrAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")
+var (
+	// ErrAkeInvalidClientMac indicates that the MAC contained in the KE3 message is not valid in the given session.
+	ErrAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")
+
+	// ErrInvalidState indicates that the given state is not valid due to a wrong length.
+	ErrInvalidState = errors.New("invalid state length")
+)
 
 // Server represents an OPAQUE Server, exposing its functions and holding its state.
 type Server struct {
@@ -182,17 +187,16 @@ func (s *Server) DeserializeKE3(ke3 []byte) (*message.KE3, error) {
 	return s.Parameters.DeserializeKE3(ke3)
 }
 
-// SetAKEState sets the interal state of the AKE server from the given bytes
+// SetAKEState sets the internal state of the AKE server from the given bytes.
 func (s *Server) SetAKEState(state []byte) error {
 	if len(state) != s.MAC.Size()+s.KDF.Size() {
-		return errors.New("invalid state length")
+		return ErrInvalidState
 	}
 
 	return s.Ake.SetState(state[:s.MAC.Size()], state[s.MAC.Size():])
 }
 
-// SerializeState returns the internal state of the AKE server serialized to
-// bytes
+// SerializeState returns the internal state of the AKE server serialized to bytes.
 func (s *Server) SerializeState() []byte {
 	return s.Ake.SerializeState()
 }
