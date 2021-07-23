@@ -182,14 +182,13 @@ func (s *Server) DeserializeKE3(ke3 []byte) (*message.KE3, error) {
 	return s.Parameters.DeserializeKE3(ke3)
 }
 
-// DeserializeAKEState sets the interal state of the AKE server from the given
-// bytes
-func (s *Server) DeserializeAKEState(state []byte) error {
-	if len(state) != s.MAC.Size() + s.KDF.Size() {
-		return errors.New("state is the wrong length")
+// SetAKEState sets the interal state of the AKE server from the given bytes
+func (s *Server) SetAKEState(state []byte) error {
+	if len(state) != s.MAC.Size()+s.KDF.Size() {
+		return errors.New("invalid state length")
 	}
 
-	return s.Ake.SetState(state[:l], state[l:])
+	return s.Ake.SetState(state[:s.MAC.Size()], state[s.MAC.Size():])
 }
 
 // SerializeState returns the internal state of the AKE server serialized to

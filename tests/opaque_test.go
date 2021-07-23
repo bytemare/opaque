@@ -198,7 +198,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 			t.Fatalf(dbgErr, p.Mode, err)
 		}
 
-		if err := server.DeserializeAKEState(state); err != nil {
+		if err := server.SetAKEState(state); err != nil {
 			t.Fatalf(dbgErr, p.Mode, err)
 		}
 
