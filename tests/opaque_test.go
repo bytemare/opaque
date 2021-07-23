@@ -69,106 +69,145 @@ func TestFull(t *testing.T) {
 func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte) {
 	// Client
 	client := p.Client()
-	reqReg := client.RegistrationInit(p.password)
-	m1s := reqReg.Serialize()
+
+	var m1s []byte
+	{
+		reqReg := client.RegistrationInit(p.password)
+		m1s = reqReg.Serialize()
+	}
 
 	// Server
-	server := p.Server()
-	m1, err := server.DeserializeRegistrationRequest(m1s)
-	if err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
-	}
+	var m2s []byte
+	var credID []byte
+	{
+		server := p.Server()
+		m1, err := server.DeserializeRegistrationRequest(m1s)
+		if err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
 
-	credID := internal.RandomBytes(32)
-	respReg, err := server.RegistrationResponse(m1, p.serverPublicKey, credID, p.oprfSeed)
-	if err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
-	}
+		credID = internal.RandomBytes(32)
+		respReg, err := server.RegistrationResponse(m1, p.serverPublicKey, credID, p.oprfSeed)
+		if err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
 
-	m2s := respReg.Serialize()
+		m2s = respReg.Serialize()
+	}
 
 	// Client
-	clientCreds := &opaque.Credentials{
-		Client: p.username,
-		Server: p.serverID,
-	}
+	var m3s []byte
+	var exportKeyReg []byte
+	{
+		clientCreds := &opaque.Credentials{
+			Client: p.username,
+			Server: p.serverID,
+		}
 
-	var clientSecretKey []byte
-	if p.Mode == opaque.External {
-		clientSecretKey, _ = client.KeyGen()
-	}
+		var clientSecretKey []byte
+		if p.Mode == opaque.External {
+			clientSecretKey, _ = client.KeyGen()
+		}
 
-	m2, err := client.DeserializeRegistrationResponse(m2s)
-	if err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
-	}
+		m2, err := client.DeserializeRegistrationResponse(m2s)
+		if err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
 
-	upload, exportKeyReg, err := client.RegistrationFinalize(clientSecretKey, clientCreds, m2)
-	if err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
-	}
+		upload, key, err := client.RegistrationFinalize(clientSecretKey, clientCreds, m2)
+		if err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
+		exportKeyReg = key
 
-	m3s := upload.Serialize()
+		m3s = upload.Serialize()
+	}
 
 	// Server
-	m3, err := server.DeserializeRegistrationUpload(m3s)
-	if err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
-	}
+	{
+		server := p.Server()
+		m3, err := server.DeserializeRegistrationUpload(m3s)
+		if err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
 
-	return &opaque.ClientRecord{
-		CredentialIdentifier: credID,
-		ClientIdentity:       p.username,
-		RegistrationUpload:   m3,
-	}, exportKeyReg
+		return &opaque.ClientRecord{
+			CredentialIdentifier: credID,
+			ClientIdentity:       p.username,
+			RegistrationUpload:   m3,
+		}, exportKeyReg
+	}
 }
 
 func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord) []byte {
 	// Client
 	client := p.Client()
-	ke1 := client.Init(p.password)
-	m4s := ke1.Serialize()
+
+	var m4s []byte
+	{
+		ke1 := client.Init(p.password)
+		m4s = ke1.Serialize()
+	}
 
 	// Server
-	server := p.Server()
+	var m5s []byte
+	var state []byte
+	{
+		server := p.Server()
+		m4, err := server.DeserializeKE1(m4s)
+		if err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
 
-	m4, err := server.DeserializeKE1(m4s)
-	if err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
+		ke2, err := server.Init(m4, p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed, record)
+		if err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
+
+		state = server.SerializeState()
+
+		m5s = ke2.Serialize()
 	}
-
-	ke2, err := server.Init(m4, p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed, record)
-	if err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
-	}
-
-	m5s := ke2.Serialize()
 
 	// Client
-	m5, err := client.DeserializeKE2(m5s)
-	if err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
-	}
+	var m6s []byte
+	var exportKeyLogin []byte
+	var clientKey []byte
+	{
+		m5, err := client.DeserializeKE2(m5s)
+		if err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
 
-	ke3, exportKeyLogin, err := client.Finish(p.username, p.serverID, m5)
-	if err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
-	}
+		ke3, key, err := client.Finish(p.username, p.serverID, m5)
+		if err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
+		exportKeyLogin = key
 
-	m6s := ke3.Serialize()
+		m6s = ke3.Serialize()
+		clientKey = client.SessionKey()
+	}
 
 	// Server
-	m6, err := server.DeserializeKE3(m6s)
-	if err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
-	}
+	var serverKey []byte
+	{
+		server := p.Server()
+		m6, err := server.DeserializeKE3(m6s)
+		if err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
 
-	if err := server.Finish(m6); err != nil {
-		t.Fatalf(dbgErr, p.Mode, err)
-	}
+		if err := server.SetAKEState(state); err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
 
-	clientKey := client.SessionKey()
-	serverKey := server.SessionKey()
+		if err := server.Finish(m6); err != nil {
+			t.Fatalf(dbgErr, p.Mode, err)
+		}
+
+		serverKey = server.SessionKey()
+	}
 
 	if !bytes.Equal(clientKey, serverKey) {
 		t.Fatalf("mode %v: session keys differ", p.Mode)

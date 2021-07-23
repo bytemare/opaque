@@ -10,6 +10,8 @@
 package ake
 
 import (
+	"errors"
+
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 
@@ -18,6 +20,8 @@ import (
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
+
+var errStateNotEmpty = errors.New("existing state is not empty")
 
 // Server exposes the server's AKE functions and holds its state.
 type Server struct {
@@ -73,12 +77,39 @@ func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverS
 	return ke2, nil
 }
 
+// SerializeState will return a []byte containing internal state of the Server.
+func (s *Server) SerializeState() []byte {
+	state := make([]byte, len(s.clientMac)+len(s.sessionSecret))
+
+	i := copy(state, s.clientMac)
+	copy(state[i:], s.sessionSecret)
+
+	return state
+}
+
+// SetState will set the given clientMac and sessionSecret in the server's internal state.
+func (s *Server) SetState(clientMac, sessionSecret []byte) error {
+	if len(s.clientMac) != 0 || len(s.sessionSecret) != 0 {
+		return errStateNotEmpty
+	}
+
+	s.clientMac = clientMac
+	s.sessionSecret = sessionSecret
+
+	return nil
+}
+
 // Finalize verifies the authentication tag contained in ke3.
 func (s *Server) Finalize(p *internal.Parameters, ke3 *message.KE3) bool {
 	return p.MAC.Equal(s.clientMac, ke3.Mac)
 }
 
-// SessionKey returns the secret shared session key if a previous call to Finalize() was successful.
+// SessionKey returns the secret shared session key if a previous call to Response() was successful.
 func (s *Server) SessionKey() []byte {
 	return s.sessionSecret
+}
+
+// ExpectedMAC returns the expected client MAC if a previous call to Response() was successful.
+func (s *Server) ExpectedMAC() []byte {
+	return s.clientMac
 }
