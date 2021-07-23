@@ -142,10 +142,14 @@ func (s *Server) Finish(ke3 *message.KE3) error {
 	return nil
 }
 
-// SessionKey returns the session key if the previous calls to Init() and Finish() were
-// successful.
+// SessionKey returns the session key if the previous call to Init() was successful.
 func (s *Server) SessionKey() []byte {
 	return s.Ake.SessionKey()
+}
+
+// ExpectedMAC returns the expected client MAC if the previous call to Init() was successful.
+func (s *Server) ExpectedMAC() []byte {
+	return s.Ake.ExpectedMAC()
 }
 
 // DeserializeRegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized RegistrationRequest structure.
@@ -176,4 +180,21 @@ func (s *Server) DeserializeKE2(ke2 []byte) (*message.KE2, error) {
 // DeserializeKE3 takes a serialized KE3 message and returns a deserialized KE3 structure.
 func (s *Server) DeserializeKE3(ke3 []byte) (*message.KE3, error) {
 	return s.Parameters.DeserializeKE3(ke3)
+}
+
+// DeserializeAKEState sets the interal state of the AKE server from the given
+// bytes
+func (s *Server) DeserializeAKEState(state []byte) error {
+	l := s.Parameters.MAC.Size()
+	if len(state) != 2*l {
+		return errors.New("state is the wrong length")
+	}
+
+	return s.Ake.SetState(state[:l], state[l:])
+}
+
+// SerializeState returns the internal state of the AKE server serialized to
+// bytes
+func (s *Server) SerializeState() []byte {
+	return s.Ake.SerializeState()
 }

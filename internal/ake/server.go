@@ -14,7 +14,6 @@ import (
 
 	"github.com/bytemare/cryptotools/group"
 	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/utils"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -80,24 +79,24 @@ func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverS
 
 // SerializeState will return a []byte with the given capacity containing
 // internal state of the Server.
-func (s *Server) SerializeState(size int) []byte {
-	return utils.Concatenate(size, s.clientMac, s.sessionSecret)
+func (s *Server) SerializeState() []byte {
+	state := make([]byte, len(s.clientMac)+len(s.sessionSecret))
+
+	i := copy(state, s.clientMac)
+	copy(state[i:], s.sessionSecret)
+
+	return state
 }
 
-// DeserializeState will set internal state onto the server. `size` should the
-// output of internal.Parameters.MAC.Size()
-func (s *Server) DeserializeState(data []byte, size int) error {
+// SetState will set the given clientMac and sessionSecret in the server's
+// internal state
+func (s *Server) SetState(clientMac, sessionSecret []byte) error {
 	if len(s.clientMac) != 0 || len(s.sessionSecret) != 0 {
-		return errors.New("existing state is not nil")
+		return errors.New("existing state is not empty")
 	}
 
-	if len(data) != size*2 {
-		return errors.New("invalid byte length")
-	}
-
-	s.clientMac = data[:size]
-	s.sessionSecret = data[size:]
-
+	s.clientMac = clientMac
+	s.sessionSecret = sessionSecret
 	return nil
 }
 
@@ -106,7 +105,12 @@ func (s *Server) Finalize(p *internal.Parameters, ke3 *message.KE3) bool {
 	return p.MAC.Equal(s.clientMac, ke3.Mac)
 }
 
-// SessionKey returns the secret shared session key if a previous call to Finalize() was successful.
+// SessionKey returns the secret shared session key if a previous call to Response() was successful.
 func (s *Server) SessionKey() []byte {
 	return s.sessionSecret
+}
+
+// ExpectedMAC returns the expected client MAC if a previous call to Response() was successful.
+func (s *Server) ExpectedMAC() []byte {
+	return s.clientMac
 }
