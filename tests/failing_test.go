@@ -34,6 +34,7 @@ import (
 )
 
 var errInvalidMessageLength = errors.New("invalid message length")
+var errInvalidStateLength = errors.New("invalid state length")
 
 func TestDeserializeRegistrationRequest(t *testing.T) {
 	c := opaque.DefaultConfiguration()
@@ -124,6 +125,19 @@ func TestDeserializeKE3(t *testing.T) {
 	client := c.Client()
 	if _, err := client.DeserializeKE3(internal.RandomBytes(ke3Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
+	}
+}
+
+func TestSetAKEState(t *testing.T) {
+	c := opaque.DefaultConfiguration()
+	macLength := c.MAC.Size()
+	keyLength := c.KDF.Size()
+
+	buf := internal.RandomBytes(macLength + keyLength + 1)
+
+	server := c.Server()
+	if err := server.SetAKEState(buf); err == nil || err.Error() != errInvalidStateLength.Error() {
+		t.Fatalf("Expected error for SetAKEState. want %q, got %q", errInvalidStateLength, err)
 	}
 }
 
