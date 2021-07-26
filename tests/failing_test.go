@@ -33,8 +33,11 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
-var errInvalidMessageLength = errors.New("invalid message length")
-var errInvalidStateLength = errors.New("invalid state length")
+var (
+	errInvalidMessageLength = errors.New("invalid message length")
+	errInvalidStateLength   = errors.New("invalid state length")
+	errStateExists          = errors.New("existing state is not empty")
+)
 
 func TestDeserializeRegistrationRequest(t *testing.T) {
 	c := opaque.DefaultConfiguration()
@@ -83,8 +86,8 @@ func TestDeserializeRegistrationUpload(t *testing.T) {
 
 func TestDeserializeKE1(t *testing.T) {
 	c := opaque.DefaultConfiguration()
-	group := ciphersuite.Identifier(c.Group)
-	ke1Length := encoding.PointLength[group] + c.NonceLen + encoding.PointLength[group]
+	group := ciphersuite.Identifier(c.AKE)
+	ke1Length := encoding.PointLength[group] + internal.NonceLength + encoding.PointLength[group]
 
 	server := c.Server()
 	if _, err := server.DeserializeKE1(internal.RandomBytes(ke1Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
@@ -128,45 +131,38 @@ func TestDeserializeKE3(t *testing.T) {
 	}
 }
 
-func TestSetAKEState(t *testing.T) {
-	c := opaque.DefaultConfiguration()
-	macLength := c.MAC.Size()
-	keyLength := c.KDF.Size()
-
-	buf := internal.RandomBytes(macLength + keyLength + 1)
-
-	server := c.Server()
-	if err := server.SetAKEState(buf); err == nil || err.Error() != errInvalidStateLength.Error() {
-		t.Fatalf("Expected error for SetAKEState. want %q, got %q", errInvalidStateLength, err)
-	}
-}
-
 // opaque.go
 
-func TestDeserializeConfiguration(t *testing.T) {
-	r6 := internal.RandomBytes(6)
-	r8 := internal.RandomBytes(8)
+func TestDeserializeConfiguration_Short(t *testing.T) {
+	r9 := internal.RandomBytes(8)
 
-	if _, err := opaque.DeserializeConfiguration(r6); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
-		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r7. want %q, got %q",
+	if _, err := opaque.DeserializeConfiguration(r9); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
+		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r9. want %q, got %q",
 			internal.ErrConfigurationInvalidLength, err)
 	}
 
-	if _, err := opaque.DeserializeConfiguration(r8); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
-		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r9. want %q, got %q",
-			internal.ErrConfigurationInvalidLength, err)
+}
+
+func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
+	d := opaque.DefaultConfiguration().Serialize()
+	d[8] = 3
+
+	expected := "decoding the configuration context: "
+	if _, err := opaque.DeserializeConfiguration(d); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
+			expected, err)
 	}
 }
 
 func TestNilConfiguration(t *testing.T) {
 	def := opaque.DefaultConfiguration()
-	g := ciphersuite.Identifier(def.Group)
+	g := ciphersuite.Identifier(def.AKE)
 	defaultConfiguration := &internal.Parameters{
-		KDF:             &internal.KDF{H: def.KDF.Get()},
-		MAC:             &internal.Mac{H: def.MAC.Get()},
-		Hash:            &internal.Hash{H: def.Hash.Get()},
-		MHF:             &internal.MHF{MHF: def.MHF.Get()},
-		NonceLen:        def.NonceLen,
+		KDF:             internal.NewKDF(def.KDF),
+		MAC:             internal.NewMac(def.MAC),
+		Hash:            internal.NewHash(def.Hash),
+		MHF:             internal.NewMHF(def.MHF),
+		NonceLen:        internal.NonceLength,
 		OPRFPointLength: encoding.PointLength[g],
 		AkePointLength:  encoding.PointLength[g],
 		Group:           g,
@@ -199,40 +195,52 @@ var confs = []configuration{
 	},
 	{
 		Conf: &opaque.Configuration{
-			Group:    opaque.P256Sha256,
-			KDF:      hash.SHA256,
-			MAC:      hash.SHA256,
-			Hash:     hash.SHA256,
-			MHF:      mhf.Scrypt,
-			Mode:     opaque.Internal,
-			NonceLen: 32,
+			OPRF: opaque.P256Sha256,
+			KDF:  hash.SHA256,
+			MAC:  hash.SHA256,
+			Hash: hash.SHA256,
+			MHF:  mhf.Scrypt,
+			Mode: opaque.Internal,
+			AKE:  opaque.P256Sha256,
 		},
 		Curve: elliptic.P256(),
 	},
 	{
 		Conf: &opaque.Configuration{
-			Group:    opaque.P384Sha512,
-			KDF:      hash.SHA512,
-			MAC:      hash.SHA512,
-			Hash:     hash.SHA512,
-			MHF:      mhf.Scrypt,
-			Mode:     opaque.Internal,
-			NonceLen: 32,
+			OPRF: opaque.P384Sha512,
+			KDF:  hash.SHA512,
+			MAC:  hash.SHA512,
+			Hash: hash.SHA512,
+			MHF:  mhf.Scrypt,
+			Mode: opaque.Internal,
+			AKE:  opaque.P384Sha512,
 		},
 		Curve: elliptic.P384(),
 	},
 	{
 		Conf: &opaque.Configuration{
-			Group:    opaque.P521Sha512,
-			KDF:      hash.SHA512,
-			MAC:      hash.SHA512,
-			Hash:     hash.SHA512,
-			MHF:      mhf.Scrypt,
-			Mode:     opaque.Internal,
-			NonceLen: 32,
+			OPRF: opaque.P521Sha512,
+			KDF:  hash.SHA512,
+			MAC:  hash.SHA512,
+			Hash: hash.SHA512,
+			MHF:  mhf.Scrypt,
+			Mode: opaque.Internal,
+			AKE:  opaque.P521Sha512,
 		},
 		Curve: elliptic.P521(),
 	},
+	//{
+	//	Conf: &opaque.Configuration{
+	//		OPRF: opaque.Curve25519Sha512,
+	//		KDF:  hash.SHA512,
+	//		MAC:  hash.SHA512,
+	//		Hash: hash.SHA512,
+	//		MHF:  mhf.Scrypt,
+	//		Mode: opaque.Internal,
+	//		AKE:  opaque.Curve25519Sha512,
+	//	},
+	//	Curve: elliptic.P521(),
+	//},
 }
 
 func getBadRistrettoScalar() []byte {
@@ -249,7 +257,7 @@ func getBadRistrettoElement() []byte {
 	return decoded
 }
 
-func getBadNistScalar(t *testing.T, ci ciphersuite.Identifier, curve elliptic.Curve) []byte {
+func badScalar(t *testing.T, ci ciphersuite.Identifier, curve elliptic.Curve) []byte {
 	order := curve.Params().P
 	exceeded := order.Add(order, big.NewInt(2)).Bytes()
 
@@ -276,18 +284,18 @@ func getBadNistElement(t *testing.T, id ciphersuite.Identifier) []byte {
 }
 
 func getBadElement(t *testing.T, c configuration) []byte {
-	if c.Conf.Group == opaque.RistrettoSha512 {
+	if c.Conf.AKE == opaque.RistrettoSha512 {
 		return getBadRistrettoElement()
 	} else {
-		return getBadNistElement(t, oprf.Ciphersuite(c.Conf.Group).Group())
+		return getBadNistElement(t, oprf.Ciphersuite(c.Conf.AKE).Group())
 	}
 }
 
 func getBadScalar(t *testing.T, c configuration) []byte {
-	if c.Conf.Group == opaque.RistrettoSha512 {
+	if c.Conf.AKE == opaque.RistrettoSha512 {
 		return getBadRistrettoScalar()
 	} else {
-		return getBadNistScalar(t, oprf.Ciphersuite(c.Conf.Group).Group(), c.Curve)
+		return badScalar(t, oprf.Ciphersuite(c.Conf.AKE).Group(), c.Curve)
 	}
 }
 
@@ -498,6 +506,38 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	}
 }
 
+func TestServerSetAKEState_InvalidInput(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+
+	/*
+		Test an invalid state
+	*/
+
+	buf := internal.RandomBytes(conf.MAC.Size() + conf.KDF.Size() + 1)
+
+	server := conf.Server()
+	if err := server.SetAKEState(buf); err == nil || err.Error() != errInvalidStateLength.Error() {
+		t.Fatalf("Expected error for SetAKEState. want %q, got %q", errInvalidStateLength, err)
+	}
+
+	/*
+		A state already exists.
+	*/
+
+	credId := internal.RandomBytes(32)
+	seed := internal.RandomBytes(32)
+	client := conf.Client()
+	server = conf.Server()
+	sk, pk := server.KeyGen()
+	rec := buildRecord(t, credId, seed, []byte("yo"), pk, client, server)
+	ke1 := client.Init([]byte("yo"))
+	_, _ = server.Init(ke1, nil, sk, pk, seed, rec)
+	state := server.SerializeState()
+	if err := server.SetAKEState(state); err == nil || err.Error() != errStateExists.Error() {
+		t.Fatalf("Expected error for SetAKEState. want %q, got %q", errStateExists, err)
+	}
+}
+
 // client.go
 
 func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
@@ -638,6 +678,18 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 	}
 }
 
+func cleartextCredentials(clientPublicKey, serverPublicKey, idc, ids []byte) []byte {
+	if ids == nil {
+		ids = serverPublicKey
+	}
+
+	if idc == nil {
+		idc = clientPublicKey
+	}
+
+	return encoding.Concat3(serverPublicKey, encoding.EncodeVector(ids), encoding.EncodeVector(idc))
+}
+
 func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 	/*
 		Invalid envelope tag
@@ -671,9 +723,9 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 
 		badpks := getBadElement(t, conf)
 
-		ctc := envelope.CreateCleartextCredentials(rec.RegistrationUpload.PublicKey, badpks, nil, nil)
+		ctc := cleartextCredentials(rec.RegistrationUpload.PublicKey, badpks, nil, nil)
 		authKey := client.KDF.Expand(randomizedPwd, encoding.SuffixString(env.Nonce, tag.AuthKey), client.KDF.Size())
-		authTag := client.MAC.MAC(authKey, encoding.Concat3(env.Nonce, env.InnerEnvelope, ctc.Serialize()))
+		authTag := client.MAC.MAC(authKey, encoding.Concat3(env.Nonce, env.InnerEnvelope, ctc))
 		env.AuthTag = authTag
 
 		clear := encoding.Concat(badpks, env.Serialize())
@@ -790,12 +842,12 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 //		badKey := getBadScalar(t, conf)
 //		pad := client.KDF.Expand(randomizedPwd, encoding.SuffixString(env.Nonce, tag.Pad), len(badKey))
 //		env.InnerEnvelope = internal.Xor(badKey, pad)
-//		ctc := envelope.CreateCleartextCredentials(client.AKEGroup.Get().Base().Bytes(), pks, nil, nil)
+//		ctc := envelope.createCleartextCredentials(client.AKEGroup.Get().Base().Bytes(), pks, nil, nil)
 //		authKey := client.KDF.Expand(randomizedPwd, encoding.SuffixString(env.Nonce, tag.AuthKey), client.KDF.Size())
-//		authTag := client.MAC.MAC(authKey, encoding.Concat3(env.Nonce, env.InnerEnvelope, ctc.Serialize()))
+//		authTag := client.MAC.MAC(authKey, encoding.Concat3(env.Nonce, env.InnerEnvelope, ctc.serialize()))
 //		env.AuthTag = authTag
 //
-//		clear := encoding.Concat(pks, env.Serialize())
+//		clear := encoding.Concat(pks, env.serialize())
 //		ke2.MaskedResponse = server.MaskResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
 //
 //		// too short

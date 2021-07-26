@@ -33,6 +33,7 @@ type Server struct {
 	nonceS []byte
 }
 
+// NewServer returns a new, empty, 3DH server.
 func NewServer() *Server {
 	return &Server{}
 }

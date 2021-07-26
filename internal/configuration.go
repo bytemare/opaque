@@ -23,19 +23,23 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
+// NonceLength is the default length used for nonces.
+const NonceLength = 32
+
 var errInvalidMessageLength = errors.New("invalid message length")
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
 func RandomBytes(length int) []byte {
 	r := make([]byte, length)
 	if _, err := cryptorand.Read(r); err != nil {
-		// We can as well not panic and try again in a loop
+		// We can as well not panic and try again in a loop and a counter to stop.
 		panic(fmt.Errorf("unexpected error in generating random bytes : %w", err))
 	}
 
 	return r
 }
 
+// Parameters is the internal representation of the instance runtime parameters.
 type Parameters struct {
 	KDF             *KDF
 	MAC             *Mac
@@ -50,6 +54,7 @@ type Parameters struct {
 	Context         []byte
 }
 
+// DeserializeRegistrationRequest takes a serialized RegistrationRequest message as input and attempts to deserialize it.
 func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.RegistrationRequest, error) {
 	if len(input) != p.OPRFPointLength {
 		return nil, errInvalidMessageLength
@@ -58,6 +63,7 @@ func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.Regi
 	return &message.RegistrationRequest{Data: input}, nil
 }
 
+// DeserializeRegistrationResponse takes a serialized RegistrationResponse message as input and attempts to deserialize it.
 func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.RegistrationResponse, error) {
 	if len(input) != p.OPRFPointLength+p.AkePointLength {
 		return nil, errInvalidMessageLength
@@ -69,6 +75,7 @@ func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.Reg
 	}, nil
 }
 
+// DeserializeRegistrationUpload takes a serialized RegistrationUpload message as input and attempts to deserialize it.
 func (p *Parameters) DeserializeRegistrationUpload(input []byte) (*message.RegistrationUpload, error) {
 	if len(input) != p.AkePointLength+p.Hash.Size()+p.EnvelopeSize {
 		return nil, errInvalidMessageLength
@@ -97,6 +104,7 @@ func (p *Parameters) deserializeCredentialResponse(input []byte, maxResponseLeng
 	}
 }
 
+// DeserializeKE1 takes a serialized KE1 message as input and attempts to deserialize it.
 func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 	if len(input) != p.OPRFPointLength+p.NonceLen+p.AkePointLength {
 		return nil, errInvalidMessageLength
@@ -112,6 +120,7 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 	}, nil
 }
 
+// DeserializeKE2 takes a serialized KE2 message as input and attempts to deserialize it.
 func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 	maxResponseLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize
 
@@ -135,6 +144,7 @@ func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 	}, nil
 }
 
+// DeserializeKE3 takes a serialized KE3 message as input and attempts to deserialize it.
 func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
 	if len(input) != p.MAC.Size() {
 		return nil, errInvalidMessageLength

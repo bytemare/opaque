@@ -16,6 +16,8 @@
 package opaque
 
 import (
+	"fmt"
+
 	"github.com/bytemare/cryptotools/group/ciphersuite"
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
@@ -56,6 +58,9 @@ const (
 	// P521Sha512 identifies the NIST P-512 group and SHA-512.
 	P521Sha512 = Group(oprf.P521Sha512)
 
+	// Curve25519Sha512 identifies a group over Curve25519 with SHA2-512 hash-to-group hashing.
+	Curve25519Sha512 = Group(ciphersuite.Curve25519Sha512)
+
 	confLength = 7
 )
 
@@ -68,8 +73,8 @@ type Credentials struct {
 // Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
 // as well as KDF, MAC, Hash should be the same.
 type Configuration struct {
-	// Group identifies the group and ciphersuite to use for the OPRF and AKE.
-	Group Group `json:"oprf"`
+	// OPRF identifies the ciphersuite to use for the OPRF.
+	OPRF Group `json:"oprf"`
 
 	// KDF identifies the hash function to be used for key derivation (e.g. HKDF).
 	// Identifiers are defined in github.com/bytemare/cryptotools/hash.
@@ -89,11 +94,11 @@ type Configuration struct {
 	// Mode identifies the envelope mode to be used.
 	Mode Mode `json:"mode"`
 
+	// AKE identifies the group to use for the AKE.
+	AKE Group `json:"group"`
+
 	// Context is optional shared information to include in the AKE transcript.
 	Context []byte
-
-	// NonceLen identifies the length to use for nonces. 32 is the recommended value.
-	NonceLen int `json:"nn"`
 }
 
 func envelopeSize(mode Mode, p *internal.Parameters) int {
@@ -105,18 +110,18 @@ func envelopeSize(mode Mode, p *internal.Parameters) int {
 	return p.NonceLen + p.MAC.Size() + innerSize
 }
 
-func (c *Configuration) toInternal() *internal.Parameters {
-	g := ciphersuite.Identifier(c.Group)
+func (c Configuration) toInternal() *internal.Parameters {
+	g := ciphersuite.Identifier(c.AKE)
 	ip := &internal.Parameters{
-		KDF:             &internal.KDF{H: c.KDF.Get()},
-		MAC:             &internal.Mac{H: c.MAC.Get()},
-		Hash:            &internal.Hash{H: c.Hash.Get()},
-		MHF:             &internal.MHF{MHF: c.MHF.Get()},
-		NonceLen:        c.NonceLen,
-		OPRFPointLength: encoding.PointLength[g],
+		KDF:             internal.NewKDF(c.KDF),
+		MAC:             internal.NewMac(c.MAC),
+		Hash:            internal.NewHash(c.Hash),
+		MHF:             internal.NewMHF(c.MHF),
+		NonceLen:        internal.NonceLength,
+		OPRFPointLength: encoding.PointLength[ciphersuite.Identifier(c.OPRF)],
 		AkePointLength:  encoding.PointLength[g],
 		Group:           g,
-		OPRF:            oprf.Ciphersuite(g),
+		OPRF:            oprf.Ciphersuite(c.OPRF),
 		Context:         c.Context,
 	}
 	ip.EnvelopeSize = envelopeSize(c.Mode, ip)
@@ -125,57 +130,70 @@ func (c *Configuration) toInternal() *internal.Parameters {
 }
 
 // Serialize returns the byte encoding of the Configuration structure.
-func (c *Configuration) Serialize() []byte {
-	b := make([]byte, confLength)
-	b[0] = byte(c.Group)
-	b[1] = byte(c.KDF)
-	b[2] = byte(c.MAC)
-	b[3] = byte(c.Hash)
-	b[4] = byte(c.MHF)
-	b[5] = byte(c.Mode)
-	b[6] = encoding.I2OSP(c.NonceLen, 1)[0]
+func (c Configuration) Serialize() []byte {
+	ctx := encoding.EncodeVector(c.Context)
+	b := []byte{
+		byte(c.OPRF),
+		byte(c.KDF),
+		byte(c.MAC),
+		byte(c.Hash),
+		byte(c.MHF),
+		byte(c.Mode),
+		byte(c.AKE),
+	}
 
-	return b
+	s := make([]byte, 0, confLength+len(ctx))
+	s = append(s, b...)
+	s = append(s, ctx...)
+
+	return s
 }
 
 // Client returns a newly instantiated Client from the Configuration.
-func (c *Configuration) Client() *Client {
-	return NewClient(c)
+func (c Configuration) Client() *Client {
+	return NewClient(&c)
 }
 
 // Server returns a newly instantiated Server from the Configuration.
-func (c *Configuration) Server() *Server {
-	return NewServer(c)
+func (c Configuration) Server() *Server {
+	return NewServer(&c)
 }
 
 // DeserializeConfiguration decodes the input and returns a Parameter structure. This assumes that the encoded parameters
 // are valid, and will not be checked.
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
-	if len(encoded) != confLength {
+	if len(encoded) < confLength+2 {
 		return nil, internal.ErrConfigurationInvalidLength
 	}
 
+	ctx, _, err := encoding.DecodeVector(encoded[confLength:])
+	if err != nil {
+		return nil, fmt.Errorf("decoding the configuration context: %w", err)
+	}
+
 	return &Configuration{
-		Group:    Group(encoded[0]),
-		KDF:      hash.Hashing(encoded[1]),
-		MAC:      hash.Hashing(encoded[2]),
-		Hash:     hash.Hashing(encoded[3]),
-		MHF:      mhf.Identifier(encoded[4]),
-		Mode:     Mode(encoded[5]),
-		NonceLen: encoding.OS2IP(encoded[6:]),
+		OPRF:    Group(encoded[0]),
+		KDF:     hash.Hashing(encoded[1]),
+		MAC:     hash.Hashing(encoded[2]),
+		Hash:    hash.Hashing(encoded[3]),
+		MHF:     mhf.Identifier(encoded[4]),
+		Mode:    Mode(encoded[5]),
+		AKE:     Group(encoded[6]),
+		Context: ctx,
 	}, nil
 }
 
 // DefaultConfiguration returns a default configuration with strong parameters.
 func DefaultConfiguration() *Configuration {
 	return &Configuration{
-		Group:    RistrettoSha512,
-		KDF:      hash.SHA512,
-		MAC:      hash.SHA512,
-		Hash:     hash.SHA512,
-		MHF:      mhf.Scrypt,
-		Mode:     Internal,
-		NonceLen: 32,
+		OPRF:    RistrettoSha512,
+		KDF:     hash.SHA512,
+		MAC:     hash.SHA512,
+		Hash:    hash.SHA512,
+		MHF:     mhf.Scrypt,
+		Mode:    Internal,
+		AKE:     RistrettoSha512,
+		Context: nil,
 	}
 }
 

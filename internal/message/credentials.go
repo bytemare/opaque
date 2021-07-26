@@ -11,6 +11,7 @@ package message
 
 import "github.com/bytemare/opaque/internal/encoding"
 
+// CredentialRequest represents credential request message.
 type CredentialRequest struct {
 	Data []byte `json:"data"`
 }
@@ -20,6 +21,7 @@ func (c *CredentialRequest) Serialize() []byte {
 	return c.Data
 }
 
+// CredentialResponse represents credential response message.
 type CredentialResponse struct {
 	Data           []byte `json:"data"`
 	MaskingNonce   []byte `json:"mn"`

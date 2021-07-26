@@ -15,16 +15,12 @@ import (
 	"github.com/bytemare/cryptotools/group"
 )
 
-type Server struct {
-	*oprf
-	privateKey group.Scalar
-}
-
-func (s *Server) Evaluate(blindedElement []byte) ([]byte, error) {
-	b, err := s.group.NewElement().Decode(blindedElement)
+// Evaluate evaluates the blinded input with the given key.
+func (c Ciphersuite) Evaluate(privateKey group.Scalar, blindedElement []byte) ([]byte, error) {
+	b, err := c.Group().NewElement().Decode(blindedElement)
 	if err != nil {
 		return nil, fmt.Errorf("can't evaluate input : %w", err)
 	}
 
-	return b.Mult(s.privateKey).Bytes(), nil
+	return b.Mult(privateKey).Bytes(), nil
 }

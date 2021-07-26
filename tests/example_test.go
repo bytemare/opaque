@@ -12,18 +12,38 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"reflect"
-
-	"github.com/bytemare/opaque/internal"
 
 	"github.com/bytemare/cryptotools/hash"
 	"github.com/bytemare/cryptotools/mhf"
 
 	"github.com/bytemare/opaque"
+	"github.com/bytemare/opaque/internal"
 )
 
-func isSame(a, b *opaque.Configuration) bool {
-	return reflect.DeepEqual(a, b)
+func isSameConf(a, b *opaque.Configuration) bool {
+	if a.OPRF != b.OPRF {
+		return false
+	}
+	if a.KDF != b.KDF {
+		return false
+	}
+	if a.MAC != b.MAC {
+		return false
+	}
+	if a.Hash != b.Hash {
+		return false
+	}
+	if a.MHF != b.MHF {
+		return false
+	}
+	if a.Mode != b.Mode {
+		return false
+	}
+	if a.AKE != b.AKE {
+		return false
+	}
+
+	return bytes.Equal(a.Context, b.Context)
 }
 
 func ExampleConfiguration() {
@@ -33,16 +53,17 @@ func ExampleConfiguration() {
 	defaultConf := opaque.DefaultConfiguration()
 
 	customConf := &opaque.Configuration{
-		Group:    opaque.RistrettoSha512,
-		KDF:      hash.SHA512,
-		MAC:      hash.SHA512,
-		Hash:     hash.SHA512,
-		MHF:      mhf.Scrypt,
-		Mode:     opaque.Internal,
-		NonceLen: 32,
+		OPRF:    opaque.RistrettoSha512,
+		KDF:     hash.SHA512,
+		MAC:     hash.SHA512,
+		Hash:    hash.SHA512,
+		MHF:     mhf.Scrypt,
+		Mode:    opaque.Internal,
+		AKE:     opaque.RistrettoSha512,
+		Context: nil,
 	}
 
-	if !isSame(defaultConf, customConf) {
+	if !isSameConf(defaultConf, customConf) {
 		log.Fatalln("Oh no! Configurations differ!")
 	}
 
@@ -54,7 +75,9 @@ func ExampleConfiguration() {
 		log.Fatalf("Oh no! Decoding the configurations failed! %v", err)
 	}
 
-	if !isSame(defaultConf, conf) {
+	log.Printf("%v / %v", defaultConf.Context, conf.Context)
+
+	if !isSameConf(defaultConf, conf) {
 		log.Fatalln("Oh no! Something went wrong in decoding the configuration!")
 	}
 

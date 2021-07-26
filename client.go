@@ -145,9 +145,8 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 
 	serverPublicKey, env := c.unmask(ke2.MaskingNonce, maskingKey, ke2.MaskedResponse)
 
-	m := &envelope.Mailer{Parameters: c.Parameters}
-
-	clientSecretKey, clientPublicKey, exportKey, err := m.RecoverEnvelope(c.mode, randomizedPwd, serverPublicKey, idc, ids, env)
+	clientSecretKey, clientPublicKey, exportKey, err := envelope.RecoverEnvelope(c.Parameters, c.mode,
+		randomizedPwd, serverPublicKey, idc, ids, env)
 	if err != nil {
 		return nil, nil, fmt.Errorf("recover envelope: %w", err)
 	}

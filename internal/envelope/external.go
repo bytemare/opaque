@@ -28,7 +28,7 @@ func (e *externalMode) recoverPublicKey(privateKey group.Scalar) group.Element {
 }
 
 func (e *externalMode) crypt(randomizedPwd, nonce, input []byte) []byte {
-	pad := e.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.Pad), len(input))
+	pad := e.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.EncryptionPad), len(input))
 	return internal.Xor(input, pad)
 }
 

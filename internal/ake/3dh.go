@@ -88,7 +88,7 @@ func deriveKeys(h *internal.KDF, ikm, context []byte) (k *macKeys, sessionSecret
 	prk := h.Extract(nil, ikm)
 	k = &macKeys{}
 	handshakeSecret := deriveSecret(h, prk, []byte(tag.Handshake), context)
-	sessionSecret = deriveSecret(h, prk, []byte(tag.Session), context)
+	sessionSecret = deriveSecret(h, prk, []byte(tag.SessionKey), context)
 	k.serverMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacServer), nil)
 	k.clientMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacClient), nil)
 

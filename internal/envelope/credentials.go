@@ -11,38 +11,15 @@ package envelope
 
 import "github.com/bytemare/opaque/internal/encoding"
 
-type CleartextCredentials struct {
-	Pks []byte
-	Idc []byte
-	Ids []byte
-}
-
-func (c *CleartextCredentials) Serialize() []byte {
-	var u, s []byte
-	if c.Idc != nil {
-		u = encoding.EncodeVector(c.Idc)
-	}
-
-	if c.Ids != nil {
-		s = encoding.EncodeVector(c.Ids)
-	}
-
-	return encoding.Concat3(c.Pks, s, u)
-}
-
-// CreateCleartextCredentials assumes that clientPublicKey, serverPublicKey are non-nil valid group elements.
-func CreateCleartextCredentials(clientPublicKey, serverPublicKey, idc, ids []byte) *CleartextCredentials {
-	if idc == nil {
-		idc = clientPublicKey
-	}
-
+// cleartextCredentials assumes that clientPublicKey, serverPublicKey are non-nil valid group elements.
+func cleartextCredentials(clientPublicKey, serverPublicKey, idc, ids []byte) []byte {
 	if ids == nil {
 		ids = serverPublicKey
 	}
 
-	return &CleartextCredentials{
-		Pks: serverPublicKey,
-		Idc: idc,
-		Ids: ids,
+	if idc == nil {
+		idc = clientPublicKey
 	}
+
+	return encoding.Concat3(serverPublicKey, encoding.EncodeVector(ids), encoding.EncodeVector(idc))
 }

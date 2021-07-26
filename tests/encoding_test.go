@@ -24,3 +24,19 @@ func TestEncodeVectorLenPanic(t *testing.T) {
 	encoding.EncodeVectorLen(nil, 3)
 	t.Fatal("no panic with exceeding encoding length")
 }
+
+func TestDecodeVector(t *testing.T) {
+	/*
+		DecodeVector with invalid header and payload
+	*/
+
+	badHeader := []byte{0}
+	if _, _, err := encoding.DecodeVector(badHeader); err == nil || err.Error() != "insufficient header length for decoding" {
+		t.Fatalf("expected error for short input. Got %q", err)
+	}
+
+	badPayload := []byte{0, 3, 0, 0}
+	if _, _, err := encoding.DecodeVector(badPayload); err == nil || err.Error() != "insufficient total length for decoding" {
+		t.Fatalf("expected error for short input. Got %q", err)
+	}
+}

@@ -24,7 +24,7 @@ type internalMode struct {
 }
 
 func (i *internalMode) deriveSecretKey(seed []byte) group.Scalar {
-	return i.HashToScalar(seed, []byte(tag.H2sDST))
+	return i.HashToScalar(seed, []byte(tag.DerivePrivateKey))
 }
 
 func (i *internalMode) deriveAkeKeyPair(seed []byte) (group.Scalar, group.Element) {
@@ -33,14 +33,14 @@ func (i *internalMode) deriveAkeKeyPair(seed []byte) (group.Scalar, group.Elemen
 }
 
 func (i *internalMode) buildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, clientPublicKey []byte, err error) {
-	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.SecretKeyDST), encoding.ScalarLength[i.Identifier])
+	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), encoding.ScalarLength[i.Identifier])
 	_, pk := i.deriveAkeKeyPair(seed)
 
 	return nil, encoding.SerializePoint(pk, i.Identifier), nil
 }
 
 func (i *internalMode) recoverKeys(randomizedPwd, nonce, _ []byte) (clientSecretKey group.Scalar, clientPublicKey group.Element, err error) {
-	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.SecretKeyDST), encoding.ScalarLength[i.Identifier])
+	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), encoding.ScalarLength[i.Identifier])
 	sk, pk := i.deriveAkeKeyPair(seed)
 
 	return sk, pk, nil

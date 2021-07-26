@@ -55,11 +55,11 @@ func (s *Server) KeyGen() (secretKey, publicKey []byte) {
 
 func (s *Server) evaluate(seed, blinded []byte) (m []byte, err error) {
 	ku := s.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair))
-	return s.OPRF.Server(ku).Evaluate(blinded)
+	return s.OPRF.Evaluate(ku, blinded)
 }
 
 func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element []byte) (m []byte, err error) {
-	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.OprfKey), encoding.ScalarLength[s.Group])
+	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.ExpandOPRF), encoding.ScalarLength[s.Group])
 	return s.evaluate(seed, element)
 }
 

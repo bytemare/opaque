@@ -8,6 +8,7 @@
 
 package encoding
 
+// Concat returns the concatenation of the two input byte strings.
 func Concat(a, b []byte) []byte {
 	e := make([]byte, 0, len(a)+len(b))
 	e = append(e, a...)
@@ -16,6 +17,7 @@ func Concat(a, b []byte) []byte {
 	return e
 }
 
+// Concat3 returns the concatenation of the three input byte strings.
 func Concat3(a, b, c []byte) []byte {
 	e := make([]byte, 0, len(a)+len(b)+len(c))
 	e = append(e, a...)
@@ -25,6 +27,7 @@ func Concat3(a, b, c []byte) []byte {
 	return e
 }
 
+// SuffixString returns the concatenation of the input byte string and the string argument.
 func SuffixString(a []byte, b string) []byte {
 	e := make([]byte, 0, len(a)+len(b))
 	e = append(e, a...)

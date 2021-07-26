@@ -15,33 +15,35 @@ import (
 	"github.com/bytemare/cryptotools/group"
 
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/tag"
 )
 
-const dstFinalizePrefix = "Finalize-"
-
+// Client implements the OPRF client and holds its state.
 type Client struct {
 	*oprf
 	input []byte
 	blind group.Scalar
 }
 
+// SetBlind allows to set the blinding scalar to use.
 func (c *Client) SetBlind(blind group.Scalar) {
 	c.blind = blind
 }
 
+// Blind masks the input.
 func (c *Client) Blind(input []byte) []byte {
 	if c.blind == nil {
 		c.blind = c.group.NewScalar().Random()
 	}
 
-	p := c.group.HashToGroup(input, c.dst(hash2groupDSTPrefix))
+	p := c.group.HashToGroup(input, c.dst(tag.OPRFPrefix))
 	c.input = input
 
 	return p.Mult(c.blind).Bytes()
 }
 
 func (o *oprf) hashTranscript(input, unblinded []byte) []byte {
-	finalizeDST := o.dst(dstFinalizePrefix)
+	finalizeDST := o.dst(tag.OPRFFinalize)
 	encInput := encoding.EncodeVector(input)
 	encElement := encoding.EncodeVector(unblinded)
 	encDST := encoding.EncodeVector(finalizeDST)
@@ -49,6 +51,7 @@ func (o *oprf) hashTranscript(input, unblinded []byte) []byte {
 	return o.hash.Hash(encInput, encElement, encDST)
 }
 
+// Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
 func (c *Client) Finalize(evaluation []byte) ([]byte, error) {
 	ev, err := c.group.NewElement().Decode(evaluation)
 	if err != nil {

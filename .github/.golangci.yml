@@ -26,7 +26,6 @@ linters:
     - gofumpt
     - goheader
     - goimports
-    - golint
     - gomodguard
     - gomoddirectives
     - goprintffuncname
@@ -193,18 +192,6 @@ issues:
         - errcheck
         - dupl
         - gosec
-    - path: internal
-      text: "should have comment or be unexported"
-      linters:
-        - golint
-    - path: internal
-      text: "should have comment (or a comment on this block) or be unexported"
-      linters:
-        - golint
-    - path: internal
-      text: " should have comment or be unexported"
-      linters:
-        - revive
     - path: internal/hash.go
       linters:
         - errcheck
@@ -222,4 +209,4 @@ run:
   tests: false
 
 output:
- format: github-actions
+ #format: github-actions

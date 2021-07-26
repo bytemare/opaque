@@ -26,9 +26,10 @@ var errAkeInvalidServerMac = errors.New("invalid server mac")
 type Client struct {
 	esk           group.Scalar
 	sessionSecret []byte
-	NonceU        []byte // testing: integrated to support testing, to force values.
+	nonceU        []byte // testing: integrated to support testing, to force values.
 }
 
+// NewClient returns a new, empty, 3DH client.
 func NewClient() *Client {
 	return &Client{}
 }
@@ -41,8 +42,8 @@ func (c *Client) SetValues(id ciphersuite.Identifier, esk group.Scalar, nonce []
 		c.esk = s
 	}
 
-	if c.NonceU == nil {
-		c.NonceU = nonce
+	if c.nonceU == nil {
+		c.nonceU = nonce
 	}
 
 	return id.Base().Mult(c.esk)
@@ -53,7 +54,7 @@ func (c *Client) Start(cs ciphersuite.Identifier) *message.KE1 {
 	epk := c.SetValues(cs, nil, nil, 32)
 
 	return &message.KE1{
-		NonceU: c.NonceU,
+		NonceU: c.nonceU,
 		EpkU:   encoding.PadPoint(epk.Bytes(), cs),
 	}
 }

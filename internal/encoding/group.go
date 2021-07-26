@@ -25,22 +25,25 @@ const (
 	p521ScalarLength      = 66
 )
 
+// ScalarLength indexes the length of scalars.
 var ScalarLength = map[ciphersuite.Identifier]int{
-	ciphersuite.Ristretto255Sha512: ristrettoPointLength,
+	ciphersuite.Ristretto255Sha512: ristrettoScalarLength,
 	// ciphersuite.Decaf448Shake256: 56,
 	ciphersuite.P256Sha256: p256ScalarLength,
 	ciphersuite.P384Sha512: p384ScalarLength,
 	ciphersuite.P521Sha512: p521ScalarLength,
 }
 
+// PointLength indexes the length of elements.
 var PointLength = map[ciphersuite.Identifier]int{
-	ciphersuite.Ristretto255Sha512: ristrettoScalarLength,
+	ciphersuite.Ristretto255Sha512: ristrettoPointLength,
 	// ciphersuite.Decaf448Shake256: 56,
 	ciphersuite.P256Sha256: p256PointLength,
 	ciphersuite.P384Sha512: p384PointLength,
 	ciphersuite.P521Sha512: p521PointLength,
 }
 
+// SerializeScalar pads the given scalar if necessary.
 func SerializeScalar(s group.Scalar, c ciphersuite.Identifier) []byte {
 	length := ScalarLength[c]
 
@@ -53,10 +56,12 @@ func SerializeScalar(s group.Scalar, c ciphersuite.Identifier) []byte {
 	return e
 }
 
+// SerializePoint pads the given element if necessary.
 func SerializePoint(e group.Element, c ciphersuite.Identifier) []byte {
 	return PadPoint(e.Bytes(), c)
 }
 
+// PadPoint pads the encoded element if necessary.
 func PadPoint(point []byte, c ciphersuite.Identifier) []byte {
 	length := PointLength[c]
 

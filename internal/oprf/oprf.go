@@ -15,15 +15,14 @@ import (
 	"github.com/bytemare/cryptotools/hash"
 
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/tag"
 )
 
 // mode distinguishes between the OPRF base mode and the Verifiable mode.
 type mode byte
 
-const (
-	// base identifies the OPRF non-verifiable, base mode.
-	base mode = iota
-)
+// base identifies the OPRF non-verifiable, base mode.
+const base mode = iota
 
 // Ciphersuite identifies the OPRF compatible cipher suite to be used.
 type Ciphersuite ciphersuite.Identifier
@@ -40,12 +39,6 @@ const (
 
 	// P521Sha512 is the OPRF cipher suite of the NIST P-512 group and SHA-512.
 	P521Sha512
-
-	// version is a string explicitly stating the version name.
-	version = "VOPRF07-"
-
-	// hash2groupDSTPrefix is the DST prefix to use for HashToGroup operations.
-	hash2groupDSTPrefix = "HashToGroup-"
 )
 
 var suiteToHash = make(map[Ciphersuite]hash.Hashing)
@@ -54,6 +47,7 @@ func (c Ciphersuite) register(h hash.Hashing) {
 	suiteToHash[c] = h
 }
 
+// Group returns the casted identifier for the cipher suite.
 func (c Ciphersuite) Group() ciphersuite.Identifier {
 	return ciphersuite.Identifier(c)
 }
@@ -63,7 +57,7 @@ func (c Ciphersuite) hash() hash.Hashing {
 }
 
 func contextString(id Ciphersuite) []byte {
-	v := []byte(version)
+	v := []byte(tag.OPRF)
 	ctx := make([]byte, 0, len(v)+1+2)
 	ctx = append(ctx, v...)
 	ctx = append(ctx, encoding.I2OSP(int(base), 1)...)
@@ -73,7 +67,6 @@ func contextString(id Ciphersuite) []byte {
 }
 
 type oprf struct {
-	id            Ciphersuite
 	group         group.Group
 	hash          *hash.Hash
 	contextString []byte
@@ -97,7 +90,6 @@ func (c Ciphersuite) DeriveKey(input, dst []byte) group.Scalar {
 func (c Ciphersuite) Client() *Client {
 	client := &Client{
 		oprf: &oprf{
-			id:            c,
 			group:         c.Group(),
 			hash:          c.hash().Get(),
 			contextString: contextString(c),
@@ -105,19 +97,6 @@ func (c Ciphersuite) Client() *Client {
 	}
 
 	return client
-}
-
-// Server returns an OPRF server.
-func (c Ciphersuite) Server(privateKey group.Scalar) *Server {
-	return &Server{
-		oprf: &oprf{
-			id:            c,
-			group:         c.Group(),
-			hash:          c.hash().Get(),
-			contextString: contextString(c),
-		},
-		privateKey: privateKey,
-	}
 }
 
 func init() {

@@ -120,7 +120,7 @@ type vector struct {
 func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	// Client
 	client := p.Client()
-	oprfClient := buildOPRFClient(oprf.Ciphersuite(p.Group), v.Inputs.BlindRegistration)
+	oprfClient := buildOPRFClient(oprf.Ciphersuite(p.OPRF), v.Inputs.BlindRegistration)
 	client.Core.Oprf = oprfClient
 	regReq := client.RegistrationInit(v.Inputs.Password)
 
@@ -183,7 +183,7 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	client := p.Client()
 
 	if !isFake(v.Config.Fake) {
-		client.Core.Oprf = buildOPRFClient(oprf.Ciphersuite(p.Group), v.Inputs.BlindLogin)
+		client.Core.Oprf = buildOPRFClient(oprf.Ciphersuite(p.AKE), v.Inputs.BlindLogin)
 		esk, err := client.Group.NewScalar().Decode(v.Inputs.ClientPrivateKeyshare)
 		if err != nil {
 			t.Fatal(err)
@@ -269,14 +269,14 @@ func (v *vector) test(t *testing.T) {
 	}
 
 	p := &opaque.Configuration{
-		Group:    opaque.Group(v.Config.OPRF[1]),
-		Hash:     hashToHash(v.Config.Hash),
-		KDF:      kdfToHash(v.Config.KDF),
-		MAC:      macToHash(v.Config.MAC),
-		MHF:      mhf.Scrypt,
-		Mode:     opaque.Mode(mode[0]),
-		Context:  []byte(v.Config.Context),
-		NonceLen: 32,
+		OPRF:    opaque.Group(v.Config.OPRF[1]),
+		Hash:    hashToHash(v.Config.Hash),
+		KDF:     kdfToHash(v.Config.KDF),
+		MAC:     macToHash(v.Config.MAC),
+		MHF:     mhfToMHF(v.Config.MHF),
+		Mode:    opaque.Mode(mode[0]),
+		AKE:     groupToGroup(v.Config.Group),
+		Context: []byte(v.Config.Context),
 	}
 
 	// Registration
@@ -322,6 +322,21 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 	//if !bytes.Equal(v.Intermediates.ClientMacKey, s.Ake.Keys.ClientMacKey) {
 	//	t.Fatal("ClientMacs do not match")
 	//}
+
+	if !isFake(v.Config.Fake) {
+		vectorKE3, err := s.DeserializeKE3(v.Outputs.KE3)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !bytes.Equal(vectorKE3.Mac, s.ExpectedMAC()) {
+			t.Fatalf("Expected client MACs do not match : %v", s.ExpectedMAC())
+		}
+
+		if !bytes.Equal(v.Outputs.SessionKey, s.SessionKey()) {
+			t.Fatalf("Server's session key is invalid : %v", v.Outputs.SessionKey)
+		}
+	}
 
 	vectorKE2, err := s.DeserializeKE2(v.Outputs.KE2)
 	if err != nil {
@@ -421,6 +436,17 @@ func macToHash(h string) hash.Hashing {
 	}
 }
 
+func mhfToMHF(h string) mhf.Identifier {
+	switch h {
+	case "Identity":
+		return 0
+	case "Scrypt":
+		return mhf.Scrypt
+	default:
+		return 0
+	}
+}
+
 func groupToGroup(g string) opaque.Group {
 	switch g {
 	case "ristretto255":
@@ -433,6 +459,9 @@ func groupToGroup(g string) opaque.Group {
 		return opaque.P384Sha512
 	case "P521_XMD:SHA-512_SSWU_RO_":
 		return opaque.P521Sha512
+	case "curve25519_XMD:SHA-512_ELL2_RO_":
+		//return opaque.Curve25519Sha512
+		panic("group not supported")
 	default:
 		panic("group not recognised")
 	}

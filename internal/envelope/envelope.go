@@ -25,11 +25,13 @@ var (
 	errRecoverInvalidSK   = errors.New("can't recover envelope: invalid secret key encoding")
 )
 
+// Credentials is currently used for testing purposes.
 type Credentials struct {
 	Idc, Ids                    []byte
 	EnvelopeNonce, MaskingNonce []byte // testing: integrated to support testing
 }
 
+// Mode determines the envelope mode to operate in.
 type Mode byte
 
 // Internal and External define the Envelope modes.
@@ -38,12 +40,14 @@ const (
 	External
 )
 
+// Envelope represents the OPAQUE envelope.
 type Envelope struct {
 	Nonce         []byte
 	InnerEnvelope []byte
 	AuthTag       []byte
 }
 
+// Serialize returns the byte serialization of the envelope.
 func (e *Envelope) Serialize() []byte {
 	return encoding.Concat3(e.Nonce, e.InnerEnvelope, e.AuthTag)
 }
@@ -53,17 +57,18 @@ type innerEnvelope interface {
 	recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey group.Scalar, clientPublicKey group.Element, err error)
 }
 
+// BuildPRK derives the randomized password from the OPRF output.
 func BuildPRK(p *internal.Parameters, unblinded []byte) []byte {
-	// testing: commented out to support testing. hardened := p.Harden(unblinded, nil)
-	hardened := unblinded
+	hardened := p.MHF.Harden(unblinded, nil, p.OPRFPointLength)
 	return p.KDF.Extract(nil, hardened)
 }
 
-type Mailer struct {
+// mailer is a utility structure to manage envelope creation and recovery.
+type mailer struct {
 	*internal.Parameters
 }
 
-func (m *Mailer) inner(mode Mode) innerEnvelope {
+func (m *mailer) inner(mode Mode) innerEnvelope {
 	var inner innerEnvelope
 
 	switch mode {
@@ -78,18 +83,16 @@ func (m *Mailer) inner(mode Mode) innerEnvelope {
 	return inner
 }
 
-func (m *Mailer) buildKeys(randomizedPwd, nonce []byte) (authKey, exportKey []byte) {
-	authKey = m.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.AuthKey), m.KDF.Size())
-	exportKey = m.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExportKey), m.KDF.Size())
-
-	return
+func (m *mailer) exportKey(randomizedPwd, nonce []byte) []byte {
+	return m.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExportKey), m.KDF.Size())
 }
 
-func (m *Mailer) authTag(authKey, nonce, inner, ctc []byte) []byte {
+func (m *mailer) authTag(randomizedPwd, nonce, inner, ctc []byte) []byte {
+	authKey := m.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.AuthKey), m.KDF.Size())
 	return m.MAC.MAC(authKey, encoding.Concat3(nonce, inner, ctc))
 }
 
-func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, serverPublicKey, clientSecretKey []byte,
+func (m *mailer) createEnvelope(mode Mode, randomizedPwd, serverPublicKey, clientSecretKey []byte,
 	creds *Credentials) (envelope *Envelope, publicKey, exportKey []byte, err error) {
 	// testing: integrated to support testing with set nonce
 	nonce := creds.EnvelopeNonce
@@ -97,15 +100,13 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, serverPublicKey, clien
 		nonce = internal.RandomBytes(m.NonceLen)
 	}
 
-	authKey, exportKey := m.buildKeys(randomizedPwd, nonce)
-
 	inner, clientPublicKey, err := m.inner(mode).buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	ctc := CreateCleartextCredentials(clientPublicKey, serverPublicKey, creds.Idc, creds.Ids)
-	authTag := m.authTag(authKey, nonce, inner, ctc.Serialize())
+	ctc := cleartextCredentials(clientPublicKey, serverPublicKey, creds.Idc, creds.Ids)
+	authTag := m.authTag(randomizedPwd, nonce, inner, ctc)
 
 	envelope = &Envelope{
 		Nonce:         nonce,
@@ -113,25 +114,29 @@ func (m *Mailer) CreateEnvelope(mode Mode, randomizedPwd, serverPublicKey, clien
 		AuthTag:       authTag,
 	}
 
+	exportKey = m.exportKey(randomizedPwd, nonce)
+
 	return envelope, clientPublicKey, exportKey, nil
 }
 
 // RecoverEnvelope assumes that the envelope's inner envelope has been previously checked to be of correct size.
-func (m *Mailer) RecoverEnvelope(mode Mode, randomizedPwd, serverPublicKey, idc, ids []byte,
+func RecoverEnvelope(p *internal.Parameters, mode Mode, randomizedPwd, serverPublicKey, idc, ids []byte,
 	envelope *Envelope) (clientSecretKey group.Scalar, clientPublicKey group.Element, exportKey []byte, err error) {
-	authKey, exportKey := m.buildKeys(randomizedPwd, envelope.Nonce)
+	m := &mailer{p}
 
 	clientSecretKey, clientPublicKey, err = m.inner(mode).recoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	ctc := CreateCleartextCredentials(clientPublicKey.Bytes(), serverPublicKey, idc, ids)
+	ctc := cleartextCredentials(clientPublicKey.Bytes(), serverPublicKey, idc, ids)
 
-	expectedTag := m.authTag(authKey, envelope.Nonce, envelope.InnerEnvelope, ctc.Serialize())
+	expectedTag := m.authTag(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope, ctc)
 	if !m.MAC.Equal(expectedTag, envelope.AuthTag) {
 		return nil, nil, nil, errEnvelopeInvalidTag
 	}
+
+	exportKey = m.exportKey(randomizedPwd, envelope.Nonce)
 
 	return clientSecretKey, clientPublicKey, exportKey, nil
 }
