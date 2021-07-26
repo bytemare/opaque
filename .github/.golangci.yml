@@ -112,8 +112,6 @@ linters-settings:
     simplify: true
   goimports:
     local-prefixes: github.com/bytemare/opaque
-  golint:
-    min-confidence: 0
   gomnd:
     settings:
       mnd:
@@ -209,4 +207,4 @@ run:
   tests: false
 
 output:
- #format: github-actions
+ format: github-actions
