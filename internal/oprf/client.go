@@ -12,7 +12,7 @@ package oprf
 import (
 	"fmt"
 
-	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
@@ -22,11 +22,11 @@ import (
 type Client struct {
 	*oprf
 	input []byte
-	blind group.Scalar
+	blind *group.Scalar
 }
 
 // SetBlind allows to set the blinding scalar to use.
-func (c *Client) SetBlind(blind group.Scalar) {
+func (c *Client) SetBlind(blind *group.Scalar) {
 	c.blind = blind
 }
 

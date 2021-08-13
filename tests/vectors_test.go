@@ -10,6 +10,7 @@ package opaque_test
 
 import (
 	"bytes"
+	"crypto"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -19,8 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/crypto/mhf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal/oprf"
@@ -403,34 +403,34 @@ func isFake(f string) bool {
 	}
 }
 
-func hashToHash(h string) hash.Hashing {
+func hashToHash(h string) crypto.Hash {
 	switch h {
 	case "SHA256":
-		return hash.SHA256
+		return crypto.SHA256
 	case "SHA512":
-		return hash.SHA512
+		return crypto.SHA512
 	default:
 		return 0
 	}
 }
 
-func kdfToHash(h string) hash.Hashing {
+func kdfToHash(h string) crypto.Hash {
 	switch h {
 	case "HKDF-SHA256":
-		return hash.SHA256
+		return crypto.SHA256
 	case "HKDF-SHA512":
-		return hash.SHA512
+		return crypto.SHA512
 	default:
 		return 0
 	}
 }
 
-func macToHash(h string) hash.Hashing {
+func macToHash(h string) crypto.Hash {
 	switch h {
 	case "HMAC-SHA256":
-		return hash.SHA256
+		return crypto.SHA256
 	case "HMAC-SHA512":
-		return hash.SHA512
+		return crypto.SHA512
 	default:
 		return 0
 	}
@@ -460,7 +460,7 @@ func groupToGroup(g string) opaque.Group {
 	case "P521_XMD:SHA-512_SSWU_RO_":
 		return opaque.P521Sha512
 	case "curve25519_XMD:SHA-512_ELL2_RO_":
-		//return opaque.Curve25519Sha512
+		// return opaque.Curve25519Sha512
 		panic("group not supported")
 	default:
 		panic("group not recognised")

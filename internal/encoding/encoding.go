@@ -9,11 +9,7 @@
 // Package encoding provides encoding utilities.
 package encoding
 
-import (
-	"errors"
-
-	"github.com/bytemare/cryptotools/encoding"
-)
+import "errors"
 
 var (
 	errI2OSPLength  = errors.New("requested size is too big")
@@ -21,23 +17,13 @@ var (
 	errTotalLength  = errors.New("insufficient total length for decoding")
 )
 
-// OS2IP Octet Stream to Integer Primitive on maximum 4 bytes / 32 bits.
-func OS2IP(in []byte) int {
-	return encoding.OS2IP(in)
-}
-
-// I2OSP 32 bit Integer to Octet Stream Primitive on maximum 4 bytes.
-func I2OSP(value, length int) []byte {
-	return encoding.I2OSP(value, length)
-}
-
 // EncodeVectorLen returns the input prepended with a byte encoding of its length.
 func EncodeVectorLen(input []byte, length int) []byte {
 	switch length {
 	case 1:
-		return append(encoding.I2OSP(len(input), 1), input...)
+		return append(I2OSP(len(input), 1), input...)
 	case 2:
-		return append(encoding.I2OSP(len(input), 2), input...)
+		return append(I2OSP(len(input), 2), input...)
 	default:
 		panic(errI2OSPLength)
 	}

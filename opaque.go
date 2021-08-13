@@ -16,11 +16,11 @@
 package opaque
 
 import (
+	"crypto"
 	"fmt"
 
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/crypto/group"
+	"github.com/bytemare/crypto/mhf"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -59,7 +59,7 @@ const (
 	P521Sha512 = Group(oprf.P521Sha512)
 
 	// Curve25519Sha512 identifies a group over Curve25519 with SHA2-512 hash-to-group hashing.
-	Curve25519Sha512 = Group(ciphersuite.Curve25519Sha512)
+	Curve25519Sha512 = Group(group.Curve25519Sha512)
 
 	confLength = 7
 )
@@ -73,22 +73,23 @@ type Credentials struct {
 // Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
 // as well as KDF, MAC, Hash should be the same.
 type Configuration struct {
+	// Context is optional shared information to include in the AKE transcript.
+	Context []byte
+
+	// KDF identifies the hash function to be used for key derivation (e.g. HKDF).
+	KDF crypto.Hash `json:"kdf"`
+
+	// MAC identifies the hash function to be used for message authentication (e.g. HMAC).
+	MAC crypto.Hash `json:"mac"`
+
+	// Hash identifies the hash function to be used for hashing, as defined in github.com/bytemare/crypto/hash.
+	Hash crypto.Hash `json:"hash"`
+
 	// OPRF identifies the ciphersuite to use for the OPRF.
 	OPRF Group `json:"oprf"`
 
-	// KDF identifies the hash function to be used for key derivation (e.g. HKDF).
-	// Identifiers are defined in github.com/bytemare/cryptotools/hash.
-	KDF hash.Hashing `json:"kdf"`
-
-	// MAC identifies the hash function to be used for message authentication (e.g. HMAC).
-	// Identifiers are defined in github.com/bytemare/cryptotools/hash.
-	MAC hash.Hashing `json:"mac"`
-
-	// Hash identifies the hash function to be used for hashing, as defined in github.com/bytemare/cryptotools/hash.
-	Hash hash.Hashing `json:"hash"`
-
 	// MHF identifies the memory-hard function for expensive key derivation on the client,
-	// defined in github.com/bytemare/cryptotools/mhf.
+	// defined in github.com/bytemare/crypto/mhf.
 	MHF mhf.Identifier `json:"mhf"`
 
 	// Mode identifies the envelope mode to be used.
@@ -96,9 +97,6 @@ type Configuration struct {
 
 	// AKE identifies the group to use for the AKE.
 	AKE Group `json:"group"`
-
-	// Context is optional shared information to include in the AKE transcript.
-	Context []byte
 }
 
 func envelopeSize(mode Mode, p *internal.Parameters) int {
@@ -111,14 +109,14 @@ func envelopeSize(mode Mode, p *internal.Parameters) int {
 }
 
 func (c Configuration) toInternal() *internal.Parameters {
-	g := ciphersuite.Identifier(c.AKE)
+	g := group.Group(c.AKE)
 	ip := &internal.Parameters{
 		KDF:             internal.NewKDF(c.KDF),
 		MAC:             internal.NewMac(c.MAC),
 		Hash:            internal.NewHash(c.Hash),
 		MHF:             internal.NewMHF(c.MHF),
 		NonceLen:        internal.NonceLength,
-		OPRFPointLength: encoding.PointLength[ciphersuite.Identifier(c.OPRF)],
+		OPRFPointLength: encoding.PointLength[group.Group(c.OPRF)],
 		AkePointLength:  encoding.PointLength[g],
 		Group:           g,
 		OPRF:            oprf.Ciphersuite(c.OPRF),
@@ -131,7 +129,6 @@ func (c Configuration) toInternal() *internal.Parameters {
 
 // Serialize returns the byte encoding of the Configuration structure.
 func (c Configuration) Serialize() []byte {
-	ctx := encoding.EncodeVector(c.Context)
 	b := []byte{
 		byte(c.OPRF),
 		byte(c.KDF),
@@ -142,6 +139,7 @@ func (c Configuration) Serialize() []byte {
 		byte(c.AKE),
 	}
 
+	ctx := encoding.EncodeVector(c.Context)
 	s := make([]byte, 0, confLength+len(ctx))
 	s = append(s, b...)
 	s = append(s, ctx...)
@@ -173,9 +171,9 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 
 	return &Configuration{
 		OPRF:    Group(encoded[0]),
-		KDF:     hash.Hashing(encoded[1]),
-		MAC:     hash.Hashing(encoded[2]),
-		Hash:    hash.Hashing(encoded[3]),
+		KDF:     crypto.Hash(encoded[1]),
+		MAC:     crypto.Hash(encoded[2]),
+		Hash:    crypto.Hash(encoded[3]),
 		MHF:     mhf.Identifier(encoded[4]),
 		Mode:    Mode(encoded[5]),
 		AKE:     Group(encoded[6]),
@@ -187,9 +185,9 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 func DefaultConfiguration() *Configuration {
 	return &Configuration{
 		OPRF:    RistrettoSha512,
-		KDF:     hash.SHA512,
-		MAC:     hash.SHA512,
-		Hash:    hash.SHA512,
+		KDF:     crypto.SHA512,
+		MAC:     crypto.SHA512,
+		Hash:    crypto.SHA512,
 		MHF:     mhf.Scrypt,
 		Mode:    Internal,
 		AKE:     RistrettoSha512,

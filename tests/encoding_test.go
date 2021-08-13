@@ -9,8 +9,9 @@
 package opaque
 
 import (
-	"github.com/bytemare/opaque/internal/encoding"
 	"testing"
+
+	"github.com/bytemare/opaque/internal/encoding"
 )
 
 func TestEncodeVectorLenPanic(t *testing.T) {

@@ -12,7 +12,7 @@ package envelope
 import (
 	"errors"
 
-	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -54,7 +54,7 @@ func (e *Envelope) Serialize() []byte {
 
 type innerEnvelope interface {
 	buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte, err error)
-	recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey group.Scalar, clientPublicKey group.Element, err error)
+	recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, err error)
 }
 
 // BuildPRK derives the randomized password from the OPRF output.
@@ -121,7 +121,7 @@ func (m *mailer) createEnvelope(mode Mode, randomizedPwd, serverPublicKey, clien
 
 // RecoverEnvelope assumes that the envelope's inner envelope has been previously checked to be of correct size.
 func RecoverEnvelope(p *internal.Parameters, mode Mode, randomizedPwd, serverPublicKey, idc, ids []byte,
-	envelope *Envelope) (clientSecretKey group.Scalar, clientPublicKey group.Element, exportKey []byte, err error) {
+	envelope *Envelope) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, exportKey []byte, err error) {
 	m := &mailer{p}
 
 	clientSecretKey, clientPublicKey, err = m.inner(mode).recoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)

@@ -10,11 +10,11 @@ package opaque_test
 
 import (
 	"bytes"
+	"crypto"
 	"fmt"
 	"log"
 
-	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/crypto/mhf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
@@ -54,9 +54,9 @@ func ExampleConfiguration() {
 
 	customConf := &opaque.Configuration{
 		OPRF:    opaque.RistrettoSha512,
-		KDF:     hash.SHA512,
-		MAC:     hash.SHA512,
-		Hash:    hash.SHA512,
+		KDF:     crypto.SHA512,
+		MAC:     crypto.SHA512,
+		Hash:    crypto.SHA512,
 		MHF:     mhf.Scrypt,
 		Mode:    opaque.Internal,
 		AKE:     opaque.RistrettoSha512,
@@ -74,8 +74,6 @@ func ExampleConfiguration() {
 	if err != nil {
 		log.Fatalf("Oh no! Decoding the configurations failed! %v", err)
 	}
-
-	log.Printf("%v / %v", defaultConf.Context, conf.Context)
 
 	if !isSameConf(defaultConf, conf) {
 		log.Fatalln("Oh no! Something went wrong in decoding the configuration!")

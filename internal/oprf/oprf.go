@@ -10,9 +10,8 @@
 package oprf
 
 import (
-	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
+	"github.com/bytemare/crypto/group"
+	"github.com/bytemare/crypto/hash"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
@@ -25,7 +24,7 @@ type mode byte
 const base mode = iota
 
 // Ciphersuite identifies the OPRF compatible cipher suite to be used.
-type Ciphersuite ciphersuite.Identifier
+type Ciphersuite group.Group
 
 const (
 	// RistrettoSha512 is the OPRF cipher suite of the Ristretto255 group and SHA-512.
@@ -48,8 +47,8 @@ func (c Ciphersuite) register(h hash.Hashing) {
 }
 
 // Group returns the casted identifier for the cipher suite.
-func (c Ciphersuite) Group() ciphersuite.Identifier {
-	return ciphersuite.Identifier(c)
+func (c Ciphersuite) Group() group.Group {
+	return group.Group(c)
 }
 
 func (c Ciphersuite) hash() hash.Hashing {
@@ -82,7 +81,7 @@ func (o *oprf) dst(prefix string) []byte {
 }
 
 // DeriveKey returns a scalar mapped from the input.
-func (c Ciphersuite) DeriveKey(input, dst []byte) group.Scalar {
+func (c Ciphersuite) DeriveKey(input, dst []byte) *group.Scalar {
 	return c.Group().HashToScalar(input, dst)
 }
 

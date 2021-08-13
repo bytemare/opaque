@@ -12,11 +12,11 @@ package oprf
 import (
 	"fmt"
 
-	"github.com/bytemare/cryptotools/group"
+	"github.com/bytemare/crypto/group"
 )
 
 // Evaluate evaluates the blinded input with the given key.
-func (c Ciphersuite) Evaluate(privateKey group.Scalar, blindedElement []byte) ([]byte, error) {
+func (c Ciphersuite) Evaluate(privateKey *group.Scalar, blindedElement []byte) ([]byte, error) {
 	b, err := c.Group().NewElement().Decode(blindedElement)
 	if err != nil {
 		return nil, fmt.Errorf("can't evaluate input : %w", err)

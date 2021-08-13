@@ -10,8 +10,7 @@
 package envelope
 
 import (
-	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -19,11 +18,11 @@ import (
 )
 
 type externalMode struct {
-	ciphersuite.Identifier
+	group.Group
 	*internal.KDF
 }
 
-func (e *externalMode) recoverPublicKey(privateKey group.Scalar) group.Element {
+func (e *externalMode) recoverPublicKey(privateKey *group.Scalar) *group.Point {
 	return e.Base().Mult(privateKey)
 }
 
@@ -40,10 +39,10 @@ func (e *externalMode) buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey 
 
 	clientPublicKey := e.recoverPublicKey(scalar)
 
-	return e.crypt(randomizedPwd, nonce, clientSecretKey), encoding.SerializePoint(clientPublicKey, e.Identifier), nil
+	return e.crypt(randomizedPwd, nonce, clientSecretKey), encoding.SerializePoint(clientPublicKey, e.Group), nil
 }
 
-func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (sk group.Scalar, clientPublicKey group.Element, err error) {
+func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (sk *group.Scalar, clientPublicKey *group.Point, err error) {
 	clientSecretKey := e.crypt(randomizedPwd, nonce, innerEnvelope)
 
 	sk, err = e.NewScalar().Decode(clientSecretKey)

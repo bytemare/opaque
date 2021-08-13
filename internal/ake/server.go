@@ -12,8 +12,7 @@ package ake
 import (
 	"errors"
 
-	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -29,7 +28,7 @@ type Server struct {
 	sessionSecret []byte
 
 	// testing: integrated to support testing, to force values.
-	esk    group.Scalar
+	esk    *group.Scalar
 	nonceS []byte
 }
 
@@ -40,7 +39,7 @@ func NewServer() *Server {
 
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
-func (s *Server) SetValues(id ciphersuite.Identifier, esk group.Scalar, nonce []byte, nonceLen int) group.Element {
+func (s *Server) SetValues(id group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Point {
 	es, nonce := setValues(id, esk, nonce, nonceLen)
 	if s.esk == nil || (esk != nil && s.esk != es) {
 		s.esk = es
@@ -54,7 +53,7 @@ func (s *Server) SetValues(id ciphersuite.Identifier, esk group.Scalar, nonce []
 }
 
 // Response produces a 3DH server response message.
-func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverSecretKey group.Scalar, clientIdentity, clientPublicKey []byte,
+func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverSecretKey *group.Scalar, clientIdentity, clientPublicKey []byte,
 	ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
 	epk := s.SetValues(p.Group, nil, nil, p.NonceLen)
 	nonce := s.nonceS

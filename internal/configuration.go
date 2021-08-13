@@ -14,7 +14,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
@@ -49,7 +49,7 @@ type Parameters struct {
 	EnvelopeSize    int
 	OPRFPointLength int
 	AkePointLength  int
-	Group           ciphersuite.Identifier
+	Group           group.Group
 	OPRF            oprf.Ciphersuite
 	Context         []byte
 }

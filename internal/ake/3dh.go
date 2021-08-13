@@ -12,8 +12,7 @@ package ake
 import (
 	"fmt"
 
-	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -29,7 +28,7 @@ const (
 )
 
 // KeyGen returns private and public keys in the group.
-func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
+func KeyGen(id group.Group) (sk, pk []byte) {
 	scalar := id.NewScalar().Random()
 	publicKey := id.Base().Mult(scalar)
 
@@ -38,7 +37,7 @@ func KeyGen(id ciphersuite.Identifier) (sk, pk []byte) {
 
 // setValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
-func setValues(g group.Group, scalar group.Scalar, nonce []byte, nonceLen int) (s group.Scalar, n []byte) {
+func setValues(g group.Group, scalar *group.Scalar, nonce []byte, nonceLen int) (s *group.Scalar, n []byte) {
 	if scalar != nil {
 		s = scalar
 	} else {
@@ -95,7 +94,7 @@ func deriveKeys(h *internal.KDF, ikm, context []byte) (k *macKeys, sessionSecret
 	return k, sessionSecret
 }
 
-func decodeKeys(g group.Group, peerEpk, peerPk []byte) (epk, pk group.Element, err error) {
+func decodeKeys(g group.Group, peerEpk, peerPk []byte) (epk, pk *group.Point, err error) {
 	epk, err = g.NewElement().Decode(peerEpk)
 	if err != nil {
 		return nil, nil, fmt.Errorf("decoding peer ephemeral public key: %w", err)
@@ -109,7 +108,7 @@ func decodeKeys(g group.Group, peerEpk, peerPk []byte) (epk, pk group.Element, e
 	return epk, pk, nil
 }
 
-func k3dh(p1 group.Element, s1 group.Scalar, p2 group.Element, s2 group.Scalar, p3 group.Element, s3 group.Scalar) []byte {
+func k3dh(p1 *group.Point, s1 *group.Scalar, p2 *group.Point, s2 *group.Scalar, p3 *group.Point, s3 *group.Scalar) []byte {
 	e1 := p1.Mult(s1)
 	e2 := p2.Mult(s2)
 	e3 := p3.Mult(s3)
@@ -117,7 +116,7 @@ func k3dh(p1 group.Element, s1 group.Scalar, p2 group.Element, s2 group.Scalar, 
 	return encoding.Concat3(e1.Bytes(), e2.Bytes(), e3.Bytes())
 }
 
-func ikm(s selector, g group.Group, esk, secretKey group.Scalar, peerEpk, peerPublicKey []byte) ([]byte, error) {
+func ikm(s selector, g group.Group, esk, secretKey *group.Scalar, peerEpk, peerPublicKey []byte) ([]byte, error) {
 	epk, gpk, err := decodeKeys(g, peerEpk, peerPublicKey)
 	if err != nil {
 		return nil, err
@@ -136,7 +135,7 @@ type macs struct {
 }
 
 type coreKeys struct {
-	esk, secretKey         group.Scalar
+	esk, secretKey         *group.Scalar
 	peerEpk, peerPublicKey []byte
 }
 

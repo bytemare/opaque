@@ -10,8 +10,7 @@
 package envelope
 
 import (
-	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -19,28 +18,28 @@ import (
 )
 
 type internalMode struct {
-	ciphersuite.Identifier
+	group.Group
 	*internal.KDF
 }
 
-func (i *internalMode) deriveSecretKey(seed []byte) group.Scalar {
+func (i *internalMode) deriveSecretKey(seed []byte) *group.Scalar {
 	return i.HashToScalar(seed, []byte(tag.DerivePrivateKey))
 }
 
-func (i *internalMode) deriveAkeKeyPair(seed []byte) (group.Scalar, group.Element) {
+func (i *internalMode) deriveAkeKeyPair(seed []byte) (*group.Scalar, *group.Point) {
 	sk := i.deriveSecretKey(seed)
 	return sk, i.Base().Mult(sk)
 }
 
 func (i *internalMode) buildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, clientPublicKey []byte, err error) {
-	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), encoding.ScalarLength[i.Identifier])
+	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), encoding.ScalarLength[i.Group])
 	_, pk := i.deriveAkeKeyPair(seed)
 
-	return nil, encoding.SerializePoint(pk, i.Identifier), nil
+	return nil, encoding.SerializePoint(pk, i.Group), nil
 }
 
-func (i *internalMode) recoverKeys(randomizedPwd, nonce, _ []byte) (clientSecretKey group.Scalar, clientPublicKey group.Element, err error) {
-	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), encoding.ScalarLength[i.Identifier])
+func (i *internalMode) recoverKeys(randomizedPwd, nonce, _ []byte) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, err error) {
+	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), encoding.ScalarLength[i.Group])
 	sk, pk := i.deriveAkeKeyPair(seed)
 
 	return sk, pk, nil

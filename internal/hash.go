@@ -10,15 +10,16 @@
 package internal
 
 import (
+	"crypto"
 	"crypto/hmac"
 
-	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/crypto/hash"
+	"github.com/bytemare/crypto/mhf"
 )
 
 // NewKDF returns a newly instantiated KDF.
-func NewKDF(id hash.Hashing) *KDF {
-	return &KDF{h: id.Get()}
+func NewKDF(id crypto.Hash) *KDF {
+	return &KDF{h: hash.FromCrypto(id).Get()}
 }
 
 // KDF wraps a hash function and exposes KDF methods.
@@ -42,8 +43,8 @@ func (k *KDF) Size() int {
 }
 
 // NewMac returns a newly instantiated Mac.
-func NewMac(id hash.Hashing) *Mac {
-	return &Mac{h: id.Get()}
+func NewMac(id crypto.Hash) *Mac {
+	return &Mac{h: hash.FromCrypto(id).Get()}
 }
 
 // Mac wraps a hash function and exposes Message Authentication Code methods.
@@ -67,8 +68,8 @@ func (m *Mac) Size() int {
 }
 
 // NewHash returns a newly instantiated Hash.
-func NewHash(id hash.Hashing) *Hash {
-	return &Hash{h: id.Get()}
+func NewHash(id crypto.Hash) *Hash {
+	return &Hash{h: hash.FromCrypto(id).Get()}
 }
 
 // Hash wraps a hash function and exposes only necessary hashing methods.

@@ -9,19 +9,19 @@
 package opaque
 
 import (
+	"crypto"
 	"crypto/elliptic"
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"math/big"
 	"reflect"
 	"strings"
 	"testing"
 
-	"github.com/bytemare/cryptotools/group/ciphersuite"
-	"github.com/bytemare/cryptotools/hash"
-	"github.com/bytemare/cryptotools/mhf"
+	"github.com/bytemare/crypto/group"
+
+	"github.com/bytemare/crypto/mhf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
@@ -86,7 +86,7 @@ func TestDeserializeRegistrationUpload(t *testing.T) {
 
 func TestDeserializeKE1(t *testing.T) {
 	c := opaque.DefaultConfiguration()
-	group := ciphersuite.Identifier(c.AKE)
+	group := group.Group(c.AKE)
 	ke1Length := encoding.PointLength[group] + internal.NonceLength + encoding.PointLength[group]
 
 	server := c.Server()
@@ -140,7 +140,6 @@ func TestDeserializeConfiguration_Short(t *testing.T) {
 		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r9. want %q, got %q",
 			internal.ErrConfigurationInvalidLength, err)
 	}
-
 }
 
 func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
@@ -156,7 +155,7 @@ func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
 
 func TestNilConfiguration(t *testing.T) {
 	def := opaque.DefaultConfiguration()
-	g := ciphersuite.Identifier(def.AKE)
+	g := group.Group(def.AKE)
 	defaultConfiguration := &internal.Parameters{
 		KDF:             internal.NewKDF(def.KDF),
 		MAC:             internal.NewMac(def.MAC),
@@ -196,9 +195,9 @@ var confs = []configuration{
 	{
 		Conf: &opaque.Configuration{
 			OPRF: opaque.P256Sha256,
-			KDF:  hash.SHA256,
-			MAC:  hash.SHA256,
-			Hash: hash.SHA256,
+			KDF:  crypto.SHA256,
+			MAC:  crypto.SHA256,
+			Hash: crypto.SHA256,
 			MHF:  mhf.Scrypt,
 			Mode: opaque.Internal,
 			AKE:  opaque.P256Sha256,
@@ -208,9 +207,9 @@ var confs = []configuration{
 	{
 		Conf: &opaque.Configuration{
 			OPRF: opaque.P384Sha512,
-			KDF:  hash.SHA512,
-			MAC:  hash.SHA512,
-			Hash: hash.SHA512,
+			KDF:  crypto.SHA512,
+			MAC:  crypto.SHA512,
+			Hash: crypto.SHA512,
 			MHF:  mhf.Scrypt,
 			Mode: opaque.Internal,
 			AKE:  opaque.P384Sha512,
@@ -220,9 +219,9 @@ var confs = []configuration{
 	{
 		Conf: &opaque.Configuration{
 			OPRF: opaque.P521Sha512,
-			KDF:  hash.SHA512,
-			MAC:  hash.SHA512,
-			Hash: hash.SHA512,
+			KDF:  crypto.SHA512,
+			MAC:  crypto.SHA512,
+			Hash: crypto.SHA512,
 			MHF:  mhf.Scrypt,
 			Mode: opaque.Internal,
 			AKE:  opaque.P521Sha512,
@@ -257,7 +256,7 @@ func getBadRistrettoElement() []byte {
 	return decoded
 }
 
-func badScalar(t *testing.T, ci ciphersuite.Identifier, curve elliptic.Curve) []byte {
+func badScalar(t *testing.T, ci group.Group, curve elliptic.Curve) []byte {
 	order := curve.Params().P
 	exceeded := order.Add(order, big.NewInt(2)).Bytes()
 
@@ -269,7 +268,7 @@ func badScalar(t *testing.T, ci ciphersuite.Identifier, curve elliptic.Curve) []
 	return exceeded
 }
 
-func getBadNistElement(t *testing.T, id ciphersuite.Identifier) []byte {
+func getBadNistElement(t *testing.T, id group.Group) []byte {
 	size := encoding.PointLength[id]
 	element := internal.RandomBytes(size)
 	// detag compression
@@ -363,7 +362,7 @@ func TestServer_BadRegistrationRequest(t *testing.T) {
 		badRequest := &message.RegistrationRequest{Data: getBadElement(t, e)}
 		server := e.Conf.Server()
 		if _, err := server.RegistrationResponse(badRequest, nil, credId, seed); err == nil || !strings.HasPrefix(err.Error(), terr) {
-			log.Printf("#%d - expected error. Got %v", i, err)
+			t.Fatalf("#%d - expected error. Got %v", i, err)
 		}
 	}
 }

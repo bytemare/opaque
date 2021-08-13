@@ -10,8 +10,7 @@
 package encoding
 
 import (
-	"github.com/bytemare/cryptotools/group"
-	"github.com/bytemare/cryptotools/group/ciphersuite"
+	"github.com/bytemare/crypto/group"
 )
 
 const (
@@ -26,25 +25,25 @@ const (
 )
 
 // ScalarLength indexes the length of scalars.
-var ScalarLength = map[ciphersuite.Identifier]int{
-	ciphersuite.Ristretto255Sha512: ristrettoScalarLength,
-	// ciphersuite.Decaf448Shake256: 56,
-	ciphersuite.P256Sha256: p256ScalarLength,
-	ciphersuite.P384Sha512: p384ScalarLength,
-	ciphersuite.P521Sha512: p521ScalarLength,
+var ScalarLength = map[group.Group]int{
+	group.Ristretto255Sha512: ristrettoScalarLength,
+	// group.Decaf448Shake256: 56,
+	group.P256Sha256: p256ScalarLength,
+	group.P384Sha512: p384ScalarLength,
+	group.P521Sha512: p521ScalarLength,
 }
 
 // PointLength indexes the length of elements.
-var PointLength = map[ciphersuite.Identifier]int{
-	ciphersuite.Ristretto255Sha512: ristrettoPointLength,
-	// ciphersuite.Decaf448Shake256: 56,
-	ciphersuite.P256Sha256: p256PointLength,
-	ciphersuite.P384Sha512: p384PointLength,
-	ciphersuite.P521Sha512: p521PointLength,
+var PointLength = map[group.Group]int{
+	group.Ristretto255Sha512: ristrettoPointLength,
+	// group.Decaf448Shake256: 56,
+	group.P256Sha256: p256PointLength,
+	group.P384Sha512: p384PointLength,
+	group.P521Sha512: p521PointLength,
 }
 
 // SerializeScalar pads the given scalar if necessary.
-func SerializeScalar(s group.Scalar, c ciphersuite.Identifier) []byte {
+func SerializeScalar(s *group.Scalar, c group.Group) []byte {
 	length := ScalarLength[c]
 
 	e := s.Bytes()
@@ -57,12 +56,12 @@ func SerializeScalar(s group.Scalar, c ciphersuite.Identifier) []byte {
 }
 
 // SerializePoint pads the given element if necessary.
-func SerializePoint(e group.Element, c ciphersuite.Identifier) []byte {
+func SerializePoint(e *group.Point, c group.Group) []byte {
 	return PadPoint(e.Bytes(), c)
 }
 
 // PadPoint pads the encoded element if necessary.
-func PadPoint(point []byte, c ciphersuite.Identifier) []byte {
+func PadPoint(point []byte, c group.Group) []byte {
 	length := PointLength[c]
 
 	for len(point) < length {

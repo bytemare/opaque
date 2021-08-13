@@ -4,7 +4,7 @@
 [![codecov](https://codecov.io/gh/bytemare/opaque/branch/main/graph/badge.svg?token=5bQfB0OctA)](https://codecov.io/gh/bytemare/opaque)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbytemare%2Fopaque.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbytemare%2Fopaque?ref=badge_shield)
 
-This package implements the [OPAQUE](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque) asymmetric password-authenticated key exchange protocol.
+This package implements the [OPAQUE](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque) asymmetric password-authenticated key exchange protocol to the latest draft version.
 
 OPAQUE enables a client to authenticate to a server without ever revealing its password, with strong security guarantees. The server and client share a nice session secret on successful authentication.
 
