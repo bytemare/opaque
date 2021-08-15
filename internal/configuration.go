@@ -75,8 +75,8 @@ func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.Reg
 	}, nil
 }
 
-// DeserializeRegistrationUpload takes a serialized RegistrationUpload message as input and attempts to deserialize it.
-func (p *Parameters) DeserializeRegistrationUpload(input []byte) (*message.RegistrationUpload, error) {
+// DeserializeRegistrationRecord takes a serialized RegistrationRecord message as input and attempts to deserialize it.
+func (p *Parameters) DeserializeRegistrationRecord(input []byte) (*message.RegistrationRecord, error) {
 	if len(input) != p.AkePointLength+p.Hash.Size()+p.EnvelopeSize {
 		return nil, errInvalidMessageLength
 	}
@@ -85,7 +85,7 @@ func (p *Parameters) DeserializeRegistrationUpload(input []byte) (*message.Regis
 	maskingKey := input[p.AkePointLength : p.AkePointLength+p.Hash.Size()]
 	env := input[p.AkePointLength+p.Hash.Size():]
 
-	return &message.RegistrationUpload{
+	return &message.RegistrationRecord{
 		PublicKey:  pku,
 		MaskingKey: maskingKey,
 		Envelope:   env,

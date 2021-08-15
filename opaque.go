@@ -199,7 +199,7 @@ func DefaultConfiguration() *Configuration {
 type ClientRecord struct {
 	CredentialIdentifier []byte
 	ClientIdentity       []byte
-	*message.RegistrationUpload
+	*message.RegistrationRecord
 
 	// testing
 	TestMaskNonce []byte

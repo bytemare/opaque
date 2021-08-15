@@ -77,7 +77,7 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
 	}, nil
 }
 
-func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey []byte, record *message.RegistrationUpload,
+func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey []byte, record *message.RegistrationRecord,
 	credentialIdentifier, oprfSeed, maskingNonce []byte) (*cred.CredentialResponse, error) {
 	z, err := s.oprfResponse(oprfSeed, credentialIdentifier, req.Data)
 	if err != nil {
@@ -113,7 +113,7 @@ func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverP
 	}
 
 	response, err := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
-		record.RegistrationUpload, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce)
+		record.RegistrationRecord, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce)
 	if err != nil {
 		return nil, fmt.Errorf(" credentialResponse: %w", err)
 	}
@@ -165,9 +165,9 @@ func (s *Server) DeserializeRegistrationResponse(registrationResponse []byte) (*
 	return s.Parameters.DeserializeRegistrationResponse(registrationResponse)
 }
 
-// DeserializeRegistrationUpload takes a serialized RegistrationUpload message and returns a deserialized RegistrationUpload structure.
-func (s *Server) DeserializeRegistrationUpload(registrationUpload []byte) (*message.RegistrationUpload, error) {
-	return s.Parameters.DeserializeRegistrationUpload(registrationUpload)
+// DeserializeRegistrationRecord takes a serialized RegistrationRecord message and returns a deserialized RegistrationRecord structure.
+func (s *Server) DeserializeRegistrationRecord(registrationUpload []byte) (*message.RegistrationRecord, error) {
+	return s.Parameters.DeserializeRegistrationRecord(registrationUpload)
 }
 
 // DeserializeKE1 takes a serialized KE1 message and returns a deserialized KE1 structure.

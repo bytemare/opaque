@@ -32,14 +32,14 @@ func (r *RegistrationResponse) Serialize() []byte {
 	return encoding.Concat(r.Data, r.Pks)
 }
 
-// RegistrationUpload represents the client record sent as the last registration message by the client to the server.
-type RegistrationUpload struct {
+// RegistrationRecord represents the client record sent as the last registration message by the client to the server.
+type RegistrationRecord struct {
 	PublicKey  []byte `json:"pku"`
 	MaskingKey []byte `json:"msk"`
 	Envelope   []byte `json:"env"`
 }
 
-// Serialize returns the byte encoding of RegistrationUpload.
-func (r *RegistrationUpload) Serialize() []byte {
+// Serialize returns the byte encoding of RegistrationRecord.
+func (r *RegistrationRecord) Serialize() []byte {
 	return encoding.Concat3(r.PublicKey, r.MaskingKey, r.Envelope)
 }

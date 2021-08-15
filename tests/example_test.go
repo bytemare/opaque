@@ -180,7 +180,7 @@ func ExampleRegistration() {
 	c3s := c3.Serialize()
 
 	// Server registers the client upload
-	upload, err := server.DeserializeRegistrationUpload(c3s)
+	upload, err := server.DeserializeRegistrationRecord(c3s)
 	if err != nil {
 		panic(err)
 	}
@@ -188,10 +188,10 @@ func ExampleRegistration() {
 	exampleClientRecord = &opaque.ClientRecord{
 		CredentialIdentifier: credID,
 		ClientIdentity:       clientID,
-		RegistrationUpload:   upload,
+		RegistrationRecord:   upload,
 	}
 
-	if exampleClientRecord.RegistrationUpload != nil {
+	if exampleClientRecord.RegistrationRecord != nil {
 		fmt.Println("OPAQUE registration is easy!")
 	} else {
 		log.Fatalln("Oh no! Something went wrong storing the client record.")

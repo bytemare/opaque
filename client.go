@@ -68,11 +68,11 @@ func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest 
 	return &message.RegistrationRequest{Data: m}
 }
 
-// RegistrationFinalize returns a RegistrationUpload message given the server's RegistrationResponse and credentials. If
+// RegistrationFinalize returns a RegistrationRecord message given the server's RegistrationResponse and credentials. If
 // the envelope mode is internal, then clientSecretKey is ignored and can be set to nil. For the external
 // mode, clientSecretKey must be the client's private key for the AKE.
 func (c *Client) RegistrationFinalize(clientSecretKey []byte, creds *Credentials,
-	resp *message.RegistrationResponse) (upload *message.RegistrationUpload, exportKey []byte, err error) {
+	resp *message.RegistrationResponse) (upload *message.RegistrationRecord, exportKey []byte, err error) {
 	creds2 := &envelope.Credentials{
 		Idc:           creds.Client,
 		Ids:           creds.Server,
@@ -94,7 +94,7 @@ func (c *Client) RegistrationFinalize(clientSecretKey []byte, creds *Credentials
 		return nil, nil, fmt.Errorf("building envelope: %w", err)
 	}
 
-	return &message.RegistrationUpload{
+	return &message.RegistrationRecord{
 		PublicKey:  clientPublicKey,
 		MaskingKey: maskingKey,
 		Envelope:   envU.Serialize(),

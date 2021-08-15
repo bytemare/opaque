@@ -126,7 +126,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 	// Server
 	{
 		server := p.Server()
-		m3, err := server.DeserializeRegistrationUpload(m3s)
+		m3, err := server.DeserializeRegistrationRecord(m3s)
 		if err != nil {
 			t.Fatalf(dbgErr, p.Mode, err)
 		}
@@ -134,7 +134,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 		return &opaque.ClientRecord{
 			CredentialIdentifier: credID,
 			ClientIdentity:       p.username,
-			RegistrationUpload:   m3,
+			RegistrationRecord:   m3,
 		}, exportKeyReg
 	}
 }

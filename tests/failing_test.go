@@ -69,17 +69,17 @@ func TestDeserializeRegistrationResponse(t *testing.T) {
 	}
 }
 
-func TestDeserializeRegistrationUpload(t *testing.T) {
+func TestDeserializeRegistrationRecord(t *testing.T) {
 	c := opaque.DefaultConfiguration()
 
 	server := c.Server()
 	length := server.AkePointLength + server.Hash.Size() + server.EnvelopeSize + 1
-	if _, err := server.DeserializeRegistrationUpload(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.DeserializeRegistrationRecord(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	client := c.Client()
-	if _, err := client.DeserializeRegistrationUpload(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.DeserializeRegistrationRecord(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
@@ -314,7 +314,7 @@ func buildRecord(t *testing.T, credID, oprfSeed, password, pks []byte, client *o
 	return &opaque.ClientRecord{
 		CredentialIdentifier: credID,
 		ClientIdentity:       nil,
-		RegistrationUpload:   r3,
+		RegistrationRecord:   r3,
 		TestMaskNonce:        nil,
 	}
 }
@@ -408,7 +408,7 @@ func TestServerInit_InvalidData(t *testing.T) {
 	rec := &opaque.ClientRecord{
 		CredentialIdentifier: internal.RandomBytes(32),
 		ClientIdentity:       nil,
-		RegistrationUpload: &message.RegistrationUpload{
+		RegistrationRecord: &message.RegistrationRecord{
 			MaskingKey: internal.RandomBytes(32),
 		},
 		TestMaskNonce: nil,
@@ -435,7 +435,7 @@ func TestServerInit_InvalidEPKU(t *testing.T) {
 	rec := &opaque.ClientRecord{
 		CredentialIdentifier: internal.RandomBytes(32),
 		ClientIdentity:       nil,
-		RegistrationUpload: &message.RegistrationUpload{
+		RegistrationRecord: &message.RegistrationRecord{
 			MaskingKey: internal.RandomBytes(32),
 		},
 		TestMaskNonce: nil,
@@ -463,7 +463,7 @@ func TestServerInit_InvalidPKU(t *testing.T) {
 	rec := &opaque.ClientRecord{
 		CredentialIdentifier: internal.RandomBytes(32),
 		ClientIdentity:       nil,
-		RegistrationUpload: &message.RegistrationUpload{
+		RegistrationRecord: &message.RegistrationRecord{
 			MaskingKey: internal.RandomBytes(32),
 		},
 		TestMaskNonce: nil,
@@ -758,7 +758,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 
 		badpks := getBadElement(t, conf)
 
-		ctc := cleartextCredentials(rec.RegistrationUpload.PublicKey, badpks, nil, nil)
+		ctc := cleartextCredentials(rec.RegistrationRecord.PublicKey, badpks, nil, nil)
 		authKey := client.KDF.Expand(randomizedPwd, encoding.SuffixString(env.Nonce, tag.AuthKey), client.KDF.Size())
 		authTag := client.MAC.MAC(authKey, encoding.Concat3(env.Nonce, env.InnerEnvelope, ctc))
 		env.AuthTag = authTag

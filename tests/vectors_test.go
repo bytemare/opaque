@@ -106,7 +106,7 @@ type outputs struct {
 	ExportKey            ByteToHex `json:"export_key"`            //
 	RegistrationRequest  ByteToHex `json:"registration_request"`  //
 	RegistrationResponse ByteToHex `json:"registration_response"` //
-	RegistrationUpload   ByteToHex `json:"registration_upload"`   //
+	RegistrationRecord   ByteToHex `json:"registration_upload"`   //
 	SessionKey           ByteToHex `json:"session_key"`           //
 }
 
@@ -173,7 +173,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 		t.Fatalf("envelopes do not match\nexpected %v,\ngot %v", v.Intermediates.Envelope, upload.Envelope)
 	}
 
-	if !bytes.Equal(v.Outputs.RegistrationUpload, upload.Serialize()) {
+	if !bytes.Equal(v.Outputs.RegistrationRecord, upload.Serialize()) {
 		t.Fatalf("registration upload do not match")
 	}
 }
@@ -202,14 +202,14 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 
 	record := &opaque.ClientRecord{}
 	if !isFake(v.Config.Fake) {
-		cupload, err := server.DeserializeRegistrationUpload(v.Outputs.RegistrationUpload)
+		cupload, err := server.DeserializeRegistrationRecord(v.Outputs.RegistrationRecord)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		record.RegistrationUpload = cupload
+		record.RegistrationRecord = cupload
 	} else {
-		record.RegistrationUpload = &message.RegistrationUpload{
+		record.RegistrationRecord = &message.RegistrationRecord{
 			PublicKey:  v.Inputs.ClientPublicKey,
 			MaskingKey: v.Inputs.MaskingKey,
 			Envelope:   opaque.GetFakeEnvelope(p),
