@@ -539,6 +539,39 @@ func TestServerSetAKEState_InvalidInput(t *testing.T) {
 
 // client.go
 
+func TestClientRegistrationFinalize_InvalidSks(t *testing.T) {
+	/*
+		Invalid client secret key length
+	*/
+	credID := internal.RandomBytes(32)
+	oprfSeed := internal.RandomBytes(32)
+
+	for _, conf := range confs {
+		conf.Conf.Mode = opaque.External
+		client := conf.Conf.Client()
+		server := conf.Conf.Server()
+		_, pks := server.KeyGen()
+		r1 := client.RegistrationInit([]byte("yo"))
+
+		r2, err := server.RegistrationResponse(r1, pks, credID, oprfSeed)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// nil sks
+		expected := "invalid secret key length"
+		if _, _, err := client.RegistrationFinalize(nil, &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+			t.Fatalf("expected error for invalid client secret key length - got %v", err)
+		}
+
+		// short pks
+		sks := internal.RandomBytes(10)
+		if _, _, err := client.RegistrationFinalize(sks, &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+			t.Fatalf("expected error for invalid client secret key length - got %v", err)
+		}
+	}
+}
+
 func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 	/*
 		Empty and invalid server public key sent to client
@@ -557,16 +590,18 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		skc, _ := client.KeyGen()
+
 		// nil pks
 		r2.Pks = nil
 		expected := "invalid server public key :"
-		if _, _, err := client.RegistrationFinalize(nil, &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, err := client.RegistrationFinalize(skc, &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid server public key - got %v", err)
 		}
 
 		// nil pks
 		r2.Pks = getBadElement(t, conf)
-		if _, _, err := client.RegistrationFinalize(nil, &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, err := client.RegistrationFinalize(skc, &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid server public key - got %v", err)
 		}
 	}
@@ -584,7 +619,8 @@ func TestClientRegistrationFinalize_InvalidEvaluation(t *testing.T) {
 		}
 
 		expected := "building envelope: finalizing OPRF : "
-		if _, _, err := client.RegistrationFinalize(nil, &opaque.Credentials{}, badr2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		skc, _ := client.KeyGen()
+		if _, _, err := client.RegistrationFinalize(skc, &opaque.Credentials{}, badr2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid evualuated element - got %v", err)
 		}
 	}

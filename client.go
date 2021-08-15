@@ -25,6 +25,9 @@ var (
 	// errInvalidMaskedLength happens when unmasking a masked response.
 	errInvalidMaskedLength = errors.New("invalid masked response length")
 
+	// errInvalidSKS happens when the input external secret key is not of correct length.
+	errInvalidSKSLength = errors.New("invalid secret key length")
+
 	// errInvalidPKS happens when the server sends an invalid public key on registration.
 	errInvalidPKS = errors.New("invalid server public key")
 )
@@ -75,6 +78,10 @@ func (c *Client) RegistrationFinalize(clientSecretKey []byte, creds *Credentials
 		Ids:           creds.Server,
 		EnvelopeNonce: creds.TestEnvNonce,
 		MaskingNonce:  creds.TestMaskNonce,
+	}
+
+	if c.mode == envelope.External && len(clientSecretKey) != encoding.ScalarLength[c.Parameters.Group] {
+		return nil, nil, errInvalidSKSLength
 	}
 
 	// this check is very important: it verifies the server's public key validity in the group.
