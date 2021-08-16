@@ -18,20 +18,20 @@ import (
 
 type internalMode struct{}
 
-func (i *internalMode) deriveAkeKeyPair(m *mailer, randomizedPwd, nonce []byte) (*group.Scalar, *group.Point) {
+func (i *internalMode) deriveAkeKeyPair(m *sheath, randomizedPwd, nonce []byte) (*group.Scalar, *group.Point) {
 	seed := m.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), encoding.ScalarLength[m.Group])
 	sk := m.Group.HashToScalar(seed, []byte(tag.DerivePrivateKey))
 
 	return sk, m.Group.Base().Mult(sk)
 }
 
-func (i *internalMode) buildInnerEnvelope(m *mailer,
+func (i *internalMode) buildInnerEnvelope(m *sheath,
 	randomizedPwd, nonce, _ []byte) (inner, clientPublicKey []byte, err error) {
 	_, pk := i.deriveAkeKeyPair(m, randomizedPwd, nonce)
 	return nil, encoding.SerializePoint(pk, m.Group), nil
 }
 
-func (i *internalMode) recoverKeys(m *mailer,
+func (i *internalMode) recoverKeys(m *sheath,
 	randomizedPwd, nonce, _ []byte) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, err error) {
 	sk, pk := i.deriveAkeKeyPair(m, randomizedPwd, nonce)
 	return sk, pk, nil

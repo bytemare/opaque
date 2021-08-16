@@ -19,16 +19,16 @@ import (
 
 type externalMode struct{}
 
-func (e *externalMode) recoverPublicKey(m *mailer, privateKey *group.Scalar) *group.Point {
+func (e *externalMode) recoverPublicKey(m *sheath, privateKey *group.Scalar) *group.Point {
 	return m.Group.Base().Mult(privateKey)
 }
 
-func (e *externalMode) crypt(m *mailer, randomizedPwd, nonce, input []byte) []byte {
+func (e *externalMode) crypt(m *sheath, randomizedPwd, nonce, input []byte) []byte {
 	pad := m.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.EncryptionPad), encoding.ScalarLength[m.Group])
 	return internal.Xor(input, pad)
 }
 
-func (e *externalMode) buildInnerEnvelope(m *mailer,
+func (e *externalMode) buildInnerEnvelope(m *sheath,
 	randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte, err error) {
 	scalar, err := m.Group.NewScalar().Decode(clientSecretKey)
 	if err != nil {
@@ -40,7 +40,7 @@ func (e *externalMode) buildInnerEnvelope(m *mailer,
 	return e.crypt(m, randomizedPwd, nonce, clientSecretKey), encoding.SerializePoint(clientPublicKey, m.Group), nil
 }
 
-func (e *externalMode) recoverKeys(m *mailer,
+func (e *externalMode) recoverKeys(m *sheath,
 	randomizedPwd, nonce, innerEnvelope []byte) (sk *group.Scalar, clientPublicKey *group.Point, err error) {
 	clientSecretKey := e.crypt(m, randomizedPwd, nonce, innerEnvelope)
 

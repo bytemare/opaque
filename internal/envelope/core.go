@@ -48,7 +48,7 @@ func (c *Core) BuildEnvelope(p *internal.Parameters, mode Mode, evaluation, serv
 	}
 
 	randomizedPwd := BuildPRK(p, unblinded)
-	m := &mailer{Parameters: p}
+	m := &sheath{Parameters: p}
 
 	env, clientPublicKey, exportKey, err = m.createEnvelope(mode, randomizedPwd, serverPublicKey, clientSecretKey, creds)
 	if err != nil {
