@@ -10,8 +10,9 @@
 package oprf
 
 import (
+	"crypto"
+
 	"github.com/bytemare/crypto/group"
-	"github.com/bytemare/crypto/hash"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
@@ -38,21 +39,20 @@ const (
 
 	// P521Sha512 is the OPRF cipher suite of the NIST P-512 group and SHA-512.
 	P521Sha512
+
+	// Curve25519Sha512 OPRF cipher suite of the Curve25519 prime-order subgroup and SHA-512.
+	Curve25519Sha512
 )
 
-var suiteToHash = make(map[Ciphersuite]hash.Hashing)
+var suiteToHash = make(map[group.Group]crypto.Hash)
 
-func (c Ciphersuite) register(h hash.Hashing) {
-	suiteToHash[c] = h
+func (c Ciphersuite) register(h crypto.Hash) {
+	suiteToHash[c.Group()] = h
 }
 
 // Group returns the casted identifier for the cipher suite.
 func (c Ciphersuite) Group() group.Group {
 	return group.Group(c)
-}
-
-func (c Ciphersuite) hash() hash.Hashing {
-	return suiteToHash[c]
 }
 
 func contextString(id Ciphersuite) []byte {
@@ -66,8 +66,7 @@ func contextString(id Ciphersuite) []byte {
 }
 
 type oprf struct {
-	group         group.Group
-	hash          *hash.Hash
+	group.Group
 	contextString []byte
 }
 
@@ -89,8 +88,7 @@ func (c Ciphersuite) DeriveKey(input, dst []byte) *group.Scalar {
 func (c Ciphersuite) Client() *Client {
 	client := &Client{
 		oprf: &oprf{
-			group:         c.Group(),
-			hash:          c.hash().Get(),
+			Group:         c.Group(),
 			contextString: contextString(c),
 		},
 	}
@@ -99,8 +97,9 @@ func (c Ciphersuite) Client() *Client {
 }
 
 func init() {
-	RistrettoSha512.register(hash.SHA512)
-	P256Sha256.register(hash.SHA256)
-	P384Sha512.register(hash.SHA512)
-	P521Sha512.register(hash.SHA512)
+	RistrettoSha512.register(crypto.SHA512)
+	P256Sha256.register(crypto.SHA256)
+	P384Sha512.register(crypto.SHA512)
+	P521Sha512.register(crypto.SHA512)
+	Curve25519Sha512.register(crypto.SHA512)
 }

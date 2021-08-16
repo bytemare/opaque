@@ -228,18 +228,18 @@ var confs = []configuration{
 		},
 		Curve: elliptic.P521(),
 	},
-	//{
-	//	Conf: &opaque.Configuration{
-	//		OPRF: opaque.Curve25519Sha512,
-	//		KDF:  hash.SHA512,
-	//		MAC:  hash.SHA512,
-	//		Hash: hash.SHA512,
-	//		MHF:  mhf.Scrypt,
-	//		Mode: opaque.Internal,
-	//		AKE:  opaque.Curve25519Sha512,
-	//	},
-	//	Curve: elliptic.P521(),
-	//},
+	{
+		Conf: &opaque.Configuration{
+			OPRF: opaque.Curve25519Sha512,
+			KDF:  crypto.SHA512,
+			MAC:  crypto.SHA512,
+			Hash: crypto.SHA512,
+			MHF:  mhf.Scrypt,
+			Mode: opaque.Internal,
+			AKE:  opaque.Curve25519Sha512,
+		},
+		Curve: nil,
+	},
 }
 
 func getBadRistrettoScalar() []byte {
@@ -251,6 +251,13 @@ func getBadRistrettoScalar() []byte {
 
 func getBadRistrettoElement() []byte {
 	a := "2a292df7e32cababbd9de088d1d1abec9fc0440f637ed2fba145094dc14bea08"
+	decoded, _ := hex.DecodeString(a)
+
+	return decoded
+}
+
+func getBad25519Element() []byte {
+	a := "efffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"
 	decoded, _ := hex.DecodeString(a)
 
 	return decoded
@@ -283,9 +290,12 @@ func getBadNistElement(t *testing.T, id group.Group) []byte {
 }
 
 func getBadElement(t *testing.T, c configuration) []byte {
-	if c.Conf.AKE == opaque.RistrettoSha512 {
+	switch c.Conf.AKE {
+	case opaque.RistrettoSha512:
 		return getBadRistrettoElement()
-	} else {
+	case opaque.Curve25519Sha512:
+		return getBad25519Element()
+	default:
 		return getBadNistElement(t, oprf.Ciphersuite(c.Conf.AKE).Group())
 	}
 }

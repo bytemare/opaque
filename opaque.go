@@ -59,7 +59,7 @@ const (
 	P521Sha512 = Group(oprf.P521Sha512)
 
 	// Curve25519Sha512 identifies a group over Curve25519 with SHA2-512 hash-to-group hashing.
-	Curve25519Sha512 = Group(group.Curve25519Sha512)
+	Curve25519Sha512 = Group(oprf.Curve25519Sha512)
 
 	confLength = 7
 )

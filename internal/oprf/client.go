@@ -33,13 +33,24 @@ func (c *Client) SetBlind(blind *group.Scalar) {
 // Blind masks the input.
 func (c *Client) Blind(input []byte) []byte {
 	if c.blind == nil {
-		c.blind = c.group.NewScalar().Random()
+		c.blind = c.NewScalar().Random()
 	}
 
-	p := c.group.HashToGroup(input, c.dst(tag.OPRFPrefix))
+	p := c.HashToGroup(input, c.dst(tag.OPRFPrefix))
 	c.input = input
 
 	return p.Mult(c.blind).Bytes()
+}
+
+func (o *oprf) hash(input ...[]byte) []byte {
+	h := suiteToHash[o.Group].New()
+	h.Reset()
+
+	for _, i := range input {
+		_, _ = h.Write(i)
+	}
+
+	return h.Sum(nil)
 }
 
 func (o *oprf) hashTranscript(input, unblinded []byte) []byte {
@@ -48,12 +59,12 @@ func (o *oprf) hashTranscript(input, unblinded []byte) []byte {
 	encElement := encoding.EncodeVector(unblinded)
 	encDST := encoding.EncodeVector(finalizeDST)
 
-	return o.hash.Hash(encInput, encElement, encDST)
+	return o.hash(encInput, encElement, encDST)
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
 func (c *Client) Finalize(evaluation []byte) ([]byte, error) {
-	ev, err := c.group.NewElement().Decode(evaluation)
+	ev, err := c.NewElement().Decode(evaluation)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode element : %w", err)
 	}

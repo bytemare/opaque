@@ -4,8 +4,8 @@ github.com/armfazh/h2c-go-ref v0.0.0-20210215173008-07e12a6f8e0d h1:0YBiQ+rXap26
 github.com/armfazh/h2c-go-ref v0.0.0-20210215173008-07e12a6f8e0d/go.mod h1:8fwPDRbWg9lh+s+iVv/7yAthCGHoGLTpeXnHf/J5EXs=
 github.com/armfazh/tozan-ecc v0.1.3 h1:g3OKE0KR4L/GZaoQYzsOUdg97Ey5lZRl1i1fD/QkUUw=
 github.com/armfazh/tozan-ecc v0.1.3/go.mod h1:u25eZC5Z8uJFQxJxGBz1Blfii/7m3DfmwX0vFnwtG9I=
-github.com/bytemare/crypto v0.2.1 h1:PNhmxliM63A/mburyuFQi0EOjA2RigW76RA85iVkKnY=
-github.com/bytemare/crypto v0.2.1/go.mod h1:pu/iz03i01db1e6wst4DSgUqEHkjhFdW2e8y4qI8D3E=
+github.com/bytemare/crypto v0.2.3 h1:m92SvXgqRWfjAMfkEMfvyHBhFCGVWiT7Tga9IAUhKnU=
+github.com/bytemare/crypto v0.2.3/go.mod h1:pu/iz03i01db1e6wst4DSgUqEHkjhFdW2e8y4qI8D3E=
 github.com/gtank/ristretto255 v0.1.2 h1:JEqUCPA1NvLq5DwYtuzigd7ss8fwbYay9fi4/5uMzcc=
 github.com/gtank/ristretto255 v0.1.2/go.mod h1:Ph5OpO6c7xKUGROZfWVLiJf9icMDwUeIvY4OmlYW69o=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=

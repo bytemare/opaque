@@ -460,8 +460,7 @@ func groupToGroup(g string) opaque.Group {
 	case "P521_XMD:SHA-512_SSWU_RO_":
 		return opaque.P521Sha512
 	case "curve25519_XMD:SHA-512_ELL2_RO_":
-		// return opaque.Curve25519Sha512
-		panic("group not supported")
+		return opaque.Curve25519Sha512
 	default:
 		panic("group not recognised")
 	}
