@@ -40,6 +40,17 @@ const (
 	External
 )
 
+var modes = map[Mode]innerEnvelope{
+	Internal: &internalMode{},
+	External: &externalMode{},
+}
+
+// IsValidMode returns whether m is a valid envelope mode.
+func IsValidMode(m Mode) bool {
+	_, ok := modes[m]
+	return ok
+}
+
 // Envelope represents the OPAQUE envelope.
 type Envelope struct {
 	Nonce         []byte
@@ -53,8 +64,8 @@ func (e *Envelope) Serialize() []byte {
 }
 
 type innerEnvelope interface {
-	buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte, err error)
-	recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, err error)
+	buildInnerEnvelope(m *mailer, randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte, err error)
+	recoverKeys(m *mailer, randomizedPwd, nonce, innerEnvelope []byte) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, err error)
 }
 
 // BuildPRK derives the randomized password from the OPRF output.
@@ -66,21 +77,6 @@ func BuildPRK(p *internal.Parameters, unblinded []byte) []byte {
 // mailer is a utility structure to manage envelope creation and recovery.
 type mailer struct {
 	*internal.Parameters
-}
-
-func (m *mailer) inner(mode Mode) innerEnvelope {
-	var inner innerEnvelope
-
-	switch mode {
-	case Internal:
-		inner = &internalMode{m.Group, m.KDF}
-	case External:
-		inner = &externalMode{m.Group, m.KDF}
-	default:
-		panic("invalid mode")
-	}
-
-	return inner
 }
 
 func (m *mailer) exportKey(randomizedPwd, nonce []byte) []byte {
@@ -100,12 +96,12 @@ func (m *mailer) createEnvelope(mode Mode, randomizedPwd, serverPublicKey, clien
 		nonce = internal.RandomBytes(m.NonceLen)
 	}
 
-	inner, clientPublicKey, err := m.inner(mode).buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey)
+	inner, clientPublicKey, err := modes[mode].buildInnerEnvelope(m, randomizedPwd, nonce, clientSecretKey)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	ctc := cleartextCredentials(clientPublicKey, serverPublicKey, creds.Idc, creds.Ids)
+	ctc := CleartextCredentials(clientPublicKey, serverPublicKey, creds.Idc, creds.Ids)
 	authTag := m.authTag(randomizedPwd, nonce, inner, ctc)
 
 	envelope = &Envelope{
@@ -124,12 +120,12 @@ func RecoverEnvelope(p *internal.Parameters, mode Mode, randomizedPwd, serverPub
 	envelope *Envelope) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, exportKey []byte, err error) {
 	m := &mailer{p}
 
-	clientSecretKey, clientPublicKey, err = m.inner(mode).recoverKeys(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
+	clientSecretKey, clientPublicKey, err = modes[mode].recoverKeys(m, randomizedPwd, envelope.Nonce, envelope.InnerEnvelope)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	ctc := cleartextCredentials(clientPublicKey.Bytes(), serverPublicKey, idc, ids)
+	ctc := CleartextCredentials(clientPublicKey.Bytes(), serverPublicKey, idc, ids)
 
 	expectedTag := m.authTag(randomizedPwd, envelope.Nonce, envelope.InnerEnvelope, ctc)
 	if !m.MAC.Equal(expectedTag, envelope.AuthTag) {

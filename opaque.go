@@ -108,7 +108,7 @@ func envelopeSize(mode Mode, p *internal.Parameters) int {
 	return p.NonceLen + p.MAC.Size() + innerSize
 }
 
-func (c Configuration) toInternal() *internal.Parameters {
+func (c *Configuration) toInternal() *internal.Parameters {
 	g := group.Group(c.AKE)
 	ip := &internal.Parameters{
 		KDF:             internal.NewKDF(c.KDF),
@@ -128,7 +128,7 @@ func (c Configuration) toInternal() *internal.Parameters {
 }
 
 // Serialize returns the byte encoding of the Configuration structure.
-func (c Configuration) Serialize() []byte {
+func (c *Configuration) Serialize() []byte {
 	b := []byte{
 		byte(c.OPRF),
 		byte(c.KDF),
@@ -148,13 +148,13 @@ func (c Configuration) Serialize() []byte {
 }
 
 // Client returns a newly instantiated Client from the Configuration.
-func (c Configuration) Client() *Client {
-	return NewClient(&c)
+func (c *Configuration) Client() *Client {
+	return NewClient(c)
 }
 
 // Server returns a newly instantiated Server from the Configuration.
-func (c Configuration) Server() *Server {
-	return NewServer(&c)
+func (c *Configuration) Server() *Server {
+	return NewServer(c)
 }
 
 // DeserializeConfiguration decodes the input and returns a Parameter structure. This assumes that the encoded parameters

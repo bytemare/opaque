@@ -263,9 +263,16 @@ func getBad25519Element() []byte {
 	return decoded
 }
 
+func getBad25519Scalar() []byte {
+	a := "ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000011"
+	decoded, _ := hex.DecodeString(a)
+
+	return decoded
+}
+
 func badScalar(t *testing.T, ci group.Group, curve elliptic.Curve) []byte {
 	order := curve.Params().P
-	exceeded := order.Add(order, big.NewInt(2)).Bytes()
+	exceeded := new(big.Int).Add(order, big.NewInt(2)).Bytes()
 
 	_, err := ci.NewScalar().Decode(exceeded)
 	if err == nil {
@@ -301,9 +308,12 @@ func getBadElement(t *testing.T, c configuration) []byte {
 }
 
 func getBadScalar(t *testing.T, c configuration) []byte {
-	if c.Conf.AKE == opaque.RistrettoSha512 {
+	switch c.Conf.AKE {
+	case opaque.RistrettoSha512:
 		return getBadRistrettoScalar()
-	} else {
+	case opaque.Curve25519Sha512:
+		return getBad25519Scalar()
+	default:
 		return badScalar(t, oprf.Ciphersuite(c.Conf.AKE).Group(), c.Curve)
 	}
 }
@@ -549,9 +559,20 @@ func TestServerSetAKEState_InvalidInput(t *testing.T) {
 
 // client.go
 
-func TestClientRegistrationFinalize_InvalidSks(t *testing.T) {
+func TestClient_InvalidMode(t *testing.T) {
+	defer func() {
+		recover()
+	}()
+
+	c := opaque.DefaultConfiguration()
+	c.Mode = 3
+	_ = c.Client()
+	t.Fatal("expected panic with invalid envelope mode")
+}
+
+func TestClientRegistrationFinalize_InvalidSkc(t *testing.T) {
 	/*
-		Invalid client secret key length
+		Invalid client secret key
 	*/
 	credID := internal.RandomBytes(32)
 	oprfSeed := internal.RandomBytes(32)
@@ -568,16 +589,23 @@ func TestClientRegistrationFinalize_InvalidSks(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		// nil sks
+		// nil skc
 		expected := "invalid secret key length"
 		if _, _, err := client.RegistrationFinalize(nil, &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid client secret key length - got %v", err)
 		}
 
-		// short pks
-		sks := internal.RandomBytes(10)
-		if _, _, err := client.RegistrationFinalize(sks, &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		// short skc
+		skc := internal.RandomBytes(10)
+		if _, _, err := client.RegistrationFinalize(skc, &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid client secret key length - got %v", err)
+		}
+
+		// invalid skc
+		expected = "building envelope: can't build envelope: invalid secret key encoding"
+		skc = getBadScalar(t, conf)
+		if _, _, err := client.RegistrationFinalize(skc, &opaque.Credentials{}, r2); err == nil || err.Error() != expected {
+			t.Fatalf("expected error for invalid client secret - got %v", err)
 		}
 	}
 }
@@ -613,6 +641,47 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 		r2.Pks = getBadElement(t, conf)
 		if _, _, err := client.RegistrationFinalize(skc, &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid server public key - got %v", err)
+		}
+	}
+}
+
+func TestClientFinish_ExternalInvalidSecretKey(t *testing.T) {
+	/*
+		The key recovered from the envelope is an invalid scalar in the external mode.
+	*/
+	credID := internal.RandomBytes(32)
+	oprfSeed := internal.RandomBytes(32)
+
+	for i, conf := range confs {
+		conf.Conf.Mode = opaque.External
+		client := conf.Conf.Client()
+		server := conf.Conf.Server()
+		sks, pks := server.KeyGen()
+		rec := buildRecord(t, credID, oprfSeed, []byte("yo"), pks, client, server)
+		ke1 := client.Init([]byte("yo"))
+		ke2, _ := server.Init(ke1, nil, sks, pks, oprfSeed, rec)
+
+		env, randomizedPwd, err := getEnvelope(envelope.Mode(conf.Conf.Mode), client, ke2)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// tamper the envelope
+		badKey := getBadScalar(t, conf)
+		pad := client.KDF.Expand(randomizedPwd, encoding.SuffixString(env.Nonce, tag.EncryptionPad), len(badKey))
+		env.InnerEnvelope = internal.Xor(badKey, pad)
+		ctc := cleartextCredentials(client.Group.Base().Bytes(), pks, nil, nil)
+		authKey := client.KDF.Expand(randomizedPwd, encoding.SuffixString(env.Nonce, tag.AuthKey), client.KDF.Size())
+		authTag := client.MAC.MAC(authKey, encoding.Concat3(env.Nonce, env.InnerEnvelope, ctc))
+		env.AuthTag = authTag
+
+		clear := encoding.Concat(pks, env.Serialize())
+		ke2.MaskedResponse = server.MaskResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
+
+		// too short
+		expected := "recover envelope: can't recover envelope: invalid secret key encoding"
+		if _, _, err := client.Finish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+			t.Fatalf("%d expected error for short response - got %v", i, err)
 		}
 	}
 }
@@ -846,59 +915,16 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 //			t.Fatal(err)
 //		}
 //
-//		if dc, err := client.OprfCiphersuite.Group().Get().NewElement().Decode(r2.Data); err != nil {
-//			log.Printf("Test %v / %v --- %v", client.OprfCiphersuite, r2.Data, err)
+//		log.Printf("Test %v", client.OPRF)
+//		if dc, err := client.OPRF.Group().NewElement().Decode(r2.Data); err != nil {
+//			log.Printf("Test %v / %v --- %v", client.OPRF, r2.Data, err)
 //		} else {
-//			log.Printf("Test %v \n\t%v --- %v", client.OprfCiphersuite, dc.Bytes(), err)
+//			log.Printf("Test %v \n\t%v --- %v", client.OPRF, dc.Bytes(), err)
 //		}
 //
 //		expected := "building envelope: can't build envelope: invalid secret key encoding"
 //		if _, _, err := client.RegistrationFinalize(getBadScalar(t, conf), &opaque.Credentials{}, r2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 //			t.Fatalf("expected error for invalid client secret key - got %v", err)
-//		}
-//	}
-//}
-
-//func TestClientFinish_ExternalInvalidSecretKey(t *testing.T) {
-//	/*
-//		The key recovered from the envelope is an invalid scalar in the external mode.
-//	 */
-//	credID := internal.RandomBytes(32)
-//	oprfSeed := internal.RandomBytes(32)
-//
-//	for i, conf := range confs {
-//		log.Printf("%d", i)
-//		conf.Conf.Mode = opaque.External
-//		client := conf.Conf.Client()
-//		server := conf.Conf.Server()
-//		sks, pks := server.KeyGen()
-//		rec := buildRecord(t, credID, oprfSeed, []byte("yo"), pks, client, server)
-//
-//		ke1 := client.Init([]byte("yo"))
-//		ke2, _ := server.Init(ke1, nil, sks, pks, oprfSeed, rec)
-//		log.Printf("data %v", ke2.Data)
-//
-//		env, randomizedPwd, err := getEnvelope(envelope.Mode(conf.Conf.Mode), client, ke2)
-//		if err != nil {
-//			t.Fatal(err)
-//		}
-//
-//		// tamper the envelope
-//		badKey := getBadScalar(t, conf)
-//		pad := client.KDF.Expand(randomizedPwd, encoding.SuffixString(env.Nonce, tag.Pad), len(badKey))
-//		env.InnerEnvelope = internal.Xor(badKey, pad)
-//		ctc := envelope.createCleartextCredentials(client.AKEGroup.Get().Base().Bytes(), pks, nil, nil)
-//		authKey := client.KDF.Expand(randomizedPwd, encoding.SuffixString(env.Nonce, tag.AuthKey), client.KDF.Size())
-//		authTag := client.MAC.MAC(authKey, encoding.Concat3(env.Nonce, env.InnerEnvelope, ctc.serialize()))
-//		env.AuthTag = authTag
-//
-//		clear := encoding.Concat(pks, env.serialize())
-//		ke2.MaskedResponse = server.MaskResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
-//
-//		// too short
-//		expected := "recover envelope: can't recover envelope: invalid secret key encoding"
-//		if _, _, err := client.Finish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
-//			t.Fatalf("%d expected error for short response - got %v", i, err)
 //		}
 //	}
 //}

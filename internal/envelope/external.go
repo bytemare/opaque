@@ -17,38 +17,37 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 )
 
-type externalMode struct {
-	group.Group
-	*internal.KDF
+type externalMode struct{}
+
+func (e *externalMode) recoverPublicKey(m *mailer, privateKey *group.Scalar) *group.Point {
+	return m.Group.Base().Mult(privateKey)
 }
 
-func (e *externalMode) recoverPublicKey(privateKey *group.Scalar) *group.Point {
-	return e.Base().Mult(privateKey)
-}
-
-func (e *externalMode) crypt(randomizedPwd, nonce, input []byte) []byte {
-	pad := e.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.EncryptionPad), encoding.ScalarLength[e.Group])
+func (e *externalMode) crypt(m *mailer, randomizedPwd, nonce, input []byte) []byte {
+	pad := m.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.EncryptionPad), encoding.ScalarLength[m.Group])
 	return internal.Xor(input, pad)
 }
 
-func (e *externalMode) buildInnerEnvelope(randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte, err error) {
-	scalar, err := e.NewScalar().Decode(clientSecretKey)
+func (e *externalMode) buildInnerEnvelope(m *mailer,
+	randomizedPwd, nonce, clientSecretKey []byte) (innerEnvelope, pk []byte, err error) {
+	scalar, err := m.Group.NewScalar().Decode(clientSecretKey)
 	if err != nil {
 		return nil, nil, errBuildInvalidSK
 	}
 
-	clientPublicKey := e.recoverPublicKey(scalar)
+	clientPublicKey := e.recoverPublicKey(m, scalar)
 
-	return e.crypt(randomizedPwd, nonce, clientSecretKey), encoding.SerializePoint(clientPublicKey, e.Group), nil
+	return e.crypt(m, randomizedPwd, nonce, clientSecretKey), encoding.SerializePoint(clientPublicKey, m.Group), nil
 }
 
-func (e *externalMode) recoverKeys(randomizedPwd, nonce, innerEnvelope []byte) (sk *group.Scalar, clientPublicKey *group.Point, err error) {
-	clientSecretKey := e.crypt(randomizedPwd, nonce, innerEnvelope)
+func (e *externalMode) recoverKeys(m *mailer,
+	randomizedPwd, nonce, innerEnvelope []byte) (sk *group.Scalar, clientPublicKey *group.Point, err error) {
+	clientSecretKey := e.crypt(m, randomizedPwd, nonce, innerEnvelope)
 
-	sk, err = e.NewScalar().Decode(clientSecretKey)
+	sk, err = m.Group.NewScalar().Decode(clientSecretKey)
 	if err != nil {
 		return nil, nil, errRecoverInvalidSK
 	}
 
-	return sk, e.recoverPublicKey(sk), nil
+	return sk, e.recoverPublicKey(m, sk), nil
 }

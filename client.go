@@ -30,6 +30,9 @@ var (
 
 	// errInvalidPKS happens when the server sends an invalid public key on registration.
 	errInvalidPKS = errors.New("invalid server public key")
+
+	// errInvalidMode happens when a Configuration has an invalid mode.
+	errInvalidMode = errors.New("invalid mode")
 )
 
 // Client represents an OPAQUE Client, exposing its functions and holding its state.
@@ -45,6 +48,10 @@ type Client struct {
 func NewClient(p *Configuration) *Client {
 	if p == nil {
 		p = DefaultConfiguration()
+	}
+
+	if !envelope.IsValidMode(envelope.Mode(p.Mode)) {
+		panic(errInvalidMode)
 	}
 
 	ip := p.toInternal()

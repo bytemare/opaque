@@ -12,29 +12,27 @@ package envelope
 import (
 	"github.com/bytemare/crypto/group"
 
-	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
 )
 
-type internalMode struct {
-	group.Group
-	*internal.KDF
+type internalMode struct{}
+
+func (i *internalMode) deriveAkeKeyPair(m *mailer, randomizedPwd, nonce []byte) (*group.Scalar, *group.Point) {
+	seed := m.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), encoding.ScalarLength[m.Group])
+	sk := m.Group.HashToScalar(seed, []byte(tag.DerivePrivateKey))
+
+	return sk, m.Group.Base().Mult(sk)
 }
 
-func (i *internalMode) deriveAkeKeyPair(randomizedPwd, nonce []byte) (*group.Scalar, *group.Point) {
-	seed := i.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), encoding.ScalarLength[i.Group])
-	sk := i.HashToScalar(seed, []byte(tag.DerivePrivateKey))
-
-	return sk, i.Base().Mult(sk)
+func (i *internalMode) buildInnerEnvelope(m *mailer,
+	randomizedPwd, nonce, _ []byte) (inner, clientPublicKey []byte, err error) {
+	_, pk := i.deriveAkeKeyPair(m, randomizedPwd, nonce)
+	return nil, encoding.SerializePoint(pk, m.Group), nil
 }
 
-func (i *internalMode) buildInnerEnvelope(randomizedPwd, nonce, _ []byte) (inner, clientPublicKey []byte, err error) {
-	_, pk := i.deriveAkeKeyPair(randomizedPwd, nonce)
-	return nil, encoding.SerializePoint(pk, i.Group), nil
-}
-
-func (i *internalMode) recoverKeys(randomizedPwd, nonce, _ []byte) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, err error) {
-	sk, pk := i.deriveAkeKeyPair(randomizedPwd, nonce)
+func (i *internalMode) recoverKeys(m *mailer,
+	randomizedPwd, nonce, _ []byte) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, err error) {
+	sk, pk := i.deriveAkeKeyPair(m, randomizedPwd, nonce)
 	return sk, pk, nil
 }
