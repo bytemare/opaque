@@ -39,9 +39,6 @@ const (
 
 	// P521Sha512 is the OPRF cipher suite of the NIST P-512 group and SHA-512.
 	P521Sha512
-
-	// Curve25519Sha512 OPRF cipher suite of the Curve25519 prime-order subgroup and SHA-512.
-	Curve25519Sha512
 )
 
 var suiteToHash = make(map[group.Group]crypto.Hash)
@@ -101,5 +98,4 @@ func init() {
 	P256Sha256.register(crypto.SHA256)
 	P384Sha512.register(crypto.SHA512)
 	P521Sha512.register(crypto.SHA512)
-	Curve25519Sha512.register(crypto.SHA512)
 }

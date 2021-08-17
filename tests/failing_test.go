@@ -228,18 +228,18 @@ var confs = []configuration{
 		},
 		Curve: elliptic.P521(),
 	},
-	{
-		Conf: &opaque.Configuration{
-			OPRF: opaque.Curve25519Sha512,
-			KDF:  crypto.SHA512,
-			MAC:  crypto.SHA512,
-			Hash: crypto.SHA512,
-			MHF:  mhf.Scrypt,
-			Mode: opaque.Internal,
-			AKE:  opaque.Curve25519Sha512,
-		},
-		Curve: nil,
-	},
+	//{
+	//	Conf: &opaque.Configuration{
+	//		OPRF: opaque.RistrettoSha512,
+	//		KDF:  crypto.SHA512,
+	//		MAC:  crypto.SHA512,
+	//		Hash: crypto.SHA512,
+	//		MHF:  mhf.Scrypt,
+	//		Mode: opaque.Internal,
+	//		AKE:  opaque.Curve25519Sha512,
+	//	},
+	//	Curve: nil,
+	//},
 }
 
 func getBadRistrettoScalar() []byte {
@@ -300,8 +300,8 @@ func getBadElement(t *testing.T, c configuration) []byte {
 	switch c.Conf.AKE {
 	case opaque.RistrettoSha512:
 		return getBadRistrettoElement()
-	case opaque.Curve25519Sha512:
-		return getBad25519Element()
+	//case opaque.Curve25519Sha512:
+	//	return getBad25519Element()
 	default:
 		return getBadNistElement(t, oprf.Ciphersuite(c.Conf.AKE).Group())
 	}
@@ -311,8 +311,8 @@ func getBadScalar(t *testing.T, c configuration) []byte {
 	switch c.Conf.AKE {
 	case opaque.RistrettoSha512:
 		return getBadRistrettoScalar()
-	case opaque.Curve25519Sha512:
-		return getBad25519Scalar()
+	//case opaque.Curve25519Sha512:
+	//	return getBad25519Scalar()
 	default:
 		return badScalar(t, oprf.Ciphersuite(c.Conf.AKE).Group(), c.Curve)
 	}
