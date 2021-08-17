@@ -99,6 +99,16 @@ type Configuration struct {
 	AKE Group `json:"group"`
 }
 
+// Client returns a newly instantiated Client from the Configuration.
+func (c *Configuration) Client() *Client {
+	return NewClient(c)
+}
+
+// Server returns a newly instantiated Server from the Configuration.
+func (c *Configuration) Server() *Server {
+	return NewServer(c)
+}
+
 func envelopeSize(mode Mode, p *internal.Parameters) int {
 	innerSize := 0
 	if mode == External {
@@ -109,6 +119,7 @@ func envelopeSize(mode Mode, p *internal.Parameters) int {
 }
 
 func (c *Configuration) toInternal() *internal.Parameters {
+	// NEED TO-DO: validate all the values.
 	g := group.Group(c.AKE)
 	ip := &internal.Parameters{
 		KDF:             internal.NewKDF(c.KDF),
@@ -139,28 +150,13 @@ func (c *Configuration) Serialize() []byte {
 		byte(c.AKE),
 	}
 
-	ctx := encoding.EncodeVector(c.Context)
-	s := make([]byte, 0, confLength+len(ctx))
-	s = append(s, b...)
-	s = append(s, ctx...)
-
-	return s
-}
-
-// Client returns a newly instantiated Client from the Configuration.
-func (c *Configuration) Client() *Client {
-	return NewClient(c)
-}
-
-// Server returns a newly instantiated Server from the Configuration.
-func (c *Configuration) Server() *Server {
-	return NewServer(c)
+	return encoding.Concat(b, encoding.EncodeVector(c.Context))
 }
 
 // DeserializeConfiguration decodes the input and returns a Parameter structure. This assumes that the encoded parameters
 // are valid, and will not be checked.
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
-	if len(encoded) < confLength+2 {
+	if len(encoded) < confLength+2 { // corresponds to the configuration length + 2-byte encoding of empty context
 		return nil, internal.ErrConfigurationInvalidLength
 	}
 
