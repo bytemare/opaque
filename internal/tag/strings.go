@@ -34,7 +34,7 @@ const (
 	MaskingKey = "MaskingKey"
 
 	// DerivePrivateKey is the client's internal mode private key hash-to-scalar dst.
-	DerivePrivateKey = "OPAQUE-HashToScalar"
+	DerivePrivateKey = "OPAQUE-DeriveAuthKeyPair"
 
 	// ExpandPrivateKey is the client's internal mode private key seed KDF dst.
 	ExpandPrivateKey = "PrivateKey"
