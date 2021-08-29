@@ -36,9 +36,6 @@ func isSameConf(a, b *opaque.Configuration) bool {
 	if a.MHF != b.MHF {
 		return false
 	}
-	if a.Mode != b.Mode {
-		return false
-	}
 	if a.AKE != b.AKE {
 		return false
 	}
@@ -58,7 +55,6 @@ func ExampleConfiguration() {
 		MAC:     crypto.SHA512,
 		Hash:    crypto.SHA512,
 		MHF:     mhf.Scrypt,
-		Mode:    opaque.Internal,
 		AKE:     opaque.RistrettoSha512,
 		Context: nil,
 	}
@@ -172,7 +168,7 @@ func ExampleRegistration() {
 	// We're using the internal mode, so we don't have to provide a private key here.
 	// This also spits out a client-only secret export_key, that the client can use for other purposes (e.g. encrypt
 	// information to store on the server, and that the server can't decrypt). We don't use in the example here.
-	c3, _, err := client.RegistrationFinalize(nil, clientCreds, c2)
+	c3, _, err := client.RegistrationFinalize(clientCreds, c2)
 	if err != nil {
 		panic(err)
 	}

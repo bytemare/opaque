@@ -50,16 +50,16 @@ func (j *ByteToHex) UnmarshalJSON(b []byte) error {
 */
 
 type config struct {
-	Context      ByteToHex `json:"Context"`
-	EnvelopeMode string    `json:"EnvelopeMode"`
-	Fake         string    `json:"Fake"`
-	Group        string    `json:"Group"`
-	Hash         string    `json:"Hash"`
-	KDF          string    `json:"KDF"`
-	MAC          string    `json:"MAC"`
-	MHF          string    `json:"MHF"`
-	Name         string    `json:"Name"`
-	OPRF         ByteToHex `json:"OPRF"`
+	Context ByteToHex `json:"Context"`
+	// EnvelopeMode string    `json:"EnvelopeMode"`
+	Fake  string    `json:"Fake"`
+	Group string    `json:"Group"`
+	Hash  string    `json:"Hash"`
+	KDF   string    `json:"KDF"`
+	MAC   string    `json:"MAC"`
+	MHF   string    `json:"MHF"`
+	Name  string    `json:"Name"`
+	OPRF  ByteToHex `json:"OPRF"`
 }
 
 type inputs struct {
@@ -69,7 +69,6 @@ type inputs struct {
 	Context               ByteToHex `json:"context"`
 	ClientKeyshare        ByteToHex `json:"client_keyshare"`
 	ClientNonce           ByteToHex `json:"client_nonce"`
-	ClientPrivateKey      ByteToHex `json:"client_private_key"`
 	ClientPrivateKeyshare ByteToHex `json:"client_private_keyshare"`
 	CredentialIdentifier  ByteToHex `json:"credential_identifier"`
 	EnvelopeNonce         ByteToHex `json:"envelope_nonce"`
@@ -120,8 +119,7 @@ type vector struct {
 func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	// Client
 	client := p.Client()
-	oprfClient := buildOPRFClient(oprf.Ciphersuite(p.OPRF), v.Inputs.BlindRegistration)
-	client.Core.Oprf = oprfClient
+	client.OPRF = buildOPRFClient(oprf.Ciphersuite(p.OPRF), v.Inputs.BlindRegistration)
 	regReq := client.RegistrationInit(v.Inputs.Password)
 
 	if !bytes.Equal(v.Outputs.RegistrationRequest, regReq.Serialize()) {
@@ -160,7 +158,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 		TestEnvNonce: v.Inputs.EnvelopeNonce,
 	}
 
-	upload, exportKey, err := client.RegistrationFinalize(v.Inputs.ClientPrivateKey, clientCredentials, regResp)
+	upload, exportKey, err := client.RegistrationFinalize(clientCredentials, regResp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +181,7 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	client := p.Client()
 
 	if !isFake(v.Config.Fake) {
-		client.Core.Oprf = buildOPRFClient(oprf.Ciphersuite(p.AKE), v.Inputs.BlindLogin)
+		client.OPRF = buildOPRFClient(oprf.Ciphersuite(p.AKE), v.Inputs.BlindLogin)
 		esk, err := client.Group.NewScalar().Decode(v.Inputs.ClientPrivateKeyshare)
 		if err != nil {
 			t.Fatal(err)
@@ -263,10 +261,10 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 }
 
 func (v *vector) test(t *testing.T) {
-	mode, err := hex.DecodeString(v.Config.EnvelopeMode)
-	if err != nil {
-		t.Fatal(err)
-	}
+	//mode, err := hex.DecodeString(v.Config.EnvelopeMode)
+	//if err != nil {
+	//	t.Fatal(err)
+	//}
 
 	p := &opaque.Configuration{
 		OPRF:    opaque.Group(v.Config.OPRF[1]),
@@ -274,7 +272,6 @@ func (v *vector) test(t *testing.T) {
 		KDF:     kdfToHash(v.Config.KDF),
 		MAC:     macToHash(v.Config.MAC),
 		MHF:     mhfToMHF(v.Config.MHF),
-		Mode:    opaque.Mode(mode[0]),
 		AKE:     groupToGroup(v.Config.Group),
 		Context: []byte(v.Config.Context),
 	}
@@ -491,7 +488,7 @@ func TestOpaqueVectors(t *testing.T) {
 			}
 
 			for _, tv := range v {
-				t.Run(fmt.Sprintf("%s - %s - %s - Fake:%s", tv.Config.Name, tv.Config.EnvelopeMode, tv.Config.Group, tv.Config.Fake), tv.test)
+				t.Run(fmt.Sprintf("%s - %s - Fake:%s", tv.Config.Name, tv.Config.Group, tv.Config.Fake), tv.test)
 			}
 			return nil
 		}); err != nil {

@@ -42,7 +42,6 @@ func I2OSP(value, length int) []byte {
 		panic(errInputLarge)
 	case length == 1:
 		binary.BigEndian.PutUint16(out, uint16(v))
-
 		return out[1:2]
 	case length == 2:
 		binary.BigEndian.PutUint16(out, uint16(v))

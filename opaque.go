@@ -28,17 +28,6 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
-// Mode designates OPAQUE's envelope mode.
-type Mode byte
-
-const (
-	// Internal designates the internal mode.
-	Internal Mode = iota + 1
-
-	// External designates the external mode.
-	External
-)
-
 // Group identifies the prime-order group with hash-to-curve capability to use in OPRF and AKE.
 type Group byte
 
@@ -61,7 +50,7 @@ const (
 	// Curve25519Sha512 identifies a group over Curve25519 with SHA2-512 hash-to-group hashing.
 	// Curve25519Sha512 = Group(group.Curve25519Sha512).
 
-	confLength = 7
+	confLength = 6
 )
 
 // Credentials holds the client and server ids (will certainly disappear in next versions°.
@@ -92,9 +81,6 @@ type Configuration struct {
 	// defined in github.com/bytemare/crypto/mhf.
 	MHF mhf.Identifier `json:"mhf"`
 
-	// Mode identifies the envelope mode to be used.
-	Mode Mode `json:"mode"`
-
 	// AKE identifies the group to use for the AKE.
 	AKE Group `json:"group"`
 }
@@ -107,15 +93,6 @@ func (c *Configuration) Client() *Client {
 // Server returns a newly instantiated Server from the Configuration.
 func (c *Configuration) Server() *Server {
 	return NewServer(c)
-}
-
-func envelopeSize(mode Mode, p *internal.Parameters) int {
-	innerSize := 0
-	if mode == External {
-		innerSize = encoding.ScalarLength[p.Group]
-	}
-
-	return p.NonceLen + p.MAC.Size() + innerSize
 }
 
 func (c *Configuration) toInternal() *internal.Parameters {
@@ -133,7 +110,7 @@ func (c *Configuration) toInternal() *internal.Parameters {
 		OPRF:            oprf.Ciphersuite(c.OPRF),
 		Context:         c.Context,
 	}
-	ip.EnvelopeSize = envelopeSize(c.Mode, ip)
+	ip.EnvelopeSize = ip.NonceLen + ip.MAC.Size()
 
 	return ip
 }
@@ -146,7 +123,6 @@ func (c *Configuration) Serialize() []byte {
 		byte(c.MAC),
 		byte(c.Hash),
 		byte(c.MHF),
-		byte(c.Mode),
 		byte(c.AKE),
 	}
 
@@ -171,8 +147,7 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		MAC:     crypto.Hash(encoded[2]),
 		Hash:    crypto.Hash(encoded[3]),
 		MHF:     mhf.Identifier(encoded[4]),
-		Mode:    Mode(encoded[5]),
-		AKE:     Group(encoded[6]),
+		AKE:     Group(encoded[5]),
 		Context: ctx,
 	}, nil
 }
@@ -185,7 +160,6 @@ func DefaultConfiguration() *Configuration {
 		MAC:     crypto.SHA512,
 		Hash:    crypto.SHA512,
 		MHF:     mhf.Scrypt,
-		Mode:    Internal,
 		AKE:     RistrettoSha512,
 		Context: nil,
 	}
