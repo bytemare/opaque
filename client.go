@@ -12,13 +12,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytemare/opaque/internal/oprf"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/keyrecovery"
 	cred "github.com/bytemare/opaque/internal/message"
+	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
@@ -27,7 +26,7 @@ var (
 	// errInvalidMaskedLength happens when unmasking a masked response.
 	errInvalidMaskedLength = errors.New("invalid masked response length")
 
-	// errInvalidPKS happens when the server sends an invalid public key on registration.
+	// errInvalidPKS happens when the server sends an invalid public key.
 	errInvalidPKS = errors.New("invalid server public key")
 )
 
@@ -99,12 +98,8 @@ func (c *Client) RegistrationFinalize(creds *Credentials,
 		return nil, nil, err
 	}
 
-	envU, clientPublicKey, exportKey, err := keyrecovery.Store(c.Parameters, randomizedPwd, resp.Pks, creds2)
-	if err != nil {
-		return nil, nil, fmt.Errorf("building envelope: %w", err)
-	}
-
 	maskingKey := c.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.KDF.Size())
+	envU, clientPublicKey, exportKey := keyrecovery.Store(c.Parameters, randomizedPwd, resp.Pks, creds2)
 
 	return &message.RegistrationRecord{
 		PublicKey:  clientPublicKey,
@@ -152,6 +147,10 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 	}
 
 	serverPublicKey, env := c.unmask(ke2.MaskingNonce, randomizedPwd, ke2.MaskedResponse)
+
+	if !c.IsValidPoint(serverPublicKey) {
+		return nil, nil, errInvalidPKS
+	}
 
 	clientSecretKey, clientPublicKey, exportKey, err := keyrecovery.Recover(c.Parameters,
 		randomizedPwd, serverPublicKey, idc, ids, env)

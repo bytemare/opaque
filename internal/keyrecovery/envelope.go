@@ -49,7 +49,7 @@ func authTag(p *internal.Parameters, randomizedPwd, nonce, ctc []byte) []byte {
 
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
 func Store(p *internal.Parameters, randomizedPwd, serverPublicKey []byte,
-	creds *Credentials) (env *Envelope, clientPublicKey, export []byte, err error) {
+	creds *Credentials) (env *Envelope, clientPublicKey, export []byte) {
 	// testing: integrated to support testing with set nonce
 	nonce := creds.EnvelopeNonce
 	if nonce == nil {
@@ -67,7 +67,7 @@ func Store(p *internal.Parameters, randomizedPwd, serverPublicKey []byte,
 		AuthTag: auth,
 	}
 
-	return env, clientPublicKey, export, nil
+	return env, clientPublicKey, export
 }
 
 // Recover assumes that the envelope's inner envelope has been previously checked to be of correct size.

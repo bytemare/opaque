@@ -79,7 +79,7 @@ func TestDeserializeRegistrationRecord(t *testing.T) {
 	}
 
 	client := c.Client()
-	if _, err := client.DeserializeRegistrationRecord(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.DeserializeRecord(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 }

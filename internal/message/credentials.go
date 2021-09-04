@@ -24,8 +24,8 @@ func (c *CredentialRequest) Serialize() []byte {
 // CredentialResponse represents credential response message.
 type CredentialResponse struct {
 	Data           []byte `json:"data"`
-	MaskingNonce   []byte `json:"mn"`
-	MaskedResponse []byte `json:"mr"`
+	MaskingNonce   []byte `json:"n"`
+	MaskedResponse []byte `json:"r"`
 }
 
 // Serialize returns the byte encoding of CredentialResponse.

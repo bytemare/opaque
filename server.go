@@ -167,7 +167,7 @@ func (s *Server) DeserializeRegistrationResponse(registrationResponse []byte) (*
 
 // DeserializeRegistrationRecord takes a serialized RegistrationRecord message and returns a deserialized RegistrationRecord structure.
 func (s *Server) DeserializeRegistrationRecord(registrationUpload []byte) (*message.RegistrationRecord, error) {
-	return s.Parameters.DeserializeRegistrationRecord(registrationUpload)
+	return s.Parameters.DeserializeRecord(registrationUpload)
 }
 
 // DeserializeKE1 takes a serialized KE1 message and returns a deserialized KE1 structure.

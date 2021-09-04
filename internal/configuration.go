@@ -26,7 +26,15 @@ import (
 // NonceLength is the default length used for nonces.
 const NonceLength = 32
 
-var errInvalidMessageLength = errors.New("invalid message length")
+var (
+	errInvalidMessageLength = errors.New("invalid message length")
+	errInvalidBlindedData   = errors.New("blinded data is an invalid point")
+	errInvalidClientEPK     = errors.New("invalid ephemeral client public key")
+	errInvalidClientPK      = errors.New("invalid client public key")
+	errInvalidEvaluatedData = errors.New("invalid OPRF evaluation")
+	errInvalidServerEPK     = errors.New("invalid ephemeral server public key")
+	errInvalidServerPK      = errors.New("invalid server public key")
+)
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
 func RandomBytes(length int) []byte {
@@ -54,10 +62,20 @@ type Parameters struct {
 	Context         []byte
 }
 
+// IsValidPoint returns whether the input data decodes successfully to a point.
+func (p *Parameters) IsValidPoint(in []byte) bool {
+	_, err := p.Group.NewElement().Decode(in)
+	return err == nil
+}
+
 // DeserializeRegistrationRequest takes a serialized RegistrationRequest message as input and attempts to deserialize it.
 func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.RegistrationRequest, error) {
 	if len(input) != p.OPRFPointLength {
 		return nil, errInvalidMessageLength
+	}
+
+	if !p.IsValidPoint(input) {
+		return nil, errInvalidBlindedData
 	}
 
 	return &message.RegistrationRequest{Data: input}, nil
@@ -69,14 +87,22 @@ func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.Reg
 		return nil, errInvalidMessageLength
 	}
 
+	if !p.IsValidPoint(input[:p.OPRFPointLength]) {
+		return nil, errInvalidEvaluatedData
+	}
+
+	if !p.IsValidPoint(input[p.OPRFPointLength:]) {
+		return nil, errInvalidServerPK
+	}
+
 	return &message.RegistrationResponse{
 		Data: input[:p.OPRFPointLength],
 		Pks:  input[p.OPRFPointLength:],
 	}, nil
 }
 
-// DeserializeRegistrationRecord takes a serialized RegistrationRecord message as input and attempts to deserialize it.
-func (p *Parameters) DeserializeRegistrationRecord(input []byte) (*message.RegistrationRecord, error) {
+// DeserializeRecord takes a serialized RegistrationRecord message as input and attempts to deserialize it.
+func (p *Parameters) DeserializeRecord(input []byte) (*message.RegistrationRecord, error) {
 	if len(input) != p.AkePointLength+p.Hash.Size()+p.EnvelopeSize {
 		return nil, errInvalidMessageLength
 	}
@@ -84,6 +110,10 @@ func (p *Parameters) DeserializeRegistrationRecord(input []byte) (*message.Regis
 	pku := input[:p.AkePointLength]
 	maskingKey := input[p.AkePointLength : p.AkePointLength+p.Hash.Size()]
 	env := input[p.AkePointLength+p.Hash.Size():]
+
+	if !p.IsValidPoint(pku) {
+		return nil, errInvalidClientPK
+	}
 
 	return &message.RegistrationRecord{
 		PublicKey:  pku,
@@ -112,11 +142,20 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 
 	creq := p.deserializeCredentialRequest(input[:p.OPRFPointLength])
 	nonceU := input[p.OPRFPointLength : p.OPRFPointLength+p.NonceLen]
+	epku := input[p.OPRFPointLength+p.NonceLen:]
+
+	if !p.IsValidPoint(creq.Data) {
+		return nil, errInvalidBlindedData
+	}
+
+	if !p.IsValidPoint(epku) {
+		return nil, errInvalidClientEPK
+	}
 
 	return &message.KE1{
 		CredentialRequest: creq,
 		NonceU:            nonceU,
-		EpkU:              input[p.OPRFPointLength+p.NonceLen:],
+		EpkU:              epku,
 	}, nil
 }
 
@@ -129,12 +168,19 @@ func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 	}
 
 	cresp := p.deserializeCredentialResponse(input, maxResponseLength)
+	if !p.IsValidPoint(cresp.Data) {
+		return nil, errInvalidEvaluatedData
+	}
 
 	nonceS := input[maxResponseLength : maxResponseLength+p.NonceLen]
 	offset := maxResponseLength + p.NonceLen
 	epks := input[offset : offset+p.AkePointLength]
 	offset += p.AkePointLength
 	mac := input[offset:]
+
+	if !p.IsValidPoint(epks) {
+		return nil, errInvalidServerEPK
+	}
 
 	return &message.KE2{
 		CredentialResponse: cresp,
