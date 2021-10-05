@@ -67,7 +67,7 @@ func (c *Client) buildPRK(evaluation []byte) ([]byte, error) {
 
 	hardened := c.MHF.Harden(unblinded, nil, c.OPRFPointLength)
 
-	return c.KDF.Extract(nil, hardened), nil
+	return c.KDF.Extract(nil, encoding.Concat(unblinded, hardened)), nil
 }
 
 // RegistrationInit returns a RegistrationRequest message blinding the given password.

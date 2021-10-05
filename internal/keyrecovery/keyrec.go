@@ -18,7 +18,7 @@ import (
 )
 
 func deriveAkeKeyPair(p *internal.Parameters, randomizedPwd, nonce []byte) (*group.Scalar, *group.Point) {
-	seed := p.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), encoding.ScalarLength[p.Group])
+	seed := p.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
 	sk := p.Group.HashToScalar(seed, []byte(tag.DerivePrivateKey))
 
 	return sk, p.Group.Base().Mult(sk)

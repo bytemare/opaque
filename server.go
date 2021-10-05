@@ -59,7 +59,7 @@ func (s *Server) evaluate(seed, blinded []byte) (m []byte, err error) {
 }
 
 func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element []byte) (m []byte, err error) {
-	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.ExpandOPRF), encoding.ScalarLength[s.Group])
+	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.ExpandOPRF), internal.SeedLength)
 	return s.evaluate(seed, element)
 }
 

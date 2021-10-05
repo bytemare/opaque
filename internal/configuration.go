@@ -22,9 +22,13 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
+const (
+	// NonceLength is the default length used for nonces.
+	NonceLength = 32
 
-// NonceLength is the default length used for nonces.
-const NonceLength = 32
+	// SeedLength is the default length used for seeds.
+	SeedLength = 32
+)
 
 var (
 	errInvalidMessageLength = errors.New("invalid message length")
