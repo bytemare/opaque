@@ -53,20 +53,17 @@ func (s *Server) KeyGen() (secretKey, publicKey []byte) {
 	return ake.KeyGen(s.Group)
 }
 
-func (s *Server) evaluate(seed, blinded []byte) (m []byte, err error) {
-	ku := s.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair))
-	return s.OPRF.Evaluate(ku, blinded)
-}
-
-func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element []byte) (m []byte, err error) {
+func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element, info []byte) (m []byte, err error) {
 	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.ExpandOPRF), internal.SeedLength)
-	return s.evaluate(seed, element)
+	ku := s.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair))
+
+	return s.OPRF.Evaluate(ku, element, info)
 }
 
 // RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given identifiers.
 func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
-	serverPublicKey, credentialIdentifier, oprfSeed []byte) (*message.RegistrationResponse, error) {
-	z, err := s.oprfResponse(oprfSeed, credentialIdentifier, req.Data)
+	serverPublicKey, credentialIdentifier, oprfSeed, userID []byte) (*message.RegistrationResponse, error) {
+	z, err := s.oprfResponse(oprfSeed, credentialIdentifier, req.Data, userID)
 	if err != nil {
 		return nil, fmt.Errorf(" RegistrationResponse: %w", err)
 	}
@@ -78,8 +75,8 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
 }
 
 func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey []byte, record *message.RegistrationRecord,
-	credentialIdentifier, oprfSeed, maskingNonce []byte) (*cred.CredentialResponse, error) {
-	z, err := s.oprfResponse(oprfSeed, credentialIdentifier, req.Data)
+	credentialIdentifier, oprfSeed, maskingNonce, info []byte) (*cred.CredentialResponse, error) {
+	z, err := s.oprfResponse(oprfSeed, credentialIdentifier, req.Data, info)
 	if err != nil {
 		return nil, fmt.Errorf("oprfResponse: %w", err)
 	}
@@ -113,7 +110,7 @@ func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverP
 	}
 
 	response, err := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
-		record.RegistrationRecord, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce)
+		record.RegistrationRecord, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce, record.ClientIdentity)
 	if err != nil {
 		return nil, fmt.Errorf(" credentialResponse: %w", err)
 	}

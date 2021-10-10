@@ -29,16 +29,16 @@ type Ciphersuite group.Group
 
 const (
 	// RistrettoSha512 is the OPRF cipher suite of the Ristretto255 group and SHA-512.
-	RistrettoSha512 Ciphersuite = iota + 1
+	RistrettoSha512 = Ciphersuite(group.Ristretto255Sha512)
 
 	// P256Sha256 is the OPRF cipher suite of the NIST P-256 group and SHA-256.
-	P256Sha256 Ciphersuite = iota + 2
+	P256Sha256 = Ciphersuite(group.P256Sha256)
 
-	// P384Sha512 is the OPRF cipher suite of the NIST P-384 group and SHA-512.
-	P384Sha512
+	// P384Sha384 is the OPRF cipher suite of the NIST P-384 group and SHA-384.
+	P384Sha384 = Ciphersuite(group.P384Sha512)
 
 	// P521Sha512 is the OPRF cipher suite of the NIST P-512 group and SHA-512.
-	P521Sha512
+	P521Sha512 = Ciphersuite(group.P521Sha512)
 )
 
 var suiteToHash = make(map[group.Group]crypto.Hash)
@@ -62,6 +62,13 @@ func contextString(id Ciphersuite) []byte {
 	return ctx
 }
 
+func (c Ciphersuite) oprf() *oprf {
+	return &oprf{
+		Group:         c.Group(),
+		contextString: contextString(c),
+	}
+}
+
 type oprf struct {
 	group.Group
 	contextString []byte
@@ -83,19 +90,12 @@ func (c Ciphersuite) DeriveKey(input, dst []byte) *group.Scalar {
 
 // Client returns an OPRF client.
 func (c Ciphersuite) Client() *Client {
-	client := &Client{
-		oprf: &oprf{
-			Group:         c.Group(),
-			contextString: contextString(c),
-		},
-	}
-
-	return client
+	return &Client{oprf: c.oprf()}
 }
 
 func init() {
 	RistrettoSha512.register(crypto.SHA512)
 	P256Sha256.register(crypto.SHA256)
-	P384Sha512.register(crypto.SHA512)
+	P384Sha384.register(crypto.SHA384)
 	P521Sha512.register(crypto.SHA512)
 }

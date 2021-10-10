@@ -22,6 +22,7 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
+
 const (
 	// NonceLength is the default length used for nonces.
 	NonceLength = 32

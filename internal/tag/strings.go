@@ -16,8 +16,14 @@ const (
 	// OPRF is a string explicitly stating the version name.
 	OPRF = "VOPRF07-"
 
-	// OPRFPrefix is the DST prefix to use for HashToGroup operations.
-	OPRFPrefix = "HashToGroup-"
+	// OPRFContextPrefix is the DST prefix for the meta data tag.
+	OPRFContextPrefix = "Context-"
+
+	// OPRFPointPrefix is the DST prefix to use for HashToGroup operations.
+	OPRFPointPrefix = "HashToGroup-"
+
+	// OPRFScalarPrefix is the DST prefix to use for HashToGroup operations.
+	OPRFScalarPrefix = "HashToScalar-"
 
 	// OPRFFinalize is the DST suffix used in the client transcript.
 	OPRFFinalize = "Finalize-"

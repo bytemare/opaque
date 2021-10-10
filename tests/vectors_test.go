@@ -128,7 +128,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 
 	// Server
 	server := p.Server()
-	regResp, err := server.RegistrationResponse(regReq, v.Inputs.ServerPublicKey, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
+	regResp, err := server.RegistrationResponse(regReq, v.Inputs.ServerPublicKey, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed, v.Inputs.ClientIdentity)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -452,7 +452,7 @@ func groupToGroup(g string) opaque.Group {
 		panic("group not supported")
 	case "P256_XMD:SHA-256_SSWU_RO_":
 		return opaque.P256Sha256
-	case "P384_XMD:SHA-512_SSWU_RO_":
+	case "P384_XMD:SHA-384_SSWU_RO_":
 		return opaque.P384Sha512
 	case "P521_XMD:SHA-512_SSWU_RO_":
 		return opaque.P521Sha512

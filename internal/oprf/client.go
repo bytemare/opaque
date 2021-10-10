@@ -36,7 +36,7 @@ func (c *Client) Blind(input []byte) []byte {
 		c.blind = c.NewScalar().Random()
 	}
 
-	p := c.HashToGroup(input, c.dst(tag.OPRFPrefix))
+	p := c.HashToGroup(input, c.dst(tag.OPRFPointPrefix))
 	c.input = input
 
 	return p.Mult(c.blind).Bytes()
@@ -53,21 +53,22 @@ func (o *oprf) hash(input ...[]byte) []byte {
 	return h.Sum(nil)
 }
 
-func (o *oprf) hashTranscript(input, unblinded []byte) []byte {
+func (o *oprf) hashTranscript(input, unblinded, info []byte) []byte {
 	finalizeDST := o.dst(tag.OPRFFinalize)
 	encInput := encoding.EncodeVector(input)
+	encInfo := encoding.EncodeVector(info)
 	encElement := encoding.EncodeVector(unblinded)
 	encDST := encoding.EncodeVector(finalizeDST)
 
-	return o.hash(encInput, encElement, encDST)
+	return o.hash(encInput, encInfo, encElement, encDST)
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
-func (c *Client) Finalize(evaluation []byte) ([]byte, error) {
+func (c *Client) Finalize(evaluation, info []byte) ([]byte, error) {
 	ev, err := c.NewElement().Decode(evaluation)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode element : %w", err)
 	}
 
-	return c.hashTranscript(c.input, ev.InvertMult(c.blind).Bytes()), nil
+	return c.hashTranscript(c.input, ev.InvertMult(c.blind).Bytes(), info), nil
 }

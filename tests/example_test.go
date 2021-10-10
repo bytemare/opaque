@@ -146,7 +146,7 @@ func ExampleRegistration() {
 
 	// clientID must absolutely be unique among all clients.
 	credID := internal.RandomBytes(64)
-	s2, err := server.RegistrationResponse(s1, serverPublicKey, credID, secretOprfSeed)
+	s2, err := server.RegistrationResponse(s1, serverPublicKey, credID, secretOprfSeed, clientID)
 	if err != nil {
 		panic(err)
 	}

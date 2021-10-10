@@ -317,7 +317,7 @@ func getBadScalar(t *testing.T, c configuration) []byte {
 
 func buildRecord(t *testing.T, credID, oprfSeed, password, pks []byte, client *opaque.Client, server *opaque.Server) *opaque.ClientRecord {
 	r1 := client.RegistrationInit(password)
-	r2, err := server.RegistrationResponse(r1, pks, credID, oprfSeed)
+	r2, err := server.RegistrationResponse(r1, pks, credID, oprfSeed, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,8 +335,8 @@ func buildRecord(t *testing.T, credID, oprfSeed, password, pks []byte, client *o
 	}
 }
 
-func buildPRK(client *opaque.Client, evaluation []byte) ([]byte, error) {
-	unblinded, err := client.OPRF.Finalize(evaluation)
+func buildPRK(client *opaque.Client, evaluation, info []byte) ([]byte, error) {
+	unblinded, err := client.OPRF.Finalize(evaluation, info)
 	if err != nil {
 		return nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
@@ -346,8 +346,8 @@ func buildPRK(client *opaque.Client, evaluation []byte) ([]byte, error) {
 	return client.KDF.Extract(nil, hardened), nil
 }
 
-func getEnvelope(client *opaque.Client, ke2 *message.KE2) (*keyrecovery.Envelope, []byte, error) {
-	randomizedPwd, err := buildPRK(client, ke2.Data)
+func getEnvelope(client *opaque.Client, ke2 *message.KE2, info []byte) (*keyrecovery.Envelope, []byte, error) {
+	randomizedPwd, err := buildPRK(client, ke2.Data, info)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
@@ -379,7 +379,7 @@ func TestServer_BadRegistrationRequest(t *testing.T) {
 	for i, e := range confs {
 		badRequest := &message.RegistrationRequest{Data: getBadElement(t, e)}
 		server := e.Conf.Server()
-		if _, err := server.RegistrationResponse(badRequest, nil, credId, seed); err == nil || !strings.HasPrefix(err.Error(), terr) {
+		if _, err := server.RegistrationResponse(badRequest, nil, credId, seed, nil); err == nil || !strings.HasPrefix(err.Error(), terr) {
 			t.Fatalf("#%d - expected error. Got %v", i, err)
 		}
 	}
@@ -570,7 +570,7 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 		_, pks := server.KeyGen()
 		r1 := client.RegistrationInit([]byte("yo"))
 
-		r2, err := server.RegistrationResponse(r1, pks, credID, oprfSeed)
+		r2, err := server.RegistrationResponse(r1, pks, credID, oprfSeed, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -678,7 +678,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		ke1 := client.Init([]byte("yo"))
 		ke2, _ := server.Init(ke1, nil, sks, pks, oprfSeed, rec)
 
-		env, _, err := getEnvelope(client, ke2)
+		env, _, err := getEnvelope(client, ke2, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -734,7 +734,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 
 		// tamper PKS
 		ke2.EpkS = epks
-		env, randomizedPwd, err := getEnvelope(client, ke2)
+		env, randomizedPwd, err := getEnvelope(client, ke2, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -749,7 +749,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		clear := encoding.Concat(badpks, env.Serialize())
 		ke2.MaskedResponse = server.MaskResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
 
-		expected = " AKE finalization: decoding peer public key:"
+		expected = "invalid server public key"
 		if _, _, err := client.Finish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid epks encoding - got %q", err)
 		}

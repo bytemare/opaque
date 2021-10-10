@@ -59,8 +59,8 @@ func (c *Client) KeyGen() (secretKey, publicKey []byte) {
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation []byte) ([]byte, error) {
-	unblinded, err := c.OPRF.Finalize(evaluation)
+func (c *Client) buildPRK(evaluation, info []byte) ([]byte, error) {
+	unblinded, err := c.OPRF.Finalize(evaluation, info)
 	if err != nil {
 		return nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
@@ -93,7 +93,7 @@ func (c *Client) RegistrationFinalize(creds *Credentials,
 		return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
 	}
 
-	randomizedPwd, err := c.buildPRK(resp.Data)
+	randomizedPwd, err := c.buildPRK(resp.Data, creds2.Idc)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -141,7 +141,7 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 		return nil, nil, errInvalidMaskedLength
 	}
 
-	randomizedPwd, err := c.buildPRK(ke2.Data)
+	randomizedPwd, err := c.buildPRK(ke2.Data, idc)
 	if err != nil {
 		return nil, nil, err
 	}
