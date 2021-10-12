@@ -58,24 +58,33 @@ func (c *Client) Start(cs group.Group) *message.KE1 {
 	}
 }
 
-// Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions
-// returns a KE3 message.
-func (c *Client) Finalize(p *internal.Parameters, clientIdentity []byte, clientSecretKey *group.Scalar, serverIdentity, serverPublicKey []byte,
-	ke1 *message.KE1, ke2 *message.KE2) (*message.KE3, error) {
-	k := &coreKeys{c.esk, clientSecretKey, ke2.EpkS, serverPublicKey}
-
-	macs, sessionSecret, err := core3DH(client, p, k, clientIdentity, serverIdentity, ke1, ke2)
+func bundleKeys(g group.Group, esk, sk *group.Scalar, pepk, ppk []byte) (*coreKeys, error) {
+	epk, gpk, err := decodeKeys(g, pepk, ppk)
 	if err != nil {
 		return nil, err
 	}
 
-	if !p.MAC.Equal(macs.serverMac, ke2.Mac) {
+	return &coreKeys{esk, sk, epk, gpk}, nil
+}
+
+// Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions
+// returns a KE3 message.
+func (c *Client) Finalize(p *internal.Parameters, clientIdentity []byte, clientSecretKey *group.Scalar, serverIdentity, serverPublicKey []byte,
+	ke1 *message.KE1, ke2 *message.KE2) (*message.KE3, error) {
+	k, err := bundleKeys(p.Group, c.esk, clientSecretKey, ke2.EpkS, serverPublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	sessionSecret, serverMac, clientMac := core3DH(client, p, k, clientIdentity, serverIdentity, ke1, ke2)
+
+	if !p.MAC.Equal(serverMac, ke2.Mac) {
 		return nil, errAkeInvalidServerMac
 	}
 
 	c.sessionSecret = sessionSecret
 
-	return &message.KE3{Mac: macs.clientMac}, nil
+	return &message.KE3{Mac: clientMac}, nil
 }
 
 // SessionKey returns the secret shared session key if a previous call to Finalize() was successful.

@@ -57,7 +57,11 @@ func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverS
 	ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
 	epk := s.SetValues(p.Group, nil, nil, p.NonceLen)
 	nonce := s.nonceS
-	k := &coreKeys{s.esk, serverSecretKey, ke1.EpkU, clientPublicKey}
+
+	k, err := bundleKeys(p.Group, s.esk, serverSecretKey, ke1.EpkU, clientPublicKey)
+	if err != nil {
+		return nil, err
+	}
 
 	ke2 := &message.KE2{
 		CredentialResponse: response,
@@ -65,14 +69,10 @@ func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverS
 		EpkS:               encoding.PadPoint(epk.Bytes(), p.Group),
 	}
 
-	macs, sessionSecret, err := core3DH(server, p, k, clientIdentity, serverIdentity, ke1, ke2)
-	if err != nil {
-		return nil, err
-	}
-
+	sessionSecret, serverMac, clientMac := core3DH(server, p, k, clientIdentity, serverIdentity, ke1, ke2)
 	s.sessionSecret = sessionSecret
-	s.clientMac = macs.clientMac
-	ke2.Mac = macs.serverMac
+	s.clientMac = clientMac
+	ke2.Mac = serverMac
 
 	return ke2, nil
 }
