@@ -10,8 +10,6 @@
 package ake
 
 import (
-	"fmt"
-
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
@@ -51,20 +49,6 @@ func setValues(g group.Group, scalar *group.Scalar, nonce []byte, nonceLen int) 
 	return s, nonce
 }
 
-func decodeKeys(g group.Group, peerEpk, peerPk []byte) (epk, pk *group.Point, err error) {
-	epk, err = g.NewElement().Decode(peerEpk)
-	if err != nil {
-		return nil, nil, fmt.Errorf("decoding peer ephemeral public key: %w", err)
-	}
-
-	pk, err = g.NewElement().Decode(peerPk)
-	if err != nil {
-		return nil, nil, fmt.Errorf("decoding peer public key: %w", err)
-	}
-
-	return epk, pk, nil
-}
-
 func buildLabel(length int, label, context []byte) []byte {
 	return encoding.Concat3(
 		encoding.I2OSP(length, 2),
@@ -90,7 +74,7 @@ func initTranscript(p *internal.Parameters, idc, ids []byte, ke1 *message.KE1, k
 	sids := encoding.EncodeVector(ids)
 	p.Hash.Write(encoding.Concatenate([]byte(tag.VersionTag), encoding.EncodeVector(p.Context),
 		sidc, ke1.Serialize(),
-		sids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS))
+		sids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS.Bytes()))
 }
 
 type macKeys struct {
@@ -125,10 +109,6 @@ func ikm(s selector, k *coreKeys) []byte {
 	}
 }
 
-type macs struct {
-	serverMac, clientMac []byte
-}
-
 type coreKeys struct {
 	esk, secretKey         *group.Scalar
 	peerEpk, peerPublicKey *group.Point
@@ -136,8 +116,9 @@ type coreKeys struct {
 
 func core3DH(s selector, p *internal.Parameters, k *coreKeys, idu, ids []byte,
 	ke1 *message.KE1, ke2 *message.KE2) (sessionSecret, macS, macC []byte) {
-	ikm := ikm(s, k)
 	initTranscript(p, idu, ids, ke1, ke2)
+
+	ikm := ikm(s, k)
 	keys, sessionSecret := deriveKeys(p.KDF, ikm, p.Hash.Sum()) // preamble
 	serverMac := p.MAC.MAC(keys.serverMacKey, p.Hash.Sum())     // transcript2
 	p.Hash.Write(serverMac)

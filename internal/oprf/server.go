@@ -10,8 +10,6 @@
 package oprf
 
 import (
-	"fmt"
-
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal/encoding"
@@ -29,14 +27,9 @@ func (c Ciphersuite) pTag(info []byte) *group.Scalar {
 }
 
 // Evaluate evaluates the blinded input with the given key.
-func (c Ciphersuite) Evaluate(privateKey *group.Scalar, blindedElement, info []byte) ([]byte, error) {
-	b, err := c.Group().NewElement().Decode(blindedElement)
-	if err != nil {
-		return nil, fmt.Errorf("can't evaluate input : %w", err)
-	}
-
+func (c Ciphersuite) Evaluate(privateKey *group.Scalar, blindedElement *group.Point, info []byte) *group.Point {
 	context := c.pTag(info)
 	inv := privateKey.Add(context).Invert()
 
-	return b.Mult(inv).Bytes(), nil
+	return blindedElement.Mult(inv)
 }

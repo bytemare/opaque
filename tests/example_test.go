@@ -146,10 +146,12 @@ func ExampleRegistration() {
 
 	// clientID must absolutely be unique among all clients.
 	credID := internal.RandomBytes(64)
-	s2, err := server.RegistrationResponse(s1, serverPublicKey, credID, secretOprfSeed, clientID)
+	pks, err := server.Group.NewElement().Decode(serverPublicKey)
 	if err != nil {
 		panic(err)
 	}
+
+	s2 := server.RegistrationResponse(s1, pks, credID, secretOprfSeed)
 
 	// The server responds with its serialized response.
 	s2s := s2.Serialize()

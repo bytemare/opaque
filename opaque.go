@@ -109,6 +109,7 @@ func (c *Configuration) toInternal() *internal.Parameters {
 		Group:           g,
 		OPRF:            oprf.Ciphersuite(c.OPRF),
 		Context:         c.Context,
+		Info:            nil,
 	}
 	ip.EnvelopeSize = ip.NonceLen + ip.MAC.Size()
 

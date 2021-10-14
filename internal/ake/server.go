@@ -15,7 +15,6 @@ import (
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
@@ -53,20 +52,17 @@ func (s *Server) SetValues(id group.Group, esk *group.Scalar, nonce []byte, nonc
 }
 
 // Response produces a 3DH server response message.
-func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverSecretKey *group.Scalar, clientIdentity, clientPublicKey []byte,
-	ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
+func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverSecretKey *group.Scalar,
+	clientIdentity []byte, clientPublicKey *group.Point,
+	ke1 *message.KE1, response *cred.CredentialResponse) *message.KE2 {
 	epk := s.SetValues(p.Group, nil, nil, p.NonceLen)
 	nonce := s.nonceS
-
-	k, err := bundleKeys(p.Group, s.esk, serverSecretKey, ke1.EpkU, clientPublicKey)
-	if err != nil {
-		return nil, err
-	}
+	k := &coreKeys{s.esk, serverSecretKey, ke1.EpkU, clientPublicKey}
 
 	ke2 := &message.KE2{
 		CredentialResponse: response,
 		NonceS:             nonce,
-		EpkS:               encoding.PadPoint(epk.Bytes(), p.Group),
+		EpkS:               epk,
 	}
 
 	sessionSecret, serverMac, clientMac := core3DH(server, p, k, clientIdentity, serverIdentity, ke1, ke2)
@@ -74,7 +70,7 @@ func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverS
 	s.clientMac = clientMac
 	ke2.Mac = serverMac
 
-	return ke2, nil
+	return ke2
 }
 
 // SerializeState will return a []byte containing internal state of the Server.

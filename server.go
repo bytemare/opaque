@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bytemare/crypto/group"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -53,7 +55,7 @@ func (s *Server) KeyGen() (secretKey, publicKey []byte) {
 	return ake.KeyGen(s.Group)
 }
 
-func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element, info []byte) (m []byte, err error) {
+func (s *Server) oprfResponse(element *group.Point, oprfSeed, credentialIdentifier, info []byte) *group.Point {
 	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.ExpandOPRF), internal.SeedLength)
 	ku := s.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair))
 
@@ -62,24 +64,19 @@ func (s *Server) oprfResponse(oprfSeed, credentialIdentifier, element, info []by
 
 // RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given identifiers.
 func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
-	serverPublicKey, credentialIdentifier, oprfSeed, userID []byte) (*message.RegistrationResponse, error) {
-	z, err := s.oprfResponse(oprfSeed, credentialIdentifier, req.Data, userID)
-	if err != nil {
-		return nil, fmt.Errorf(" RegistrationResponse: %w", err)
-	}
+	serverPublicKey *group.Point, credentialIdentifier, oprfSeed []byte) *message.RegistrationResponse {
+	z := s.oprfResponse(req.Data, oprfSeed, credentialIdentifier, s.Info)
 
 	return &message.RegistrationResponse{
-		Data: encoding.PadPoint(z, s.Group),
+		C:    s.OPRF,
+		Data: z,
 		Pks:  serverPublicKey,
-	}, nil
+	}
 }
 
 func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey []byte, record *message.RegistrationRecord,
-	credentialIdentifier, oprfSeed, maskingNonce, info []byte) (*cred.CredentialResponse, error) {
-	z, err := s.oprfResponse(oprfSeed, credentialIdentifier, req.Data, info)
-	if err != nil {
-		return nil, fmt.Errorf("oprfResponse: %w", err)
-	}
+	credentialIdentifier, oprfSeed, maskingNonce, info []byte) *cred.CredentialResponse {
+	z := s.oprfResponse(req.Data, oprfSeed, credentialIdentifier, info)
 
 	// testing: integrated to support testing, to force values.
 	if len(maskingNonce) == 0 {
@@ -90,30 +87,32 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 	maskedResponse := s.MaskResponse(record.MaskingKey, maskingNonce, clear)
 
 	return &cred.CredentialResponse{
-		Data:           encoding.PadPoint(z, s.Group),
+		Data:           z,
 		MaskingNonce:   maskingNonce,
 		MaskedResponse: maskedResponse,
-	}, nil
+	}
 }
 
 // Init responds to a KE1 message with a KE2 message given server credentials and client record.
 func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord) (*message.KE2, error) {
-	_, err := s.Group.NewElement().Decode(serverPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("invalid server public key: %w", err)
-	}
-
 	sks, err := s.Group.NewScalar().Decode(serverSecretKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid server secret key: %w", err)
 	}
 
-	response, err := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
-		record.RegistrationRecord, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce, record.ClientIdentity)
+	_, err = s.Group.NewElement().Decode(serverPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf(" credentialResponse: %w", err)
+		return nil, fmt.Errorf("invalid server public key: %w", err)
 	}
+
+	pku, err := s.Group.NewElement().Decode(record.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("invalid client public key in record: %w", err)
+	}
+
+	response := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
+		record.RegistrationRecord, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce, s.Info)
 
 	clientIdentity := record.ClientIdentity
 
@@ -125,10 +124,7 @@ func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverP
 		serverIdentity = serverPublicKey
 	}
 
-	ke2, err := s.Ake.Response(s.Parameters, serverIdentity, sks, clientIdentity, record.PublicKey, ke1, response)
-	if err != nil {
-		return nil, fmt.Errorf(" AKE response: %w", err)
-	}
+	ke2 := s.Ake.Response(s.Parameters, serverIdentity, sks, clientIdentity, pku, ke1, response)
 
 	return ke2, nil
 }

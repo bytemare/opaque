@@ -15,7 +15,6 @@ import (
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -54,28 +53,16 @@ func (c *Client) Start(cs group.Group) *message.KE1 {
 
 	return &message.KE1{
 		NonceU: c.nonceU,
-		EpkU:   encoding.PadPoint(epk.Bytes(), cs),
+		EpkU:   epk,
 	}
-}
-
-func bundleKeys(g group.Group, esk, sk *group.Scalar, pepk, ppk []byte) (*coreKeys, error) {
-	epk, gpk, err := decodeKeys(g, pepk, ppk)
-	if err != nil {
-		return nil, err
-	}
-
-	return &coreKeys{esk, sk, epk, gpk}, nil
 }
 
 // Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions
 // returns a KE3 message.
-func (c *Client) Finalize(p *internal.Parameters, clientIdentity []byte, clientSecretKey *group.Scalar, serverIdentity, serverPublicKey []byte,
+func (c *Client) Finalize(p *internal.Parameters, clientIdentity []byte, clientSecretKey *group.Scalar,
+	serverIdentity []byte, serverPublicKey *group.Point,
 	ke1 *message.KE1, ke2 *message.KE2) (*message.KE3, error) {
-	k, err := bundleKeys(p.Group, c.esk, clientSecretKey, ke2.EpkS, serverPublicKey)
-	if err != nil {
-		return nil, err
-	}
-
+	k := &coreKeys{c.esk, clientSecretKey, ke2.EpkS, serverPublicKey}
 	sessionSecret, serverMac, clientMac := core3DH(client, p, k, clientIdentity, serverIdentity, ke1, ke2)
 
 	if !p.MAC.Equal(serverMac, ke2.Mac) {

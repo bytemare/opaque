@@ -10,8 +10,6 @@
 package oprf
 
 import (
-	"fmt"
-
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal/encoding"
@@ -31,7 +29,7 @@ func (c *Client) SetBlind(blind *group.Scalar) {
 }
 
 // Blind masks the input.
-func (c *Client) Blind(input []byte) []byte {
+func (c *Client) Blind(input []byte) *group.Point {
 	if c.blind == nil {
 		c.blind = c.NewScalar().Random()
 	}
@@ -39,7 +37,7 @@ func (c *Client) Blind(input []byte) []byte {
 	p := c.HashToGroup(input, c.dst(tag.OPRFPointPrefix))
 	c.input = input
 
-	return p.Mult(c.blind).Bytes()
+	return p.Mult(c.blind)
 }
 
 func (o *oprf) hash(input ...[]byte) []byte {
@@ -64,11 +62,6 @@ func (o *oprf) hashTranscript(input, unblinded, info []byte) []byte {
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
-func (c *Client) Finalize(evaluation, info []byte) ([]byte, error) {
-	ev, err := c.NewElement().Decode(evaluation)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode element : %w", err)
-	}
-
-	return c.hashTranscript(c.input, ev.InvertMult(c.blind).Bytes(), info), nil
+func (c *Client) Finalize(evaluation *group.Point, info []byte) ([]byte, error) {
+	return c.hashTranscript(c.input, evaluation.InvertMult(c.blind).Bytes(), info), nil
 }

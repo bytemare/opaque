@@ -128,22 +128,24 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 
 	// Server
 	server := p.Server()
-	regResp, err := server.RegistrationResponse(regReq, v.Inputs.ServerPublicKey, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed, v.Inputs.ClientIdentity)
+	pks, err := server.Group.NewElement().Decode(v.Inputs.ServerPublicKey)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
+
+	regResp := server.RegistrationResponse(regReq, pks, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
 
 	vRegResp, err := client.DeserializeRegistrationResponse(v.Outputs.RegistrationResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(vRegResp.Data, regResp.Data) {
+	if !bytes.Equal(vRegResp.Data.Bytes(), regResp.Data.Bytes()) {
 		t.Logf("%v\n%v", vRegResp.Data, regResp.Data)
 		t.Fatal("registration response data do not match")
 	}
 
-	if !bytes.Equal(vRegResp.Pks, regResp.Pks) {
+	if !bytes.Equal(vRegResp.Pks.Bytes(), regResp.Pks.Bytes()) {
 		t.Fatal("registration response serverPublicKey do not match")
 	}
 
@@ -340,7 +342,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(vectorKE2.CredentialResponse.Data, ke2.CredentialResponse.Data) {
+	if !bytes.Equal(vectorKE2.CredentialResponse.Data.Bytes(), ke2.CredentialResponse.Data.Bytes()) {
 		t.Fatal("data do not match")
 	}
 
@@ -360,7 +362,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal("nonces do not match")
 	}
 
-	if !bytes.Equal(vectorKE2.EpkS, ke2.EpkS) {
+	if !bytes.Equal(vectorKE2.EpkS.Bytes(), ke2.EpkS.Bytes()) {
 		t.Fatal("epks do not match")
 	}
 
