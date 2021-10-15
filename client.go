@@ -61,15 +61,11 @@ func (c *Client) KeyGen() (secretKey, publicKey []byte) {
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation *group.Point, info []byte) ([]byte, error) {
-	unblinded, err := c.OPRF.Finalize(evaluation, info)
-	if err != nil {
-		return nil, fmt.Errorf("finalizing OPRF : %w", err)
-	}
-
+func (c *Client) buildPRK(evaluation *group.Point, info []byte) []byte {
+	unblinded := c.OPRF.Finalize(evaluation, info)
 	hardened := c.MHF.Harden(unblinded, nil, c.OPRFPointLength)
 
-	return c.KDF.Extract(nil, encoding.Concat(unblinded, hardened)), nil
+	return c.KDF.Extract(nil, encoding.Concat(unblinded, hardened))
 }
 
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
@@ -82,7 +78,7 @@ func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest 
 // the envelope mode is internal, then clientSecretKey is ignored and can be set to nil. For the external
 // mode, clientSecretKey must be the client's private key for the AKE.
 func (c *Client) RegistrationFinalize(creds *Credentials,
-	resp *message.RegistrationResponse) (upload *message.RegistrationRecord, exportKey []byte, err error) {
+	resp *message.RegistrationResponse) (upload *message.RegistrationRecord, exportKey []byte) {
 	creds2 := &keyrecovery.Credentials{
 		Idc:           creds.Client,
 		Ids:           creds.Server,
@@ -95,19 +91,15 @@ func (c *Client) RegistrationFinalize(creds *Credentials,
 	// 	return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
 	// }
 
-	randomizedPwd, err := c.buildPRK(resp.Data, c.Info)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	randomizedPwd := c.buildPRK(resp.Data, c.Info)
 	maskingKey := c.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.KDF.Size())
-	envU, clientPublicKey, exportKey := keyrecovery.Store(c.Parameters, randomizedPwd, resp.Pks.Bytes(), creds2)
+	envU, clientPublicKey, exportKey := keyrecovery.Store(c.Parameters, randomizedPwd, encoding.SerializePoint(resp.Pks, c.Group), creds2)
 
 	return &message.RegistrationRecord{
 		PublicKey:  clientPublicKey,
 		MaskingKey: maskingKey,
 		Envelope:   envU.Serialize(),
-	}, exportKey, nil
+	}, exportKey
 }
 
 // Init initiates the authentication process, returning a KE1 message blinding the given password.
@@ -143,11 +135,7 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 		return nil, nil, errInvalidMaskedLength
 	}
 
-	randomizedPwd, err := c.buildPRK(ke2.Data, c.Info)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	randomizedPwd := c.buildPRK(ke2.Data, c.Info)
 	serverPublicKey, env := c.unmask(ke2.MaskingNonce, randomizedPwd, ke2.MaskedResponse)
 
 	pks, err := c.Group.NewElement().Decode(serverPublicKey)
@@ -162,7 +150,7 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 	}
 
 	if idc == nil {
-		idc = clientPublicKey.Bytes()
+		idc = encoding.SerializePoint(clientPublicKey, c.Group)
 	}
 
 	if ids == nil {
