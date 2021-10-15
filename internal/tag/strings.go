@@ -16,7 +16,7 @@ const (
 	// OPRF is a string explicitly stating the version name.
 	OPRF = "VOPRF07-"
 
-	// OPRFContextPrefix is the DST prefix for the meta data tag.
+	// OPRFContextPrefix is the DST prefix for the metadata tag.
 	OPRFContextPrefix = "Context-"
 
 	// OPRFPointPrefix is the DST prefix to use for HashToGroup operations.
@@ -44,9 +44,6 @@ const (
 
 	// ExpandPrivateKey is the client's internal mode private key seed KDF dst.
 	ExpandPrivateKey = "PrivateKey"
-
-	// EncryptionPad is the external mode's encryption key KDF dst.
-	EncryptionPad = "Pad"
 
 	// 3DH tags.
 
