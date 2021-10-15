@@ -18,10 +18,7 @@ import (
 
 func (c Ciphersuite) pTag(info []byte) *group.Scalar {
 	o := c.oprf()
-	context := make([]byte, 0, len(tag.OPRFContextPrefix)+len(o.contextString)+2+len(info))
-	context = append(context, tag.OPRFContextPrefix...)
-	context = append(context, o.contextString...)
-	context = append(context, encoding.EncodeVector(info)...)
+	context := encoding.Concat3([]byte(tag.OPRFContextPrefix), o.contextString, encoding.EncodeVector(info))
 
 	return c.Group().HashToScalar(context, o.dst(tag.OPRFScalarPrefix))
 }

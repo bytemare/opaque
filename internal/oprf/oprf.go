@@ -63,13 +63,7 @@ func (c Ciphersuite) SerializePoint(p *group.Point) []byte {
 }
 
 func contextString(id Ciphersuite) []byte {
-	v := []byte(tag.OPRF)
-	ctx := make([]byte, 0, len(v)+1+2)
-	ctx = append(ctx, v...)
-	ctx = append(ctx, encoding.I2OSP(int(base), 1)...)
-	ctx = append(ctx, encoding.I2OSP(int(id), 2)...)
-
-	return ctx
+	return encoding.Concat3([]byte(tag.OPRF), encoding.I2OSP(int(base), 1), encoding.I2OSP(int(id), 2))
 }
 
 func (c Ciphersuite) oprf() *oprf {
@@ -85,12 +79,7 @@ type oprf struct {
 }
 
 func (o *oprf) dst(prefix string) []byte {
-	p := []byte(prefix)
-	dst := make([]byte, 0, len(p)+len(o.contextString))
-	dst = append(dst, p...)
-	dst = append(dst, o.contextString...)
-
-	return dst
+	return encoding.Concat([]byte(prefix), o.contextString)
 }
 
 // DeriveKey returns a scalar mapped from the input.
