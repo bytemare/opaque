@@ -62,8 +62,8 @@ func (c *Client) Start(cs group.Group) *message.KE1 {
 func (c *Client) Finalize(p *internal.Parameters, clientIdentity []byte, clientSecretKey *group.Scalar,
 	serverIdentity []byte, serverPublicKey *group.Point,
 	ke1 *message.KE1, ke2 *message.KE2) (*message.KE3, error) {
-	k := &coreKeys{c.esk, clientSecretKey, ke2.EpkS, serverPublicKey}
-	sessionSecret, serverMac, clientMac := core3DH(client, p, k, clientIdentity, serverIdentity, ke1, ke2)
+	ikm := k3dh(p.Group, ke2.EpkS, c.esk, serverPublicKey, c.esk, ke2.EpkS, clientSecretKey)
+	sessionSecret, serverMac, clientMac := core3DH(p, ikm, clientIdentity, serverIdentity, ke1, ke2)
 
 	if !p.MAC.Equal(serverMac, ke2.Mac) {
 		return nil, errAkeInvalidServerMac
