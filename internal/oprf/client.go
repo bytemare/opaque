@@ -62,6 +62,7 @@ func (o *oprf) hashTranscript(input, unblinded, info []byte) []byte {
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
-func (c *Client) Finalize(evaluation *group.Point, info []byte) ([]byte, error) {
-	return c.hashTranscript(c.input, evaluation.InvertMult(c.blind).Bytes(), info), nil
+func (c *Client) Finalize(evaluation *group.Point, info []byte) []byte {
+	u := encoding.SerializePoint(evaluation.InvertMult(c.blind), c.Group)
+	return c.hashTranscript(c.input, u, info)
 }
