@@ -160,10 +160,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 		TestEnvNonce: v.Inputs.EnvelopeNonce,
 	}
 
-	upload, exportKey, err := client.RegistrationFinalize(clientCredentials, regResp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	upload, exportKey := client.RegistrationFinalize(clientCredentials, regResp)
 
 	if !bytes.Equal(v.Outputs.ExportKey, exportKey) {
 		t.Fatal("exportKey do not match")
