@@ -146,10 +146,12 @@ func ExampleRegistration() {
 
 	// clientID must absolutely be unique among all clients.
 	credID := internal.RandomBytes(64)
-	s2, err := server.RegistrationResponse(s1, serverPublicKey, credID, secretOprfSeed)
+	pks, err := server.Group.NewElement().Decode(serverPublicKey)
 	if err != nil {
 		panic(err)
 	}
+
+	s2 := server.RegistrationResponse(s1, pks, credID, secretOprfSeed)
 
 	// The server responds with its serialized response.
 	s2s := s2.Serialize()
@@ -168,11 +170,7 @@ func ExampleRegistration() {
 	// We're using the internal mode, so we don't have to provide a private key here.
 	// This also spits out a client-only secret export_key, that the client can use for other purposes (e.g. encrypt
 	// information to store on the server, and that the server can't decrypt). We don't use in the example here.
-	c3, _, err := client.RegistrationFinalize(clientCreds, c2)
-	if err != nil {
-		panic(err)
-	}
-
+	c3, _ := client.RegistrationFinalize(clientCreds, c2)
 	c3s := c3.Serialize()
 
 	// Server registers the client upload

@@ -41,8 +41,8 @@ const (
 	// P256Sha256 identifies the NIST P-256 group and SHA-256.
 	P256Sha256 = Group(oprf.P256Sha256)
 
-	// P384Sha512 identifies the NIST P-384 group and SHA-512.
-	P384Sha512 = Group(oprf.P384Sha512)
+	// P384Sha512 identifies the NIST P-384 group and SHA-384.
+	P384Sha512 = Group(oprf.P384Sha384)
 
 	// P521Sha512 identifies the NIST P-512 group and SHA-512.
 	P521Sha512 = Group(oprf.P521Sha512)
@@ -109,6 +109,7 @@ func (c *Configuration) toInternal() *internal.Parameters {
 		Group:           g,
 		OPRF:            oprf.Ciphersuite(c.OPRF),
 		Context:         c.Context,
+		Info:            nil,
 	}
 	ip.EnvelopeSize = ip.NonceLen + ip.MAC.Size()
 
