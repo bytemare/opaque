@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        GOVER: [ '1.16', '1.15', '1.14' ]
+        GOVER: [ '1.17', '1.16', '1.15' ]
 
     steps:
       - name: Checkout repo
@@ -75,6 +75,7 @@ jobs:
             -Dsonar.projectKey=bytemare_opaque
             -Dsonar.organization=bytemare-github
             -Dsonar.go.coverage.reportPaths=coverage.out
+            -Dsonar.sources=.,internal/,message/
             -Dsonar.test.exclusions=tests/**
             -Dsonar.tests=tests/
             -Dsonar.verbose=true

@@ -10,6 +10,7 @@ linters:
     - dupl
     - durationcheck
     - errcheck
+    - errname
     - errorlint
     - exportloopref
     - forbidigo
@@ -37,7 +38,7 @@ linters:
     - ineffassign
     - lll
     - makezero
-    - maligned
+    #- maligned
     - megacheck
     - misspell
     - nakedret
@@ -54,6 +55,8 @@ linters:
     - staticcheck
     - structcheck
     - stylecheck
+    - tagliatelle
+    #- tenv
     - testpackage
     - thelper
     - tparallel
@@ -102,7 +105,7 @@ linters-settings:
   gocyclo:
     min-complexity: 15
   godox:
-    keywords: # default keywords are TODO, BUG, and FIXME, these can be overwritten by this setting
+    keywords:
       - NOTE
       - OPTIMIZE
       - HACK
