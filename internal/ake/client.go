@@ -15,7 +15,6 @@ import (
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -54,28 +53,25 @@ func (c *Client) Start(cs group.Group) *message.KE1 {
 
 	return &message.KE1{
 		NonceU: c.nonceU,
-		EpkU:   encoding.PadPoint(epk.Bytes(), cs),
+		EpkU:   epk,
 	}
 }
 
 // Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions
 // returns a KE3 message.
-func (c *Client) Finalize(p *internal.Parameters, clientIdentity []byte, clientSecretKey *group.Scalar, serverIdentity, serverPublicKey []byte,
+func (c *Client) Finalize(p *internal.Parameters, clientIdentity []byte, clientSecretKey *group.Scalar,
+	serverIdentity []byte, serverPublicKey *group.Point,
 	ke1 *message.KE1, ke2 *message.KE2) (*message.KE3, error) {
-	k := &coreKeys{c.esk, clientSecretKey, ke2.EpkS, serverPublicKey}
+	ikm := k3dh(p.Group, ke2.EpkS, c.esk, serverPublicKey, c.esk, ke2.EpkS, clientSecretKey)
+	sessionSecret, serverMac, clientMac := core3DH(p, ikm, clientIdentity, serverIdentity, ke1, ke2)
 
-	macs, sessionSecret, err := core3DH(client, p, k, clientIdentity, serverIdentity, ke1, ke2)
-	if err != nil {
-		return nil, err
-	}
-
-	if !p.MAC.Equal(macs.serverMac, ke2.Mac) {
+	if !p.MAC.Equal(serverMac, ke2.Mac) {
 		return nil, errAkeInvalidServerMac
 	}
 
 	c.sessionSecret = sessionSecret
 
-	return &message.KE3{Mac: macs.clientMac}, nil
+	return &message.KE3{Mac: clientMac}, nil
 }
 
 // SessionKey returns the secret shared session key if a previous call to Finalize() was successful.

@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bytemare/crypto/group"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -54,15 +56,11 @@ func NewClient(p *Configuration) *Client {
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation []byte) ([]byte, error) {
-	unblinded, err := c.OPRF.Finalize(evaluation)
-	if err != nil {
-		return nil, fmt.Errorf("finalizing OPRF : %w", err)
-	}
-
+func (c *Client) buildPRK(evaluation *group.Point, info []byte) []byte {
+	unblinded := c.OPRF.Finalize(evaluation, info)
 	hardened := c.MHF.Harden(unblinded, nil, c.OPRFPointLength)
 
-	return c.KDF.Extract(nil, encoding.Concat(unblinded, hardened)), nil
+	return c.KDF.Extract(nil, encoding.Concat(unblinded, hardened))
 }
 
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
@@ -75,7 +73,7 @@ func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest 
 // the envelope mode is internal, then clientSecretKey is ignored and can be set to nil. For the external
 // mode, clientSecretKey must be the client's private key for the AKE.
 func (c *Client) RegistrationFinalize(creds *Credentials,
-	resp *message.RegistrationResponse) (upload *message.RegistrationRecord, exportKey []byte, err error) {
+	resp *message.RegistrationResponse) (upload *message.RegistrationRecord, exportKey []byte) {
 	creds2 := &keyrecovery.Credentials{
 		Idc:           creds.Client,
 		Ids:           creds.Server,
@@ -84,30 +82,26 @@ func (c *Client) RegistrationFinalize(creds *Credentials,
 	}
 
 	// this check is very important: it verifies the server's public key validity in the group.
-	if _, err = c.Group.NewElement().Decode(resp.Pks); err != nil {
-		return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
-	}
+	// if _, err = c.Group.NewElement().Decode(resp.Pks); err != nil {
+	// 	return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
+	// }
 
-	randomizedPwd, err := c.buildPRK(resp.Data)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	randomizedPwd := c.buildPRK(resp.Data, c.Info)
 	maskingKey := c.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.KDF.Size())
-	envU, clientPublicKey, exportKey := keyrecovery.Store(c.Parameters, randomizedPwd, resp.Pks, creds2)
+	envU, clientPublicKey, exportKey := keyrecovery.Store(c.Parameters, randomizedPwd, encoding.SerializePoint(resp.Pks, c.Group), creds2)
 
 	return &message.RegistrationRecord{
 		PublicKey:  clientPublicKey,
 		MaskingKey: maskingKey,
 		Envelope:   envU.Serialize(),
-	}, exportKey, nil
+	}, exportKey
 }
 
 // Init initiates the authentication process, returning a KE1 message blinding the given password.
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) Init(password []byte) *message.KE1 {
 	m := c.OPRF.Blind(password)
-	credReq := &cred.CredentialRequest{Data: encoding.PadPoint(m, c.Group)}
+	credReq := &cred.CredentialRequest{Data: m}
 	c.Ke1 = c.Ake.Start(c.Group)
 	c.Ke1.CredentialRequest = credReq
 
@@ -136,14 +130,11 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 		return nil, nil, errInvalidMaskedLength
 	}
 
-	randomizedPwd, err := c.buildPRK(ke2.Data)
-	if err != nil {
-		return nil, nil, err
-	}
-
+	randomizedPwd := c.buildPRK(ke2.Data, c.Info)
 	serverPublicKey, env := c.unmask(ke2.MaskingNonce, randomizedPwd, ke2.MaskedResponse)
 
-	if !c.IsValidPoint(serverPublicKey) {
+	pks, err := c.Group.NewElement().Decode(serverPublicKey)
+	if err != nil {
 		return nil, nil, errInvalidPKS
 	}
 
@@ -154,14 +145,14 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 	}
 
 	if idc == nil {
-		idc = clientPublicKey.Bytes()
+		idc = encoding.SerializePoint(clientPublicKey, c.Group)
 	}
 
 	if ids == nil {
 		ids = serverPublicKey
 	}
 
-	ke3, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, serverPublicKey, c.Ke1, ke2)
+	ke3, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, pks, c.Ke1, ke2)
 	if err != nil {
 		return nil, nil, fmt.Errorf(" AKE finalization: %w", err)
 	}

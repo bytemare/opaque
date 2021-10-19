@@ -10,21 +10,12 @@
 package ake
 
 import (
-	"fmt"
-
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
-)
-
-type selector bool
-
-const (
-	client selector = true
-	server selector = false
 )
 
 // KeyGen returns private and public keys in the group.
@@ -76,7 +67,7 @@ func initTranscript(p *internal.Parameters, idc, ids []byte, ke1 *message.KE1, k
 	sids := encoding.EncodeVector(ids)
 	p.Hash.Write(encoding.Concatenate([]byte(tag.VersionTag), encoding.EncodeVector(p.Context),
 		sidc, ke1.Serialize(),
-		sids, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS))
+		sids, ke2.CredentialResponse.Serialize(), ke2.NonceS, encoding.SerializePoint(ke2.EpkS, p.Group)))
 }
 
 type macKeys struct {
@@ -94,66 +85,23 @@ func deriveKeys(h *internal.KDF, ikm, context []byte) (k *macKeys, sessionSecret
 	return k, sessionSecret
 }
 
-func decodeKeys(g group.Group, peerEpk, peerPk []byte) (epk, pk *group.Point, err error) {
-	epk, err = g.NewElement().Decode(peerEpk)
-	if err != nil {
-		return nil, nil, fmt.Errorf("decoding peer ephemeral public key: %w", err)
-	}
+func k3dh(g group.Group, p1 *group.Point, s1 *group.Scalar, p2 *group.Point, s2 *group.Scalar, p3 *group.Point, s3 *group.Scalar) []byte {
+	e1 := encoding.SerializePoint(p1.Mult(s1), g)
+	e2 := encoding.SerializePoint(p2.Mult(s2), g)
+	e3 := encoding.SerializePoint(p3.Mult(s3), g)
 
-	pk, err = g.NewElement().Decode(peerPk)
-	if err != nil {
-		return nil, nil, fmt.Errorf("decoding peer public key: %w", err)
-	}
-
-	return epk, pk, nil
+	return encoding.Concat3(e1, e2, e3)
 }
 
-func k3dh(p1 *group.Point, s1 *group.Scalar, p2 *group.Point, s2 *group.Scalar, p3 *group.Point, s3 *group.Scalar) []byte {
-	e1 := p1.Mult(s1)
-	e2 := p2.Mult(s2)
-	e3 := p3.Mult(s3)
-
-	return encoding.Concat3(e1.Bytes(), e2.Bytes(), e3.Bytes())
-}
-
-func ikm(s selector, g group.Group, esk, secretKey *group.Scalar, peerEpk, peerPublicKey []byte) ([]byte, error) {
-	epk, gpk, err := decodeKeys(g, peerEpk, peerPublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	switch s {
-	case client:
-		return k3dh(epk, esk, gpk, esk, epk, secretKey), nil
-	default: // server
-		return k3dh(epk, esk, epk, secretKey, gpk, esk), nil
-	}
-}
-
-type macs struct {
-	serverMac, clientMac []byte
-}
-
-type coreKeys struct {
-	esk, secretKey         *group.Scalar
-	peerEpk, peerPublicKey []byte
-}
-
-func core3DH(s selector, p *internal.Parameters, k *coreKeys, idu, ids []byte,
-	ke1 *message.KE1, ke2 *message.KE2) (*macs, []byte, error) {
-	ikm, err := ikm(s, p.Group, k.esk, k.secretKey, k.peerEpk, k.peerPublicKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func core3DH(p *internal.Parameters, ikm, idu, ids []byte,
+	ke1 *message.KE1, ke2 *message.KE2) (sessionSecret, macS, macC []byte) {
 	initTranscript(p, idu, ids, ke1, ke2)
-	keys, sessionSecret := deriveKeys(p.KDF, ikm, p.Hash.Sum()) // preamble
-	m := &macs{
-		serverMac: p.MAC.MAC(keys.serverMacKey, p.Hash.Sum()), // transcript2
-	}
-	p.Hash.Write(m.serverMac)
-	transcript3 := p.Hash.Sum()
-	m.clientMac = p.MAC.MAC(keys.clientMacKey, transcript3)
 
-	return m, sessionSecret, nil
+	keys, sessionSecret := deriveKeys(p.KDF, ikm, p.Hash.Sum()) // preamble
+	serverMac := p.MAC.MAC(keys.serverMacKey, p.Hash.Sum())     // transcript2
+	p.Hash.Write(serverMac)
+	transcript3 := p.Hash.Sum()
+	clientMac := p.MAC.MAC(keys.clientMacKey, transcript3)
+
+	return sessionSecret, serverMac, clientMac
 }

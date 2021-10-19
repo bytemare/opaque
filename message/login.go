@@ -10,33 +10,37 @@
 package message
 
 import (
+	"github.com/bytemare/crypto/group"
+
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/message"
 )
 
 // KE1 is the first message of the login flow, created by the client and sent to the server.
 type KE1 struct {
+	G group.Group
 	*message.CredentialRequest
-	NonceU []byte `json:"n"`
-	EpkU   []byte `json:"e"`
+	NonceU []byte       `json:"n"`
+	EpkU   *group.Point `json:"e"`
 }
 
 // Serialize returns the byte encoding of KE1.
 func (m *KE1) Serialize() []byte {
-	return encoding.Concat3(m.CredentialRequest.Serialize(), m.NonceU, m.EpkU)
+	return encoding.Concat3(m.CredentialRequest.Serialize(), m.NonceU, encoding.SerializePoint(m.EpkU, m.G))
 }
 
 // KE2 is the second message of the login flow, created by the server and sent to the client.
 type KE2 struct {
+	G group.Group
 	*message.CredentialResponse
-	NonceS []byte `json:"n"`
-	EpkS   []byte `json:"e"`
-	Mac    []byte `json:"m"`
+	NonceS []byte       `json:"n"`
+	EpkS   *group.Point `json:"e"`
+	Mac    []byte       `json:"m"`
 }
 
 // Serialize returns the byte encoding of KE2.
 func (m *KE2) Serialize() []byte {
-	return encoding.Concat(m.CredentialResponse.Serialize(), encoding.Concat3(m.NonceS, m.EpkS, m.Mac))
+	return encoding.Concat(m.CredentialResponse.Serialize(), encoding.Concat3(m.NonceS, encoding.SerializePoint(m.EpkS, m.G), m.Mac))
 }
 
 // KE3 is the third and last message of the login flow, created by the client and sent to the server.

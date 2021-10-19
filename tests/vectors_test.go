@@ -128,22 +128,24 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 
 	// Server
 	server := p.Server()
-	regResp, err := server.RegistrationResponse(regReq, v.Inputs.ServerPublicKey, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
+	pks, err := server.Group.NewElement().Decode(v.Inputs.ServerPublicKey)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
+
+	regResp := server.RegistrationResponse(regReq, pks, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
 
 	vRegResp, err := client.DeserializeRegistrationResponse(v.Outputs.RegistrationResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(vRegResp.Data, regResp.Data) {
+	if !bytes.Equal(vRegResp.Data.Bytes(), regResp.Data.Bytes()) {
 		t.Logf("%v\n%v", vRegResp.Data, regResp.Data)
 		t.Fatal("registration response data do not match")
 	}
 
-	if !bytes.Equal(vRegResp.Pks, regResp.Pks) {
+	if !bytes.Equal(vRegResp.Pks.Bytes(), regResp.Pks.Bytes()) {
 		t.Fatal("registration response serverPublicKey do not match")
 	}
 
@@ -158,10 +160,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 		TestEnvNonce: v.Inputs.EnvelopeNonce,
 	}
 
-	upload, exportKey, err := client.RegistrationFinalize(clientCredentials, regResp)
-	if err != nil {
-		t.Fatal(err)
-	}
+	upload, exportKey := client.RegistrationFinalize(clientCredentials, regResp)
 
 	if !bytes.Equal(v.Outputs.ExportKey, exportKey) {
 		t.Fatal("exportKey do not match")
@@ -340,7 +339,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(vectorKE2.CredentialResponse.Data, ke2.CredentialResponse.Data) {
+	if !bytes.Equal(vectorKE2.CredentialResponse.Data.Bytes(), ke2.CredentialResponse.Data.Bytes()) {
 		t.Fatal("data do not match")
 	}
 
@@ -360,7 +359,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal("nonces do not match")
 	}
 
-	if !bytes.Equal(vectorKE2.EpkS, ke2.EpkS) {
+	if !bytes.Equal(vectorKE2.EpkS.Bytes(), ke2.EpkS.Bytes()) {
 		t.Fatal("epks do not match")
 	}
 
@@ -452,7 +451,7 @@ func groupToGroup(g string) opaque.Group {
 		panic("group not supported")
 	case "P256_XMD:SHA-256_SSWU_RO_":
 		return opaque.P256Sha256
-	case "P384_XMD:SHA-512_SSWU_RO_":
+	case "P384_XMD:SHA-384_SSWU_RO_":
 		return opaque.P384Sha512
 	case "P521_XMD:SHA-512_SSWU_RO_":
 		return opaque.P521Sha512

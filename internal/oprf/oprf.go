@@ -29,16 +29,16 @@ type Ciphersuite group.Group
 
 const (
 	// RistrettoSha512 is the OPRF cipher suite of the Ristretto255 group and SHA-512.
-	RistrettoSha512 Ciphersuite = iota + 1
+	RistrettoSha512 = Ciphersuite(group.Ristretto255Sha512)
 
 	// P256Sha256 is the OPRF cipher suite of the NIST P-256 group and SHA-256.
-	P256Sha256 Ciphersuite = iota + 2
+	P256Sha256 = Ciphersuite(group.P256Sha256)
 
-	// P384Sha512 is the OPRF cipher suite of the NIST P-384 group and SHA-512.
-	P384Sha512
+	// P384Sha384 is the OPRF cipher suite of the NIST P-384 group and SHA-384.
+	P384Sha384 = Ciphersuite(group.P384Sha512)
 
 	// P521Sha512 is the OPRF cipher suite of the NIST P-512 group and SHA-512.
-	P521Sha512
+	P521Sha512 = Ciphersuite(group.P521Sha512)
 )
 
 var suiteToHash = make(map[group.Group]crypto.Hash)
@@ -52,14 +52,25 @@ func (c Ciphersuite) Group() group.Group {
 	return group.Group(c)
 }
 
-func contextString(id Ciphersuite) []byte {
-	v := []byte(tag.OPRF)
-	ctx := make([]byte, 0, len(v)+1+2)
-	ctx = append(ctx, v...)
-	ctx = append(ctx, encoding.I2OSP(int(base), 1)...)
-	ctx = append(ctx, encoding.I2OSP(int(id), 2)...)
+// SerializeScalar returns the byte encoding of the scalar padded accordingly.
+func (c Ciphersuite) SerializeScalar(s *group.Scalar) []byte {
+	return encoding.SerializeScalar(s, c.Group())
+}
 
-	return ctx
+// SerializePoint returns the byte encoding of the point padded accordingly.
+func (c Ciphersuite) SerializePoint(p *group.Point) []byte {
+	return encoding.SerializePoint(p, c.Group())
+}
+
+func contextString(id Ciphersuite) []byte {
+	return encoding.Concat3([]byte(tag.OPRF), encoding.I2OSP(int(base), 1), encoding.I2OSP(int(id), 2))
+}
+
+func (c Ciphersuite) oprf() *oprf {
+	return &oprf{
+		Group:         c.Group(),
+		contextString: contextString(c),
+	}
 }
 
 type oprf struct {
@@ -68,12 +79,7 @@ type oprf struct {
 }
 
 func (o *oprf) dst(prefix string) []byte {
-	p := []byte(prefix)
-	dst := make([]byte, 0, len(p)+len(o.contextString))
-	dst = append(dst, p...)
-	dst = append(dst, o.contextString...)
-
-	return dst
+	return encoding.Concat([]byte(prefix), o.contextString)
 }
 
 // DeriveKey returns a scalar mapped from the input.
@@ -83,19 +89,12 @@ func (c Ciphersuite) DeriveKey(input, dst []byte) *group.Scalar {
 
 // Client returns an OPRF client.
 func (c Ciphersuite) Client() *Client {
-	client := &Client{
-		oprf: &oprf{
-			Group:         c.Group(),
-			contextString: contextString(c),
-		},
-	}
-
-	return client
+	return &Client{oprf: c.oprf()}
 }
 
 func init() {
 	RistrettoSha512.register(crypto.SHA512)
 	P256Sha256.register(crypto.SHA256)
-	P384Sha512.register(crypto.SHA512)
+	P384Sha384.register(crypto.SHA384)
 	P521Sha512.register(crypto.SHA512)
 }

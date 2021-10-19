@@ -9,26 +9,33 @@
 // Package message provides the internal credential recovery messages.
 package message
 
-import "github.com/bytemare/opaque/internal/encoding"
+import (
+	"github.com/bytemare/crypto/group"
+
+	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/oprf"
+)
 
 // CredentialRequest represents credential request message.
 type CredentialRequest struct {
-	Data []byte `json:"data"`
+	C    oprf.Ciphersuite
+	Data *group.Point `json:"data"`
 }
 
 // Serialize returns the byte encoding of CredentialRequest.
 func (c *CredentialRequest) Serialize() []byte {
-	return c.Data
+	return c.C.SerializePoint(c.Data)
 }
 
 // CredentialResponse represents credential response message.
 type CredentialResponse struct {
-	Data           []byte `json:"data"`
-	MaskingNonce   []byte `json:"n"`
-	MaskedResponse []byte `json:"r"`
+	C              oprf.Ciphersuite
+	Data           *group.Point `json:"data"`
+	MaskingNonce   []byte       `json:"n"`
+	MaskedResponse []byte       `json:"r"`
 }
 
 // Serialize returns the byte encoding of CredentialResponse.
 func (c *CredentialResponse) Serialize() []byte {
-	return encoding.Concat3(c.Data, c.MaskingNonce, c.MaskedResponse)
+	return encoding.Concat3(c.C.SerializePoint(c.Data), c.MaskingNonce, c.MaskedResponse)
 }

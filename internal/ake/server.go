@@ -15,7 +15,6 @@ import (
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encoding"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
@@ -53,28 +52,39 @@ func (s *Server) SetValues(id group.Group, esk *group.Scalar, nonce []byte, nonc
 }
 
 // Response produces a 3DH server response message.
-func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverSecretKey *group.Scalar, clientIdentity, clientPublicKey []byte,
-	ke1 *message.KE1, response *cred.CredentialResponse) (*message.KE2, error) {
+func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverSecretKey *group.Scalar,
+	clientIdentity []byte, clientPublicKey *group.Point,
+	ke1 *message.KE1, response *cred.CredentialResponse) *message.KE2 {
 	epk := s.SetValues(p.Group, nil, nil, p.NonceLen)
-	nonce := s.nonceS
-	k := &coreKeys{s.esk, serverSecretKey, ke1.EpkU, clientPublicKey}
 
 	ke2 := &message.KE2{
 		CredentialResponse: response,
-		NonceS:             nonce,
-		EpkS:               encoding.PadPoint(epk.Bytes(), p.Group),
+		NonceS:             s.nonceS,
+		EpkS:               epk,
 	}
 
-	macs, sessionSecret, err := core3DH(server, p, k, clientIdentity, serverIdentity, ke1, ke2)
-	if err != nil {
-		return nil, err
-	}
-
+	ikm := k3dh(p.Group, ke1.EpkU, s.esk, ke1.EpkU, serverSecretKey, clientPublicKey, s.esk)
+	sessionSecret, serverMac, clientMac := core3DH(p, ikm, clientIdentity, serverIdentity, ke1, ke2)
 	s.sessionSecret = sessionSecret
-	s.clientMac = macs.clientMac
-	ke2.Mac = macs.serverMac
+	s.clientMac = clientMac
+	ke2.Mac = serverMac
 
-	return ke2, nil
+	return ke2
+}
+
+// Finalize verifies the authentication tag contained in ke3.
+func (s *Server) Finalize(p *internal.Parameters, ke3 *message.KE3) bool {
+	return p.MAC.Equal(s.clientMac, ke3.Mac)
+}
+
+// SessionKey returns the secret shared session key if a previous call to Response() was successful.
+func (s *Server) SessionKey() []byte {
+	return s.sessionSecret
+}
+
+// ExpectedMAC returns the expected client MAC if a previous call to Response() was successful.
+func (s *Server) ExpectedMAC() []byte {
+	return s.clientMac
 }
 
 // SerializeState will return a []byte containing internal state of the Server.
@@ -97,19 +107,4 @@ func (s *Server) SetState(clientMac, sessionSecret []byte) error {
 	s.sessionSecret = sessionSecret
 
 	return nil
-}
-
-// Finalize verifies the authentication tag contained in ke3.
-func (s *Server) Finalize(p *internal.Parameters, ke3 *message.KE3) bool {
-	return p.MAC.Equal(s.clientMac, ke3.Mac)
-}
-
-// SessionKey returns the secret shared session key if a previous call to Response() was successful.
-func (s *Server) SessionKey() []byte {
-	return s.sessionSecret
-}
-
-// ExpectedMAC returns the expected client MAC if a previous call to Response() was successful.
-func (s *Server) ExpectedMAC() []byte {
-	return s.clientMac
 }

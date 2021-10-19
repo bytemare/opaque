@@ -10,8 +10,6 @@
 package oprf
 
 import (
-	"fmt"
-
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal/encoding"
@@ -31,15 +29,15 @@ func (c *Client) SetBlind(blind *group.Scalar) {
 }
 
 // Blind masks the input.
-func (c *Client) Blind(input []byte) []byte {
+func (c *Client) Blind(input []byte) *group.Point {
 	if c.blind == nil {
 		c.blind = c.NewScalar().Random()
 	}
 
-	p := c.HashToGroup(input, c.dst(tag.OPRFPrefix))
+	p := c.HashToGroup(input, c.dst(tag.OPRFPointPrefix))
 	c.input = input
 
-	return p.Mult(c.blind).Bytes()
+	return p.Mult(c.blind)
 }
 
 func (o *oprf) hash(input ...[]byte) []byte {
@@ -53,21 +51,18 @@ func (o *oprf) hash(input ...[]byte) []byte {
 	return h.Sum(nil)
 }
 
-func (o *oprf) hashTranscript(input, unblinded []byte) []byte {
+func (o *oprf) hashTranscript(input, unblinded, info []byte) []byte {
 	finalizeDST := o.dst(tag.OPRFFinalize)
 	encInput := encoding.EncodeVector(input)
+	encInfo := encoding.EncodeVector(info)
 	encElement := encoding.EncodeVector(unblinded)
 	encDST := encoding.EncodeVector(finalizeDST)
 
-	return o.hash(encInput, encElement, encDST)
+	return o.hash(encInput, encInfo, encElement, encDST)
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
-func (c *Client) Finalize(evaluation []byte) ([]byte, error) {
-	ev, err := c.NewElement().Decode(evaluation)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode element : %w", err)
-	}
-
-	return c.hashTranscript(c.input, ev.InvertMult(c.blind).Bytes()), nil
+func (c *Client) Finalize(evaluation *group.Point, info []byte) []byte {
+	u := encoding.SerializePoint(evaluation.InvertMult(c.blind), c.Group)
+	return c.hashTranscript(c.input, u, info)
 }

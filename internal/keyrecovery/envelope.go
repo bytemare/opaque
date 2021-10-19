@@ -47,6 +47,19 @@ func authTag(p *internal.Parameters, randomizedPwd, nonce, ctc []byte) []byte {
 	return p.MAC.MAC(authKey, encoding.Concat(nonce, ctc))
 }
 
+// cleartextCredentials assumes that clientPublicKey, serverPublicKey are non-nil valid group elements.
+func cleartextCredentials(clientPublicKey, serverPublicKey, idc, ids []byte) []byte {
+	if ids == nil {
+		ids = serverPublicKey
+	}
+
+	if idc == nil {
+		idc = clientPublicKey
+	}
+
+	return encoding.Concat3(serverPublicKey, encoding.EncodeVector(ids), encoding.EncodeVector(idc))
+}
+
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
 func Store(p *internal.Parameters, randomizedPwd, serverPublicKey []byte,
 	creds *Credentials) (env *Envelope, clientPublicKey, export []byte) {
@@ -74,7 +87,7 @@ func Store(p *internal.Parameters, randomizedPwd, serverPublicKey []byte,
 func Recover(p *internal.Parameters, randomizedPwd, serverPublicKey, idc, ids []byte,
 	envelope *Envelope) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, export []byte, err error) {
 	clientSecretKey, clientPublicKey = recoverKeys(p, randomizedPwd, envelope.Nonce)
-	ctc := cleartextCredentials(clientPublicKey.Bytes(), serverPublicKey, idc, ids)
+	ctc := cleartextCredentials(encoding.SerializePoint(clientPublicKey, p.Group), serverPublicKey, idc, ids)
 
 	expectedTag := authTag(p, randomizedPwd, envelope.Nonce, ctc)
 	if !p.MAC.Equal(expectedTag, envelope.AuthTag) {
