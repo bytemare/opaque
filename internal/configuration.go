@@ -73,12 +73,12 @@ func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.Regi
 		return nil, errInvalidMessageLength
 	}
 
-	data, err := p.Group.NewElement().Decode(input[:p.OPRFPointLength])
+	data, err := p.OPRF.Group().NewElement().Decode(input[:p.OPRFPointLength])
 	if err != nil {
 		return nil, errInvalidBlindedData
 	}
 
-	return &message.RegistrationRequest{Data: data}, nil
+	return &message.RegistrationRequest{C: p.OPRF, Data: data}, nil
 }
 
 // DeserializeRegistrationResponse takes a serialized RegistrationResponse message as input and attempts to deserialize it.
@@ -98,6 +98,8 @@ func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.Reg
 	}
 
 	return &message.RegistrationResponse{
+		C:    p.OPRF,
+		G:    p.Group,
 		Data: data,
 		Pks:  pks,
 	}, nil
@@ -109,15 +111,17 @@ func (p *Parameters) DeserializeRecord(input []byte) (*message.RegistrationRecor
 		return nil, errInvalidMessageLength
 	}
 
-	pku := input[:p.AkePointLength]
+	pk := input[:p.AkePointLength]
 	maskingKey := input[p.AkePointLength : p.AkePointLength+p.Hash.Size()]
 	env := input[p.AkePointLength+p.Hash.Size():]
 
-	if _, err := p.Group.NewElement().Decode(pku); err != nil {
+	pku, err := p.Group.NewElement().Decode(pk)
+	if err != nil {
 		return nil, errInvalidServerPK
 	}
 
 	return &message.RegistrationRecord{
+		G:          p.Group,
 		PublicKey:  pku,
 		MaskingKey: maskingKey,
 		Envelope:   env,
@@ -130,7 +134,10 @@ func (p *Parameters) deserializeCredentialRequest(input []byte) (*cred.Credentia
 		return nil, errInvalidServerPK
 	}
 
-	return &cred.CredentialRequest{Data: data}, nil
+	return &cred.CredentialRequest{
+		C:    p.OPRF,
+		Data: data,
+	}, nil
 }
 
 func (p *Parameters) deserializeCredentialResponse(input []byte, maxResponseLength int) (*cred.CredentialResponse, error) {
@@ -140,6 +147,7 @@ func (p *Parameters) deserializeCredentialResponse(input []byte, maxResponseLeng
 	}
 
 	return &cred.CredentialResponse{
+		C:              p.OPRF,
 		Data:           data,
 		MaskingNonce:   input[p.OPRFPointLength : p.OPRFPointLength+p.NonceLen],
 		MaskedResponse: input[p.OPRFPointLength+p.NonceLen : maxResponseLength],

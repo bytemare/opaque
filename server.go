@@ -28,6 +28,12 @@ var (
 
 	// ErrInvalidState indicates that the given state is not valid due to a wrong length.
 	ErrInvalidState = errors.New("invalid state length")
+
+	// ErrInvalidEnvelopeLength indicates the envelope contained in the record is of invalid length.
+	ErrInvalidEnvelopeLength = errors.New("record has invalid envelope length")
+
+	// ErrInvalidPksLength indicates the input public key is not of right length.
+	ErrInvalidPksLength = errors.New("input server public key's length is invalid")
 )
 
 // Server represents an OPAQUE Server, exposing its functions and holding its state.
@@ -101,14 +107,16 @@ func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverP
 		return nil, fmt.Errorf("invalid server secret key: %w", err)
 	}
 
-	_, err = s.Group.NewElement().Decode(serverPublicKey)
-	if err != nil {
+	if len(serverPublicKey) != s.AkePointLength {
+		return nil, ErrInvalidPksLength
+	}
+
+	if _, err = s.Group.NewElement().Decode(serverPublicKey); err != nil {
 		return nil, fmt.Errorf("invalid server public key: %w", err)
 	}
 
-	pku, err := s.Group.NewElement().Decode(record.PublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("invalid client public key in record: %w", err)
+	if len(record.Envelope) != s.EnvelopeSize {
+		return nil, ErrInvalidEnvelopeLength
 	}
 
 	response := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
@@ -117,14 +125,14 @@ func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverP
 	clientIdentity := record.ClientIdentity
 
 	if clientIdentity == nil {
-		clientIdentity = record.PublicKey
+		clientIdentity = encoding.SerializePoint(record.PublicKey, s.Group)
 	}
 
 	if serverIdentity == nil {
 		serverIdentity = serverPublicKey
 	}
 
-	ke2 := s.Ake.Response(s.Parameters, serverIdentity, sks, clientIdentity, pku, ke1, response)
+	ke2 := s.Ake.Response(s.Parameters, serverIdentity, sks, clientIdentity, record.PublicKey, ke1, response)
 
 	return ke2, nil
 }

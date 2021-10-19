@@ -30,24 +30,25 @@ func (r *RegistrationRequest) Serialize() []byte {
 // RegistrationResponse is the second message of the registration flow, created by the server and sent to the client.
 type RegistrationResponse struct {
 	C    oprf.Ciphersuite
-	g    group.Group
+	G    group.Group
 	Data *group.Point `json:"data"`
 	Pks  *group.Point `json:"pks"`
 }
 
 // Serialize returns the byte encoding of RegistrationResponse.
 func (r *RegistrationResponse) Serialize() []byte {
-	return encoding.Concat(r.C.SerializePoint(r.Data), encoding.SerializePoint(r.Pks, r.g))
+	return encoding.Concat(r.C.SerializePoint(r.Data), encoding.SerializePoint(r.Pks, r.G))
 }
 
 // RegistrationRecord represents the client record sent as the last registration message by the client to the server.
 type RegistrationRecord struct {
-	PublicKey  []byte `json:"pku"`
-	MaskingKey []byte `json:"msk"`
-	Envelope   []byte `json:"env"`
+	G          group.Group
+	PublicKey  *group.Point `json:"pku"`
+	MaskingKey []byte       `json:"msk"`
+	Envelope   []byte       `json:"env"`
 }
 
 // Serialize returns the byte encoding of RegistrationRecord.
 func (r *RegistrationRecord) Serialize() []byte {
-	return encoding.Concat3(r.PublicKey, r.MaskingKey, r.Envelope)
+	return encoding.Concat3(encoding.SerializePoint(r.PublicKey, r.G), r.MaskingKey, r.Envelope)
 }

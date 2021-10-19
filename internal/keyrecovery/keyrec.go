@@ -24,9 +24,9 @@ func deriveAkeKeyPair(p *internal.Parameters, randomizedPwd, nonce []byte) (*gro
 	return sk, p.Group.Base().Mult(sk)
 }
 
-func getPubkey(p *internal.Parameters, randomizedPwd, nonce []byte) []byte {
+func getPubkey(p *internal.Parameters, randomizedPwd, nonce []byte) *group.Point {
 	_, pk := deriveAkeKeyPair(p, randomizedPwd, nonce)
-	return encoding.SerializePoint(pk, p.Group)
+	return pk
 }
 
 func recoverKeys(p *internal.Parameters,

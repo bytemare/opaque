@@ -45,8 +45,8 @@ var PointLength = map[group.Group]int{
 }
 
 // SerializeScalar pads the given scalar if necessary.
-func SerializeScalar(s *group.Scalar, c group.Group) []byte {
-	length := ScalarLength[c]
+func SerializeScalar(s *group.Scalar, g group.Group) []byte {
+	length := ScalarLength[g]
 
 	e := s.Bytes()
 
@@ -58,13 +58,13 @@ func SerializeScalar(s *group.Scalar, c group.Group) []byte {
 }
 
 // SerializePoint pads the given element if necessary.
-func SerializePoint(e *group.Point, c group.Group) []byte {
-	return PadPoint(e.Bytes(), c)
+func SerializePoint(e *group.Point, g group.Group) []byte {
+	return PadPoint(e.Bytes(), g)
 }
 
 // PadPoint pads the encoded element if necessary.
-func PadPoint(point []byte, c group.Group) []byte {
-	length := PointLength[c]
+func PadPoint(point []byte, g group.Group) []byte {
+	length := PointLength[g]
 
 	for len(point) < length {
 		point = append([]byte{0x00}, point...)

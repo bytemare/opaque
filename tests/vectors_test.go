@@ -20,6 +20,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bytemare/opaque/internal/encoding"
+
 	"github.com/bytemare/crypto/mhf"
 
 	"github.com/bytemare/opaque"
@@ -206,11 +208,12 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 
 		record.RegistrationRecord = cupload
 	} else {
-		record.RegistrationRecord = &message.RegistrationRecord{
-			PublicKey:  v.Inputs.ClientPublicKey,
-			MaskingKey: v.Inputs.MaskingKey,
-			Envelope:   opaque.GetFakeEnvelope(p),
+		rec, err := server.DeserializeRecord(encoding.Concat3(v.Inputs.ClientPublicKey, v.Inputs.MaskingKey, opaque.GetFakeEnvelope(p)))
+		if err != nil {
+			t.Fatal(err)
 		}
+
+		record.RegistrationRecord = rec
 	}
 
 	record.CredentialIdentifier = v.Inputs.CredentialIdentifier

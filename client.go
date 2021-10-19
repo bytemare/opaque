@@ -126,7 +126,7 @@ func (c *Client) unmask(maskingNonce, randomizedPwd, maskedResponse []byte) ([]b
 // or ids parameters are nil, the client and server's public keys are taken as identities for both.
 func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, exportKey []byte, err error) {
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
-	if len(ke2.MaskedResponse) != encoding.PointLength[c.Group]+c.EnvelopeSize {
+	if len(ke2.MaskedResponse) != c.AkePointLength+c.EnvelopeSize {
 		return nil, nil, errInvalidMaskedLength
 	}
 

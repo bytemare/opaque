@@ -52,11 +52,6 @@ func (c Ciphersuite) Group() group.Group {
 	return group.Group(c)
 }
 
-// SerializeScalar returns the byte encoding of the scalar padded accordingly.
-func (c Ciphersuite) SerializeScalar(s *group.Scalar) []byte {
-	return encoding.SerializeScalar(s, c.Group())
-}
-
 // SerializePoint returns the byte encoding of the point padded accordingly.
 func (c Ciphersuite) SerializePoint(p *group.Point) []byte {
 	return encoding.SerializePoint(p, c.Group())

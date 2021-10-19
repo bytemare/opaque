@@ -69,17 +69,25 @@ func TestDeserializeRegistrationResponse(t *testing.T) {
 }
 
 func TestDeserializeRegistrationRecord(t *testing.T) {
-	c := opaque.DefaultConfiguration()
+	for _, e := range confs {
+		server := e.Conf.Server()
+		length := server.AkePointLength + server.Hash.Size() + server.EnvelopeSize + 1
+		if _, err := server.DeserializeRegistrationRecord(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
+		}
 
-	server := c.Server()
-	length := server.AkePointLength + server.Hash.Size() + server.EnvelopeSize + 1
-	if _, err := server.DeserializeRegistrationRecord(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
-		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
-	}
+		badPKu := getBadElement(t, e)
+		rec := encoding.Concat(badPKu, internal.RandomBytes(server.Hash.Size()+server.EnvelopeSize))
 
-	client := c.Client()
-	if _, err := client.DeserializeRecord(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
-		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
+		expect := "invalid server public key"
+		if _, err := server.DeserializeRegistrationRecord(rec); err == nil || err.Error() != expect {
+			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", expect, err)
+		}
+
+		client := e.Conf.Client()
+		if _, err := client.DeserializeRecord(internal.RandomBytes(length)); err == nil || err.Error() != errInvalidMessageLength.Error() {
+			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
+		}
 	}
 }
 
@@ -300,7 +308,7 @@ func getBadElement(t *testing.T, c configuration) []byte {
 	// case opaque.Curve25519Sha512:
 	//	return getBad25519Element()
 	default:
-		return getBadNistElement(t, oprf.Ciphersuite(c.Conf.AKE).Group())
+		return getBadNistElement(t, group.Group(c.Conf.AKE))
 	}
 }
 
@@ -315,7 +323,7 @@ func getBadScalar(t *testing.T, c configuration) []byte {
 	}
 }
 
-func buildRecord(t *testing.T, credID, oprfSeed, password, pks []byte, client *opaque.Client, server *opaque.Server) *opaque.ClientRecord {
+func buildRecord(credID, oprfSeed, password, pks []byte, client *opaque.Client, server *opaque.Server) *opaque.ClientRecord {
 	r1 := client.RegistrationInit(password)
 	pk, err := server.Group.NewElement().Decode(pks)
 	if err != nil {
@@ -388,12 +396,13 @@ func TestServerInit_InvalidPublicKey(t *testing.T) {
 	for _, conf := range confs {
 		server := conf.Conf.Server()
 		sk, _ := server.KeyGen()
-		expected := "invalid server public key: "
 
+		expected := "input server public key's length is invalid"
 		if _, err := server.Init(nil, nil, sk, nil, nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil pubkey - got %s", err)
 		}
 
+		expected = "invalid server public key: "
 		if _, err := server.Init(nil, nil, sk, getBadElement(t, conf), nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on bad secret key - got %s", err)
 		}
@@ -410,6 +419,23 @@ func TestServerInit_NilSecretKey(t *testing.T) {
 		expected := "invalid server secret key: "
 
 		if _, err := server.Init(nil, nil, nil, pk, nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
+			t.Fatalf("expected error on nil secret key - got %s", err)
+		}
+	}
+}
+
+func TestServerInit_InvalidEnvelope(t *testing.T) {
+	/*
+		Record envelope of invalid length
+	*/
+	for _, conf := range confs {
+		server := conf.Conf.Server()
+		sk, pk := server.KeyGen()
+		rec := buildRecord(internal.RandomBytes(32), internal.RandomBytes(32), []byte("yo"), pk, conf.Conf.Client(), server)
+		rec.Envelope = internal.RandomBytes(15)
+
+		expected := "record has invalid envelope length"
+		if _, err := server.Init(nil, nil, sk, pk, nil, rec); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil secret key - got %s", err)
 		}
 	}
@@ -455,34 +481,6 @@ func TestServerInit_InvalidEPKU(t *testing.T) {
 	}
 }
 
-func TestServerInit_InvalidPKU(t *testing.T) {
-	/*
-		Invalid PKU in KE1
-	*/
-	seed := internal.RandomBytes(32)
-	rec := &opaque.ClientRecord{
-		CredentialIdentifier: internal.RandomBytes(32),
-		ClientIdentity:       nil,
-		RegistrationRecord: &message.RegistrationRecord{
-			MaskingKey: internal.RandomBytes(32),
-		},
-		TestMaskNonce: nil,
-	}
-
-	for _, conf := range confs {
-		rec.Envelope = opaque.GetFakeEnvelope(conf.Conf)
-		server := conf.Conf.Server()
-		sk, pk := server.KeyGen()
-		client := conf.Conf.Client()
-		ke1 := client.Init([]byte("yo"))
-		rec.PublicKey = getBadElement(t, conf)
-		expected := "invalid client public key in record: "
-		if _, err := server.Init(ke1, nil, sk, pk, seed, rec); err == nil || !strings.HasPrefix(err.Error(), expected) {
-			t.Fatalf("expected error on bad pku - got %s", err)
-		}
-	}
-}
-
 func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	/*
 		ke3 mac is invalid
@@ -493,9 +491,12 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	client := conf.Client()
 	server := conf.Server()
 	sk, pk := server.KeyGen()
-	rec := buildRecord(t, credId, seed, []byte("yo"), pk, client, server)
+	rec := buildRecord(credId, seed, []byte("yo"), pk, client, server)
 	ke1 := client.Init([]byte("yo"))
-	ke2, _ := server.Init(ke1, nil, sk, pk, seed, rec)
+	ke2, err := server.Init(ke1, nil, sk, pk, seed, rec)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ke3, _, _ := client.Finish(nil, nil, ke2)
 	ke3.Mac[0] = ^ke3.Mac[0]
 
@@ -528,7 +529,7 @@ func TestServerSetAKEState_InvalidInput(t *testing.T) {
 	client := conf.Client()
 	server = conf.Server()
 	sk, pk := server.KeyGen()
-	rec := buildRecord(t, credId, seed, []byte("yo"), pk, client, server)
+	rec := buildRecord(credId, seed, []byte("yo"), pk, client, server)
 	ke1 := client.Init([]byte("yo"))
 	_, _ = server.Init(ke1, nil, sk, pk, seed, rec)
 	state := server.SerializeState()
@@ -609,7 +610,7 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 		client := conf.Conf.Client()
 		server := conf.Conf.Server()
 		sks, pks := server.KeyGen()
-		rec := buildRecord(t, credID, oprfSeed, []byte("yo"), pks, client, server)
+		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.Init([]byte("yo"))
 		ke2, _ := server.Init(ke1, nil, sks, pks, oprfSeed, rec)
@@ -642,7 +643,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		client := conf.Conf.Client()
 		server := conf.Conf.Server()
 		sks, pks := server.KeyGen()
-		rec := buildRecord(t, credID, oprfSeed, []byte("yo"), pks, client, server)
+		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.Init([]byte("yo"))
 		ke2, _ := server.Init(ke1, nil, sks, pks, oprfSeed, rec)
@@ -688,18 +689,20 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		client := conf.Conf.Client()
 		server := conf.Conf.Server()
 		sks, pks := server.KeyGen()
-		rec := buildRecord(t, credID, oprfSeed, []byte("yo"), pks, client, server)
+		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.Init([]byte("yo"))
 		ke2, _ := server.Init(ke1, nil, sks, pks, oprfSeed, rec)
 		// epks := ke2.EpkS
 
 		// tamper epks
-		//ke2.EpkS = server.Group.NewElement().Mult(server.Group.NewScalar().Random())
-		//expected := " AKE finalization: decoding peer ephemeral public key:"
-		//if _, _, err := client.Finish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
-		//	t.Fatalf("expected error for invalid epks encoding - got %q", err)
-		//}
+		offset := client.AkePointLength + client.MAC.Size()
+		encoded := ke2.Serialize()
+		badKe2 := encoding.Concat3(encoded[:len(encoded)-offset], getBadElement(t, conf), ke2.Mac)
+		expected := "invalid ephemeral server public key"
+		if _, err := client.DeserializeKE2(badKe2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+			t.Fatalf("expected error for invalid epks encoding - got %q", err)
+		}
 
 		// tamper PKS
 		// ke2.EpkS = server.Group.NewElement().Mult(server.Group.NewScalar().Random())
@@ -710,7 +713,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 
 		badpks := getBadElement(t, conf)
 
-		ctc := cleartextCredentials(rec.RegistrationRecord.PublicKey, badpks, nil, nil)
+		ctc := cleartextCredentials(encoding.SerializePoint(rec.RegistrationRecord.PublicKey, client.Group), badpks, nil, nil)
 		authKey := client.KDF.Expand(randomizedPwd, encoding.SuffixString(env.Nonce, tag.AuthKey), client.KDF.Size())
 		authTag := client.MAC.MAC(authKey, encoding.Concat(env.Nonce, ctc))
 		env.AuthTag = authTag
@@ -718,7 +721,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		clear := encoding.Concat(badpks, env.Serialize())
 		ke2.MaskedResponse = server.MaskResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
 
-		expected := "invalid server public key"
+		expected = "invalid server public key"
 		if _, _, err := client.Finish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid envelope mac - got %q", err)
 		}
@@ -746,7 +749,7 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 		client := conf.Conf.Client()
 		server := conf.Conf.Server()
 		sks, pks := server.KeyGen()
-		rec := buildRecord(t, credID, oprfSeed, []byte("yo"), pks, client, server)
+		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.Init([]byte("yo"))
 		ke2, _ := server.Init(ke1, nil, sks, pks, oprfSeed, rec)
