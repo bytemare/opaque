@@ -53,11 +53,6 @@ func NewClient(p *Configuration) *Client {
 	}
 }
 
-// KeyGen returns a key pair in the AKE group. It can then be used for the external mode.
-func (c *Client) KeyGen() (secretKey, publicKey []byte) {
-	return ake.KeyGen(c.Group)
-}
-
 // buildPRK derives the randomized password from the OPRF output.
 func (c *Client) buildPRK(evaluation []byte) ([]byte, error) {
 	unblinded, err := c.OPRF.Finalize(evaluation)
