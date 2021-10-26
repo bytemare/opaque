@@ -14,7 +14,7 @@ const (
 	// OPRF tags.
 
 	// OPRF is a string explicitly stating the version name.
-	OPRF = "VOPRF07-"
+	OPRF = "VOPRF08-"
 
 	// OPRFContextPrefix is the DST prefix for the metadata tag.
 	OPRFContextPrefix = "Context-"
