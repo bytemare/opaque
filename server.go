@@ -99,8 +99,8 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 	}
 }
 
-// Init responds to a KE1 message with a KE2 message given server credentials and client record.
-func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
+// LoginInit responds to a KE1 message with a KE2 message given server credentials and client record.
+func (s *Server) LoginInit(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord) (*message.KE2, error) {
 	sks, err := s.Group.NewScalar().Decode(serverSecretKey)
 	if err != nil {
@@ -137,8 +137,8 @@ func (s *Server) Init(ke1 *message.KE1, serverIdentity, serverSecretKey, serverP
 	return ke2, nil
 }
 
-// Finish returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
-func (s *Server) Finish(ke3 *message.KE3) error {
+// LoginFinish returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
+func (s *Server) LoginFinish(ke3 *message.KE3) error {
 	if !s.Ake.Finalize(s.Parameters, ke3) {
 		return ErrAkeInvalidClientMac
 	}
@@ -146,12 +146,12 @@ func (s *Server) Finish(ke3 *message.KE3) error {
 	return nil
 }
 
-// SessionKey returns the session key if the previous call to Init() was successful.
+// SessionKey returns the session key if the previous call to LoginInit() was successful.
 func (s *Server) SessionKey() []byte {
 	return s.Ake.SessionKey()
 }
 
-// ExpectedMAC returns the expected client MAC if the previous call to Init() was successful.
+// ExpectedMAC returns the expected client MAC if the previous call to LoginInit() was successful.
 func (s *Server) ExpectedMAC() []byte {
 	return s.Ake.ExpectedMAC()
 }

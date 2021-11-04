@@ -211,7 +211,7 @@ func ExampleLoginKeyExchange() {
 	server := conf.Server()
 
 	// The client initiates the ball and sends the serialized ke1 to the server
-	ke1 := client.Init(password)
+	ke1 := client.LoginInit(password)
 	message1 := ke1.Serialize()
 
 	// The server interprets ke1, and sends back ke2
@@ -220,7 +220,7 @@ func ExampleLoginKeyExchange() {
 		panic(err)
 	}
 
-	ke2, err := server.Init(ke1s, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed,
+	ke2, err := server.LoginInit(ke1s, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed,
 		exampleClientRecord)
 	if err != nil {
 		panic(err)
@@ -236,7 +236,7 @@ func ExampleLoginKeyExchange() {
 	}
 
 	// In this example, we don't use the secret export key. The client sends the serialized ke3 to the server.
-	ke3, _, err := client.Finish(clientID, serverID, ke2c)
+	ke3, _, err := client.LoginFinish(clientID, serverID, ke2c)
 	if err != nil {
 		panic(err)
 	}
@@ -256,11 +256,11 @@ func ExampleLoginKeyExchange() {
 		panic(err)
 	}
 
-	if err := server.Finish(ke3s); err != nil {
+	if err := server.LoginFinish(ke3s); err != nil {
 		panic(err)
 	}
 
-	// If server.Finish() returns successfully, we can trust the client and safely extract the shared session key.
+	// If server.LoginFinish() returns successfully, we can trust the client and safely extract the shared session key.
 	serverSessionKey := server.SessionKey()
 
 	// The following test does not exist in the real world and simply proves the point that the keys match.

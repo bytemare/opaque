@@ -97,9 +97,9 @@ func (c *Client) RegistrationFinalize(creds *Credentials,
 	}, exportKey
 }
 
-// Init initiates the authentication process, returning a KE1 message blinding the given password.
+// LoginInit initiates the authentication process, returning a KE1 message blinding the given password.
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
-func (c *Client) Init(password []byte) *message.KE1 {
+func (c *Client) LoginInit(password []byte) *message.KE1 {
 	m := c.OPRF.Blind(password)
 	credReq := &cred.CredentialRequest{Data: m}
 	c.Ke1 = c.Ake.Start(c.Group)
@@ -122,9 +122,9 @@ func (c *Client) unmask(maskingNonce, randomizedPwd, maskedResponse []byte) ([]b
 	return serverPublicKey, env
 }
 
-// Finish returns a KE3 message given the server's KE2 response message and the identities. If the idc
+// LoginFinish returns a KE3 message given the server's KE2 response message and the identities. If the idc
 // or ids parameters are nil, the client and server's public keys are taken as identities for both.
-func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, exportKey []byte, err error) {
+func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, exportKey []byte, err error) {
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
 	if len(ke2.MaskedResponse) != c.AkePointLength+c.EnvelopeSize {
 		return nil, nil, errInvalidMaskedLength
@@ -160,7 +160,7 @@ func (c *Client) Finish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, ex
 	return ke3, exportKey, nil
 }
 
-// SessionKey returns the session key if the previous call to Finish() was successful.
+// SessionKey returns the session key if the previous call to LoginFinish() was successful.
 func (c *Client) SessionKey() []byte {
 	return c.Ake.SessionKey()
 }

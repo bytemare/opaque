@@ -133,7 +133,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 
 	var m4s []byte
 	{
-		ke1 := client.Init(p.password)
+		ke1 := client.LoginInit(p.password)
 		m4s = ke1.Serialize()
 	}
 
@@ -147,7 +147,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 			t.Fatalf(dbgErr, err)
 		}
 
-		ke2, err := server.Init(m4, p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed, record)
+		ke2, err := server.LoginInit(m4, p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed, record)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -167,7 +167,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 			t.Fatalf(dbgErr, err)
 		}
 
-		ke3, key, err := client.Finish(p.username, p.serverID, m5)
+		ke3, key, err := client.LoginFinish(p.username, p.serverID, m5)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -190,7 +190,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 			t.Fatalf(dbgErr, err)
 		}
 
-		if err := server.Finish(m6); err != nil {
+		if err := server.LoginFinish(m6); err != nil {
 			t.Fatalf(dbgErr, err)
 		}
 
