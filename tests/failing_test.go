@@ -93,8 +93,8 @@ func TestDeserializeRegistrationRecord(t *testing.T) {
 
 func TestDeserializeKE1(t *testing.T) {
 	c := opaque.DefaultConfiguration()
-	group := group.Group(c.AKE)
-	ke1Length := encoding.PointLength[group] + internal.NonceLength + encoding.PointLength[group]
+	g := group.Group(c.AKE)
+	ke1Length := encoding.PointLength[g] + internal.NonceLength + encoding.PointLength[g]
 
 	server := c.Server()
 	if _, err := server.DeserializeKE1(internal.RandomBytes(ke1Length + 1)); err == nil || err.Error() != errInvalidMessageLength.Error() {
