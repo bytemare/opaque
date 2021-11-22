@@ -128,18 +128,6 @@ func (p *Parameters) DeserializeRecord(input []byte) (*message.RegistrationRecor
 	}, nil
 }
 
-func (p *Parameters) deserializeCredentialRequest(input []byte) (*cred.CredentialRequest, error) {
-	data, err := p.Group.NewElement().Decode(input[:p.OPRFPointLength])
-	if err != nil {
-		return nil, errInvalidServerPK
-	}
-
-	return &cred.CredentialRequest{
-		C:    p.OPRF,
-		Data: data,
-	}, nil
-}
-
 func (p *Parameters) deserializeCredentialResponse(input []byte, maxResponseLength int) (*cred.CredentialResponse, error) {
 	data, err := p.Group.NewElement().Decode(input[:p.OPRFPointLength])
 	if err != nil {
@@ -160,7 +148,7 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 		return nil, errInvalidMessageLength
 	}
 
-	creq, err := p.deserializeCredentialRequest(input[:p.OPRFPointLength])
+	data, err := p.Group.NewElement().Decode(input[:p.OPRFPointLength])
 	if err != nil {
 		return nil, errInvalidBlindedData
 	}
@@ -173,9 +161,12 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 	}
 
 	return &message.KE1{
-		CredentialRequest: creq,
-		NonceU:            nonceU,
-		EpkU:              epku,
+		CredentialRequest: &cred.CredentialRequest{
+			C:    p.OPRF,
+			Data: data,
+		},
+		NonceU: nonceU,
+		EpkU:   epku,
 	}, nil
 }
 
