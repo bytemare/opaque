@@ -497,7 +497,10 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ke3, _, _ := client.LoginFinish(nil, nil, ke2)
+	ke3, _, err := client.LoginFinish(nil, nil, ke2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ke3.Mac[0] = ^ke3.Mac[0]
 
 	expected := opaque.ErrAkeInvalidClientMac

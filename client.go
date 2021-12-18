@@ -30,13 +30,15 @@ var (
 
 	// errInvalidPKS happens when the server sends an invalid public key.
 	errInvalidPKS = errors.New("invalid server public key")
+
+	// errKe1Missing happens when LoginFinish is called and the client has no Ke1 in state.
+	errKe1Missing = errors.New("missing KE1 in client")
 )
 
 // Client represents an OPAQUE Client, exposing its functions and holding its state.
 type Client struct {
 	OPRF *oprf.Client
 	Ake  *ake.Client
-	Ke1  *message.KE1
 	*internal.Parameters
 }
 
@@ -102,10 +104,11 @@ func (c *Client) RegistrationFinalize(creds *Credentials,
 func (c *Client) LoginInit(password []byte) *message.KE1 {
 	m := c.OPRF.Blind(password)
 	credReq := &cred.CredentialRequest{Data: m}
-	c.Ke1 = c.Ake.Start(c.Group)
-	c.Ke1.CredentialRequest = credReq
+	ke1 := c.Ake.Start(c.Group)
+	ke1.CredentialRequest = credReq
+	c.Ake.Ke1 = ke1.Serialize()
 
-	return c.Ke1
+	return ke1
 }
 
 // unmask assumes that maskedResponse has been checked to be of length pointLength + envelope size.
@@ -125,6 +128,10 @@ func (c *Client) unmask(maskingNonce, randomizedPwd, maskedResponse []byte) ([]b
 // LoginFinish returns a KE3 message given the server's KE2 response message and the identities. If the idc
 // or ids parameters are nil, the client and server's public keys are taken as identities for both.
 func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, exportKey []byte, err error) {
+	if len(c.Ake.Ke1) == 0 {
+		return nil, nil, errKe1Missing
+	}
+
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
 	if len(ke2.MaskedResponse) != c.AkePointLength+c.EnvelopeSize {
 		return nil, nil, errInvalidMaskedLength
@@ -152,7 +159,7 @@ func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE
 		ids = serverPublicKey
 	}
 
-	ke3, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, pks, c.Ke1, ke2)
+	ke3, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, pks, ke2)
 	if err != nil {
 		return nil, nil, fmt.Errorf(" AKE finalization: %w", err)
 	}

@@ -23,6 +23,7 @@ var errAkeInvalidServerMac = errors.New("invalid server mac")
 // Client exposes the client's AKE functions and holds its state.
 type Client struct {
 	esk           *group.Scalar
+	Ke1           []byte
 	sessionSecret []byte
 	nonceU        []byte // testing: integrated to support testing, to force values.
 }
@@ -60,10 +61,9 @@ func (c *Client) Start(cs group.Group) *message.KE1 {
 // Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions
 // returns a KE3 message.
 func (c *Client) Finalize(p *internal.Parameters, clientIdentity []byte, clientSecretKey *group.Scalar,
-	serverIdentity []byte, serverPublicKey *group.Point,
-	ke1 *message.KE1, ke2 *message.KE2) (*message.KE3, error) {
+	serverIdentity []byte, serverPublicKey *group.Point, ke2 *message.KE2) (*message.KE3, error) {
 	ikm := k3dh(p.Group, ke2.EpkS, c.esk, serverPublicKey, c.esk, ke2.EpkS, clientSecretKey)
-	sessionSecret, serverMac, clientMac := core3DH(p, ikm, clientIdentity, serverIdentity, ke1, ke2)
+	sessionSecret, serverMac, clientMac := core3DH(p, ikm, clientIdentity, serverIdentity, c.Ke1, ke2)
 
 	if !p.MAC.Equal(serverMac, ke2.Mac) {
 		return nil, errAkeInvalidServerMac
