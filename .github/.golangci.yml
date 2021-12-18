@@ -2,7 +2,9 @@ linters:
   disable-all: true
   enable:
     - asciicheck
+    - bidichk
     - bodyclose
+    - contextcheck
     - cyclop
     - deadcode
     - depguard
@@ -44,6 +46,7 @@ linters:
     - nakedret
     - nestif
     - nilerr
+    - nilnil
     - noctx
     - nolintlint
     - paralleltest
@@ -56,7 +59,7 @@ linters:
     - structcheck
     - stylecheck
     - tagliatelle
-    #- tenv
+    - tenv
     - testpackage
     - thelper
     - tparallel
@@ -65,6 +68,7 @@ linters:
     - unparam
     - unused
     - varcheck
+    #- varnamelen
     - wastedassign
     - whitespace
     #- wrapcheck
@@ -196,6 +200,9 @@ issues:
     - path: internal/hash.go
       linters:
         - errcheck
+    - path: internal/tag/strings.go
+      linters:
+        - gosec
 
   max-issues-per-linter: 0
   max-same-issues: 0
