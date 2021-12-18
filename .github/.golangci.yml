@@ -145,14 +145,6 @@ linters-settings:
     enable:
       - atomicalign
     disable-all: false
-  depguard:
-    list-type: blacklist
-    packages:
-      # logging is allowed only by logutils.Log, logrus
-      # is allowed to use only in logutils package
-      - github.com/sirupsen/logrus
-    packages-with-error-message:
-      - github.com/sirupsen/logrus: "logging is allowed only by logutils.Log"
   lll:
     line-length: 145
     # tab width ('\t') in spaces. Default to 1.
@@ -190,13 +182,6 @@ issues:
     - "should have a package comment, unless it's in another file for this package"
 
   exclude-rules:
-    # Exclude some linters from running on tests files.
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - errcheck
-        - dupl
-        - gosec
     - path: internal/hash.go
       linters:
         - errcheck
