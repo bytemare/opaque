@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bytemare/opaque/internal/masking"
+
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
@@ -27,9 +29,6 @@ import (
 var (
 	// errInvalidMaskedLength happens when unmasking a masked response.
 	errInvalidMaskedLength = errors.New("invalid masked response length")
-
-	// errInvalidPKS happens when the server sends an invalid public key.
-	errInvalidPKS = errors.New("invalid server public key")
 
 	// errKe1Missing happens when LoginFinish is called and the client has no Ke1 in state.
 	errKe1Missing = errors.New("missing KE1 in client")
@@ -111,20 +110,6 @@ func (c *Client) LoginInit(password []byte) *message.KE1 {
 	return ke1
 }
 
-// unmask assumes that maskedResponse has been checked to be of length pointLength + envelope size.
-func (c *Client) unmask(maskingNonce, randomizedPwd, maskedResponse []byte) ([]byte, *keyrecovery.Envelope) {
-	maskingKey := c.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.Hash.Size())
-	clear := c.MaskResponse(maskingKey, maskingNonce, maskedResponse)
-	serverPublicKey := clear[:encoding.PointLength[c.Group]]
-	e := clear[encoding.PointLength[c.Group]:]
-	env := &keyrecovery.Envelope{
-		Nonce:   e[:c.NonceLen],
-		AuthTag: e[c.NonceLen:],
-	}
-
-	return serverPublicKey, env
-}
-
 // LoginFinish returns a KE3 message given the server's KE2 response message and the identities. If the idc
 // or ids parameters are nil, the client and server's public keys are taken as identities for both.
 func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, exportKey []byte, err error) {
@@ -137,29 +122,33 @@ func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE
 		return nil, nil, errInvalidMaskedLength
 	}
 
+	// Finalize the OPRF.
 	randomizedPwd := c.buildPRK(ke2.Data, c.Info)
-	serverPublicKey, env := c.unmask(ke2.MaskingNonce, randomizedPwd, ke2.MaskedResponse)
 
-	pks, err := c.Group.NewElement().Decode(serverPublicKey)
+	// Decrypt the masked response.
+	serverPublicKey, serverPublicKeyBytes, envelope, err :=
+		masking.Unmask(c.Parameters, randomizedPwd, ke2.MaskingNonce, ke2.MaskedResponse)
 	if err != nil {
-		return nil, nil, errInvalidPKS
+		return nil, nil, err
 	}
 
-	clientSecretKey, clientPublicKey, exportKey, err := keyrecovery.Recover(c.Parameters,
-		randomizedPwd, serverPublicKey, idc, ids, env)
+	// Recover the client keys.
+	clientSecretKey, clientPublicKey, exportKey, err :=
+		keyrecovery.Recover(c.Parameters, randomizedPwd, serverPublicKeyBytes, idc, ids, envelope)
 	if err != nil {
-		return nil, nil, fmt.Errorf("recover envelope: %w", err)
+		return nil, nil, err
 	}
 
+	// Finalize the AKE.
 	if idc == nil {
 		idc = encoding.SerializePoint(clientPublicKey, c.Group)
 	}
 
 	if ids == nil {
-		ids = serverPublicKey
+		ids = serverPublicKeyBytes
 	}
 
-	ke3, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, pks, ke2)
+	ke3, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, serverPublicKey, ke2)
 	if err != nil {
 		return nil, nil, fmt.Errorf(" AKE finalization: %w", err)
 	}

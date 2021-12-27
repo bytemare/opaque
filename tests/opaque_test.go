@@ -37,7 +37,7 @@ func TestFull(t *testing.T) {
 		userID:        username,
 		serverID:      ids,
 		password:      password,
-		oprfSeed:      internal.RandomBytes(32),
+		oprfSeed:      internal.RandomBytes(p.Hash.Size()),
 	}
 
 	serverSecretKey, pks := p.Server().KeyGen()

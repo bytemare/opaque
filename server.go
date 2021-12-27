@@ -12,6 +12,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/bytemare/opaque/internal/masking"
+
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
@@ -36,7 +38,7 @@ var (
 	ErrInvalidPksLength = errors.New("input server public key's length is invalid")
 
 	// ErrInvalidOPRFSeedLength indicates that the OPRF seed is not of right length.
-	ErrInvalidOPRFSeedLength = errors.New("input OPRF seed length is invalid")
+	ErrInvalidOPRFSeedLength = errors.New("input OPRF seed length is invalid (must be of hash output length)")
 )
 
 // Server represents an OPAQUE Server, exposing its functions and holding its state.
@@ -87,13 +89,7 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 	credentialIdentifier, oprfSeed, maskingNonce, info []byte) *cred.CredentialResponse {
 	z := s.oprfResponse(req.Data, oprfSeed, credentialIdentifier, info)
 
-	// testing: integrated to support testing, to force values.
-	if len(maskingNonce) == 0 {
-		maskingNonce = internal.RandomBytes(s.Parameters.NonceLen)
-	}
-
-	clear := encoding.Concat(serverPublicKey, record.Envelope)
-	maskedResponse := s.MaskResponse(record.MaskingKey, maskingNonce, clear)
+	maskingNonce, maskedResponse := masking.Mask(s.Parameters, maskingNonce, record.MaskingKey, serverPublicKey, record.Envelope)
 
 	return &cred.CredentialResponse{
 		Data:           z,
@@ -112,7 +108,7 @@ func (s *Server) verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed []by
 		return nil, ErrInvalidPksLength
 	}
 
-	if len(oprfSeed) != internal.SeedLength {
+	if len(oprfSeed) != s.Hash.Size() {
 		return nil, ErrInvalidOPRFSeedLength
 	}
 

@@ -211,8 +211,8 @@ func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
 	return &message.KE3{Mac: input}, nil
 }
 
-// MaskResponse is used to encrypt and decrypt the response in KE2.
-func (p *Parameters) MaskResponse(key, nonce, in []byte) []byte {
+// XorResponse is used to encrypt and decrypt the response in KE2.
+func (p *Parameters) XorResponse(key, nonce, in []byte) []byte {
 	pad := p.KDF.Expand(key, encoding.SuffixString(nonce, tag.CredentialResponsePad), encoding.PointLength[p.Group]+p.EnvelopeSize)
 	return Xor(pad, in)
 }

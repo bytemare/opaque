@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/crypto/mhf"
 
 	"github.com/bytemare/opaque"
@@ -355,7 +354,7 @@ func getEnvelope(client *opaque.Client, ke2 *message.KE2, info []byte) (*keyreco
 
 	maskingKey := client.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), client.Hash.Size())
 
-	clear := client.MaskResponse(maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
+	clear := client.XorResponse(maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
 	e := clear[encoding.PointLength[client.Group]:]
 
 	env := &keyrecovery.Envelope{
@@ -396,14 +395,15 @@ func TestServerInit_InvalidPublicKey(t *testing.T) {
 	for _, conf := range confs {
 		server := conf.Conf.Server()
 		sk, _ := server.KeyGen()
+		oprfSeed := internal.RandomBytes(conf.Conf.Hash.Size())
 
 		expected := "input server public key's length is invalid"
-		if _, err := server.LoginInit(nil, nil, sk, nil, nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, err := server.LoginInit(nil, nil, sk, nil, oprfSeed, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil pubkey - got %s", err)
 		}
 
 		expected = "invalid server public key: "
-		if _, err := server.LoginInit(nil, nil, sk, getBadElement(t, conf), nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, err := server.LoginInit(nil, nil, sk, getBadElement(t, conf), oprfSeed, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on bad secret key - got %s", err)
 		}
 	}
@@ -422,12 +422,12 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 			t.Fatalf("expected error on nil seed - got %s", err)
 		}
 
-		seed := internal.RandomBytes(internal.SeedLength - 1)
+		seed := internal.RandomBytes(conf.Conf.Hash.Size() - 1)
 		if _, err := server.LoginInit(nil, nil, sk, pk, seed, nil); err == nil || !errors.Is(err, expected) {
 			t.Fatalf("expected error on bad seed - got %s", err)
 		}
 
-		seed = internal.RandomBytes(internal.SeedLength + 1)
+		seed = internal.RandomBytes(conf.Conf.Hash.Size() + 1)
 		if _, err := server.LoginInit(nil, nil, sk, pk, seed, nil); err == nil || !errors.Is(err, expected) {
 			t.Fatalf("expected error on bad seed - got %s", err)
 		}
@@ -456,11 +456,12 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 	for _, conf := range confs {
 		server := conf.Conf.Server()
 		sk, pk := server.KeyGen()
-		rec := buildRecord(internal.RandomBytes(32), internal.RandomBytes(32), []byte("yo"), pk, conf.Conf.Client(), server)
+		oprfSeed := internal.RandomBytes(conf.Conf.Hash.Size())
+		rec := buildRecord(internal.RandomBytes(32), oprfSeed, []byte("yo"), pk, conf.Conf.Client(), server)
 		rec.Envelope = internal.RandomBytes(15)
 
 		expected := "record has invalid envelope length"
-		if _, err := server.LoginInit(nil, nil, sk, pk, nil, rec); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, err := server.LoginInit(nil, nil, sk, pk, oprfSeed, rec); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil secret key - got %s", err)
 		}
 	}
@@ -512,13 +513,13 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	*/
 	conf := opaque.DefaultConfiguration()
 	credId := internal.RandomBytes(32)
-	seed := internal.RandomBytes(32)
+	oprfSeed := internal.RandomBytes(conf.Hash.Size())
 	client := conf.Client()
 	server := conf.Server()
 	sk, pk := server.KeyGen()
-	rec := buildRecord(credId, seed, []byte("yo"), pk, client, server)
+	rec := buildRecord(credId, oprfSeed, []byte("yo"), pk, client, server)
 	ke1 := client.LoginInit([]byte("yo"))
-	ke2, err := server.LoginInit(ke1, nil, sk, pk, seed, rec)
+	ke2, err := server.LoginInit(ke1, nil, sk, pk, oprfSeed, rec)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -553,7 +554,7 @@ func TestServerSetAKEState_InvalidInput(t *testing.T) {
 	*/
 
 	credId := internal.RandomBytes(32)
-	seed := internal.RandomBytes(32)
+	seed := internal.RandomBytes(conf.Hash.Size())
 	client := conf.Client()
 	server = conf.Server()
 	sk, pk := server.KeyGen()
@@ -567,18 +568,17 @@ func TestServerSetAKEState_InvalidInput(t *testing.T) {
 }
 
 // client.go
-
 func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 	/*
 		Invalid data sent to the client
 	*/
 	credID := internal.RandomBytes(32)
-	oprfSeed := internal.RandomBytes(32)
 
 	for _, conf := range confs {
 		client := conf.Conf.Client()
 		server := conf.Conf.Server()
 		_, pks := server.KeyGen()
+		oprfSeed := internal.RandomBytes(conf.Conf.Hash.Size())
 		r1 := client.RegistrationInit([]byte("yo"))
 
 		pk, err := server.Group.NewElement().Decode(pks)
@@ -632,12 +632,12 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 		The masked response is of invalid length.
 	*/
 	credID := internal.RandomBytes(32)
-	oprfSeed := internal.RandomBytes(32)
 
 	for _, conf := range confs {
 		client := conf.Conf.Client()
 		server := conf.Conf.Server()
 		sks, pks := server.KeyGen()
+		oprfSeed := internal.RandomBytes(conf.Conf.Hash.Size())
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.LoginInit([]byte("yo"))
@@ -665,12 +665,12 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		Invalid envelope tag
 	*/
 	credID := internal.RandomBytes(32)
-	oprfSeed := internal.RandomBytes(32)
 
 	for _, conf := range confs {
 		client := conf.Conf.Client()
 		server := conf.Conf.Server()
 		sks, pks := server.KeyGen()
+		oprfSeed := internal.RandomBytes(conf.Conf.Hash.Size())
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.LoginInit([]byte("yo"))
@@ -684,7 +684,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		// tamper the envelope
 		env.AuthTag = internal.RandomBytes(client.MAC.Size())
 		clear := encoding.Concat(pks, env.Serialize())
-		ke2.MaskedResponse = server.MaskResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
+		ke2.MaskedResponse = server.XorResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
 
 		// too short
 		expected := "recover envelope: invalid envelope authentication tag"
@@ -711,12 +711,12 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		Tamper KE2 values
 	*/
 	credID := internal.RandomBytes(32)
-	oprfSeed := internal.RandomBytes(32)
 
 	for _, conf := range confs {
 		client := conf.Conf.Client()
 		server := conf.Conf.Server()
 		sks, pks := server.KeyGen()
+		oprfSeed := internal.RandomBytes(conf.Conf.Hash.Size())
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.LoginInit([]byte("yo"))
@@ -747,7 +747,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		env.AuthTag = authTag
 
 		clear := encoding.Concat(badpks, env.Serialize())
-		ke2.MaskedResponse = server.MaskResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
+		ke2.MaskedResponse = server.XorResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
 
 		expected = "invalid server public key"
 		if _, _, err := client.LoginFinish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
@@ -757,7 +757,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		// replace PKS
 		fakepks := server.Group.NewElement().Mult(server.Group.NewScalar().Random()).Bytes()
 		clear = encoding.Concat(fakepks, env.Serialize())
-		ke2.MaskedResponse = server.MaskResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
+		ke2.MaskedResponse = server.XorResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
 
 		expected = "recover envelope: invalid envelope authentication tag"
 		if _, _, err := client.LoginFinish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
@@ -771,12 +771,12 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 		Invalid server ke2 mac
 	*/
 	credID := internal.RandomBytes(32)
-	oprfSeed := internal.RandomBytes(32)
 
 	for _, conf := range confs {
 		client := conf.Conf.Client()
 		server := conf.Conf.Server()
 		sks, pks := server.KeyGen()
+		oprfSeed := internal.RandomBytes(conf.Conf.Hash.Size())
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.LoginInit([]byte("yo"))
