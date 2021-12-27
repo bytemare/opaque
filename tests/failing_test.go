@@ -409,6 +409,31 @@ func TestServerInit_InvalidPublicKey(t *testing.T) {
 	}
 }
 
+func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
+	/*
+		Nil and invalid server public key
+	*/
+	for _, conf := range confs {
+		server := conf.Conf.Server()
+		sk, pk := server.KeyGen()
+		expected := opaque.ErrInvalidOPRFSeedLength
+
+		if _, err := server.LoginInit(nil, nil, sk, pk, nil, nil); err == nil || !errors.Is(err, expected) {
+			t.Fatalf("expected error on nil seed - got %s", err)
+		}
+
+		seed := internal.RandomBytes(internal.SeedLength - 1)
+		if _, err := server.LoginInit(nil, nil, sk, pk, seed, nil); err == nil || !errors.Is(err, expected) {
+			t.Fatalf("expected error on bad seed - got %s", err)
+		}
+
+		seed = internal.RandomBytes(internal.SeedLength + 1)
+		if _, err := server.LoginInit(nil, nil, sk, pk, seed, nil); err == nil || !errors.Is(err, expected) {
+			t.Fatalf("expected error on bad seed - got %s", err)
+		}
+	}
+}
+
 func TestServerInit_NilSecretKey(t *testing.T) {
 	/*
 		Nil server secret key

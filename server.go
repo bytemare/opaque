@@ -34,6 +34,9 @@ var (
 
 	// ErrInvalidPksLength indicates the input public key is not of right length.
 	ErrInvalidPksLength = errors.New("input server public key's length is invalid")
+
+	// ErrInvalidOPRFSeedLength indicates that the OPRF seed is not of right length.
+	ErrInvalidOPRFSeedLength = errors.New("input OPRF seed length is invalid")
 )
 
 // Server represents an OPAQUE Server, exposing its functions and holding its state.
@@ -99,9 +102,7 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 	}
 }
 
-// LoginInit responds to a KE1 message with a KE2 message given server credentials and client record.
-func (s *Server) LoginInit(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
-	record *ClientRecord) (*message.KE2, error) {
+func (s *Server) verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed []byte, record *ClientRecord) (*group.Scalar, error) {
 	sks, err := s.Group.NewScalar().Decode(serverSecretKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid server secret key: %w", err)
@@ -111,12 +112,27 @@ func (s *Server) LoginInit(ke1 *message.KE1, serverIdentity, serverSecretKey, se
 		return nil, ErrInvalidPksLength
 	}
 
-	if _, err = s.Group.NewElement().Decode(serverPublicKey); err != nil {
+	if len(oprfSeed) != internal.SeedLength {
+		return nil, ErrInvalidOPRFSeedLength
+	}
+
+	if _, err := s.Group.NewElement().Decode(serverPublicKey); err != nil {
 		return nil, fmt.Errorf("invalid server public key: %w", err)
 	}
 
 	if len(record.Envelope) != s.EnvelopeSize {
 		return nil, ErrInvalidEnvelopeLength
+	}
+
+	return sks, nil
+}
+
+// LoginInit responds to a KE1 message with a KE2 message given server credentials and client record.
+func (s *Server) LoginInit(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
+	record *ClientRecord) (*message.KE2, error) {
+	sks, err := s.verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed, record)
+	if err != nil {
+		return nil, err
 	}
 
 	response := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
