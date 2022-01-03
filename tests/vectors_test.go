@@ -20,11 +20,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bytemare/opaque/internal/encoding"
-
 	"github.com/bytemare/crypto/mhf"
 
 	"github.com/bytemare/opaque"
+	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
 )

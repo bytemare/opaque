@@ -12,13 +12,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytemare/opaque/internal/masking"
-
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/masking"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"

@@ -11,14 +11,13 @@ package opaque
 import (
 	"errors"
 
-	"github.com/bytemare/opaque/internal/masking"
-
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/keyrecovery"
+	"github.com/bytemare/opaque/internal/masking"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
