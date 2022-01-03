@@ -10,7 +10,6 @@ package opaque
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/bytemare/opaque/internal/masking"
 
@@ -150,7 +149,7 @@ func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE
 
 	ke3, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, serverPublicKey, ke2)
 	if err != nil {
-		return nil, nil, fmt.Errorf(" AKE finalization: %w", err)
+		return nil, nil, err
 	}
 
 	return ke3, exportKey, nil

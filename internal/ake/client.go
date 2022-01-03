@@ -18,7 +18,7 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
-var errAkeInvalidServerMac = errors.New("invalid server mac")
+var errAkeInvalidServerMac = errors.New(" AKE finalization: invalid server mac")
 
 // Client exposes the client's AKE functions and holds its state.
 type Client struct {
