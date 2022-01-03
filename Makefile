@@ -5,12 +5,12 @@ COMMIT      := $(shell git rev-parse HEAD)
 lint:
 	@echo "Linting ..."
 	@gofumports -w -local github.com/bytemare/opaque .
-	@golangci-lint run --config=./.github/.golangci.yml ./...
+	@if golangci-lint run --config=./.github/.golangci.yml ./...; then echo "Linting OK"; else return 1; fi;
 
 .PHONY: license
 license:
 	@echo "Checking License headers ..."
-	@addlicense -check -v -f .github/licence-header.tmpl *
+	@if addlicense -check -v -f .github/licence-header.tmpl *; then echo "License headers OK"; else return 1; fi;
 
 .PHONY: test
 test:
