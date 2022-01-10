@@ -32,12 +32,13 @@ const (
 )
 
 var (
-	errInvalidMessageLength = errors.New("invalid message length")
+	errInvalidMessageLength = errors.New("invalid message length for the configuration")
 	errInvalidBlindedData   = errors.New("blinded data is an invalid point")
 	errInvalidClientEPK     = errors.New("invalid ephemeral client public key")
 	errInvalidEvaluatedData = errors.New("invalid OPRF evaluation")
 	errInvalidServerEPK     = errors.New("invalid ephemeral server public key")
 	errInvalidServerPK      = errors.New("invalid server public key")
+	errInvalidClientPK      = errors.New("invalid client public key")
 )
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
@@ -117,7 +118,7 @@ func (p *Parameters) DeserializeRecord(input []byte) (*message.RegistrationRecor
 
 	pku, err := p.Group.NewElement().Decode(pk)
 	if err != nil {
-		return nil, errInvalidServerPK
+		return nil, errInvalidClientPK
 	}
 
 	return &message.RegistrationRecord{
@@ -131,7 +132,7 @@ func (p *Parameters) DeserializeRecord(input []byte) (*message.RegistrationRecor
 func (p *Parameters) deserializeCredentialResponse(input []byte, maxResponseLength int) (*cred.CredentialResponse, error) {
 	data, err := p.Group.NewElement().Decode(input[:p.OPRFPointLength])
 	if err != nil {
-		return nil, errInvalidServerPK
+		return nil, errInvalidEvaluatedData
 	}
 
 	return &cred.CredentialResponse{
@@ -172,15 +173,16 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 
 // DeserializeKE2 takes a serialized KE2 message as input and attempts to deserialize it.
 func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
-	maxResponseLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize
+	maxResponseLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize // size of credential response
 
+	// Verify it matches the size of a legal KE2 message.
 	if len(input) != maxResponseLength+p.NonceLen+p.AkePointLength+p.MAC.Size() {
 		return nil, errInvalidMessageLength
 	}
 
 	cresp, err := p.deserializeCredentialResponse(input, maxResponseLength)
 	if err != nil {
-		return nil, errInvalidEvaluatedData
+		return nil, err
 	}
 
 	nonceS := input[maxResponseLength : maxResponseLength+p.NonceLen]
