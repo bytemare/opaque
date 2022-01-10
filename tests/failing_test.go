@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	errInvalidMessageLength = errors.New("invalid message length")
+	errInvalidMessageLength = errors.New("invalid message length for the configuration")
 	errInvalidStateLength   = errors.New("invalid state length")
 	errStateExists          = errors.New("existing state is not empty")
 )
@@ -78,7 +78,7 @@ func TestDeserializeRegistrationRecord(t *testing.T) {
 		badPKu := getBadElement(t, e)
 		rec := encoding.Concat(badPKu, internal.RandomBytes(server.Hash.Size()+server.EnvelopeSize))
 
-		expect := "invalid server public key"
+		expect := "invalid client public key"
 		if _, err := server.DeserializeRegistrationRecord(rec); err == nil || err.Error() != expect {
 			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", expect, err)
 		}
