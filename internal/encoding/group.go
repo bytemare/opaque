@@ -29,7 +29,7 @@ var ScalarLength = map[group.Group]int{
 	group.Ristretto255Sha512: ristrettoScalarLength,
 	// group.Decaf448Shake256: 56,
 	group.P256Sha256:       p256ScalarLength,
-	group.P384Sha512:       p384ScalarLength,
+	group.P384Sha384:       p384ScalarLength,
 	group.P521Sha512:       p521ScalarLength,
 	group.Curve25519Sha512: curve25519ScalarLength,
 }
@@ -39,7 +39,7 @@ var PointLength = map[group.Group]int{
 	group.Ristretto255Sha512: ristrettoPointLength,
 	// group.Decaf448Shake256: 56,
 	group.P256Sha256:       p256PointLength,
-	group.P384Sha512:       p384PointLength,
+	group.P384Sha384:       p384PointLength,
 	group.P521Sha512:       p521PointLength,
 	group.Curve25519Sha512: curve25519PointLength,
 }

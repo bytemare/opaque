@@ -35,7 +35,7 @@ const (
 	P256Sha256 = Ciphersuite(group.P256Sha256)
 
 	// P384Sha384 is the OPRF cipher suite of the NIST P-384 group and SHA-384.
-	P384Sha384 = Ciphersuite(group.P384Sha512)
+	P384Sha384 = Ciphersuite(group.P384Sha384)
 
 	// P521Sha512 is the OPRF cipher suite of the NIST P-512 group and SHA-512.
 	P521Sha512 = Ciphersuite(group.P521Sha512)
