@@ -24,6 +24,9 @@ import (
 )
 
 var (
+	// ErrInvalidServerSecretKey indicates that server's secret key is invalid.
+	ErrInvalidServerSecretKey = errors.New("invalid server secret key")
+
 	// ErrAkeInvalidClientMac indicates that the MAC contained in the KE3 message is not valid in the given session.
 	ErrAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")
 
@@ -100,7 +103,7 @@ func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey
 func (s *Server) verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed []byte, record *ClientRecord) (*group.Scalar, error) {
 	sks, err := s.Group.NewScalar().Decode(serverSecretKey)
 	if err != nil {
-		return nil, fmt.Errorf("invalid server secret key: %w", err)
+		return nil, fmt.Errorf("%v: %w", ErrInvalidServerSecretKey, err)
 	}
 
 	if len(serverPublicKey) != s.AkePointLength {
