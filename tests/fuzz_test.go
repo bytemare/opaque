@@ -5,8 +5,9 @@ package opaque
 
 import (
 	"errors"
-	"github.com/bytemare/opaque"
 	"testing"
+
+	"github.com/bytemare/opaque"
 )
 
 var (
