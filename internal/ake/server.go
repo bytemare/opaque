@@ -64,7 +64,7 @@ func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverS
 	}
 
 	ikm := k3dh(p.Group, ke1.EpkU, s.esk, ke1.EpkU, serverSecretKey, clientPublicKey, s.esk)
-	sessionSecret, serverMac, clientMac := core3DH(p, ikm, clientIdentity, serverIdentity, ke1, ke2)
+	sessionSecret, serverMac, clientMac := core3DH(p, ikm, clientIdentity, serverIdentity, ke1.Serialize(), ke2)
 	s.sessionSecret = sessionSecret
 	s.clientMac = clientMac
 	ke2.Mac = serverMac

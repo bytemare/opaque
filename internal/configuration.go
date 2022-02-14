@@ -32,12 +32,13 @@ const (
 )
 
 var (
-	errInvalidMessageLength = errors.New("invalid message length")
+	errInvalidMessageLength = errors.New("invalid message length for the configuration")
 	errInvalidBlindedData   = errors.New("blinded data is an invalid point")
 	errInvalidClientEPK     = errors.New("invalid ephemeral client public key")
 	errInvalidEvaluatedData = errors.New("invalid OPRF evaluation")
 	errInvalidServerEPK     = errors.New("invalid ephemeral server public key")
 	errInvalidServerPK      = errors.New("invalid server public key")
+	errInvalidClientPK      = errors.New("invalid client public key")
 )
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
@@ -64,7 +65,6 @@ type Parameters struct {
 	Group           group.Group
 	OPRF            oprf.Ciphersuite
 	Context         []byte
-	Info            []byte
 }
 
 // DeserializeRegistrationRequest takes a serialized RegistrationRequest message as input and attempts to deserialize it.
@@ -73,12 +73,16 @@ func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.Regi
 		return nil, errInvalidMessageLength
 	}
 
-	data, err := p.OPRF.Group().NewElement().Decode(input[:p.OPRFPointLength])
+	blindedMessage, err := p.OPRF.Group().NewElement().Decode(input[:p.OPRFPointLength])
 	if err != nil {
 		return nil, errInvalidBlindedData
 	}
 
-	return &message.RegistrationRequest{C: p.OPRF, Data: data}, nil
+	if blindedMessage.IsIdentity() {
+		return nil, errInvalidBlindedData
+	}
+
+	return &message.RegistrationRequest{C: p.OPRF, BlindedMessage: blindedMessage}, nil
 }
 
 // DeserializeRegistrationResponse takes a serialized RegistrationResponse message as input and attempts to deserialize it.
@@ -87,8 +91,12 @@ func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.Reg
 		return nil, errInvalidMessageLength
 	}
 
-	data, err := p.Group.NewElement().Decode(input[:p.OPRFPointLength])
+	evaluatedMessage, err := p.OPRF.Group().NewElement().Decode(input[:p.OPRFPointLength])
 	if err != nil {
+		return nil, errInvalidEvaluatedData
+	}
+
+	if evaluatedMessage.IsIdentity() {
 		return nil, errInvalidEvaluatedData
 	}
 
@@ -97,11 +105,15 @@ func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.Reg
 		return nil, errInvalidServerPK
 	}
 
+	if pks.IsIdentity() {
+		return nil, errInvalidServerPK
+	}
+
 	return &message.RegistrationResponse{
-		C:    p.OPRF,
-		G:    p.Group,
-		Data: data,
-		Pks:  pks,
+		C:                p.OPRF,
+		G:                p.Group,
+		EvaluatedMessage: evaluatedMessage,
+		Pks:              pks,
 	}, nil
 }
 
@@ -117,7 +129,11 @@ func (p *Parameters) DeserializeRecord(input []byte) (*message.RegistrationRecor
 
 	pku, err := p.Group.NewElement().Decode(pk)
 	if err != nil {
-		return nil, errInvalidServerPK
+		return nil, errInvalidClientPK
+	}
+
+	if pku.IsIdentity() {
+		return nil, errInvalidClientPK
 	}
 
 	return &message.RegistrationRecord{
@@ -128,29 +144,21 @@ func (p *Parameters) DeserializeRecord(input []byte) (*message.RegistrationRecor
 	}, nil
 }
 
-func (p *Parameters) deserializeCredentialRequest(input []byte) (*cred.CredentialRequest, error) {
-	data, err := p.Group.NewElement().Decode(input[:p.OPRFPointLength])
-	if err != nil {
-		return nil, errInvalidServerPK
-	}
-
-	return &cred.CredentialRequest{
-		C:    p.OPRF,
-		Data: data,
-	}, nil
-}
-
 func (p *Parameters) deserializeCredentialResponse(input []byte, maxResponseLength int) (*cred.CredentialResponse, error) {
 	data, err := p.Group.NewElement().Decode(input[:p.OPRFPointLength])
 	if err != nil {
-		return nil, errInvalidServerPK
+		return nil, errInvalidEvaluatedData
+	}
+
+	if data.IsIdentity() {
+		return nil, errInvalidEvaluatedData
 	}
 
 	return &cred.CredentialResponse{
-		C:              p.OPRF,
-		Data:           data,
-		MaskingNonce:   input[p.OPRFPointLength : p.OPRFPointLength+p.NonceLen],
-		MaskedResponse: input[p.OPRFPointLength+p.NonceLen : maxResponseLength],
+		C:                p.OPRF,
+		EvaluatedMessage: data,
+		MaskingNonce:     input[p.OPRFPointLength : p.OPRFPointLength+p.NonceLen],
+		MaskedResponse:   input[p.OPRFPointLength+p.NonceLen : maxResponseLength],
 	}, nil
 }
 
@@ -160,8 +168,12 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 		return nil, errInvalidMessageLength
 	}
 
-	creq, err := p.deserializeCredentialRequest(input[:p.OPRFPointLength])
+	blindedMessage, err := p.Group.NewElement().Decode(input[:p.OPRFPointLength])
 	if err != nil {
+		return nil, errInvalidBlindedData
+	}
+
+	if blindedMessage.IsIdentity() {
 		return nil, errInvalidBlindedData
 	}
 
@@ -172,24 +184,32 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 		return nil, errInvalidClientEPK
 	}
 
+	if epku.IsIdentity() {
+		return nil, errInvalidClientEPK
+	}
+
 	return &message.KE1{
-		CredentialRequest: creq,
-		NonceU:            nonceU,
-		EpkU:              epku,
+		CredentialRequest: &cred.CredentialRequest{
+			C:              p.OPRF,
+			BlindedMessage: blindedMessage,
+		},
+		NonceU: nonceU,
+		EpkU:   epku,
 	}, nil
 }
 
 // DeserializeKE2 takes a serialized KE2 message as input and attempts to deserialize it.
 func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
-	maxResponseLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize
+	maxResponseLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize // size of credential response
 
+	// Verify it matches the size of a legal KE2 message.
 	if len(input) != maxResponseLength+p.NonceLen+p.AkePointLength+p.MAC.Size() {
 		return nil, errInvalidMessageLength
 	}
 
 	cresp, err := p.deserializeCredentialResponse(input, maxResponseLength)
 	if err != nil {
-		return nil, errInvalidEvaluatedData
+		return nil, err
 	}
 
 	nonceS := input[maxResponseLength : maxResponseLength+p.NonceLen]
@@ -200,6 +220,10 @@ func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 
 	epks, err := p.Group.NewElement().Decode(epk)
 	if err != nil {
+		return nil, errInvalidServerEPK
+	}
+
+	if epks.IsIdentity() {
 		return nil, errInvalidServerEPK
 	}
 
@@ -220,8 +244,8 @@ func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
 	return &message.KE3{Mac: input}, nil
 }
 
-// MaskResponse is used to encrypt and decrypt the response in KE2.
-func (p *Parameters) MaskResponse(key, nonce, in []byte) []byte {
+// XorResponse is used to encrypt and decrypt the response in KE2.
+func (p *Parameters) XorResponse(key, nonce, in []byte) []byte {
 	pad := p.KDF.Expand(key, encoding.SuffixString(nonce, tag.CredentialResponsePad), encoding.PointLength[p.Group]+p.EnvelopeSize)
 	return Xor(pad, in)
 }

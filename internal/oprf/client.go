@@ -10,11 +10,15 @@
 package oprf
 
 import (
+	"errors"
+
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
 )
+
+var errInvalidInput = errors.New("invalid input - OPRF input deterministically maps to the group identity element")
 
 // Client implements the OPRF client and holds its state.
 type Client struct {
@@ -35,6 +39,10 @@ func (c *Client) Blind(input []byte) *group.Point {
 	}
 
 	p := c.HashToGroup(input, c.dst(tag.OPRFPointPrefix))
+	if p.IsIdentity() {
+		panic(errInvalidInput)
+	}
+
 	c.input = input
 
 	return p.Mult(c.blind)
@@ -51,18 +59,16 @@ func (o *oprf) hash(input ...[]byte) []byte {
 	return h.Sum(nil)
 }
 
-func (o *oprf) hashTranscript(input, unblinded, info []byte) []byte {
-	finalizeDST := o.dst(tag.OPRFFinalize)
+func (o *oprf) hashTranscript(input, unblinded []byte) []byte {
 	encInput := encoding.EncodeVector(input)
-	encInfo := encoding.EncodeVector(info)
 	encElement := encoding.EncodeVector(unblinded)
-	encDST := encoding.EncodeVector(finalizeDST)
+	encDST := []byte(tag.OPRFFinalize)
 
-	return o.hash(encInput, encInfo, encElement, encDST)
+	return o.hash(encInput, encElement, encDST)
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
-func (c *Client) Finalize(evaluation *group.Point, info []byte) []byte {
+func (c *Client) Finalize(evaluation *group.Point) []byte {
 	u := encoding.SerializePoint(evaluation.InvertMult(c.blind), c.Group)
-	return c.hashTranscript(c.input, u, info)
+	return c.hashTranscript(c.input, u)
 }

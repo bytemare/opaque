@@ -17,12 +17,16 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/masking"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
 
 var (
+	// ErrInvalidServerSecretKey indicates that server's secret key is invalid.
+	ErrInvalidServerSecretKey = errors.New("invalid server secret key")
+
 	// ErrAkeInvalidClientMac indicates that the MAC contained in the KE3 message is not valid in the given session.
 	ErrAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")
 
@@ -34,6 +38,15 @@ var (
 
 	// ErrInvalidPksLength indicates the input public key is not of right length.
 	ErrInvalidPksLength = errors.New("input server public key's length is invalid")
+
+	// ErrInvalidOPRFSeedLength indicates that the OPRF seed is not of right length.
+	ErrInvalidOPRFSeedLength = errors.New("input OPRF seed length is invalid (must be of hash output length)")
+
+	// ErrIdentityPKS indicates that the server public key is the group's identity point.
+	ErrIdentityPKS = errors.New("invalid server public key: pks is identity point")
+
+	// ErrZeroSKS indicates that the server's private key is a zero scalar.
+	ErrZeroSKS = errors.New("server private key is zero")
 )
 
 // Server represents an OPAQUE Server, exposing its functions and holding its state.
@@ -61,66 +74,82 @@ func (s *Server) KeyGen() (secretKey, publicKey []byte) {
 	return ake.KeyGen(s.Group)
 }
 
-func (s *Server) oprfResponse(element *group.Point, oprfSeed, credentialIdentifier, info []byte) *group.Point {
+func (s *Server) oprfResponse(element *group.Point, oprfSeed, credentialIdentifier []byte) *group.Point {
 	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.ExpandOPRF), internal.SeedLength)
 	ku := s.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair))
 
-	return s.OPRF.Evaluate(ku, element, info)
+	return s.OPRF.Evaluate(ku, element)
 }
 
 // RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given identifiers.
 func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
 	serverPublicKey *group.Point, credentialIdentifier, oprfSeed []byte) *message.RegistrationResponse {
-	z := s.oprfResponse(req.Data, oprfSeed, credentialIdentifier, s.Info)
+	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
 
 	return &message.RegistrationResponse{
-		C:    s.OPRF,
-		Data: z,
-		Pks:  serverPublicKey,
+		C:                s.OPRF,
+		EvaluatedMessage: z,
+		Pks:              serverPublicKey,
 	}
 }
 
 func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey []byte, record *message.RegistrationRecord,
-	credentialIdentifier, oprfSeed, maskingNonce, info []byte) *cred.CredentialResponse {
-	z := s.oprfResponse(req.Data, oprfSeed, credentialIdentifier, info)
+	credentialIdentifier, oprfSeed, maskingNonce []byte) *cred.CredentialResponse {
+	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
 
-	// testing: integrated to support testing, to force values.
-	if len(maskingNonce) == 0 {
-		maskingNonce = internal.RandomBytes(s.Parameters.NonceLen)
-	}
-
-	clear := encoding.Concat(serverPublicKey, record.Envelope)
-	maskedResponse := s.MaskResponse(record.MaskingKey, maskingNonce, clear)
+	maskingNonce, maskedResponse := masking.Mask(s.Parameters, maskingNonce, record.MaskingKey, serverPublicKey, record.Envelope)
 
 	return &cred.CredentialResponse{
-		Data:           z,
-		MaskingNonce:   maskingNonce,
-		MaskedResponse: maskedResponse,
+		EvaluatedMessage: z,
+		MaskingNonce:     maskingNonce,
+		MaskedResponse:   maskedResponse,
 	}
 }
 
-// LoginInit responds to a KE1 message with a KE2 message given server credentials and client record.
-func (s *Server) LoginInit(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
-	record *ClientRecord) (*message.KE2, error) {
+func (s *Server) verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed []byte, record *ClientRecord) (*group.Scalar, error) {
 	sks, err := s.Group.NewScalar().Decode(serverSecretKey)
 	if err != nil {
-		return nil, fmt.Errorf("invalid server secret key: %w", err)
+		return nil, fmt.Errorf("%v: %w", ErrInvalidServerSecretKey, err)
+	}
+
+	if sks.IsZero() {
+		return nil, ErrZeroSKS
 	}
 
 	if len(serverPublicKey) != s.AkePointLength {
 		return nil, ErrInvalidPksLength
 	}
 
-	if _, err = s.Group.NewElement().Decode(serverPublicKey); err != nil {
+	if len(oprfSeed) != s.Hash.Size() {
+		return nil, ErrInvalidOPRFSeedLength
+	}
+
+	pks, err := s.Group.NewElement().Decode(serverPublicKey)
+	if err != nil {
 		return nil, fmt.Errorf("invalid server public key: %w", err)
+	}
+
+	if pks.IsIdentity() {
+		return nil, ErrIdentityPKS
 	}
 
 	if len(record.Envelope) != s.EnvelopeSize {
 		return nil, ErrInvalidEnvelopeLength
 	}
 
+	return sks, nil
+}
+
+// LoginInit responds to a KE1 message with a KE2 message given server credentials and client record.
+func (s *Server) LoginInit(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
+	record *ClientRecord) (*message.KE2, error) {
+	sks, err := s.verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed, record)
+	if err != nil {
+		return nil, err
+	}
+
 	response := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
-		record.RegistrationRecord, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce, s.Info)
+		record.RegistrationRecord, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce)
 
 	clientIdentity := record.ClientIdentity
 

@@ -10,7 +10,6 @@ package opaque
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/bytemare/crypto/group"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/keyrecovery"
+	"github.com/bytemare/opaque/internal/masking"
 	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
@@ -28,15 +28,14 @@ var (
 	// errInvalidMaskedLength happens when unmasking a masked response.
 	errInvalidMaskedLength = errors.New("invalid masked response length")
 
-	// errInvalidPKS happens when the server sends an invalid public key.
-	errInvalidPKS = errors.New("invalid server public key")
+	// errKe1Missing happens when LoginFinish is called and the client has no Ke1 in state.
+	errKe1Missing = errors.New("missing KE1 in client")
 )
 
 // Client represents an OPAQUE Client, exposing its functions and holding its state.
 type Client struct {
 	OPRF *oprf.Client
 	Ake  *ake.Client
-	Ke1  *message.KE1
 	*internal.Parameters
 }
 
@@ -56,17 +55,17 @@ func NewClient(p *Configuration) *Client {
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation *group.Point, info []byte) []byte {
-	unblinded := c.OPRF.Finalize(evaluation, info)
-	hardened := c.MHF.Harden(unblinded, nil, c.OPRFPointLength)
+func (c *Client) buildPRK(evaluation *group.Point) []byte {
+	output := c.OPRF.Finalize(evaluation)
+	stretched := c.MHF.Harden(output, nil, c.OPRFPointLength)
 
-	return c.KDF.Extract(nil, encoding.Concat(unblinded, hardened))
+	return c.KDF.Extract(nil, encoding.Concat(output, stretched))
 }
 
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
 func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest {
 	m := c.OPRF.Blind(password)
-	return &message.RegistrationRequest{Data: m}
+	return &message.RegistrationRequest{BlindedMessage: m}
 }
 
 // RegistrationFinalize returns a RegistrationRecord message given the server's RegistrationResponse and credentials. If
@@ -82,11 +81,11 @@ func (c *Client) RegistrationFinalize(creds *Credentials,
 	}
 
 	// this check is very important: it verifies the server's public key validity in the group.
-	// if _, err = c.Group.NewElement().Decode(resp.Pks); err != nil {
-	// 	return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
+	// if _, err := c.Group.NewElement().Decode(resp.Pks); err != nil {
+	//	return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
 	// }
 
-	randomizedPwd := c.buildPRK(resp.Data, c.Info)
+	randomizedPwd := c.buildPRK(resp.EvaluatedMessage)
 	maskingKey := c.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.KDF.Size())
 	envU, clientPublicKey, exportKey := keyrecovery.Store(c.Parameters, randomizedPwd, encoding.SerializePoint(resp.Pks, c.Group), creds2)
 
@@ -101,60 +100,55 @@ func (c *Client) RegistrationFinalize(creds *Credentials,
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) LoginInit(password []byte) *message.KE1 {
 	m := c.OPRF.Blind(password)
-	credReq := &cred.CredentialRequest{Data: m}
-	c.Ke1 = c.Ake.Start(c.Group)
-	c.Ke1.CredentialRequest = credReq
+	credReq := &cred.CredentialRequest{BlindedMessage: m}
+	ke1 := c.Ake.Start(c.Group)
+	ke1.CredentialRequest = credReq
+	c.Ake.Ke1 = ke1.Serialize()
 
-	return c.Ke1
-}
-
-// unmask assumes that maskedResponse has been checked to be of length pointLength + envelope size.
-func (c *Client) unmask(maskingNonce, randomizedPwd, maskedResponse []byte) ([]byte, *keyrecovery.Envelope) {
-	maskingKey := c.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.Hash.Size())
-	clear := c.MaskResponse(maskingKey, maskingNonce, maskedResponse)
-	serverPublicKey := clear[:encoding.PointLength[c.Group]]
-	e := clear[encoding.PointLength[c.Group]:]
-	env := &keyrecovery.Envelope{
-		Nonce:   e[:c.NonceLen],
-		AuthTag: e[c.NonceLen:],
-	}
-
-	return serverPublicKey, env
+	return ke1
 }
 
 // LoginFinish returns a KE3 message given the server's KE2 response message and the identities. If the idc
 // or ids parameters are nil, the client and server's public keys are taken as identities for both.
 func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, exportKey []byte, err error) {
+	if len(c.Ake.Ke1) == 0 {
+		return nil, nil, errKe1Missing
+	}
+
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
 	if len(ke2.MaskedResponse) != c.AkePointLength+c.EnvelopeSize {
 		return nil, nil, errInvalidMaskedLength
 	}
 
-	randomizedPwd := c.buildPRK(ke2.Data, c.Info)
-	serverPublicKey, env := c.unmask(ke2.MaskingNonce, randomizedPwd, ke2.MaskedResponse)
+	// Finalize the OPRF.
+	randomizedPwd := c.buildPRK(ke2.EvaluatedMessage)
 
-	pks, err := c.Group.NewElement().Decode(serverPublicKey)
+	// Decrypt the masked response.
+	serverPublicKey, serverPublicKeyBytes,
+		envelope, err := masking.Unmask(c.Parameters, randomizedPwd, ke2.MaskingNonce, ke2.MaskedResponse)
 	if err != nil {
-		return nil, nil, errInvalidPKS
+		return nil, nil, err
 	}
 
-	clientSecretKey, clientPublicKey, exportKey, err := keyrecovery.Recover(c.Parameters,
-		randomizedPwd, serverPublicKey, idc, ids, env)
+	// Recover the client keys.
+	clientSecretKey, clientPublicKey,
+		exportKey, err := keyrecovery.Recover(c.Parameters, randomizedPwd, serverPublicKeyBytes, idc, ids, envelope)
 	if err != nil {
-		return nil, nil, fmt.Errorf("recover envelope: %w", err)
+		return nil, nil, err
 	}
 
+	// Finalize the AKE.
 	if idc == nil {
 		idc = encoding.SerializePoint(clientPublicKey, c.Group)
 	}
 
 	if ids == nil {
-		ids = serverPublicKey
+		ids = serverPublicKeyBytes
 	}
 
-	ke3, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, pks, c.Ke1, ke2)
+	ke3, err = c.Ake.Finalize(c.Parameters, idc, clientSecretKey, ids, serverPublicKey, ke2)
 	if err != nil {
-		return nil, nil, fmt.Errorf(" AKE finalization: %w", err)
+		return nil, nil, err
 	}
 
 	return ke3, exportKey, nil

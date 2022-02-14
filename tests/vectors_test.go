@@ -20,11 +20,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bytemare/opaque/internal/encoding"
-
 	"github.com/bytemare/crypto/mhf"
 
 	"github.com/bytemare/opaque"
+	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
 )
@@ -135,6 +134,10 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 		panic(err)
 	}
 
+	if pks.IsIdentity() {
+		panic("identity")
+	}
+
 	regResp := server.RegistrationResponse(regReq, pks, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
 
 	vRegResp, err := client.DeserializeRegistrationResponse(v.Outputs.RegistrationResponse)
@@ -142,8 +145,8 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(vRegResp.Data.Bytes(), regResp.Data.Bytes()) {
-		t.Logf("%v\n%v", vRegResp.Data, regResp.Data)
+	if !bytes.Equal(vRegResp.EvaluatedMessage.Bytes(), regResp.EvaluatedMessage.Bytes()) {
+		t.Logf("%v\n%v", vRegResp.EvaluatedMessage.Bytes(), regResp.EvaluatedMessage.Bytes())
 		t.Fatal("registration response data do not match")
 	}
 
@@ -165,7 +168,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	upload, exportKey := client.RegistrationFinalize(clientCredentials, regResp)
 
 	if !bytes.Equal(v.Outputs.ExportKey, exportKey) {
-		t.Fatal("exportKey do not match")
+		t.Fatalf("exportKey do not match\nexpected %v,\ngot %v", v.Outputs.ExportKey, exportKey)
 	}
 
 	if !bytes.Equal(v.Intermediates.Envelope, upload.Envelope) {
@@ -342,7 +345,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(vectorKE2.CredentialResponse.Data.Bytes(), ke2.CredentialResponse.Data.Bytes()) {
+	if !bytes.Equal(vectorKE2.CredentialResponse.EvaluatedMessage.Bytes(), ke2.CredentialResponse.EvaluatedMessage.Bytes()) {
 		t.Fatal("data do not match")
 	}
 

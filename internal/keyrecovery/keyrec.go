@@ -14,22 +14,23 @@ import (
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 )
 
-func deriveAkeKeyPair(p *internal.Parameters, randomizedPwd, nonce []byte) (*group.Scalar, *group.Point) {
+func deriveAuthKeyPair(p *internal.Parameters, randomizedPwd, nonce []byte) (*group.Scalar, *group.Point) {
 	seed := p.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
-	sk := p.Group.HashToScalar(seed, []byte(tag.DerivePrivateKey))
+	sk := oprf.Ciphersuite(p.Group).DeriveKey(seed, []byte(tag.DerivePrivateKey))
 
 	return sk, p.Group.Base().Mult(sk)
 }
 
 func getPubkey(p *internal.Parameters, randomizedPwd, nonce []byte) *group.Point {
-	_, pk := deriveAkeKeyPair(p, randomizedPwd, nonce)
+	_, pk := deriveAuthKeyPair(p, randomizedPwd, nonce)
 	return pk
 }
 
 func recoverKeys(p *internal.Parameters,
 	randomizedPwd, nonce []byte) (clientSecretKey *group.Scalar, clientPublicKey *group.Point) {
-	return deriveAkeKeyPair(p, randomizedPwd, nonce)
+	return deriveAuthKeyPair(p, randomizedPwd, nonce)
 }

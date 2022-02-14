@@ -62,11 +62,11 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func initTranscript(p *internal.Parameters, idc, ids []byte, ke1 *message.KE1, ke2 *message.KE2) {
+func initTranscript(p *internal.Parameters, idc, ids, ke1 []byte, ke2 *message.KE2) {
 	sidc := encoding.EncodeVector(idc)
 	sids := encoding.EncodeVector(ids)
 	p.Hash.Write(encoding.Concatenate([]byte(tag.VersionTag), encoding.EncodeVector(p.Context),
-		sidc, ke1.Serialize(),
+		sidc, ke1,
 		sids, ke2.CredentialResponse.Serialize(), ke2.NonceS, encoding.SerializePoint(ke2.EpkS, p.Group)))
 }
 
@@ -93,8 +93,7 @@ func k3dh(g group.Group, p1 *group.Point, s1 *group.Scalar, p2 *group.Point, s2 
 	return encoding.Concat3(e1, e2, e3)
 }
 
-func core3DH(p *internal.Parameters, ikm, idu, ids []byte,
-	ke1 *message.KE1, ke2 *message.KE2) (sessionSecret, macS, macC []byte) {
+func core3DH(p *internal.Parameters, ikm, idu, ids, ke1 []byte, ke2 *message.KE2) (sessionSecret, macS, macC []byte) {
 	initTranscript(p, idu, ids, ke1, ke2)
 
 	keys, sessionSecret := deriveKeys(p.KDF, ikm, p.Hash.Sum()) // preamble

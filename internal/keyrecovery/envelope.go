@@ -19,9 +19,9 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 )
 
-var errEnvelopeInvalidTag = errors.New("invalid envelope authentication tag")
+var errEnvelopeInvalidMac = errors.New("recover envelope: invalid envelope authentication tag")
 
-// Credentials is currently used for testing purposes.
+// Credentials structure is currently used for testing purposes.
 type Credentials struct {
 	Idc, Ids                    []byte
 	EnvelopeNonce, MaskingNonce []byte // testing: integrated to support testing
@@ -91,7 +91,7 @@ func Recover(p *internal.Parameters, randomizedPwd, serverPublicKey, idc, ids []
 
 	expectedTag := authTag(p, randomizedPwd, envelope.Nonce, ctc)
 	if !p.MAC.Equal(expectedTag, envelope.AuthTag) {
-		return nil, nil, nil, errEnvelopeInvalidTag
+		return nil, nil, nil, errEnvelopeInvalidMac
 	}
 
 	export = exportKey(p, randomizedPwd, envelope.Nonce)

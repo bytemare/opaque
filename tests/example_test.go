@@ -119,8 +119,9 @@ func ExampleRegistration() {
 	// We assume the server is already set up with the following values. secret* values are internal secret to the server.
 	// They can be unique for all clients, and must be the same for a client between registration and login. It's safe
 	// to use these same values across clients as long as they remain secret.
-	secretOprfSeed = internal.RandomBytes(32)
-	serverPrivateKey, serverPublicKey = opaque.DefaultConfiguration().Server().KeyGen()
+	conf := opaque.DefaultConfiguration()
+	secretOprfSeed = internal.RandomBytes(conf.Hash.Size())
+	serverPrivateKey, serverPublicKey = conf.Server().KeyGen()
 
 	// Secret client information.
 	password := []byte("password")
@@ -128,7 +129,6 @@ func ExampleRegistration() {
 	// Information shared by both client and server.
 	serverID := []byte("server")
 	clientID := []byte("client")
-	conf := opaque.DefaultConfiguration()
 
 	// Runtime setup
 	client := conf.Client()

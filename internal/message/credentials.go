@@ -18,24 +18,24 @@ import (
 
 // CredentialRequest represents credential request message.
 type CredentialRequest struct {
-	C    oprf.Ciphersuite
-	Data *group.Point `json:"data"`
+	C              oprf.Ciphersuite
+	BlindedMessage *group.Point `json:"blinded_message"`
 }
 
 // Serialize returns the byte encoding of CredentialRequest.
 func (c *CredentialRequest) Serialize() []byte {
-	return c.C.SerializePoint(c.Data)
+	return c.C.SerializePoint(c.BlindedMessage)
 }
 
 // CredentialResponse represents credential response message.
 type CredentialResponse struct {
-	C              oprf.Ciphersuite
-	Data           *group.Point `json:"data"`
-	MaskingNonce   []byte       `json:"n"`
-	MaskedResponse []byte       `json:"r"`
+	C                oprf.Ciphersuite
+	EvaluatedMessage *group.Point `json:"evaluated_message"`
+	MaskingNonce     []byte       `json:"masking_nonce"`
+	MaskedResponse   []byte       `json:"masked_response"`
 }
 
 // Serialize returns the byte encoding of CredentialResponse.
 func (c *CredentialResponse) Serialize() []byte {
-	return encoding.Concat3(c.C.SerializePoint(c.Data), c.MaskingNonce, c.MaskedResponse)
+	return encoding.Concat3(c.C.SerializePoint(c.EvaluatedMessage), c.MaskingNonce, c.MaskedResponse)
 }
