@@ -11,7 +11,11 @@ package opaque
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -25,12 +29,13 @@ import (
 type vector struct {
 	DST       string           `json:"groupDST"`
 	Hash      string           `json:"hash"`
+	KeyInfo   string           `json:"keyInfo"`
 	Mode      byte             `json:"mode"`
-	PkSm      string           `json:"pkSm,omitempty"`
+	Seed      string           `json:"seed"`
 	SkSm      string           `json:"skSm"`
 	SuiteID   oprf.Ciphersuite `json:"suiteID"`
 	SuiteName string           `json:"suiteName"`
-	Vectors   []testVector     `json:"vectors,omitempty"`
+	Vectors   []testVector     `json:"vectors"`
 }
 
 type test struct {
@@ -181,6 +186,22 @@ func (v vector) test(t *testing.T) {
 		t.Fatal(fmt.Errorf("private key decoding to scalar in suite %v errored with %q", v.SuiteID, err))
 	}
 
+	decSeed, err := hex.DecodeString(v.Seed)
+	if err != nil {
+		t.Fatalf("decoding errored with %q\nfor seed %v\n", err, v.Seed)
+	}
+
+	decKeyInfo, err := hex.DecodeString(v.KeyInfo)
+	if err != nil {
+		t.Fatalf("decoding errored with %q\nfor key info %v\n", err, v.KeyInfo)
+	}
+
+	sks := v.SuiteID.DeriveKey(decSeed, decKeyInfo)
+
+	if !sks.Sub(privKey).IsZero() {
+		t.Fatalf(" DeriveKeyPair did not yield the expected key %v\n", hex.EncodeToString(sks.Bytes()))
+	}
+
 	dst, err := hex.DecodeString(v.DST)
 	if err != nil {
 		t.Fatalf("hex decoding errored with %q", err)
@@ -210,45 +231,41 @@ func (v vector) test(t *testing.T) {
 	}
 }
 
-//func TestOPRFVectors(t *testing.T) {
-//	if err := filepath.Walk("oprfVectors.json",
-//		func(path string, info os.FileInfo, err error) error {
-//			if err != nil {
-//				return err
-//			}
-//
-//			if info.IsDir() {
-//				return nil
-//			}
-//
-//			contents, err := ioutil.ReadFile(path)
-//			if err != nil {
-//				return err
-//			}
-//
-//			var v testVectors
-//			errJSON := json.Unmarshal(contents, &v)
-//			if errJSON != nil {
-//				return errJSON
-//			}
-//
-//			for _, tv := range v {
-//				if tv.Mode != 0x00 {
-//					continue
-//				}
-//
-//				if tv.SuiteName == "OPRF(decaf448, SHAKE-256)" {
-//					continue
-//				}
-//
-//				if tv.SuiteName == "OPRF(P-384, SHA-384)" {
-//					continue
-//				}
-//
-//				t.Run(tv.SuiteName, tv.test)
-//			}
-//			return nil
-//		}); err != nil {
-//		t.Fatalf("error opening test vectors: %v", err)
-//	}
-//}
+func TestOPRFVectors(t *testing.T) {
+	if err := filepath.Walk("oprfVectors.json",
+		func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if info.IsDir() {
+				return nil
+			}
+
+			contents, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+
+			var v testVectors
+			errJSON := json.Unmarshal(contents, &v)
+			if errJSON != nil {
+				return errJSON
+			}
+
+			for _, tv := range v {
+				if tv.Mode != 0x00 {
+					continue
+				}
+
+				if tv.SuiteName == "OPRF(decaf448, SHAKE-256)" {
+					continue
+				}
+
+				t.Run(tv.SuiteName, tv.test)
+			}
+			return nil
+		}); err != nil {
+		t.Fatalf("error opening test vectors: %v", err)
+	}
+}
