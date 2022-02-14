@@ -37,7 +37,6 @@ type test struct {
 	Batch             int
 	Blind             [][]byte
 	BlindedElement    [][]byte
-	Info              []byte
 	EvaluationElement [][]byte
 	Input             [][]byte
 	Output            [][]byte
@@ -50,7 +49,6 @@ type testVector struct {
 	Blind             string `json:"Blind"`
 	BlindedElement    string `json:"BlindedElement"`
 	EvaluationElement string `json:"EvaluationElement"`
-	Info              string `json:"Info"`
 	Input             string `json:"Input"`
 	Output            string `json:"Output"`
 }
@@ -92,11 +90,6 @@ func (tv *testVector) Decode() (*test, error) {
 		return nil, fmt.Errorf(" EvaluationElement decoding errored with %q", err)
 	}
 
-	info, err := hex.DecodeString(tv.Info)
-	if err != nil {
-		return nil, fmt.Errorf(" info decoding errored with %q", err)
-	}
-
 	input, err := decodeBatch(tv.Batch, tv.Input)
 	// input, err := hex.DecodeString(tv.Input)
 	if err != nil {
@@ -114,7 +107,6 @@ func (tv *testVector) Decode() (*test, error) {
 		Blind:             blind,
 		BlindedElement:    blinded,
 		EvaluationElement: evaluationElement,
-		Info:              info,
 		Input:             input,
 		Output:            output,
 	}, nil
@@ -144,7 +136,7 @@ func testEvaluation(t *testing.T, c oprf.Ciphersuite, privKey *group.Scalar, tes
 			t.Fatal(fmt.Errorf("blind decoding to element in suite %v errored with %q", c, err))
 		}
 
-		ev := c.Evaluate(privKey, b, test.Info)
+		ev := c.Evaluate(privKey, b)
 		if !bytes.Equal(test.EvaluationElement[i], ev.Bytes()) {
 			t.Fatal("unexpected evaluation")
 		}
@@ -167,7 +159,7 @@ func testFinalization(t *testing.T, c oprf.Ciphersuite, test *test) {
 		client.SetBlind(s)
 		client.Blind(test.Input[i])
 
-		output := client.Finalize(ev, test.Info)
+		output := client.Finalize(ev)
 		if !bytes.Equal(test.Output[i], output) {
 			t.Fatal("unexpected output")
 		}

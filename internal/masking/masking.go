@@ -62,5 +62,9 @@ func Unmask(p *internal.Parameters, randomizedPwd, nonce, maskedResponse []byte)
 		return nil, nil, nil, errInvalidPKS
 	}
 
+	if serverPublicKey.IsIdentity() {
+		return nil, nil, nil, errInvalidPKS
+	}
+
 	return serverPublicKey, serverPublicKeyBytes, envelope, nil
 }

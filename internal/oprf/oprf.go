@@ -78,8 +78,23 @@ func (o *oprf) dst(prefix string) []byte {
 }
 
 // DeriveKey returns a scalar mapped from the input.
-func (c Ciphersuite) DeriveKey(input, dst []byte) *group.Scalar {
-	return c.Group().HashToScalar(input, dst)
+func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
+	dst := encoding.Concat([]byte("DeriveKeyPair"), contextString(c))
+	deriveInput := encoding.Concat(seed, encoding.EncodeVector(info))
+
+	var counter uint8
+	var s *group.Scalar
+
+	for s == nil || s.IsZero() {
+		if counter > 255 {
+			panic("DeriveKeyPairError")
+		}
+
+		s = c.Group().HashToScalar(encoding.Concat(deriveInput, []byte{counter}), dst)
+		counter++
+	}
+
+	return s
 }
 
 // Client returns an OPRF client.

@@ -55,17 +55,17 @@ func NewClient(p *Configuration) *Client {
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation *group.Point, info []byte) []byte {
-	unblinded := c.OPRF.Finalize(evaluation, info)
-	hardened := c.MHF.Harden(unblinded, nil, c.OPRFPointLength)
+func (c *Client) buildPRK(evaluation *group.Point) []byte {
+	output := c.OPRF.Finalize(evaluation)
+	stretched := c.MHF.Harden(output, nil, c.OPRFPointLength)
 
-	return c.KDF.Extract(nil, encoding.Concat(unblinded, hardened))
+	return c.KDF.Extract(nil, encoding.Concat(output, stretched))
 }
 
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
 func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest {
 	m := c.OPRF.Blind(password)
-	return &message.RegistrationRequest{Data: m}
+	return &message.RegistrationRequest{BlindedMessage: m}
 }
 
 // RegistrationFinalize returns a RegistrationRecord message given the server's RegistrationResponse and credentials. If
@@ -81,11 +81,11 @@ func (c *Client) RegistrationFinalize(creds *Credentials,
 	}
 
 	// this check is very important: it verifies the server's public key validity in the group.
-	// if _, err = c.Group.NewElement().Decode(resp.Pks); err != nil {
-	// 	return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
+	// if _, err := c.Group.NewElement().Decode(resp.Pks); err != nil {
+	//	return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
 	// }
 
-	randomizedPwd := c.buildPRK(resp.Data, c.Info)
+	randomizedPwd := c.buildPRK(resp.EvaluatedMessage)
 	maskingKey := c.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.KDF.Size())
 	envU, clientPublicKey, exportKey := keyrecovery.Store(c.Parameters, randomizedPwd, encoding.SerializePoint(resp.Pks, c.Group), creds2)
 
@@ -100,7 +100,7 @@ func (c *Client) RegistrationFinalize(creds *Credentials,
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) LoginInit(password []byte) *message.KE1 {
 	m := c.OPRF.Blind(password)
-	credReq := &cred.CredentialRequest{Data: m}
+	credReq := &cred.CredentialRequest{BlindedMessage: m}
 	ke1 := c.Ake.Start(c.Group)
 	ke1.CredentialRequest = credReq
 	c.Ake.Ke1 = ke1.Serialize()
@@ -121,18 +121,18 @@ func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE
 	}
 
 	// Finalize the OPRF.
-	randomizedPwd := c.buildPRK(ke2.Data, c.Info)
+	randomizedPwd := c.buildPRK(ke2.EvaluatedMessage)
 
 	// Decrypt the masked response.
-	serverPublicKey, serverPublicKeyBytes, envelope, err :=
-		masking.Unmask(c.Parameters, randomizedPwd, ke2.MaskingNonce, ke2.MaskedResponse)
+	serverPublicKey, serverPublicKeyBytes,
+		envelope, err := masking.Unmask(c.Parameters, randomizedPwd, ke2.MaskingNonce, ke2.MaskedResponse)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Recover the client keys.
-	clientSecretKey, clientPublicKey, exportKey, err :=
-		keyrecovery.Recover(c.Parameters, randomizedPwd, serverPublicKeyBytes, idc, ids, envelope)
+	clientSecretKey, clientPublicKey,
+		exportKey, err := keyrecovery.Recover(c.Parameters, randomizedPwd, serverPublicKeyBytes, idc, ids, envelope)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -339,15 +339,15 @@ func buildRecord(credID, oprfSeed, password, pks []byte, client *opaque.Client, 
 	}
 }
 
-func buildPRK(client *opaque.Client, evaluation *group.Point, info []byte) ([]byte, error) {
-	unblinded := client.OPRF.Finalize(evaluation, info)
+func buildPRK(client *opaque.Client, evaluation *group.Point) ([]byte, error) {
+	unblinded := client.OPRF.Finalize(evaluation)
 	hardened := client.MHF.Harden(unblinded, nil, client.OPRFPointLength)
 
 	return client.KDF.Extract(nil, hardened), nil
 }
 
-func getEnvelope(client *opaque.Client, ke2 *message.KE2, info []byte) (*keyrecovery.Envelope, []byte, error) {
-	randomizedPwd, err := buildPRK(client, ke2.Data, info)
+func getEnvelope(client *opaque.Client, ke2 *message.KE2) (*keyrecovery.Envelope, []byte, error) {
+	randomizedPwd, err := buildPRK(client, ke2.EvaluatedMessage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
@@ -676,7 +676,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		ke1 := client.LoginInit([]byte("yo"))
 		ke2, _ := server.LoginInit(ke1, nil, sks, pks, oprfSeed, rec)
 
-		env, _, err := getEnvelope(client, ke2, nil)
+		env, _, err := getEnvelope(client, ke2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -734,7 +734,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 
 		// tamper PKS
 		// ke2.EpkS = server.Group.NewElement().Mult(server.Group.NewScalar().Random())
-		env, randomizedPwd, err := getEnvelope(client, ke2, nil)
+		env, randomizedPwd, err := getEnvelope(client, ke2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -755,7 +755,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		}
 
 		// replace PKS
-		fakepks := server.Group.NewElement().Mult(server.Group.NewScalar().Random()).Bytes()
+		fakepks := server.Group.Base().Mult(server.Group.NewScalar().Random()).Bytes()
 		clear = encoding.Concat(fakepks, env.Serialize())
 		ke2.MaskedResponse = server.XorResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
 

@@ -11,22 +11,9 @@ package oprf
 
 import (
 	"github.com/bytemare/crypto/group"
-
-	"github.com/bytemare/opaque/internal/encoding"
-	"github.com/bytemare/opaque/internal/tag"
 )
 
-func (c Ciphersuite) pTag(info []byte) *group.Scalar {
-	o := c.oprf()
-	context := encoding.Concat3([]byte(tag.OPRFContextPrefix), o.contextString, encoding.EncodeVector(info))
-
-	return c.Group().HashToScalar(context, o.dst(tag.OPRFScalarPrefix))
-}
-
 // Evaluate evaluates the blinded input with the given key.
-func (c Ciphersuite) Evaluate(privateKey *group.Scalar, blindedElement *group.Point, info []byte) *group.Point {
-	context := c.pTag(info)
-	inv := privateKey.Add(context).Invert()
-
-	return blindedElement.Mult(inv)
+func (c Ciphersuite) Evaluate(privateKey *group.Scalar, blindedElement *group.Point) *group.Point {
+	return blindedElement.Mult(privateKey)
 }
