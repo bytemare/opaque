@@ -59,7 +59,7 @@ linters:
     - staticcheck
     - structcheck
     - stylecheck
-    - tagliatelle
+    #- tagliatelle
     - tenv
     - testpackage
     - thelper
