@@ -14,7 +14,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/bytemare/crypto/mhf"
+	"github.com/bytemare/crypto/ksf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
@@ -33,7 +33,7 @@ func isSameConf(a, b *opaque.Configuration) bool {
 	if a.Hash != b.Hash {
 		return false
 	}
-	if a.MHF != b.MHF {
+	if a.KSF != b.KSF {
 		return false
 	}
 	if a.AKE != b.AKE {
@@ -54,7 +54,7 @@ func ExampleConfiguration() {
 		KDF:     crypto.SHA512,
 		MAC:     crypto.SHA512,
 		Hash:    crypto.SHA512,
-		MHF:     mhf.Scrypt,
+		KSF:     ksf.Scrypt,
 		AKE:     opaque.RistrettoSha512,
 		Context: nil,
 	}

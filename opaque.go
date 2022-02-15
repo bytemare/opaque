@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/bytemare/crypto/group"
-	"github.com/bytemare/crypto/mhf"
+	"github.com/bytemare/crypto/ksf"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -77,9 +77,9 @@ type Configuration struct {
 	// OPRF identifies the ciphersuite to use for the OPRF.
 	OPRF Group `json:"oprf"`
 
-	// MHF identifies the memory-hard function for expensive key derivation on the client,
-	// defined in github.com/bytemare/crypto/mhf.
-	MHF mhf.Identifier `json:"mhf"`
+	// KSF identifies the key stretching function for expensive key derivation on the client,
+	// defined in github.com/bytemare/crypto/ksf.
+	KSF ksf.Identifier `json:"ksf"`
 
 	// AKE identifies the group to use for the AKE.
 	AKE Group `json:"group"`
@@ -102,7 +102,7 @@ func (c *Configuration) toInternal() *internal.Parameters {
 		KDF:             internal.NewKDF(c.KDF),
 		MAC:             internal.NewMac(c.MAC),
 		Hash:            internal.NewHash(c.Hash),
-		MHF:             internal.NewMHF(c.MHF),
+		KSF:             internal.NewKSF(c.KSF),
 		NonceLen:        internal.NonceLength,
 		OPRFPointLength: encoding.PointLength[group.Group(c.OPRF)],
 		AkePointLength:  encoding.PointLength[g],
@@ -122,7 +122,7 @@ func (c *Configuration) Serialize() []byte {
 		byte(c.KDF),
 		byte(c.MAC),
 		byte(c.Hash),
-		byte(c.MHF),
+		byte(c.KSF),
 		byte(c.AKE),
 	}
 
@@ -146,7 +146,7 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		KDF:     crypto.Hash(encoded[1]),
 		MAC:     crypto.Hash(encoded[2]),
 		Hash:    crypto.Hash(encoded[3]),
-		MHF:     mhf.Identifier(encoded[4]),
+		KSF:     ksf.Identifier(encoded[4]),
 		AKE:     Group(encoded[5]),
 		Context: ctx,
 	}, nil
@@ -159,7 +159,7 @@ func DefaultConfiguration() *Configuration {
 		KDF:     crypto.SHA512,
 		MAC:     crypto.SHA512,
 		Hash:    crypto.SHA512,
-		MHF:     mhf.Scrypt,
+		KSF:     ksf.Scrypt,
 		AKE:     RistrettoSha512,
 		Context: nil,
 	}

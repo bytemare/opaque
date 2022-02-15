@@ -14,7 +14,7 @@ import (
 	"crypto/hmac"
 
 	"github.com/bytemare/crypto/hash"
-	"github.com/bytemare/crypto/mhf"
+	"github.com/bytemare/crypto/ksf"
 )
 
 // NewKDF returns a newly instantiated KDF.
@@ -92,29 +92,29 @@ func (h *Hash) Write(p []byte) {
 	_, _ = h.h.Write(p)
 }
 
-// NewMHF returns a newly instantiated MHF.
-func NewMHF(id mhf.Identifier) *MHF {
+// NewKSF returns a newly instantiated KSF.
+func NewKSF(id ksf.Identifier) *KSF {
 	if id == 0 {
-		return &MHF{&IdentityMHF{}}
+		return &KSF{&IdentityKSF{}}
 	}
 
-	return &MHF{id.Get()}
+	return &KSF{id.Get()}
 }
 
-// MHF wraps a MHF and exposes its functions.
-type MHF struct {
-	mhfInterface
+// KSF wraps a key stretching function and exposes its functions.
+type KSF struct {
+	ksfInterface
 }
 
-type mhfInterface interface {
+type ksfInterface interface {
 	// Harden uses default parameters for the key derivation function over the input password and salt.
 	Harden(password, salt []byte, length int) []byte
 }
 
-// IdentityMHF represents a MHF with no operations.
-type IdentityMHF struct{}
+// IdentityKSF represents a KSF with no operations.
+type IdentityKSF struct{}
 
 // Harden returns the password as is.
-func (i IdentityMHF) Harden(password, _ []byte, _ int) []byte {
+func (i IdentityKSF) Harden(password, _ []byte, _ int) []byte {
 	return password
 }

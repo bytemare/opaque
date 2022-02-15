@@ -57,7 +57,7 @@ func NewClient(p *Configuration) *Client {
 // buildPRK derives the randomized password from the OPRF output.
 func (c *Client) buildPRK(evaluation *group.Point) []byte {
 	output := c.OPRF.Finalize(evaluation)
-	stretched := c.MHF.Harden(output, nil, c.OPRFPointLength)
+	stretched := c.KSF.Harden(output, nil, c.OPRFPointLength)
 
 	return c.KDF.Extract(nil, encoding.Concat(output, stretched))
 }

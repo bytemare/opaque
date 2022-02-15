@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"github.com/bytemare/crypto/group"
-	"github.com/bytemare/crypto/mhf"
+	"github.com/bytemare/crypto/ksf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
@@ -166,7 +166,7 @@ func TestNilConfiguration(t *testing.T) {
 		KDF:             internal.NewKDF(def.KDF),
 		MAC:             internal.NewMac(def.MAC),
 		Hash:            internal.NewHash(def.Hash),
-		MHF:             internal.NewMHF(def.MHF),
+		KSF:             internal.NewKSF(def.KSF),
 		NonceLen:        internal.NonceLength,
 		OPRFPointLength: encoding.PointLength[g],
 		AkePointLength:  encoding.PointLength[g],
@@ -204,7 +204,7 @@ var confs = []configuration{
 			KDF:  crypto.SHA256,
 			MAC:  crypto.SHA256,
 			Hash: crypto.SHA256,
-			MHF:  mhf.Scrypt,
+			KSF:  ksf.Scrypt,
 			AKE:  opaque.P256Sha256,
 		},
 		Curve: elliptic.P256(),
@@ -215,7 +215,7 @@ var confs = []configuration{
 			KDF:  crypto.SHA512,
 			MAC:  crypto.SHA512,
 			Hash: crypto.SHA512,
-			MHF:  mhf.Scrypt,
+			KSF:  ksf.Scrypt,
 			AKE:  opaque.P384Sha512,
 		},
 		Curve: elliptic.P384(),
@@ -226,7 +226,7 @@ var confs = []configuration{
 			KDF:  crypto.SHA512,
 			MAC:  crypto.SHA512,
 			Hash: crypto.SHA512,
-			MHF:  mhf.Scrypt,
+			KSF:  ksf.Scrypt,
 			AKE:  opaque.P521Sha512,
 		},
 		Curve: elliptic.P521(),
@@ -237,7 +237,7 @@ var confs = []configuration{
 	//		KDF:  crypto.SHA512,
 	//		MAC:  crypto.SHA512,
 	//		Hash: crypto.SHA512,
-	//		MHF:  mhf.Scrypt,
+	//		KSF:  ksf.Scrypt,
 	//		Mode: opaque.Internal,
 	//		AKE:  opaque.Curve25519Sha512,
 	//	},
@@ -341,7 +341,7 @@ func buildRecord(credID, oprfSeed, password, pks []byte, client *opaque.Client, 
 
 func buildPRK(client *opaque.Client, evaluation *group.Point) ([]byte, error) {
 	unblinded := client.OPRF.Finalize(evaluation)
-	hardened := client.MHF.Harden(unblinded, nil, client.OPRFPointLength)
+	hardened := client.KSF.Harden(unblinded, nil, client.OPRFPointLength)
 
 	return client.KDF.Extract(nil, hardened), nil
 }
