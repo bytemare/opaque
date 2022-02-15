@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bytemare/crypto/mhf"
+	"github.com/bytemare/crypto/ksf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -58,7 +58,7 @@ type config struct {
 	Hash  string    `json:"Hash"`
 	KDF   string    `json:"KDF"`
 	MAC   string    `json:"MAC"`
-	MHF   string    `json:"MHF"`
+	KSF   string    `json:"KSF"`
 	Name  string    `json:"Name"`
 	OPRF  ByteToHex `json:"OPRF"`
 }
@@ -276,7 +276,7 @@ func (v *vector) test(t *testing.T) {
 		Hash:    hashToHash(v.Config.Hash),
 		KDF:     kdfToHash(v.Config.KDF),
 		MAC:     macToHash(v.Config.MAC),
-		MHF:     mhfToMHF(v.Config.MHF),
+		KSF:     ksfToKSF(v.Config.KSF),
 		AKE:     groupToGroup(v.Config.Group),
 		Context: []byte(v.Config.Context),
 	}
@@ -438,12 +438,12 @@ func macToHash(h string) crypto.Hash {
 	}
 }
 
-func mhfToMHF(h string) mhf.Identifier {
+func ksfToKSF(h string) ksf.Identifier {
 	switch h {
 	case "Identity":
 		return 0
 	case "Scrypt":
-		return mhf.Scrypt
+		return ksf.Scrypt
 	default:
 		return 0
 	}

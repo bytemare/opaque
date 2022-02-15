@@ -57,7 +57,7 @@ type Parameters struct {
 	KDF             *KDF
 	MAC             *Mac
 	Hash            *Hash
-	MHF             *MHF
+	KSF             *KSF
 	NonceLen        int
 	EnvelopeSize    int
 	OPRFPointLength int
