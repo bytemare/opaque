@@ -56,17 +56,20 @@ type Server struct {
 }
 
 // NewServer returns a Server instantiation given the application Configuration.
-func NewServer(p *Configuration) *Server {
+func NewServer(p *Configuration) (*Server, error) {
 	if p == nil {
 		p = DefaultConfiguration()
 	}
 
-	ip := p.toInternal()
+	ip, err := p.toInternal()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Server{
 		Parameters: ip,
 		Ake:        ake.NewServer(),
-	}
+	}, nil
 }
 
 // KeyGen returns a key pair in the AKE group.

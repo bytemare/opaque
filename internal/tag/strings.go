@@ -16,6 +16,9 @@ const (
 	// OPRF is a string explicitly stating the version name.
 	OPRF = "VOPRF09-"
 
+	// DeriveKeyPairInternal is the internal DeriveKeyPair tag as defined in VOPRF.
+	DeriveKeyPairInternal = "DeriveKeyPair"
+
 	// OPRFPointPrefix is the DST prefix to use for HashToGroup operations.
 	OPRFPointPrefix = "HashToGroup-"
 

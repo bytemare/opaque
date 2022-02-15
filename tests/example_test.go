@@ -84,10 +84,9 @@ func ExampleClient() {
 	// First, load or instantiate a configuration.
 	conf := opaque.DefaultConfiguration()
 
-	client := conf.Client()
-
-	if client == nil {
-		log.Fatalln("Oh no! Something went wrong setting up the client!")
+	client, err := conf.Client()
+	if client == nil || err != nil {
+		log.Fatalf("Oh no! Something went wrong setting up the client! %v", err)
 	}
 
 	fmt.Println("OPAQUE configuration is easy!")
@@ -99,10 +98,10 @@ func ExampleServer() {
 	// First, load or instantiate a configuration.
 	conf := opaque.DefaultConfiguration()
 
-	server := conf.Server()
+	server, err := conf.Server()
 
-	if server == nil {
-		log.Fatalln("Oh no! Something went wrong setting up the server!")
+	if server == nil || err != nil {
+		log.Fatalf("Oh no! Something went wrong setting up the server! %v", err)
 	}
 
 	fmt.Println("OPAQUE configuration is easy!")
@@ -121,7 +120,11 @@ func ExampleRegistration() {
 	// to use these same values across clients as long as they remain secret.
 	conf := opaque.DefaultConfiguration()
 	secretOprfSeed = internal.RandomBytes(conf.Hash.Size())
-	serverPrivateKey, serverPublicKey = conf.Server().KeyGen()
+	s, err := conf.Server()
+	if err != nil {
+		panic(err)
+	}
+	serverPrivateKey, serverPublicKey = s.KeyGen()
 
 	// Secret client information.
 	password := []byte("password")
@@ -131,8 +134,15 @@ func ExampleRegistration() {
 	clientID := []byte("client")
 
 	// Runtime setup
-	client := conf.Client()
-	server := conf.Server()
+	client, err := conf.Client()
+	if err != nil {
+		panic(err)
+	}
+
+	server, err := conf.Server()
+	if err != nil {
+		panic(err)
+	}
 
 	// Client starts, serializes the message, and sends it to the server.
 	c1 := client.RegistrationInit(password)
@@ -207,8 +217,15 @@ func ExampleLoginKeyExchange() {
 	conf := opaque.DefaultConfiguration()
 
 	// Run time setup
-	client := conf.Client()
-	server := conf.Server()
+	client, err := conf.Client()
+	if err != nil {
+		panic(err)
+	}
+
+	server, err := conf.Server()
+	if err != nil {
+		panic(err)
+	}
 
 	// The client initiates the ball and sends the serialized ke1 to the server
 	ke1 := client.LoginInit(password)
