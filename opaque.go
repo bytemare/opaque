@@ -17,9 +17,11 @@ package opaque
 
 import (
 	"crypto"
+	"errors"
 	"fmt"
 
 	"github.com/bytemare/crypto/group"
+	"github.com/bytemare/crypto/hash"
 	"github.com/bytemare/crypto/ksf"
 
 	"github.com/bytemare/opaque/internal"
@@ -51,6 +53,15 @@ const (
 	// Curve25519Sha512 = Group(group.Curve25519Sha512).
 
 	confLength = 6
+)
+
+var (
+	errInvalidKDFid  = errors.New("invalid KDF id")
+	errInvalidMACid  = errors.New("invalid MAC id")
+	errInvalidHASHid = errors.New("invalid Hash id")
+	errInvalidKSFid  = errors.New("invalid KSF id")
+	errInvalidOPRFid = errors.New("invalid OPRF group id")
+	errInvalidAKEid  = errors.New("invalid AKE group id")
 )
 
 // Credentials holds the client and server ids (will certainly disappear in next versions°.
@@ -86,17 +97,50 @@ type Configuration struct {
 }
 
 // Client returns a newly instantiated Client from the Configuration.
-func (c *Configuration) Client() *Client {
+func (c *Configuration) Client() (*Client, error) {
 	return NewClient(c)
 }
 
 // Server returns a newly instantiated Server from the Configuration.
-func (c *Configuration) Server() *Server {
+func (c *Configuration) Server() (*Server, error) {
 	return NewServer(c)
 }
 
-func (c *Configuration) toInternal() *internal.Parameters {
-	// NEED TO-DO: validate all the values.
+// verify returns an error on the first non-compliant parameter, ni otherwise.
+func (c *Configuration) verify() error {
+	if !hash.Hashing(c.KDF).Available() {
+		return errInvalidKDFid
+	}
+
+	if !hash.Hashing(c.MAC).Available() {
+		return errInvalidMACid
+	}
+
+	if !hash.Hashing(c.Hash).Available() {
+		return errInvalidHASHid
+	}
+
+	if c.KSF != 0 && !c.KSF.Available() {
+		return errInvalidKSFid
+	}
+
+	if !oprf.Ciphersuite(c.OPRF).Available() {
+		return errInvalidOPRFid
+	}
+
+	if !group.Group(c.AKE).Available() {
+		return errInvalidAKEid
+	}
+
+	return nil
+}
+
+// toInternal builds the internal representation of the configuration parameters.
+func (c *Configuration) toInternal() (*internal.Parameters, error) {
+	if err := c.verify(); err != nil {
+		return nil, err
+	}
+
 	g := group.Group(c.AKE)
 	ip := &internal.Parameters{
 		KDF:             internal.NewKDF(c.KDF),
@@ -112,7 +156,7 @@ func (c *Configuration) toInternal() *internal.Parameters {
 	}
 	ip.EnvelopeSize = ip.NonceLen + ip.MAC.Size()
 
-	return ip
+	return ip, nil
 }
 
 // Serialize returns the byte encoding of the Configuration structure.
@@ -178,6 +222,11 @@ type ClientRecord struct {
 // GetFakeEnvelope returns a byte array filled with 0s the length of a legitimate envelope size in the configuration's mode.
 // This fake envelope byte array is used in the client enumeration mitigation scheme.
 func GetFakeEnvelope(c *Configuration) []byte {
-	l := c.toInternal().EnvelopeSize
-	return make([]byte, l)
+	if !hash.Hashing(c.MAC).Available() {
+		panic(errInvalidMACid)
+	}
+
+	envelopeSize := internal.NonceLength + internal.NewMac(c.MAC).Size()
+
+	return make([]byte, envelopeSize)
 }

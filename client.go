@@ -40,18 +40,21 @@ type Client struct {
 }
 
 // NewClient returns a new Client instantiation given the application Configuration.
-func NewClient(p *Configuration) *Client {
+func NewClient(p *Configuration) (*Client, error) {
 	if p == nil {
 		p = DefaultConfiguration()
 	}
 
-	ip := p.toInternal()
+	ip, err := p.toInternal()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Client{
 		OPRF:       ip.OPRF.Client(),
 		Ake:        ake.NewClient(),
 		Parameters: ip,
-	}
+	}, nil
 }
 
 // buildPRK derives the randomized password from the OPRF output.

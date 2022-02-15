@@ -43,8 +43,21 @@ const (
 
 var suiteToHash = make(map[group.Group]crypto.Hash)
 
+func init() {
+	RistrettoSha512.register(crypto.SHA512)
+	P256Sha256.register(crypto.SHA256)
+	P384Sha384.register(crypto.SHA384)
+	P521Sha512.register(crypto.SHA512)
+}
+
 func (c Ciphersuite) register(h crypto.Hash) {
 	suiteToHash[c.Group()] = h
+}
+
+// Available returns whether the Ciphersuite has been registered of not.
+func (c Ciphersuite) Available() bool {
+	_, ok := suiteToHash[c.Group()]
+	return ok
 }
 
 // Group returns the casted identifier for the cipher suite.
@@ -79,7 +92,7 @@ func (o *oprf) dst(prefix string) []byte {
 
 // DeriveKey returns a scalar mapped from the input.
 func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
-	dst := encoding.Concat([]byte("DeriveKeyPair"), contextString(c))
+	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), contextString(c))
 	deriveInput := encoding.Concat(seed, encoding.EncodeVector(info))
 
 	var counter uint8
@@ -100,11 +113,4 @@ func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
 // Client returns an OPRF client.
 func (c Ciphersuite) Client() *Client {
 	return &Client{oprf: c.oprf()}
-}
-
-func init() {
-	RistrettoSha512.register(crypto.SHA512)
-	P256Sha256.register(crypto.SHA256)
-	P384Sha384.register(crypto.SHA384)
-	P521Sha512.register(crypto.SHA512)
 }

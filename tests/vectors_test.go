@@ -119,7 +119,7 @@ type vector struct {
 
 func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	// Client
-	client := p.Client()
+	client, _ := p.Client()
 	client.OPRF = buildOPRFClient(oprf.Ciphersuite(p.OPRF), v.Inputs.BlindRegistration)
 	regReq := client.RegistrationInit(v.Inputs.Password)
 
@@ -128,7 +128,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	}
 
 	// Server
-	server := p.Server()
+	server, _ := p.Server()
 	pks, err := server.Group.NewElement().Decode(v.Inputs.ServerPublicKey)
 	if err != nil {
 		panic(err)
@@ -182,7 +182,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 
 func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	// Client
-	client := p.Client()
+	client, _ := p.Client()
 
 	if !isFake(v.Config.Fake) {
 		client.OPRF = buildOPRFClient(oprf.Ciphersuite(p.AKE), v.Inputs.BlindLogin)
@@ -200,7 +200,7 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	}
 
 	// Server
-	server := p.Server()
+	server, _ := p.Server()
 
 	record := &opaque.ClientRecord{}
 	if !isFake(v.Config.Fake) {

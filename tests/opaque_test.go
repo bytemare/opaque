@@ -40,7 +40,8 @@ func TestFull(t *testing.T) {
 		oprfSeed:      internal.RandomBytes(p.Hash.Size()),
 	}
 
-	serverSecretKey, pks := p.Server().KeyGen()
+	s, _ := p.Server()
+	serverSecretKey, pks := s.KeyGen()
 	test.serverSecretKey = serverSecretKey
 	test.serverPublicKey = pks
 
@@ -62,7 +63,7 @@ func TestFull(t *testing.T) {
 
 func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte) {
 	// Client
-	client := p.Client()
+	client, _ := p.Client()
 
 	var m1s []byte
 	{
@@ -74,7 +75,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 	var m2s []byte
 	var credID []byte
 	{
-		server := p.Server()
+		server, _ := p.Server()
 		m1, err := server.DeserializeRegistrationRequest(m1s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
@@ -113,7 +114,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 
 	// Server
 	{
-		server := p.Server()
+		server, _ := p.Server()
 		m3, err := server.DeserializeRegistrationRecord(m3s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
@@ -129,7 +130,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 
 func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord) []byte {
 	// Client
-	client := p.Client()
+	client, _ := p.Client()
 
 	var m4s []byte
 	{
@@ -141,7 +142,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	var m5s []byte
 	var state []byte
 	{
-		server := p.Server()
+		server, _ := p.Server()
 		m4, err := server.DeserializeKE1(m4s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
@@ -180,7 +181,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	// Server
 	var serverKey []byte
 	{
-		server := p.Server()
+		server, _ := p.Server()
 		m6, err := server.DeserializeKE3(m6s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
