@@ -14,7 +14,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -470,6 +469,21 @@ func groupToGroup(g string) opaque.Group {
 
 type draftVectors []*vector
 
+func loadOpaqueVectors(filepath string) (draftVectors, error) {
+	contents, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, err
+	}
+
+	var v draftVectors
+	errJSON := json.Unmarshal(contents, &v)
+	if errJSON != nil {
+		return nil, errJSON
+	}
+
+	return v, nil
+}
+
 func TestOpaqueVectors(t *testing.T) {
 	if err := filepath.Walk("vectors.json",
 		func(path string, info os.FileInfo, err error) error {
@@ -481,15 +495,9 @@ func TestOpaqueVectors(t *testing.T) {
 				return nil
 			}
 
-			contents, err := ioutil.ReadFile(path)
-			if err != nil {
+			v, err := loadOpaqueVectors(path)
+			if err != nil || v == nil {
 				return err
-			}
-
-			var v draftVectors
-			errJSON := json.Unmarshal(contents, &v)
-			if errJSON != nil {
-				return errJSON
 			}
 
 			for _, tv := range v {
