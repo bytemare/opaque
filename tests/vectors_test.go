@@ -14,9 +14,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -470,33 +468,30 @@ func groupToGroup(g string) opaque.Group {
 
 type draftVectors []*vector
 
+func loadOpaqueVectors(filepath string) (draftVectors, error) {
+	contents, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, err
+	}
+
+	var v draftVectors
+	errJSON := json.Unmarshal(contents, &v)
+	if errJSON != nil {
+		return nil, errJSON
+	}
+
+	return v, nil
+}
+
 func TestOpaqueVectors(t *testing.T) {
-	if err := filepath.Walk("vectors.json",
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
+	vectorFile := "vectors.json"
 
-			if info.IsDir() {
-				return nil
-			}
+	v, err := loadOpaqueVectors(vectorFile)
+	if err != nil || v == nil {
+		t.Fatal(err)
+	}
 
-			contents, err := ioutil.ReadFile(path)
-			if err != nil {
-				return err
-			}
-
-			var v draftVectors
-			errJSON := json.Unmarshal(contents, &v)
-			if errJSON != nil {
-				return errJSON
-			}
-
-			for _, tv := range v {
-				t.Run(fmt.Sprintf("%s - %s - Fake:%s", tv.Config.Name, tv.Config.Group, tv.Config.Fake), tv.test)
-			}
-			return nil
-		}); err != nil {
-		t.Fatalf("error opening test vectors: %v", err)
+	for _, tv := range v {
+		t.Run(fmt.Sprintf("%s - %s - Fake:%s", tv.Config.Name, tv.Config.Group, tv.Config.Fake), tv.test)
 	}
 }
