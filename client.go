@@ -71,8 +71,8 @@ func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest 
 	return &message.RegistrationRequest{BlindedMessage: m}
 }
 
-// RegistrationFinalizeWithNonce returns a RegistrationRecord message given the identities, server's RegistrationResponse,
-// and the envelope nonce to be used.
+// RegistrationFinalizeWithNonce returns a RegistrationRecord message given the identities, server's
+// RegistrationResponse, and the envelope nonce to be used.
 // This function is primarily used for testing purposes and will most probably be removed at some point.
 func (c *Client) RegistrationFinalizeWithNonce(
 	resp *message.RegistrationResponse,
