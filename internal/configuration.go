@@ -67,7 +67,8 @@ type Parameters struct {
 	Context         []byte
 }
 
-// DeserializeRegistrationRequest takes a serialized RegistrationRequest message as input and attempts to deserialize it.
+// DeserializeRegistrationRequest takes a serialized RegistrationRequest message as input and attempts to deserialize
+// it.
 func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.RegistrationRequest, error) {
 	if len(input) != p.OPRFPointLength {
 		return nil, errInvalidMessageLength
@@ -85,7 +86,8 @@ func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.Regi
 	return &message.RegistrationRequest{C: p.OPRF, BlindedMessage: blindedMessage}, nil
 }
 
-// DeserializeRegistrationResponse takes a serialized RegistrationResponse message as input and attempts to deserialize it.
+// DeserializeRegistrationResponse takes a serialized RegistrationResponse message as input and attempts to deserialize
+// it.
 func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.RegistrationResponse, error) {
 	if len(input) != p.OPRFPointLength+p.AkePointLength {
 		return nil, errInvalidMessageLength
@@ -203,7 +205,8 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 
 // DeserializeKE2 takes a serialized KE2 message as input and attempts to deserialize it.
 func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
-	maxResponseLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize // size of credential response
+	// size of credential response
+	maxResponseLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize
 
 	// Verify it matches the size of a legal KE2 message.
 	if len(input) != maxResponseLength+p.NonceLen+p.AkePointLength+p.MAC.Size() {
@@ -254,5 +257,6 @@ func (p *Parameters) XorResponse(key, nonce, in []byte) []byte {
 		encoding.SuffixString(nonce, tag.CredentialResponsePad),
 		encoding.PointLength[p.Group]+p.EnvelopeSize,
 	)
+
 	return Xor(pad, in)
 }

@@ -115,7 +115,8 @@ var (
 )
 
 func ExampleRegistration() {
-	// We assume the server is already set up with the following values. secret* values are internal secret to the server.
+	// We assume the server is already set up with the following values. secret* values are internal secret to the
+	// server.
 	// They can be unique for all clients, and must be the same for a client between registration and login. It's safe
 	// to use these same values across clients as long as they remain secret.
 	conf := opaque.DefaultConfiguration()

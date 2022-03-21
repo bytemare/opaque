@@ -6,7 +6,8 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-// Package oprf implements the Elliptic Curve Oblivious Pseudorandom Function (EC-OPRF) from https://tools.ietf.org/html/draft-irtf-cfrg-voprf.
+// Package oprf implements the Elliptic Curve Oblivious Pseudorandom Function (EC-OPRF) from
+// https://tools.ietf.org/html/draft-irtf-cfrg-voprf.
 package oprf
 
 import (

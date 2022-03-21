@@ -9,7 +9,8 @@
 // Package internal provides structures and functions to operate OPAQUE that are not part of the public API.
 package internal
 
-// Xor returns a new byte slice containing the byte-by-byte xor-ing of the input slices, which must be of the same length.
+// Xor returns a new byte slice containing the byte-by-byte xor-ing of the input slices,
+// which must be of the same length.
 func Xor(a, b []byte) []byte {
 	dst := make([]byte, len(a))
 

@@ -173,8 +173,7 @@ func (c *Configuration) Serialize() []byte {
 	return encoding.Concat(b, encoding.EncodeVector(c.Context))
 }
 
-// DeserializeConfiguration decodes the input and returns a Parameter structure. This assumes that the encoded parameters
-// are valid, and will not be checked.
+// DeserializeConfiguration decodes the input and returns a Parameter structure.
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	if len(encoded) < confLength+2 { // corresponds to the configuration length + 2-byte encoding of empty context
 		return nil, internal.ErrConfigurationInvalidLength
@@ -185,7 +184,7 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		return nil, fmt.Errorf("decoding the configuration context: %w", err)
 	}
 
-	return &Configuration{
+	c := &Configuration{
 		OPRF:    Group(encoded[0]),
 		KDF:     crypto.Hash(encoded[1]),
 		MAC:     crypto.Hash(encoded[2]),
@@ -193,7 +192,13 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		KSF:     ksf.Identifier(encoded[4]),
 		AKE:     Group(encoded[5]),
 		Context: ctx,
-	}, nil
+	}
+
+	if _err := c.verify(); err != nil {
+		return nil, _err
+	}
+
+	return c, err
 }
 
 // DefaultConfiguration returns a default configuration with strong parameters.

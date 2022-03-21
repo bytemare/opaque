@@ -84,7 +84,8 @@ func (s *Server) oprfResponse(element *group.Point, oprfSeed, credentialIdentifi
 	return s.OPRF.Evaluate(ku, element)
 }
 
-// RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given identifiers.
+// RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given
+// identifiers.
 func (s *Server) RegistrationResponse(
 	req *message.RegistrationRequest,
 	serverPublicKey *group.Point,
@@ -207,17 +208,20 @@ func (s *Server) ExpectedMAC() []byte {
 	return s.Ake.ExpectedMAC()
 }
 
-// DeserializeRegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized RegistrationRequest structure.
+// DeserializeRegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized
+// RegistrationRequest structure.
 func (s *Server) DeserializeRegistrationRequest(registrationRequest []byte) (*message.RegistrationRequest, error) {
 	return s.Parameters.DeserializeRegistrationRequest(registrationRequest)
 }
 
-// DeserializeRegistrationResponse takes a serialized RegistrationResponse message and returns a deserialized RegistrationResponse structure.
+// DeserializeRegistrationResponse takes a serialized RegistrationResponse message and returns a deserialized
+// RegistrationResponse structure.
 func (s *Server) DeserializeRegistrationResponse(registrationResponse []byte) (*message.RegistrationResponse, error) {
 	return s.Parameters.DeserializeRegistrationResponse(registrationResponse)
 }
 
-// DeserializeRegistrationRecord takes a serialized RegistrationRecord message and returns a deserialized RegistrationRecord structure.
+// DeserializeRegistrationRecord takes a serialized RegistrationRecord message and returns a deserialized
+// RegistrationRecord structure.
 func (s *Server) DeserializeRegistrationRecord(registrationUpload []byte) (*message.RegistrationRecord, error) {
 	return s.Parameters.DeserializeRecord(registrationUpload)
 }
