@@ -14,7 +14,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -269,8 +268,4 @@ func TestOPRFVectors(t *testing.T) {
 		}); err != nil {
 		t.Fatalf("error opening test vectors: %v", err)
 	}
-}
-
-func TestThing(t *testing.T) {
-	log.Printf("\n - %v\n - %v\n - %v\n - %v\n - %v\n", 0x0d, '\r', byte('\r'), string(byte('\r')), uint('\r'))
 }
