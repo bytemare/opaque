@@ -9,6 +9,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  # Optional: allow read access to pull request. Use with `only-new-issues` option.
+  # pull-requests: read
+
 jobs:
   lint-and-test:
     name: Lint and Test
@@ -16,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        GOVER: [ '1.17', '1.16', '1.15' ]
+        GOVER: [ '1.18', '1.17', '1.16' ]
 
     steps:
       - name: Checkout repo
@@ -34,6 +39,7 @@ jobs:
         with:
           version: latest
           args: --config=./.github/.golangci.yml ./...
+          only-new-issues: true
 
       # Testing
       - name: Testing
@@ -52,7 +58,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v2
         with:
-          go-version: '1.17'
+          go-version: '1.18'
 
       # Coverage
       - name: Run coverage

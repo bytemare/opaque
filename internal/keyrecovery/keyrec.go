@@ -30,7 +30,6 @@ func getPubkey(p *internal.Parameters, randomizedPwd, nonce []byte) *group.Point
 	return pk
 }
 
-func recoverKeys(p *internal.Parameters,
-	randomizedPwd, nonce []byte) (clientSecretKey *group.Scalar, clientPublicKey *group.Point) {
+func recoverKeys(p *internal.Parameters, randomizedPwd, nonce []byte) (clientSecretKey *group.Scalar, clientPublicKey *group.Point) {
 	return deriveAuthKeyPair(p, randomizedPwd, nonce)
 }

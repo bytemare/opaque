@@ -322,7 +322,16 @@ func loadVectorSeedCorpus(f *testing.F, stage string) {
 	f.Add([]byte("0"), []byte(""), uint(7), uint(37), uint(7), byte('\x05'), byte('\x02'), byte('\x05'))
 	f.Add([]byte("0"), []byte("0"), uint(13), uint(5), uint(5), byte('\x03'), byte('\r'), byte('\x03'))
 	f.Add([]byte("0"), []byte("0"), uint(13), uint(5), uint(5), byte('\a'), byte('\x04'), byte('\x03'))
-	f.Add([]byte("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"), []byte("0"), uint(7), uint(7), uint(7), byte('\x01'), byte('\x03'), byte('\x01'))
+	f.Add(
+		[]byte("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+		[]byte("0"),
+		uint(7),
+		uint(7),
+		uint(7),
+		byte('\x01'),
+		byte('\x03'),
+		byte('\x01'),
+	)
 	f.Add([]byte("00000000000000000000000000000000"), []byte("0"), uint(7), uint(7), uint(7), byte('\x01'), byte('\x03'), byte('\x06'))
 }
 
@@ -470,7 +479,8 @@ func FuzzDeserializeKE1(f *testing.F) {
 		_, err = server.DeserializeKE1(ke1)
 		if err != nil {
 			conf := server.Parameters
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(ke1) == conf.OPRFPointLength+conf.NonceLen+conf.AkePointLength {
+			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
+				len(ke1) == conf.OPRFPointLength+conf.NonceLen+conf.AkePointLength {
 				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
 			}
 
@@ -513,7 +523,8 @@ func FuzzDeserializeKE2(f *testing.F) {
 			conf := client.Parameters
 			maxResponseLength := conf.OPRFPointLength + conf.NonceLen + conf.AkePointLength + conf.EnvelopeSize
 
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(ke2) == maxResponseLength+conf.NonceLen+conf.AkePointLength+conf.MAC.Size() {
+			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
+				len(ke2) == maxResponseLength+conf.NonceLen+conf.AkePointLength+conf.MAC.Size() {
 				t.Fatalf("got %q but input is valid", errInvalidMessageLength)
 			}
 

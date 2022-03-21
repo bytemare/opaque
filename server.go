@@ -85,8 +85,11 @@ func (s *Server) oprfResponse(element *group.Point, oprfSeed, credentialIdentifi
 }
 
 // RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given identifiers.
-func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
-	serverPublicKey *group.Point, credentialIdentifier, oprfSeed []byte) *message.RegistrationResponse {
+func (s *Server) RegistrationResponse(
+	req *message.RegistrationRequest,
+	serverPublicKey *group.Point,
+	credentialIdentifier, oprfSeed []byte,
+) *message.RegistrationResponse {
 	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
 
 	return &message.RegistrationResponse{
@@ -96,8 +99,12 @@ func (s *Server) RegistrationResponse(req *message.RegistrationRequest,
 	}
 }
 
-func (s *Server) credentialResponse(req *cred.CredentialRequest, serverPublicKey []byte, record *message.RegistrationRecord,
-	credentialIdentifier, oprfSeed, maskingNonce []byte) *cred.CredentialResponse {
+func (s *Server) credentialResponse(
+	req *cred.CredentialRequest,
+	serverPublicKey []byte,
+	record *message.RegistrationRecord,
+	credentialIdentifier, oprfSeed, maskingNonce []byte,
+) *cred.CredentialResponse {
 	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
 
 	maskingNonce, maskedResponse := masking.Mask(s.Parameters, maskingNonce, record.MaskingKey, serverPublicKey, record.Envelope)
@@ -144,8 +151,11 @@ func (s *Server) verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed []by
 }
 
 // LoginInit responds to a KE1 message with a KE2 message given server credentials and client record.
-func (s *Server) LoginInit(ke1 *message.KE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
-	record *ClientRecord) (*message.KE2, error) {
+func (s *Server) LoginInit(
+	ke1 *message.KE1,
+	serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
+	record *ClientRecord,
+) (*message.KE2, error) {
 	sks, err := s.verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed, record)
 	if err != nil {
 		return nil, err

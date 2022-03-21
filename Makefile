@@ -6,13 +6,14 @@ update:
 	@echo "Updating dependencies and linters ..."
 	@go get -u
 	@go mod tidy
-	@go get -u mvdan.cc/gofumpt@latest github.com/daixiang0/gci
+	@go get -u mvdan.cc/gofumpt@latest github.com/daixiang0/gci github.com/segmentio/golines@latest
 	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
 
 .PHONY: fmt
 fmt:
 	@echo "Formatting ..."
 	@go mod tidy
+	@golines -m 145 -t 4 -w .
 	@gofumpt -w -extra .
 	@gci write --Section Standard --Section Default --Section "Prefix(github.com/bytemare/opaque)" .
 

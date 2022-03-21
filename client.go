@@ -74,16 +74,25 @@ func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest 
 // RegistrationFinalizeWithNonce returns a RegistrationRecord message given the identities, server's RegistrationResponse,
 // and the envelope nonce to be used.
 // This function is primarily used for testing purposes and will most probably be removed at some point.
-func (c *Client) RegistrationFinalizeWithNonce(resp *message.RegistrationResponse, idc, ids, envelopeNonce []byte) (upload *message.RegistrationRecord, exportKey []byte) {
+func (c *Client) RegistrationFinalizeWithNonce(
+	resp *message.RegistrationResponse,
+	idc, ids, envelopeNonce []byte,
+) (upload *message.RegistrationRecord, exportKey []byte) {
 	return c.registrationFinalize(idc, ids, envelopeNonce, resp)
 }
 
 // RegistrationFinalize returns a RegistrationRecord message given the identities and the server's RegistrationResponse.
-func (c *Client) RegistrationFinalize(resp *message.RegistrationResponse, idc, ids []byte) (upload *message.RegistrationRecord, exportKey []byte) {
+func (c *Client) RegistrationFinalize(
+	resp *message.RegistrationResponse,
+	idc, ids []byte,
+) (upload *message.RegistrationRecord, exportKey []byte) {
 	return c.registrationFinalize(idc, ids, nil, resp)
 }
 
-func (c *Client) registrationFinalize(idc, ids, envelopeNonce []byte, resp *message.RegistrationResponse) (upload *message.RegistrationRecord, exportKey []byte) {
+func (c *Client) registrationFinalize(
+	idc, ids, envelopeNonce []byte,
+	resp *message.RegistrationResponse,
+) (upload *message.RegistrationRecord, exportKey []byte) {
 	creds2 := &keyrecovery.Credentials{
 		Idc:           idc,
 		Ids:           ids,

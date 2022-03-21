@@ -52,9 +52,15 @@ func (s *Server) SetValues(id group.Group, esk *group.Scalar, nonce []byte, nonc
 }
 
 // Response produces a 3DH server response message.
-func (s *Server) Response(p *internal.Parameters, serverIdentity []byte, serverSecretKey *group.Scalar,
-	clientIdentity []byte, clientPublicKey *group.Point,
-	ke1 *message.KE1, response *cred.CredentialResponse) *message.KE2 {
+func (s *Server) Response(
+	p *internal.Parameters,
+	serverIdentity []byte,
+	serverSecretKey *group.Scalar,
+	clientIdentity []byte,
+	clientPublicKey *group.Point,
+	ke1 *message.KE1,
+	response *cred.CredentialResponse,
+) *message.KE2 {
 	epk := s.SetValues(p.Group, nil, nil, p.NonceLen)
 
 	ke2 := &message.KE2{

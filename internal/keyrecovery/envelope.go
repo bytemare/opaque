@@ -61,8 +61,7 @@ func cleartextCredentials(clientPublicKey, serverPublicKey, idc, ids []byte) []b
 }
 
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
-func Store(p *internal.Parameters, randomizedPwd, serverPublicKey []byte,
-	creds *Credentials) (env *Envelope, pku *group.Point, export []byte) {
+func Store(p *internal.Parameters, randomizedPwd, serverPublicKey []byte, creds *Credentials) (env *Envelope, pku *group.Point, export []byte) {
 	// testing: integrated to support testing with set nonce
 	nonce := creds.EnvelopeNonce
 	if nonce == nil {
@@ -84,8 +83,11 @@ func Store(p *internal.Parameters, randomizedPwd, serverPublicKey []byte,
 }
 
 // Recover assumes that the envelope's inner envelope has been previously checked to be of correct size.
-func Recover(p *internal.Parameters, randomizedPwd, serverPublicKey, idc, ids []byte,
-	envelope *Envelope) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, export []byte, err error) {
+func Recover(
+	p *internal.Parameters,
+	randomizedPwd, serverPublicKey, idc, ids []byte,
+	envelope *Envelope,
+) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, export []byte, err error) {
 	clientSecretKey, clientPublicKey = recoverKeys(p, randomizedPwd, envelope.Nonce)
 	ctc := cleartextCredentials(encoding.SerializePoint(clientPublicKey, p.Group), serverPublicKey, idc, ids)
 

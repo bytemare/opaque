@@ -121,7 +121,11 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	regReq := client.RegistrationInit(v.Inputs.Password)
 
 	if !bytes.Equal(v.Outputs.RegistrationRequest, regReq.Serialize()) {
-		t.Fatalf("registration requests do not match\nwant: %v\ngot : %v", hex.EncodeToString(v.Outputs.RegistrationRequest), hex.EncodeToString(regReq.Serialize()))
+		t.Fatalf(
+			"registration requests do not match\nwant: %v\ngot : %v",
+			hex.EncodeToString(v.Outputs.RegistrationRequest),
+			hex.EncodeToString(regReq.Serialize()),
+		)
 	}
 
 	// Server
