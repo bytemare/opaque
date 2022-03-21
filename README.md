@@ -4,19 +4,36 @@
 [![codecov](https://codecov.io/gh/bytemare/opaque/branch/main/graph/badge.svg?token=5bQfB0OctA)](https://codecov.io/gh/bytemare/opaque)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbytemare%2Fopaque.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbytemare%2Fopaque?ref=badge_shield)
 
-This package implements the asymmetric password-authenticated key exchange protocol as in the latest [Internet Draft](https://github.com/cfrg/draft-irtf-cfrg-opaque).
+This package implements [OPAQUE](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque), an asymmetric password-authenticated
+key exchange protocol that is secure against pre-computation attacks. It enables a client to authenticate to a server
+without ever revealing its password to the server. 
 
-[OPAQUE](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque) enables a client to authenticate to a server without ever revealing its password, with strong security guarantees. The server and client share a nice session secret on successful authentication.
+This implementation is developed by one of the authors of the RFC [Internet Draft](https://github.com/cfrg/draft-irtf-cfrg-opaque).
+The main branch is in sync with the latest developments of the draft, and [the releases](https://github.com/bytemare/opaque/releases)
+correspond to the [official draft versions](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque).
+
+#### What is OPAQUE?
+
+> OPAQUE is a PKI-free secure aPAKE that is secure against pre-computation attacks. OPAQUE provides forward secrecy with
+> respect to password leakage while also hiding the password from the server, even during password registration. OPAQUE
+> allows applications to increase the difficulty of offline dictionary attacks via iterated hashing or other key
+> stretching schemes. OPAQUE is also extensible, allowing clients to safely store and retrieve arbitrary application data
+> on servers using only their password.
+
+#### References
+- [The original paper](https://eprint.iacr.org/2018/163.pdf) from Jarecki, Krawczyk, and Xu.
+- [OPAQUE is used in WhatsApp](https://engineering.fb.com/2021/09/10/security/whatsapp-e2ee-backups) to enable end-to-end encrypted backups.
+- [The GitHub repo](https://github.com/cfrg/draft-irtf-cfrg-opaque) where the draft is being specified.
 
 ## Installation
 
 ```
-  go get github.com/bytemare/opaque@v0.6.0
+  go get github.com/bytemare/opaque@latest
 ```
 
-## Usage
+## Documentation [![Go Reference](https://pkg.go.dev/badge/github.com/bytemare/opaque.svg)](https://pkg.go.dev/github.com/bytemare/opaque)
 
-You can find the documentation and usage examples in [the project wiki](https://github.com/bytemare/opaque/wiki) and [the package doc](https://pkg.go.dev/github.com/bytemare/opaque). 
+You can find the documentation and usage examples in [the package doc](https://pkg.go.dev/github.com/bytemare/opaque) and [the project wiki](https://github.com/bytemare/opaque/wiki) . 
 
 ## Versioning
 
