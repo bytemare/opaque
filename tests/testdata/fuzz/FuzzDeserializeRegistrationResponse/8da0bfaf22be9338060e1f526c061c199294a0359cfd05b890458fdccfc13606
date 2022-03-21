@@ -1,9 +1,0 @@
-go test fuzz v1
-[]byte("00100000000000000000000000000000")
-[]byte("0")
-uint(7)
-uint(7)
-uint(12)
-byte('\x01')
-byte('\x01')
-byte('\a')
