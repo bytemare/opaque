@@ -1,3 +1,6 @@
+//go:build go1.18
+// +build go1.18
+
 package opaque
 
 import (
@@ -263,27 +266,7 @@ func groupToGroup(g string) opaque.Group {
 
 func FuzzConfiguration(f *testing.F) {
 	// seed corpus
-	vectors, err := fuzzLoadVectors("../vectors.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, v := range vectors {
-		f.Add([]byte(v.Outputs.KE1),
-			[]byte(v.Config.Context),
-			uint(kdfToHash(v.Config.KDF)),
-			uint(macToHash(v.Config.MAC)),
-			uint(hashToHash(v.Config.Hash)),
-			v.Config.OPRF[1],
-			byte(ksfToKSF(v.Config.KSF)),
-			byte(groupToGroup(v.Config.Group)),
-		)
-	}
-
-	// previous crashers
-	f.Add([]byte("0"), []byte(""), uint(7), uint(37), uint(7), byte('\x05'), byte('\x02'), byte('\x05'))
-	f.Add([]byte("0"), []byte("0"), uint(13), uint(5), uint(5), byte('\x03'), byte('\r'), byte('\x03'))
-	f.Add([]byte("0"), []byte("0"), uint(13), uint(5), uint(5), byte('\a'), byte('\x04'), byte('\x03'))
+	loadVectorSeedCorpus(f, "")
 
 	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, oprf, _ksf, ake byte) {
 		c := &opaque.Configuration{
@@ -302,7 +285,7 @@ func FuzzConfiguration(f *testing.F) {
 
 func loadVectorSeedCorpus(f *testing.F, stage string) {
 	// seed corpus
-	vectors, err := fuzzLoadVectors("../vectors.json")
+	vectors, err := fuzzLoadVectors("vectors.json")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -310,6 +293,8 @@ func loadVectorSeedCorpus(f *testing.F, stage string) {
 	for _, v := range vectors {
 		var input ByteToHex
 		switch stage {
+		case "":
+			input = nil
 		case "RegistrationRequest":
 			input = v.Outputs.RegistrationRequest
 		case "RegistrationResponse":
@@ -411,7 +396,7 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 			conf := client.Parameters
 			maxResponseLength := conf.OPRFPointLength + conf.AkePointLength
 
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r2) == maxResponseLength+conf.AkePointLength {
+			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r2) == maxResponseLength {
 				t.Fatalf("got %q but input is valid", errInvalidMessageLength)
 			}
 
@@ -576,48 +561,3 @@ func FuzzDeserializeKE3(f *testing.F) {
 		}
 	})
 }
-
-//func FuzzRegistrationResponse(f *testing.F) {
-//	// seed corpus
-//	corpus := []string{
-//		"c021ab3bca8c7c7949f7090d2af149523c5029d6c5c45b59997f8c306ccbdf75400ceac0fbfb16005928335518be6f930a113c6c0814521262e17ecc3cdc9f91da25553da9ac142b36332dbd487713ae6712432fb317a6e00b2b17525bbe6912",
-//		"7002a52fa6c2916c49c1fff952e818e458c7f7799139b243918c97758f463a47e8f5bbbaa7ad3dce15eb299eb2a5b34875ff421b1d63d7a2cfd90961b35150da8824e44af3cdc7a29880ff532751b7ccc6a8875ac14e08964942473de9484f7b",
-//		"0226bc3aeccce9c813eaec852599fe76eafe611467a054e738441d4a3b7922aaba72721898ef81cc0a76a0b5508f2f7bb817e86f1dd05ca013190a68602c7af25f03a51c7c3d3a69f5217c0f8de4efa242b0cf4ba35cc67c820e57b69e7a4f53cd69",
-//		"03ff69ee0b845955eafc817acf721fdecccc94977c4aa0841ec33bf5060375e3a4a2912bab9b6a62cddf7d5e3209a2859e5947586f69259e0708bdfab794f689ee038744dec9da18441e1ef78ff9b2e5d62c713e56eee7aa326a9be577365f919d6c",
-//		"943a149cf304878367fa2dce5cb30eac23cfd1358e5cc0efdbd4361a9e7bd72dc26fead2a8b3d5910e25fd29402530b5c7e852585f843f3b939993624b8a7c3b581062b0e8e90db4798adbb49581f016034e0855b6d6199aceb56a71c9bd4866",
-//		"0258384d63ae4bbddde6d00d41b0e7174695ff6234563e16fc284aa589c7de93f9b8bb2700cdd47e339d95404519f2fb3da58c93d84cbb4d51de6757a31919382b02630e46a94b7f8f66071d24794c37f605055c098afc04d637caf9b1bc714bd15c",
-//	}
-//
-//	for _, s := range corpus {
-//		b, err := hex.DecodeString(s)
-//		if err != nil {
-//			f.Fatal(err)
-//		}
-//		f.Add(b)
-//	}
-//
-//	f.Fuzz(func(t *testing.T, ke1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed, record, credID, idc []byte) {
-//		server := opaque.DefaultConfiguration().Server()
-//		dKE1, err := server.DeserializeKE1(ke1)
-//		if err != nil {
-//			t.Fatalf("deserializing KE1: %v", err)
-//		}
-//
-//		dRecord, err := server.DeserializeRegistrationRecord(record)
-//		if err != nil {
-//			t.Fatalf("deserializing record: %v", err)
-//		}
-//
-//		cred := &opaque.ClientRecord{
-//			CredentialIdentifier: credID,
-//			ClientIdentity:       idc,
-//			RegistrationRecord:   dRecord,
-//			TestMaskNonce:        nil,
-//		}
-//
-//		_, err = server.LoginInit(dKE1, serverIdentity, serverSecretKey, serverPublicKey, oprfSeed, cred)
-//		if err != nil {
-//			t.Fatalf("login: %v", err)
-//		}
-//	})
-//}
