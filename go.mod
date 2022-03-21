@@ -1,6 +1,6 @@
 module github.com/bytemare/opaque
 
-go 1.17
+go 1.18
 
 require github.com/bytemare/crypto v0.2.6-0.20220214222002-6829d2da8b08
 

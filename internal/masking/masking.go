@@ -46,8 +46,10 @@ func Mask(p *internal.Parameters, nonceIn, maskingKey, serverPublicKey, envelope
 
 // Unmask decrypts the maskedResponse and returns the server's public key and the client key on success.
 // This function assumes that maskedResponse has been checked to be of length pointLength + envelope size.
-func Unmask(p *internal.Parameters, randomizedPwd, nonce, maskedResponse []byte) (serverPublicKey *group.Point,
-	serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
+func Unmask(
+	p *internal.Parameters,
+	randomizedPwd, nonce, maskedResponse []byte,
+) (serverPublicKey *group.Point, serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
 	maskingKey := p.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), p.Hash.Size())
 	clear := p.XorResponse(maskingKey, nonce, maskedResponse)
 	serverPublicKeyBytes = clear[:encoding.PointLength[p.Group]]

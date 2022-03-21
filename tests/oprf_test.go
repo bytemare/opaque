@@ -26,7 +26,7 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 )
 
-type vector struct {
+type oprfVector struct {
 	DST       string           `json:"groupDST"`
 	Hash      string           `json:"hash"`
 	KeyInfo   string           `json:"keyInfo"`
@@ -47,7 +47,7 @@ type test struct {
 	Output            [][]byte
 }
 
-type testVectors []vector
+type testVectors []oprfVector
 
 type testVector struct {
 	Batch             int    `json:"Batch"`
@@ -175,7 +175,7 @@ func getDST(prefix []byte, c oprf.Ciphersuite) []byte {
 	return encoding.Concatenate(prefix, []byte(tag.OPRF), encoding.I2OSP(0x00, 1), encoding.I2OSP(int(c), 2))
 }
 
-func (v vector) test(t *testing.T) {
+func (v oprfVector) test(t *testing.T) {
 	s, err := hex.DecodeString(v.SkSm)
 	if err != nil {
 		t.Fatalf("private key decoding errored with %q\nfor sksm %v\n", err, v.SkSm)
