@@ -172,15 +172,9 @@ func ExampleRegistration() {
 		panic(err)
 	}
 
-	clientCreds := &opaque.Credentials{
-		Client: clientID,
-		Server: serverID,
-	}
-
-	// We're using the internal mode, so we don't have to provide a private key here.
-	// This also spits out a client-only secret export_key, that the client can use for other purposes (e.g. encrypt
+	// This also generates a client-only secret export_key, that the client can use for other purposes (e.g. encrypt
 	// information to store on the server, and that the server can't decrypt). We don't use in the example here.
-	c3, _ := client.RegistrationFinalize(clientCreds, c2)
+	c3, _ := client.RegistrationFinalize(c2, clientID, serverID)
 	c3s := c3.Serialize()
 
 	// Server registers the client upload

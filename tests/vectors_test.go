@@ -15,7 +15,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -51,15 +50,14 @@ func (j *ByteToHex) UnmarshalJSON(b []byte) error {
 
 type config struct {
 	Context ByteToHex `json:"Context"`
-	// EnvelopeMode string    `json:"EnvelopeMode"`
-	Fake  string    `json:"Fake"`
-	Group string    `json:"Group"`
-	Hash  string    `json:"Hash"`
-	KDF   string    `json:"KDF"`
-	MAC   string    `json:"MAC"`
-	KSF   string    `json:"KSF"`
-	Name  string    `json:"Name"`
-	OPRF  ByteToHex `json:"OPRF"`
+	Fake    string    `json:"Fake"`
+	Group   string    `json:"Group"`
+	Hash    string    `json:"Hash"`
+	KDF     string    `json:"KDF"`
+	MAC     string    `json:"MAC"`
+	KSF     string    `json:"KSF"`
+	Name    string    `json:"Name"`
+	OPRF    ByteToHex `json:"OPRF"`
 }
 
 type inputs struct {
@@ -158,13 +156,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	}
 
 	// Client
-	clientCredentials := &opaque.Credentials{
-		Client:       v.Inputs.ClientIdentity,
-		Server:       v.Inputs.ServerIdentity,
-		TestEnvNonce: v.Inputs.EnvelopeNonce,
-	}
-
-	upload, exportKey := client.RegistrationFinalize(clientCredentials, regResp)
+	upload, exportKey := client.RegistrationFinalizeWithNonce(regResp, v.Inputs.ClientIdentity, v.Inputs.ServerIdentity, v.Inputs.EnvelopeNonce)
 
 	if !bytes.Equal(v.Outputs.ExportKey, exportKey) {
 		t.Fatalf("exportKey do not match\nexpected %v,\ngot %v", v.Outputs.ExportKey, exportKey)
@@ -265,11 +257,6 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 }
 
 func (v *vector) test(t *testing.T) {
-	//mode, err := hex.DecodeString(v.Config.EnvelopeMode)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
-
 	p := &opaque.Configuration{
 		OPRF:    opaque.Group(v.Config.OPRF[1]),
 		Hash:    hashToHash(v.Config.Hash),
@@ -485,26 +472,14 @@ func loadOpaqueVectors(filepath string) (draftVectors, error) {
 }
 
 func TestOpaqueVectors(t *testing.T) {
-	if err := filepath.Walk("vectors.json",
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
+	vectorFile := "vectors.json"
 
-			if info.IsDir() {
-				return nil
-			}
+	v, err := loadOpaqueVectors(vectorFile)
+	if err != nil || v == nil {
+		t.Fatal(err)
+	}
 
-			v, err := loadOpaqueVectors(path)
-			if err != nil || v == nil {
-				return err
-			}
-
-			for _, tv := range v {
-				t.Run(fmt.Sprintf("%s - %s - Fake:%s", tv.Config.Name, tv.Config.Group, tv.Config.Fake), tv.test)
-			}
-			return nil
-		}); err != nil {
-		t.Fatalf("error opening test vectors: %v", err)
+	for _, tv := range v {
+		t.Run(fmt.Sprintf("%s - %s - Fake:%s", tv.Config.Name, tv.Config.Group, tv.Config.Fake), tv.test)
 	}
 }
