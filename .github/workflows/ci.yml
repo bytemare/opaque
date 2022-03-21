@@ -56,7 +56,7 @@ jobs:
 
       # Test
       - name: Run Tests
-        run: go test -v ./...
+        run: make test
 
   analyze:
     name: Analyze
