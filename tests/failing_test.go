@@ -329,7 +329,7 @@ func buildRecord(credID, oprfSeed, password, pks []byte, client *opaque.Client, 
 		panic(err)
 	}
 	r2 := server.RegistrationResponse(r1, pk, credID, oprfSeed)
-	r3, _ := client.RegistrationFinalize(&opaque.Credentials{}, r2)
+	r3, _ := client.RegistrationFinalize(r2, nil, nil)
 
 	return &opaque.ClientRecord{
 		CredentialIdentifier: credID,

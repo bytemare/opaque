@@ -96,17 +96,12 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 	var m3s []byte
 	var exportKeyReg []byte
 	{
-		clientCreds := &opaque.Credentials{
-			Client: p.username,
-			Server: p.serverID,
-		}
-
 		m2, err := client.DeserializeRegistrationResponse(m2s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
 
-		upload, key := client.RegistrationFinalize(clientCreds, m2)
+		upload, key := client.RegistrationFinalize(m2, p.username, p.serverID)
 		exportKeyReg = key
 
 		m3s = upload.Serialize()

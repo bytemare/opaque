@@ -71,16 +71,23 @@ func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest 
 	return &message.RegistrationRequest{BlindedMessage: m}
 }
 
-// RegistrationFinalize returns a RegistrationRecord message given the server's RegistrationResponse and credentials. If
-// the envelope mode is internal, then clientSecretKey is ignored and can be set to nil. For the external
-// mode, clientSecretKey must be the client's private key for the AKE.
-func (c *Client) RegistrationFinalize(creds *Credentials,
-	resp *message.RegistrationResponse) (upload *message.RegistrationRecord, exportKey []byte) {
+// RegistrationFinalizeWithNonce returns a RegistrationRecord message given the identities, server's RegistrationResponse,
+// and the envelope nonce to be used.
+// This function is primarily used for testing purposes and will most probably be removed at some point.
+func (c *Client) RegistrationFinalizeWithNonce(resp *message.RegistrationResponse, idc, ids, envelopeNonce []byte) (upload *message.RegistrationRecord, exportKey []byte) {
+	return c.registrationFinalize(idc, ids, envelopeNonce, resp)
+}
+
+// RegistrationFinalize returns a RegistrationRecord message given the identities and the server's RegistrationResponse.
+func (c *Client) RegistrationFinalize(resp *message.RegistrationResponse, idc, ids []byte) (upload *message.RegistrationRecord, exportKey []byte) {
+	return c.registrationFinalize(idc, ids, nil, resp)
+}
+
+func (c *Client) registrationFinalize(idc, ids, envelopeNonce []byte, resp *message.RegistrationResponse) (upload *message.RegistrationRecord, exportKey []byte) {
 	creds2 := &keyrecovery.Credentials{
-		Idc:           creds.Client,
-		Ids:           creds.Server,
-		EnvelopeNonce: creds.TestEnvNonce,
-		MaskingNonce:  creds.TestMaskNonce,
+		Idc:           idc,
+		Ids:           ids,
+		EnvelopeNonce: envelopeNonce,
 	}
 
 	// this check is very important: it verifies the server's public key validity in the group.
