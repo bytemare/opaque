@@ -14,12 +14,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bytemare/opaque/internal/oprf"
-
 	"github.com/bytemare/crypto/hash"
 	"github.com/bytemare/crypto/ksf"
 
 	"github.com/bytemare/opaque"
+	"github.com/bytemare/opaque/internal/oprf"
 )
 
 func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) {
@@ -327,6 +326,7 @@ func loadVectorSeedCorpus(f *testing.F, stage string) {
 	f.Add([]byte("0"), []byte("0"), uint(13), uint(5), uint(5), byte('\x03'), byte('\r'), byte('\x03'))
 	f.Add([]byte("0"), []byte("0"), uint(13), uint(5), uint(5), byte('\a'), byte('\x04'), byte('\x03'))
 	f.Add([]byte("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"), []byte("0"), uint(7), uint(7), uint(7), byte('\x01'), byte('\x03'), byte('\x01'))
+	f.Add([]byte("00000000000000000000000000000000"), []byte("0"), uint(7), uint(7), uint(7), byte('\x01'), byte('\x03'), byte('\x06'))
 }
 
 func inputToConfig(context []byte, kdf, mac, h uint, oprf, _ksf, ake byte) *opaque.Configuration {
@@ -365,7 +365,7 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
-				e, _err := conf.Group.NewElement().Decode(r1[:conf.OPRFPointLength])
+				e, _err := conf.OPRF.Group().NewElement().Decode(r1[:conf.OPRFPointLength])
 				if _err == nil && !e.IsIdentity() {
 					t.Fatalf("got %q but point is valid", errInvalidBlindedData)
 				}
@@ -401,7 +401,7 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
-				e, _err := conf.Group.NewElement().Decode(r2[:conf.OPRFPointLength])
+				e, _err := conf.OPRF.Group().NewElement().Decode(r2[:conf.OPRFPointLength])
 				if _err == nil && !e.IsIdentity() {
 					t.Fatalf("got %q but input is valid", errInvalidEvaluatedData)
 				}
@@ -442,12 +442,12 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r3) == maxMessageLength {
 				t.Fatalf("got %q but input is valid", errInvalidMessageLength)
 			}
-		}
 
-		if strings.Contains(err.Error(), errInvalidClientPK.Error()) {
-			e, _err := conf.Group.NewElement().Decode(r3[:conf.AkePointLength])
-			if _err == nil && !e.IsIdentity() {
-				t.Fatalf("got %q but input is valid", errInvalidClientPK)
+			if strings.Contains(err.Error(), errInvalidClientPK.Error()) {
+				e, _err := conf.Group.NewElement().Decode(r3[:conf.AkePointLength])
+				if _err == nil && !e.IsIdentity() {
+					t.Fatalf("got %q but input is valid", errInvalidClientPK)
+				}
 			}
 		}
 	})
