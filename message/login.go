@@ -40,7 +40,10 @@ type KE2 struct {
 
 // Serialize returns the byte encoding of KE2.
 func (m *KE2) Serialize() []byte {
-	return encoding.Concat(m.CredentialResponse.Serialize(), encoding.Concat3(m.NonceS, encoding.SerializePoint(m.EpkS, m.G), m.Mac))
+	return encoding.Concat(
+		m.CredentialResponse.Serialize(),
+		encoding.Concat3(m.NonceS, encoding.SerializePoint(m.EpkS, m.G), m.Mac),
+	)
 }
 
 // KE3 is the third and last message of the login flow, created by the client and sent to the server.

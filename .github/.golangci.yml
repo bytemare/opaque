@@ -147,7 +147,7 @@ linters-settings:
       - atomicalign
     disable-all: false
   lll:
-    line-length: 145
+    line-length: 120
     # tab width ('\t') in spaces. Default to 1.
     tab-width: 4
   maligned:

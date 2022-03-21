@@ -61,7 +61,11 @@ func cleartextCredentials(clientPublicKey, serverPublicKey, idc, ids []byte) []b
 }
 
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
-func Store(p *internal.Parameters, randomizedPwd, serverPublicKey []byte, creds *Credentials) (env *Envelope, pku *group.Point, export []byte) {
+func Store(
+	p *internal.Parameters,
+	randomizedPwd, serverPublicKey []byte,
+	creds *Credentials,
+) (env *Envelope, pku *group.Point, export []byte) {
 	// testing: integrated to support testing with set nonce
 	nonce := creds.EnvelopeNonce
 	if nonce == nil {

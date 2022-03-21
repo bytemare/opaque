@@ -53,7 +53,12 @@ func TestI2OSP(t *testing.T) {
 			r := encoding.I2OSP(v.value, v.size)
 
 			if !bytes.Equal(r, v.encoded) {
-				t.Fatalf("invalid encoding for %d. Expected '%s', got '%v'", i, hex.EncodeToString(v.encoded), hex.EncodeToString(r))
+				t.Fatalf(
+					"invalid encoding for %d. Expected '%s', got '%v'",
+					i,
+					hex.EncodeToString(v.encoded),
+					hex.EncodeToString(r),
+				)
 			}
 
 			value := encoding.OS2IP(v.encoded)

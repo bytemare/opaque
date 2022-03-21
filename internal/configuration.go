@@ -144,7 +144,10 @@ func (p *Parameters) DeserializeRecord(input []byte) (*message.RegistrationRecor
 	}, nil
 }
 
-func (p *Parameters) deserializeCredentialResponse(input []byte, maxResponseLength int) (*cred.CredentialResponse, error) {
+func (p *Parameters) deserializeCredentialResponse(
+	input []byte,
+	maxResponseLength int,
+) (*cred.CredentialResponse, error) {
 	data, err := p.Group.NewElement().Decode(input[:p.OPRFPointLength])
 	if err != nil {
 		return nil, errInvalidEvaluatedData
@@ -246,6 +249,10 @@ func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
 
 // XorResponse is used to encrypt and decrypt the response in KE2.
 func (p *Parameters) XorResponse(key, nonce, in []byte) []byte {
-	pad := p.KDF.Expand(key, encoding.SuffixString(nonce, tag.CredentialResponsePad), encoding.PointLength[p.Group]+p.EnvelopeSize)
+	pad := p.KDF.Expand(
+		key,
+		encoding.SuffixString(nonce, tag.CredentialResponsePad),
+		encoding.PointLength[p.Group]+p.EnvelopeSize,
+	)
 	return Xor(pad, in)
 }

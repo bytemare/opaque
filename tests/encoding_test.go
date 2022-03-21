@@ -32,12 +32,14 @@ func TestDecodeVector(t *testing.T) {
 	*/
 
 	badHeader := []byte{0}
-	if _, _, err := encoding.DecodeVector(badHeader); err == nil || err.Error() != "insufficient header length for decoding" {
+	if _, _, err := encoding.DecodeVector(badHeader); err == nil ||
+		err.Error() != "insufficient header length for decoding" {
 		t.Fatalf("expected error for short input. Got %q", err)
 	}
 
 	badPayload := []byte{0, 3, 0, 0}
-	if _, _, err := encoding.DecodeVector(badPayload); err == nil || err.Error() != "insufficient total length for decoding" {
+	if _, _, err := encoding.DecodeVector(badPayload); err == nil ||
+		err.Error() != "insufficient total length for decoding" {
 		t.Fatalf("expected error for short input. Got %q", err)
 	}
 }

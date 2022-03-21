@@ -209,7 +209,11 @@ func (v oprfVector) test(t *testing.T) {
 
 	dst2 := getDST([]byte(tag.OPRFPointPrefix), v.SuiteID)
 	if !bytes.Equal(dst, dst2) {
-		t.Fatalf("GroupDST output is not valid.\n\twant: %v\n\tgot : %v", hex.EncodeToString(dst), hex.EncodeToString(dst2))
+		t.Fatalf(
+			"GroupDST output is not valid.\n\twant: %v\n\tgot : %v",
+			hex.EncodeToString(dst),
+			hex.EncodeToString(dst2),
+		)
 	}
 
 	for i, tv := range v.Vectors {

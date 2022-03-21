@@ -107,7 +107,13 @@ func (s *Server) credentialResponse(
 ) *cred.CredentialResponse {
 	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
 
-	maskingNonce, maskedResponse := masking.Mask(s.Parameters, maskingNonce, record.MaskingKey, serverPublicKey, record.Envelope)
+	maskingNonce, maskedResponse := masking.Mask(
+		s.Parameters,
+		maskingNonce,
+		record.MaskingKey,
+		serverPublicKey,
+		record.Envelope,
+	)
 
 	return &cred.CredentialResponse{
 		EvaluatedMessage: z,
@@ -116,7 +122,10 @@ func (s *Server) credentialResponse(
 	}
 }
 
-func (s *Server) verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed []byte, record *ClientRecord) (*group.Scalar, error) {
+func (s *Server) verifyInitInput(
+	serverSecretKey, serverPublicKey, oprfSeed []byte,
+	record *ClientRecord,
+) (*group.Scalar, error) {
 	sks, err := s.Group.NewScalar().Decode(serverSecretKey)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %w", ErrInvalidServerSecretKey, err)

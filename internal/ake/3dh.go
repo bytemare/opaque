@@ -85,7 +85,15 @@ func deriveKeys(h *internal.KDF, ikm, context []byte) (k *macKeys, sessionSecret
 	return k, sessionSecret
 }
 
-func k3dh(g group.Group, p1 *group.Point, s1 *group.Scalar, p2 *group.Point, s2 *group.Scalar, p3 *group.Point, s3 *group.Scalar) []byte {
+func k3dh(
+	g group.Group,
+	p1 *group.Point,
+	s1 *group.Scalar,
+	p2 *group.Point,
+	s2 *group.Scalar,
+	p3 *group.Point,
+	s3 *group.Scalar,
+) []byte {
 	e1 := encoding.SerializePoint(p1.Mult(s1), g)
 	e2 := encoding.SerializePoint(p2.Mult(s2), g)
 	e3 := encoding.SerializePoint(p3.Mult(s3), g)

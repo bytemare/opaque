@@ -13,7 +13,7 @@ update:
 fmt:
 	@echo "Formatting ..."
 	@go mod tidy
-	@golines -m 145 -t 4 -w .
+	@golines -m 120 -t 4 -w .
 	@gofumpt -w -extra .
 	@gci write --Section Standard --Section Default --Section "Prefix(github.com/bytemare/opaque)" .
 

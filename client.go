@@ -106,7 +106,12 @@ func (c *Client) registrationFinalize(
 
 	randomizedPwd := c.buildPRK(resp.EvaluatedMessage)
 	maskingKey := c.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.KDF.Size())
-	envU, clientPublicKey, exportKey := keyrecovery.Store(c.Parameters, randomizedPwd, encoding.SerializePoint(resp.Pks, c.Group), creds2)
+	envU, clientPublicKey, exportKey := keyrecovery.Store(
+		c.Parameters,
+		randomizedPwd,
+		encoding.SerializePoint(resp.Pks, c.Group),
+		creds2,
+	)
 
 	return &message.RegistrationRecord{
 		PublicKey:  clientPublicKey,

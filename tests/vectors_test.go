@@ -160,7 +160,12 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	}
 
 	// Client
-	upload, exportKey := client.RegistrationFinalizeWithNonce(regResp, v.Inputs.ClientIdentity, v.Inputs.ServerIdentity, v.Inputs.EnvelopeNonce)
+	upload, exportKey := client.RegistrationFinalizeWithNonce(
+		regResp,
+		v.Inputs.ClientIdentity,
+		v.Inputs.ServerIdentity,
+		v.Inputs.EnvelopeNonce,
+	)
 
 	if !bytes.Equal(v.Outputs.ExportKey, exportKey) {
 		t.Fatalf("exportKey do not match\nexpected %v,\ngot %v", v.Outputs.ExportKey, exportKey)
@@ -298,7 +303,14 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal(err)
 	}
 
-	ke2, err := s.LoginInit(ke1, v.Inputs.ServerIdentity, v.Inputs.ServerPrivateKey, v.Inputs.ServerPublicKey, v.Inputs.OprfSeed, record)
+	ke2, err := s.LoginInit(
+		ke1,
+		v.Inputs.ServerIdentity,
+		v.Inputs.ServerPrivateKey,
+		v.Inputs.ServerPublicKey,
+		v.Inputs.OprfSeed,
+		record,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +347,10 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(vectorKE2.CredentialResponse.EvaluatedMessage.Bytes(), ke2.CredentialResponse.EvaluatedMessage.Bytes()) {
+	if !bytes.Equal(
+		vectorKE2.CredentialResponse.EvaluatedMessage.Bytes(),
+		ke2.CredentialResponse.EvaluatedMessage.Bytes(),
+	) {
 		t.Fatal("data do not match")
 	}
 

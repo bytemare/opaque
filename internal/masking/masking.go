@@ -31,7 +31,10 @@ type Keys struct {
 }
 
 // Mask encrypts the serverPublicKey and the envelope under nonceIn and the maskingKey.
-func Mask(p *internal.Parameters, nonceIn, maskingKey, serverPublicKey, envelope []byte) (nonce, maskedResponse []byte) {
+func Mask(
+	p *internal.Parameters,
+	nonceIn, maskingKey, serverPublicKey, envelope []byte,
+) (nonce, maskedResponse []byte) {
 	// testing: integrated to support testing, to force values.
 	nonce = nonceIn
 	if len(nonce) == 0 {
