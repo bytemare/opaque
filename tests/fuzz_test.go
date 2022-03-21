@@ -393,7 +393,7 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
-				if err := isValidPoint(conf, r1[:conf.OPRFPointLength], errInvalidBlindedData); err != nil {
+				if err := isValidOPRFPoint(conf, r1[:conf.OPRFPointLength], errInvalidBlindedData); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -428,13 +428,13 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
-				if err := isValidPoint(conf, r2[:conf.OPRFPointLength], errInvalidEvaluatedData); err != nil {
+				if err := isValidOPRFPoint(conf, r2[:conf.OPRFPointLength], errInvalidEvaluatedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidServerPK.Error()) {
-				if err := isValidPoint(conf, r2[conf.OPRFPointLength:], errInvalidServerPK); err != nil {
+				if err := isValidAKEPoint(conf, r2[conf.OPRFPointLength:], errInvalidServerPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -469,7 +469,7 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidClientPK.Error()) {
-				if err := isValidPoint(conf, r3[:conf.AkePointLength], errInvalidClientPK); err != nil {
+				if err := isValidAKEPoint(conf, r3[:conf.AkePointLength], errInvalidClientPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -503,13 +503,13 @@ func FuzzDeserializeKE1(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
-				if err := isValidPoint(conf, ke1[:conf.OPRFPointLength], errInvalidBlindedData); err != nil {
+				if err := isValidOPRFPoint(conf, ke1[:conf.OPRFPointLength], errInvalidBlindedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidClientEPK.Error()) {
-				if err := isValidPoint(conf, ke1[conf.OPRFPointLength+conf.NonceLen:], errInvalidClientEPK); err != nil {
+				if err := isValidOPRFPoint(conf, ke1[conf.OPRFPointLength+conf.NonceLen:], errInvalidClientEPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -517,8 +517,17 @@ func FuzzDeserializeKE1(f *testing.F) {
 	})
 }
 
-func isValidPoint(conf *internal.Parameters, input []byte, err error) error {
+func isValidAKEPoint(conf *internal.Parameters, input []byte, err error) error {
 	e, _err := conf.Group.NewElement().Decode(input)
+	if _err == nil && !e.IsIdentity() {
+		return fmt.Errorf("got %q but point is valid", err)
+	}
+
+	return nil
+}
+
+func isValidOPRFPoint(conf *internal.Parameters, input []byte, err error) error {
+	e, _err := conf.OPRF.Group().NewElement().Decode(input)
 	if _err == nil && !e.IsIdentity() {
 		return fmt.Errorf("got %q but point is valid", err)
 	}
@@ -554,13 +563,13 @@ func FuzzDeserializeKE2(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
-				if err := isValidPoint(conf, ke2[:conf.OPRFPointLength], errInvalidEvaluatedData); err != nil {
+				if err := isValidOPRFPoint(conf, ke2[:conf.OPRFPointLength], errInvalidEvaluatedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidServerEPK.Error()) {
-				if err := isValidPoint(conf, ke2[conf.OPRFPointLength+conf.NonceLen:], errInvalidServerEPK); err != nil {
+				if err := isValidAKEPoint(conf, ke2[conf.OPRFPointLength+conf.NonceLen:], errInvalidServerEPK); err != nil {
 					t.Fatal(err)
 				}
 			}
