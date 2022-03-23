@@ -385,7 +385,7 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 			t.Skip()
 		}
 
-		_, err = server.DeserializeRegistrationRequest(r1)
+		_, err = server.Deserialize.RegistrationRequest(r1)
 		if err != nil {
 			conf := server.Parameters
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r1) == conf.OPRFPointLength {
@@ -418,7 +418,7 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 			t.Skip()
 		}
 
-		_, err = client.DeserializeRegistrationResponse(r2)
+		_, err = client.Deserialize.RegistrationResponse(r2)
 		if err != nil {
 			conf := client.Parameters
 			maxResponseLength := conf.OPRFPointLength + conf.AkePointLength
@@ -460,7 +460,7 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 
 		conf := server.Parameters
 
-		_, err = server.DeserializeRegistrationRecord(r3)
+		_, err = server.Deserialize.RegistrationRecord(r3)
 		if err != nil {
 			maxMessageLength := conf.AkePointLength + conf.Hash.Size() + conf.EnvelopeSize
 
@@ -494,7 +494,7 @@ func FuzzDeserializeKE1(f *testing.F) {
 			t.Skip()
 		}
 
-		_, err = server.DeserializeKE1(ke1)
+		_, err = server.Deserialize.KE1(ke1)
 		if err != nil {
 			conf := server.Parameters
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
@@ -552,7 +552,7 @@ func FuzzDeserializeKE2(f *testing.F) {
 			t.Skip()
 		}
 
-		_, err = client.DeserializeKE2(ke2)
+		_, err = client.Deserialize.KE2(ke2)
 		if err != nil {
 			conf := client.Parameters
 			maxResponseLength := conf.OPRFPointLength + conf.NonceLen + conf.AkePointLength + conf.EnvelopeSize
@@ -590,7 +590,7 @@ func FuzzDeserializeKE3(f *testing.F) {
 			t.Skip()
 		}
 
-		_, err = server.DeserializeKE3(ke3)
+		_, err = server.Deserialize.KE3(ke3)
 		if err != nil {
 			conf := server.Parameters
 			maxMessageLength := conf.MAC.Size()

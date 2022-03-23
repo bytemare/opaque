@@ -141,7 +141,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 
 	regResp := server.RegistrationResponse(regReq, pks, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
 
-	vRegResp, err := client.DeserializeRegistrationResponse(v.Outputs.RegistrationResponse)
+	vRegResp, err := client.Deserialize.RegistrationResponse(v.Outputs.RegistrationResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,14 +204,14 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 
 	record := &opaque.ClientRecord{}
 	if !isFake(v.Config.Fake) {
-		cupload, err := server.DeserializeRegistrationRecord(v.Outputs.RegistrationRecord)
+		cupload, err := server.Deserialize.RegistrationRecord(v.Outputs.RegistrationRecord)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		record.RegistrationRecord = cupload
 	} else {
-		rec, err := server.DeserializeRecord(encoding.Concat3(v.Inputs.ClientPublicKey, v.Inputs.MaskingKey, opaque.GetFakeEnvelope(p)))
+		rec, err := server.Deserialize.RegistrationRecord(encoding.Concat3(v.Inputs.ClientPublicKey, v.Inputs.MaskingKey, opaque.GetFakeEnvelope(p)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -230,7 +230,7 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	}
 
 	// Client
-	cke2, err := client.DeserializeKE2(v.Outputs.KE2)
+	cke2, err := client.Deserialize.KE2(v.Outputs.KE2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,9 +294,9 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 
 	var ke1 *message.KE1
 	if isFake(v.Config.Fake) {
-		ke1, err = s.DeserializeKE1(v.Inputs.KE1)
+		ke1, err = s.Deserialize.KE1(v.Inputs.KE1)
 	} else {
-		ke1, err = s.DeserializeKE1(v.Outputs.KE1)
+		ke1, err = s.Deserialize.KE1(v.Outputs.KE1)
 	}
 
 	if err != nil {
@@ -328,7 +328,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 	//}
 
 	if !isFake(v.Config.Fake) {
-		vectorKE3, err := s.DeserializeKE3(v.Outputs.KE3)
+		vectorKE3, err := s.Deserialize.KE3(v.Outputs.KE3)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -342,7 +342,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		}
 	}
 
-	vectorKE2, err := s.DeserializeKE2(v.Outputs.KE2)
+	vectorKE2, err := s.Deserialize.KE2(v.Outputs.KE2)
 	if err != nil {
 		t.Fatal(err)
 	}

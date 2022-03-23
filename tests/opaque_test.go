@@ -76,7 +76,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 	var credID []byte
 	{
 		server, _ := p.Server()
-		m1, err := server.DeserializeRegistrationRequest(m1s)
+		m1, err := server.Deserialize.RegistrationRequest(m1s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -96,7 +96,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 	var m3s []byte
 	var exportKeyReg []byte
 	{
-		m2, err := client.DeserializeRegistrationResponse(m2s)
+		m2, err := client.Deserialize.RegistrationResponse(m2s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -110,7 +110,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 	// Server
 	{
 		server, _ := p.Server()
-		m3, err := server.DeserializeRegistrationRecord(m3s)
+		m3, err := server.Deserialize.RegistrationRecord(m3s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -138,7 +138,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	var state []byte
 	{
 		server, _ := p.Server()
-		m4, err := server.DeserializeKE1(m4s)
+		m4, err := server.Deserialize.KE1(m4s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -158,7 +158,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	var exportKeyLogin []byte
 	var clientKey []byte
 	{
-		m5, err := client.DeserializeKE2(m5s)
+		m5, err := client.Deserialize.KE2(m5s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -177,7 +177,7 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	var serverKey []byte
 	{
 		server, _ := p.Server()
-		m6, err := server.DeserializeKE3(m6s)
+		m6, err := server.Deserialize.KE3(m6s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}

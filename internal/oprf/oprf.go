@@ -61,7 +61,7 @@ func (c Ciphersuite) Available() bool {
 	return ok
 }
 
-// Group returns the casted identifier for the cipher suite.
+// Group returns the Group identifier for the cipher suite.
 func (c Ciphersuite) Group() group.Group {
 	return group.Group(c)
 }

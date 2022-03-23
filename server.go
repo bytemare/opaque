@@ -51,6 +51,7 @@ var (
 
 // Server represents an OPAQUE Server, exposing its functions and holding its state.
 type Server struct {
+	Deserialize *Deserializer
 	*internal.Parameters
 	Ake *ake.Server
 }
@@ -67,8 +68,9 @@ func NewServer(p *Configuration) (*Server, error) {
 	}
 
 	return &Server{
-		Parameters: ip,
-		Ake:        ake.NewServer(),
+		Deserialize: &Deserializer{ip},
+		Parameters:  ip,
+		Ake:         ake.NewServer(),
 	}, nil
 }
 
@@ -206,39 +208,6 @@ func (s *Server) SessionKey() []byte {
 // ExpectedMAC returns the expected client MAC if the previous call to LoginInit() was successful.
 func (s *Server) ExpectedMAC() []byte {
 	return s.Ake.ExpectedMAC()
-}
-
-// DeserializeRegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized
-// RegistrationRequest structure.
-func (s *Server) DeserializeRegistrationRequest(registrationRequest []byte) (*message.RegistrationRequest, error) {
-	return s.Parameters.DeserializeRegistrationRequest(registrationRequest)
-}
-
-// DeserializeRegistrationResponse takes a serialized RegistrationResponse message and returns a deserialized
-// RegistrationResponse structure.
-func (s *Server) DeserializeRegistrationResponse(registrationResponse []byte) (*message.RegistrationResponse, error) {
-	return s.Parameters.DeserializeRegistrationResponse(registrationResponse)
-}
-
-// DeserializeRegistrationRecord takes a serialized RegistrationRecord message and returns a deserialized
-// RegistrationRecord structure.
-func (s *Server) DeserializeRegistrationRecord(registrationUpload []byte) (*message.RegistrationRecord, error) {
-	return s.Parameters.DeserializeRecord(registrationUpload)
-}
-
-// DeserializeKE1 takes a serialized KE1 message and returns a deserialized KE1 structure.
-func (s *Server) DeserializeKE1(ke1 []byte) (*message.KE1, error) {
-	return s.Parameters.DeserializeKE1(ke1)
-}
-
-// DeserializeKE2 takes a serialized KE2 message and returns a deserialized KE2 structure.
-func (s *Server) DeserializeKE2(ke2 []byte) (*message.KE2, error) {
-	return s.Parameters.DeserializeKE2(ke2)
-}
-
-// DeserializeKE3 takes a serialized KE3 message and returns a deserialized KE3 structure.
-func (s *Server) DeserializeKE3(ke3 []byte) (*message.KE3, error) {
-	return s.Parameters.DeserializeKE3(ke3)
 }
 
 // SetAKEState sets the internal state of the AKE server from the given bytes.

@@ -67,9 +67,9 @@ type Parameters struct {
 	Context         []byte
 }
 
-// DeserializeRegistrationRequest takes a serialized RegistrationRequest message as input and attempts to deserialize
+// InternalDeserializeRegistrationRequest takes a serialized RegistrationRequest message as input and attempts to deserialize
 // it.
-func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.RegistrationRequest, error) {
+func (p *Parameters) InternalDeserializeRegistrationRequest(input []byte) (*message.RegistrationRequest, error) {
 	if len(input) != p.OPRFPointLength {
 		return nil, errInvalidMessageLength
 	}
@@ -86,9 +86,9 @@ func (p *Parameters) DeserializeRegistrationRequest(input []byte) (*message.Regi
 	return &message.RegistrationRequest{C: p.OPRF, BlindedMessage: blindedMessage}, nil
 }
 
-// DeserializeRegistrationResponse takes a serialized RegistrationResponse message as input and attempts to deserialize
+// InternalDeserializeRegistrationResponse takes a serialized RegistrationResponse message as input and attempts to deserialize
 // it.
-func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.RegistrationResponse, error) {
+func (p *Parameters) InternalDeserializeRegistrationResponse(input []byte) (*message.RegistrationResponse, error) {
 	if len(input) != p.OPRFPointLength+p.AkePointLength {
 		return nil, errInvalidMessageLength
 	}
@@ -119,8 +119,8 @@ func (p *Parameters) DeserializeRegistrationResponse(input []byte) (*message.Reg
 	}, nil
 }
 
-// DeserializeRecord takes a serialized RegistrationRecord message as input and attempts to deserialize it.
-func (p *Parameters) DeserializeRecord(input []byte) (*message.RegistrationRecord, error) {
+// InternalDeserializeRegistrationRecord takes a serialized RegistrationRecord message as input and attempts to deserialize it.
+func (p *Parameters) InternalDeserializeRegistrationRecord(input []byte) (*message.RegistrationRecord, error) {
 	if len(input) != p.AkePointLength+p.Hash.Size()+p.EnvelopeSize {
 		return nil, errInvalidMessageLength
 	}
@@ -167,8 +167,8 @@ func (p *Parameters) deserializeCredentialResponse(
 	}, nil
 }
 
-// DeserializeKE1 takes a serialized KE1 message as input and attempts to deserialize it.
-func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
+// InternalDeserializeKE1 takes a serialized KE1 message as input and attempts to deserialize it.
+func (p *Parameters) InternalDeserializeKE1(input []byte) (*message.KE1, error) {
 	if len(input) != p.OPRFPointLength+p.NonceLen+p.AkePointLength {
 		return nil, errInvalidMessageLength
 	}
@@ -203,8 +203,8 @@ func (p *Parameters) DeserializeKE1(input []byte) (*message.KE1, error) {
 	}, nil
 }
 
-// DeserializeKE2 takes a serialized KE2 message as input and attempts to deserialize it.
-func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
+// InternalDeserializeKE2 takes a serialized KE2 message as input and attempts to deserialize it.
+func (p *Parameters) InternalDeserializeKE2(input []byte) (*message.KE2, error) {
 	// size of credential response
 	maxResponseLength := p.OPRFPointLength + p.NonceLen + p.AkePointLength + p.EnvelopeSize
 
@@ -241,8 +241,8 @@ func (p *Parameters) DeserializeKE2(input []byte) (*message.KE2, error) {
 	}, nil
 }
 
-// DeserializeKE3 takes a serialized KE3 message as input and attempts to deserialize it.
-func (p *Parameters) DeserializeKE3(input []byte) (*message.KE3, error) {
+// InternalDeserializeKE3 takes a serialized KE3 message as input and attempts to deserialize it.
+func (p *Parameters) InternalDeserializeKE3(input []byte) (*message.KE3, error) {
 	if len(input) != p.MAC.Size() {
 		return nil, errInvalidMessageLength
 	}

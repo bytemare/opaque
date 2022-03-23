@@ -34,8 +34,9 @@ var (
 
 // Client represents an OPAQUE Client, exposing its functions and holding its state.
 type Client struct {
-	OPRF *oprf.Client
-	Ake  *ake.Client
+	Deserialize *Deserializer
+	OPRF        *oprf.Client
+	Ake         *ake.Client
 	*internal.Parameters
 }
 
@@ -51,9 +52,10 @@ func NewClient(p *Configuration) (*Client, error) {
 	}
 
 	return &Client{
-		OPRF:       ip.OPRF.Client(),
-		Ake:        ake.NewClient(),
-		Parameters: ip,
+		OPRF:        ip.OPRF.Client(),
+		Ake:         ake.NewClient(),
+		Deserialize: &Deserializer{ip},
+		Parameters:  ip,
 	}, nil
 }
 
@@ -181,19 +183,4 @@ func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE
 // SessionKey returns the session key if the previous call to LoginFinish() was successful.
 func (c *Client) SessionKey() []byte {
 	return c.Ake.SessionKey()
-}
-
-// DeserializeKE1 takes a serialized KE1 message and returns a deserialized KE1 structure.
-func (c *Client) DeserializeKE1(ke1 []byte) (*message.KE1, error) {
-	return c.Parameters.DeserializeKE1(ke1)
-}
-
-// DeserializeKE2 takes a serialized KE2 message and returns a deserialized KE2 structure.
-func (c *Client) DeserializeKE2(ke2 []byte) (*message.KE2, error) {
-	return c.Parameters.DeserializeKE2(ke2)
-}
-
-// DeserializeKE3 takes a serialized KE3 message and returns a deserialized KE3 structure.
-func (c *Client) DeserializeKE3(ke3 []byte) (*message.KE3, error) {
-	return c.Parameters.DeserializeKE3(ke3)
 }

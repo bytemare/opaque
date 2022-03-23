@@ -150,7 +150,7 @@ func ExampleRegistration() {
 	c1s := c1.Serialize()
 
 	// The server receives the encoded message, decodes it, interprets it, and returns its response.
-	s1, err := server.DeserializeRegistrationRequest(c1s)
+	s1, err := server.Deserialize.RegistrationRequest(c1s)
 	if err != nil {
 		panic(err)
 	}
@@ -168,7 +168,7 @@ func ExampleRegistration() {
 	s2s := s2.Serialize()
 
 	// The client deserializes the responses, and sends back its final client record containing the envelope.
-	c2, err := client.DeserializeRegistrationResponse(s2s)
+	c2, err := client.Deserialize.RegistrationResponse(s2s)
 	if err != nil {
 		panic(err)
 	}
@@ -179,7 +179,7 @@ func ExampleRegistration() {
 	c3s := c3.Serialize()
 
 	// Server registers the client upload
-	upload, err := server.DeserializeRegistrationRecord(c3s)
+	upload, err := server.Deserialize.RegistrationRecord(c3s)
 	if err != nil {
 		panic(err)
 	}
@@ -227,7 +227,7 @@ func ExampleLoginKeyExchange() {
 	message1 := ke1.Serialize()
 
 	// The server interprets ke1, and sends back ke2
-	ke1s, err := server.DeserializeKE1(message1)
+	ke1s, err := server.Deserialize.KE1(message1)
 	if err != nil {
 		panic(err)
 	}
@@ -242,7 +242,7 @@ func ExampleLoginKeyExchange() {
 
 	// The client interprets ke2. If the everything went fine, the server is considered trustworthy and the client
 	// can use the shared session key and secret export key.
-	ke2c, err := client.DeserializeKE2(message2)
+	ke2c, err := client.Deserialize.KE2(message2)
 	if err != nil {
 		panic(err)
 	}
@@ -263,7 +263,7 @@ func ExampleLoginKeyExchange() {
 	// The server must absolutely validate this last message to authenticate the client and continue. If this message
 	// does not return successfully, the server must not send any secret or sensitive information and immediately cease
 	// the connection.
-	ke3s, err := server.DeserializeKE3(message3)
+	ke3s, err := server.Deserialize.KE3(message3)
 	if err != nil {
 		panic(err)
 	}
