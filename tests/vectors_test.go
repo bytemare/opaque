@@ -204,12 +204,12 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 
 	record := &opaque.ClientRecord{}
 	if !isFake(v.Config.Fake) {
-		cupload, err := server.Deserialize.RegistrationRecord(v.Outputs.RegistrationRecord)
+		upload, err := server.Deserialize.RegistrationRecord(v.Outputs.RegistrationRecord)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		record.RegistrationRecord = cupload
+		record.RegistrationRecord = upload
 	} else {
 		rec, err := server.Deserialize.RegistrationRecord(encoding.Concat3(v.Inputs.ClientPublicKey, v.Inputs.MaskingKey, opaque.GetFakeEnvelope(conf)))
 		if err != nil {
