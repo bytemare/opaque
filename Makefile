@@ -6,6 +6,8 @@ update:
 	@echo "Updating dependencies and linters ..."
 	@go get -u
 	@go mod tidy
+	@pin-github-action .github/workflows/ci.yml
+	@pin-github-action .github/workflows/security.yml
 	@go get -u mvdan.cc/gofumpt@latest github.com/daixiang0/gci github.com/segmentio/golines@latest
 	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
 
