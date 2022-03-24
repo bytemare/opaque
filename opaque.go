@@ -25,6 +25,7 @@ import (
 	"github.com/bytemare/crypto/ksf"
 
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
@@ -64,17 +65,11 @@ var (
 	errInvalidAKEid  = errors.New("invalid AKE group id")
 )
 
-// Credentials holds the client and server ids (will certainly disappear in next versions°.
-type Credentials struct {
-	Client, Server              []byte
-	TestEnvNonce, TestMaskNonce []byte
-}
-
 // Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
 // as well as KDF, MAC, Hash should be the same.
 type Configuration struct {
-	// Context is optional shared information to include in the AKE transcript.
-	Context []byte
+	// OPRF identifies the ciphersuite to use for the OPRF.
+	OPRF Group `json:"oprf"`
 
 	// KDF identifies the hash function to be used for key derivation (e.g. HKDF).
 	KDF crypto.Hash `json:"kdf"`
@@ -85,15 +80,15 @@ type Configuration struct {
 	// Hash identifies the hash function to be used for hashing, as defined in github.com/bytemare/crypto/hash.
 	Hash crypto.Hash `json:"hash"`
 
-	// OPRF identifies the ciphersuite to use for the OPRF.
-	OPRF Group `json:"oprf"`
-
 	// KSF identifies the key stretching function for expensive key derivation on the client,
 	// defined in github.com/bytemare/crypto/ksf.
 	KSF ksf.Identifier `json:"ksf"`
 
 	// AKE identifies the group to use for the AKE.
 	AKE Group `json:"group"`
+
+	// Context is optional shared information to include in the AKE transcript.
+	Context []byte
 }
 
 // Client returns a newly instantiated Client from the Configuration.
@@ -104,6 +99,16 @@ func (c *Configuration) Client() (*Client, error) {
 // Server returns a newly instantiated Server from the Configuration.
 func (c *Configuration) Server() (*Server, error) {
 	return NewServer(c)
+}
+
+// GenerateOPRFSeed returns a OPRF seed valid in the given configuration.
+func (c *Configuration) GenerateOPRFSeed() []byte {
+	return RandomBytes(c.Hash.Size())
+}
+
+// KeyGen returns a key pair in the AKE group.
+func (c *Configuration) KeyGen() (secretKey, publicKey []byte) {
+	return ake.KeyGen(group.Group(c.AKE))
 }
 
 // verify returns an error on the first non-compliant parameter, ni otherwise.
@@ -136,22 +141,22 @@ func (c *Configuration) verify() error {
 }
 
 // toInternal builds the internal representation of the configuration parameters.
-func (c *Configuration) toInternal() (*internal.Parameters, error) {
+func (c *Configuration) toInternal() (*internal.Configuration, error) {
 	if err := c.verify(); err != nil {
 		return nil, err
 	}
 
 	g := group.Group(c.AKE)
-	ip := &internal.Parameters{
+	ip := &internal.Configuration{
+		OPRF:            oprf.Ciphersuite(c.OPRF),
+		OPRFPointLength: encoding.PointLength[group.Group(c.OPRF)],
 		KDF:             internal.NewKDF(c.KDF),
 		MAC:             internal.NewMac(c.MAC),
 		Hash:            internal.NewHash(c.Hash),
 		KSF:             internal.NewKSF(c.KSF),
 		NonceLen:        internal.NonceLength,
-		OPRFPointLength: encoding.PointLength[group.Group(c.OPRF)],
-		AkePointLength:  encoding.PointLength[g],
 		Group:           g,
-		OPRF:            oprf.Ciphersuite(c.OPRF),
+		AkePointLength:  encoding.PointLength[g],
 		Context:         c.Context,
 	}
 	ip.EnvelopeSize = ip.NonceLen + ip.MAC.Size()
@@ -224,6 +229,54 @@ type ClientRecord struct {
 	TestMaskNonce []byte
 }
 
+// Deserializer exposes the message deserialization functions.
+type Deserializer struct {
+	internal *internal.Configuration
+}
+
+// RegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized
+// RegistrationRequest structure.
+func (s *Deserializer) RegistrationRequest(registrationRequest []byte) (*message.RegistrationRequest, error) {
+	return s.internal.DeserializeRegistrationRequest(registrationRequest)
+}
+
+// RegistrationResponse takes a serialized RegistrationResponse message and returns a deserialized
+// RegistrationResponse structure.
+func (s *Deserializer) RegistrationResponse(registrationResponse []byte) (*message.RegistrationResponse, error) {
+	return s.internal.DeserializeRegistrationResponse(registrationResponse)
+}
+
+// RegistrationRecord takes a serialized RegistrationRecord message and returns a deserialized
+// RegistrationRecord structure.
+func (s *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationRecord, error) {
+	return s.internal.DeserializeRegistrationRecord(record)
+}
+
+// KE1 takes a serialized KE1 message and returns a deserialized KE1 structure.
+func (s *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
+	return s.internal.DeserializeKE1(ke1)
+}
+
+// KE2 takes a serialized KE2 message and returns a deserialized KE2 structure.
+func (s *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
+	return s.internal.DeserializeKE2(ke2)
+}
+
+// KE3 takes a serialized KE3 message and returns a deserialized KE3 structure.
+func (s *Deserializer) KE3(ke3 []byte) (*message.KE3, error) {
+	return s.internal.DeserializeKE3(ke3)
+}
+
+// DecodeAkePrivateKey takes a serialized private key (a scalar) and attempts to return it's decoded form.
+func (s *Deserializer) DecodeAkePrivateKey(encoded []byte) (*group.Scalar, error) {
+	return s.internal.Group.NewScalar().Decode(encoded)
+}
+
+// DecodeAkePublicKey takes a serialized public key (a point) and attempts to return it's decoded form.
+func (s *Deserializer) DecodeAkePublicKey(encoded []byte) (*group.Point, error) {
+	return s.internal.Group.NewElement().Decode(encoded)
+}
+
 // GetFakeEnvelope returns a byte array filled with 0s the length of a legitimate envelope size in the configuration's.
 // This fake envelope byte array is used in the client enumeration mitigation scheme.
 func GetFakeEnvelope(c *Configuration) []byte {
@@ -234,4 +287,9 @@ func GetFakeEnvelope(c *Configuration) []byte {
 	envelopeSize := internal.NonceLength + internal.NewMac(c.MAC).Size()
 
 	return make([]byte, envelopeSize)
+}
+
+// RandomBytes returns random bytes of length len (wrapper for crypto/rand).
+func RandomBytes(length int) []byte {
+	return internal.RandomBytes(length)
 }

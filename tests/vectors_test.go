@@ -114,10 +114,10 @@ type vector struct {
 	Outputs       outputs       `json:"outputs"`
 }
 
-func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
+func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	// Client
-	client, _ := p.Client()
-	client.OPRF = buildOPRFClient(oprf.Ciphersuite(p.OPRF), v.Inputs.BlindRegistration)
+	client, _ := conf.Client()
+	client.OPRF = buildOPRFClient(oprf.Ciphersuite(conf.OPRF), v.Inputs.BlindRegistration)
 	regReq := client.RegistrationInit(v.Inputs.Password)
 
 	if !bytes.Equal(v.Outputs.RegistrationRequest, regReq.Serialize()) {
@@ -129,8 +129,8 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	}
 
 	// Server
-	server, _ := p.Server()
-	pks, err := server.Group.NewElement().Decode(v.Inputs.ServerPublicKey)
+	server, _ := conf.Server()
+	pks, err := server.Deserialize.DecodeAkePublicKey(v.Inputs.ServerPublicKey)
 	if err != nil {
 		panic(err)
 	}
@@ -141,7 +141,7 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 
 	regResp := server.RegistrationResponse(regReq, pks, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
 
-	vRegResp, err := client.DeserializeRegistrationResponse(v.Outputs.RegistrationResponse)
+	vRegResp, err := client.Deserialize.RegistrationResponse(v.Outputs.RegistrationResponse)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,18 +180,18 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	}
 }
 
-func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
+func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 	// Client
-	client, _ := p.Client()
+	client, _ := conf.Client()
 
 	if !isFake(v.Config.Fake) {
-		client.OPRF = buildOPRFClient(oprf.Ciphersuite(p.AKE), v.Inputs.BlindLogin)
-		esk, err := client.Group.NewScalar().Decode(v.Inputs.ClientPrivateKeyshare)
+		client.OPRF = buildOPRFClient(oprf.Ciphersuite(conf.AKE), v.Inputs.BlindLogin)
+		esk, err := client.Deserialize.DecodeAkePrivateKey(v.Inputs.ClientPrivateKeyshare)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		client.Ake.SetValues(client.Parameters.Group, esk, v.Inputs.ClientNonce, 32)
+		client.Ake.SetValues(client.GetConf().Group, esk, v.Inputs.ClientNonce, 32)
 		KE1 := client.LoginInit(v.Inputs.Password)
 
 		if !bytes.Equal(v.Outputs.KE1, KE1.Serialize()) {
@@ -200,18 +200,18 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	}
 
 	// Server
-	server, _ := p.Server()
+	server, _ := conf.Server()
 
 	record := &opaque.ClientRecord{}
 	if !isFake(v.Config.Fake) {
-		cupload, err := server.DeserializeRegistrationRecord(v.Outputs.RegistrationRecord)
+		upload, err := server.Deserialize.RegistrationRecord(v.Outputs.RegistrationRecord)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		record.RegistrationRecord = cupload
+		record.RegistrationRecord = upload
 	} else {
-		rec, err := server.DeserializeRecord(encoding.Concat3(v.Inputs.ClientPublicKey, v.Inputs.MaskingKey, opaque.GetFakeEnvelope(p)))
+		rec, err := server.Deserialize.RegistrationRecord(encoding.Concat3(v.Inputs.ClientPublicKey, v.Inputs.MaskingKey, opaque.GetFakeEnvelope(conf)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -230,7 +230,7 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	}
 
 	// Client
-	cke2, err := client.DeserializeKE2(v.Outputs.KE2)
+	cke2, err := client.Deserialize.KE2(v.Outputs.KE2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -286,17 +286,17 @@ func (v *vector) test(t *testing.T) {
 }
 
 func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.ClientRecord) {
-	sks, err := s.Parameters.Group.NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
+	sks, err := s.Deserialize.DecodeAkePrivateKey(v.Inputs.ServerPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.Ake.SetValues(s.Parameters.Group, sks, v.Inputs.ServerNonce, 32)
+	s.Ake.SetValues(s.GetConf().Group, sks, v.Inputs.ServerNonce, 32)
 
 	var ke1 *message.KE1
 	if isFake(v.Config.Fake) {
-		ke1, err = s.DeserializeKE1(v.Inputs.KE1)
+		ke1, err = s.Deserialize.KE1(v.Inputs.KE1)
 	} else {
-		ke1, err = s.DeserializeKE1(v.Outputs.KE1)
+		ke1, err = s.Deserialize.KE1(v.Outputs.KE1)
 	}
 
 	if err != nil {
@@ -328,7 +328,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 	//}
 
 	if !isFake(v.Config.Fake) {
-		vectorKE3, err := s.DeserializeKE3(v.Outputs.KE3)
+		vectorKE3, err := s.Deserialize.KE3(v.Outputs.KE3)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -342,7 +342,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		}
 	}
 
-	vectorKE2, err := s.DeserializeKE2(v.Outputs.KE2)
+	vectorKE2, err := s.Deserialize.KE2(v.Outputs.KE2)
 	if err != nil {
 		t.Fatal(err)
 	}

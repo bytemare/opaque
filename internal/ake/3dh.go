@@ -62,12 +62,12 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func initTranscript(p *internal.Parameters, idc, ids, ke1 []byte, ke2 *message.KE2) {
+func initTranscript(conf *internal.Configuration, idc, ids, ke1 []byte, ke2 *message.KE2) {
 	sidc := encoding.EncodeVector(idc)
 	sids := encoding.EncodeVector(ids)
-	p.Hash.Write(encoding.Concatenate([]byte(tag.VersionTag), encoding.EncodeVector(p.Context),
+	conf.Hash.Write(encoding.Concatenate([]byte(tag.VersionTag), encoding.EncodeVector(conf.Context),
 		sidc, ke1,
-		sids, ke2.CredentialResponse.Serialize(), ke2.NonceS, encoding.SerializePoint(ke2.EpkS, p.Group)))
+		sids, ke2.CredentialResponse.Serialize(), ke2.NonceS, encoding.SerializePoint(ke2.EpkS, conf.Group)))
 }
 
 type macKeys struct {
@@ -101,14 +101,18 @@ func k3dh(
 	return encoding.Concat3(e1, e2, e3)
 }
 
-func core3DH(p *internal.Parameters, ikm, idu, ids, ke1 []byte, ke2 *message.KE2) (sessionSecret, macS, macC []byte) {
-	initTranscript(p, idu, ids, ke1, ke2)
+func core3DH(
+	conf *internal.Configuration,
+	ikm, idu, ids, ke1 []byte,
+	ke2 *message.KE2,
+) (sessionSecret, macS, macC []byte) {
+	initTranscript(conf, idu, ids, ke1, ke2)
 
-	keys, sessionSecret := deriveKeys(p.KDF, ikm, p.Hash.Sum()) // preamble
-	serverMac := p.MAC.MAC(keys.serverMacKey, p.Hash.Sum())     // transcript2
-	p.Hash.Write(serverMac)
-	transcript3 := p.Hash.Sum()
-	clientMac := p.MAC.MAC(keys.clientMacKey, transcript3)
+	keys, sessionSecret := deriveKeys(conf.KDF, ikm, conf.Hash.Sum()) // preamble
+	serverMac := conf.MAC.MAC(keys.serverMacKey, conf.Hash.Sum())     // transcript2
+	conf.Hash.Write(serverMac)
+	transcript3 := conf.Hash.Sum()
+	clientMac := conf.MAC.MAC(keys.clientMacKey, transcript3)
 
 	return sessionSecret, serverMac, clientMac
 }

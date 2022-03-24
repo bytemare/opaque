@@ -18,21 +18,21 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 )
 
-func deriveAuthKeyPair(p *internal.Parameters, randomizedPwd, nonce []byte) (*group.Scalar, *group.Point) {
-	seed := p.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
-	sk := oprf.Ciphersuite(p.Group).DeriveKey(seed, []byte(tag.DerivePrivateKey))
+func deriveAuthKeyPair(conf *internal.Configuration, randomizedPwd, nonce []byte) (*group.Scalar, *group.Point) {
+	seed := conf.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
+	sk := oprf.Ciphersuite(conf.Group).DeriveKey(seed, []byte(tag.DerivePrivateKey))
 
-	return sk, p.Group.Base().Mult(sk)
+	return sk, conf.Group.Base().Mult(sk)
 }
 
-func getPubkey(p *internal.Parameters, randomizedPwd, nonce []byte) *group.Point {
-	_, pk := deriveAuthKeyPair(p, randomizedPwd, nonce)
+func getPubkey(conf *internal.Configuration, randomizedPwd, nonce []byte) *group.Point {
+	_, pk := deriveAuthKeyPair(conf, randomizedPwd, nonce)
 	return pk
 }
 
 func recoverKeys(
-	p *internal.Parameters,
+	conf *internal.Configuration,
 	randomizedPwd, nonce []byte,
 ) (clientSecretKey *group.Scalar, clientPublicKey *group.Point) {
-	return deriveAuthKeyPair(p, randomizedPwd, nonce)
+	return deriveAuthKeyPair(conf, randomizedPwd, nonce)
 }
