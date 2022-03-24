@@ -114,10 +114,10 @@ type vector struct {
 	Outputs       outputs       `json:"outputs"`
 }
 
-func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
+func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	// Client
-	client, _ := p.Client()
-	client.OPRF = buildOPRFClient(oprf.Ciphersuite(p.OPRF), v.Inputs.BlindRegistration)
+	client, _ := conf.Client()
+	client.OPRF = buildOPRFClient(oprf.Ciphersuite(conf.OPRF), v.Inputs.BlindRegistration)
 	regReq := client.RegistrationInit(v.Inputs.Password)
 
 	if !bytes.Equal(v.Outputs.RegistrationRequest, regReq.Serialize()) {
@@ -129,8 +129,8 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	}
 
 	// Server
-	server, _ := p.Server()
-	pks, err := server.Group.NewElement().Decode(v.Inputs.ServerPublicKey)
+	server, _ := conf.Server()
+	pks, err := server.Deserialize.DecodeAkePublicKey(v.Inputs.ServerPublicKey)
 	if err != nil {
 		panic(err)
 	}
@@ -180,18 +180,18 @@ func (v *vector) testRegistration(p *opaque.Configuration, t *testing.T) {
 	}
 }
 
-func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
+func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 	// Client
-	client, _ := p.Client()
+	client, _ := conf.Client()
 
 	if !isFake(v.Config.Fake) {
-		client.OPRF = buildOPRFClient(oprf.Ciphersuite(p.AKE), v.Inputs.BlindLogin)
-		esk, err := client.Group.NewScalar().Decode(v.Inputs.ClientPrivateKeyshare)
+		client.OPRF = buildOPRFClient(oprf.Ciphersuite(conf.AKE), v.Inputs.BlindLogin)
+		esk, err := client.Deserialize.DecodeAkePrivateKey(v.Inputs.ClientPrivateKeyshare)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		client.Ake.SetValues(client.Parameters.Group, esk, v.Inputs.ClientNonce, 32)
+		client.Ake.SetValues(client.GetConf().Group, esk, v.Inputs.ClientNonce, 32)
 		KE1 := client.LoginInit(v.Inputs.Password)
 
 		if !bytes.Equal(v.Outputs.KE1, KE1.Serialize()) {
@@ -200,7 +200,7 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 	}
 
 	// Server
-	server, _ := p.Server()
+	server, _ := conf.Server()
 
 	record := &opaque.ClientRecord{}
 	if !isFake(v.Config.Fake) {
@@ -211,7 +211,7 @@ func (v *vector) testLogin(p *opaque.Configuration, t *testing.T) {
 
 		record.RegistrationRecord = cupload
 	} else {
-		rec, err := server.Deserialize.RegistrationRecord(encoding.Concat3(v.Inputs.ClientPublicKey, v.Inputs.MaskingKey, opaque.GetFakeEnvelope(p)))
+		rec, err := server.Deserialize.RegistrationRecord(encoding.Concat3(v.Inputs.ClientPublicKey, v.Inputs.MaskingKey, opaque.GetFakeEnvelope(conf)))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -286,11 +286,11 @@ func (v *vector) test(t *testing.T) {
 }
 
 func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.ClientRecord) {
-	sks, err := s.Parameters.Group.NewScalar().Decode(v.Inputs.ServerPrivateKeyshare)
+	sks, err := s.Deserialize.DecodeAkePrivateKey(v.Inputs.ServerPrivateKeyshare)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.Ake.SetValues(s.Parameters.Group, sks, v.Inputs.ServerNonce, 32)
+	s.Ake.SetValues(s.GetConf().Group, sks, v.Inputs.ServerNonce, 32)
 
 	var ke1 *message.KE1
 	if isFake(v.Config.Fake) {

@@ -387,7 +387,7 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 
 		_, err = server.Deserialize.RegistrationRequest(r1)
 		if err != nil {
-			conf := server.Parameters
+			conf := server.GetConf()
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r1) == conf.OPRFPointLength {
 				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
 			}
@@ -420,7 +420,7 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 
 		_, err = client.Deserialize.RegistrationResponse(r2)
 		if err != nil {
-			conf := client.Parameters
+			conf := client.GetConf()
 			maxResponseLength := conf.OPRFPointLength + conf.AkePointLength
 
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r2) == maxResponseLength {
@@ -458,7 +458,7 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 			t.Skip()
 		}
 
-		conf := server.Parameters
+		conf := server.GetConf()
 
 		_, err = server.Deserialize.RegistrationRecord(r3)
 		if err != nil {
@@ -496,7 +496,7 @@ func FuzzDeserializeKE1(f *testing.F) {
 
 		_, err = server.Deserialize.KE1(ke1)
 		if err != nil {
-			conf := server.Parameters
+			conf := server.GetConf()
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
 				len(ke1) == conf.OPRFPointLength+conf.NonceLen+conf.AkePointLength {
 				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
@@ -517,7 +517,7 @@ func FuzzDeserializeKE1(f *testing.F) {
 	})
 }
 
-func isValidAKEPoint(conf *internal.Parameters, input []byte, err error) error {
+func isValidAKEPoint(conf *internal.Configuration, input []byte, err error) error {
 	e, _err := conf.Group.NewElement().Decode(input)
 	if _err == nil && !e.IsIdentity() {
 		return fmt.Errorf("got %q but point is valid", err)
@@ -526,7 +526,7 @@ func isValidAKEPoint(conf *internal.Parameters, input []byte, err error) error {
 	return nil
 }
 
-func isValidOPRFPoint(conf *internal.Parameters, input []byte, err error) error {
+func isValidOPRFPoint(conf *internal.Configuration, input []byte, err error) error {
 	e, _err := conf.OPRF.Group().NewElement().Decode(input)
 	if _err == nil && !e.IsIdentity() {
 		return fmt.Errorf("got %q but point is valid", err)
@@ -554,7 +554,7 @@ func FuzzDeserializeKE2(f *testing.F) {
 
 		_, err = client.Deserialize.KE2(ke2)
 		if err != nil {
-			conf := client.Parameters
+			conf := client.GetConf()
 			maxResponseLength := conf.OPRFPointLength + conf.NonceLen + conf.AkePointLength + conf.EnvelopeSize
 
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
@@ -592,7 +592,7 @@ func FuzzDeserializeKE3(f *testing.F) {
 
 		_, err = server.Deserialize.KE3(ke3)
 		if err != nil {
-			conf := server.Parameters
+			conf := server.GetConf()
 			maxMessageLength := conf.MAC.Size()
 
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(ke3) == maxMessageLength {

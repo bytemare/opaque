@@ -52,38 +52,42 @@ var (
 // Server represents an OPAQUE Server, exposing its functions and holding its state.
 type Server struct {
 	Deserialize *Deserializer
-	*internal.Parameters
-	Ake *ake.Server
+	conf        *internal.Configuration
+	Ake         *ake.Server
 }
 
 // NewServer returns a Server instantiation given the application Configuration.
-func NewServer(p *Configuration) (*Server, error) {
-	if p == nil {
-		p = DefaultConfiguration()
+func NewServer(c *Configuration) (*Server, error) {
+	if c == nil {
+		c = DefaultConfiguration()
 	}
 
-	ip, err := p.toInternal()
+	conf, err := c.toInternal()
 	if err != nil {
 		return nil, err
 	}
 
 	return &Server{
-		Deserialize: &Deserializer{ip},
-		Parameters:  ip,
+		Deserialize: &Deserializer{conf},
+		conf:        conf,
 		Ake:         ake.NewServer(),
 	}, nil
 }
 
-// KeyGen returns a key pair in the AKE group.
-func (s *Server) KeyGen() (secretKey, publicKey []byte) {
-	return ake.KeyGen(s.Group)
+// GetConf return the internal configuration.
+func (s *Server) GetConf() *internal.Configuration {
+	return s.conf
 }
 
 func (s *Server) oprfResponse(element *group.Point, oprfSeed, credentialIdentifier []byte) *group.Point {
-	seed := s.KDF.Expand(oprfSeed, encoding.SuffixString(credentialIdentifier, tag.ExpandOPRF), internal.SeedLength)
-	ku := s.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair))
+	seed := s.conf.KDF.Expand(
+		oprfSeed,
+		encoding.SuffixString(credentialIdentifier, tag.ExpandOPRF),
+		internal.SeedLength,
+	)
+	ku := s.conf.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair))
 
-	return s.OPRF.Evaluate(ku, element)
+	return s.conf.OPRF.Evaluate(ku, element)
 }
 
 // RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given
@@ -96,7 +100,7 @@ func (s *Server) RegistrationResponse(
 	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
 
 	return &message.RegistrationResponse{
-		C:                s.OPRF,
+		C:                s.conf.OPRF,
 		EvaluatedMessage: z,
 		Pks:              serverPublicKey,
 	}
@@ -111,7 +115,7 @@ func (s *Server) credentialResponse(
 	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
 
 	maskingNonce, maskedResponse := masking.Mask(
-		s.Parameters,
+		s.conf,
 		maskingNonce,
 		record.MaskingKey,
 		serverPublicKey,
@@ -129,7 +133,7 @@ func (s *Server) verifyInitInput(
 	serverSecretKey, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord,
 ) (*group.Scalar, error) {
-	sks, err := s.Group.NewScalar().Decode(serverSecretKey)
+	sks, err := s.conf.Group.NewScalar().Decode(serverSecretKey)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %w", ErrInvalidServerSecretKey, err)
 	}
@@ -138,15 +142,15 @@ func (s *Server) verifyInitInput(
 		return nil, ErrZeroSKS
 	}
 
-	if len(serverPublicKey) != s.AkePointLength {
+	if len(serverPublicKey) != s.conf.AkePointLength {
 		return nil, ErrInvalidPksLength
 	}
 
-	if len(oprfSeed) != s.Hash.Size() {
+	if len(oprfSeed) != s.conf.Hash.Size() {
 		return nil, ErrInvalidOPRFSeedLength
 	}
 
-	pks, err := s.Group.NewElement().Decode(serverPublicKey)
+	pks, err := s.conf.Group.NewElement().Decode(serverPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid server public key: %w", err)
 	}
@@ -155,7 +159,7 @@ func (s *Server) verifyInitInput(
 		return nil, ErrIdentityPKS
 	}
 
-	if len(record.Envelope) != s.EnvelopeSize {
+	if len(record.Envelope) != s.conf.EnvelopeSize {
 		return nil, ErrInvalidEnvelopeLength
 	}
 
@@ -179,21 +183,21 @@ func (s *Server) LoginInit(
 	clientIdentity := record.ClientIdentity
 
 	if clientIdentity == nil {
-		clientIdentity = encoding.SerializePoint(record.PublicKey, s.Group)
+		clientIdentity = encoding.SerializePoint(record.PublicKey, s.conf.Group)
 	}
 
 	if serverIdentity == nil {
 		serverIdentity = serverPublicKey
 	}
 
-	ke2 := s.Ake.Response(s.Parameters, serverIdentity, sks, clientIdentity, record.PublicKey, ke1, response)
+	ke2 := s.Ake.Response(s.conf, serverIdentity, sks, clientIdentity, record.PublicKey, ke1, response)
 
 	return ke2, nil
 }
 
 // LoginFinish returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
 func (s *Server) LoginFinish(ke3 *message.KE3) error {
-	if !s.Ake.Finalize(s.Parameters, ke3) {
+	if !s.Ake.Finalize(s.conf, ke3) {
 		return ErrAkeInvalidClientMac
 	}
 
@@ -212,11 +216,11 @@ func (s *Server) ExpectedMAC() []byte {
 
 // SetAKEState sets the internal state of the AKE server from the given bytes.
 func (s *Server) SetAKEState(state []byte) error {
-	if len(state) != s.MAC.Size()+s.KDF.Size() {
+	if len(state) != s.conf.MAC.Size()+s.conf.KDF.Size() {
 		return ErrInvalidState
 	}
 
-	return s.Ake.SetState(state[:s.MAC.Size()], state[s.MAC.Size():])
+	return s.Ake.SetState(state[:s.conf.MAC.Size()], state[s.conf.MAC.Size():])
 }
 
 // SerializeState returns the internal state of the AKE server serialized to bytes.

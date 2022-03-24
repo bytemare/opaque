@@ -28,20 +28,19 @@ func TestFull(t *testing.T) {
 	username := []byte("client")
 	password := []byte("password")
 
-	p := opaque.DefaultConfiguration()
-	p.Context = []byte("OPAQUETest")
+	conf := opaque.DefaultConfiguration()
+	conf.Context = []byte("OPAQUETest")
 
 	test := &testParams{
-		Configuration: p,
+		Configuration: conf,
 		username:      username,
 		userID:        username,
 		serverID:      ids,
 		password:      password,
-		oprfSeed:      internal.RandomBytes(p.Hash.Size()),
+		oprfSeed:      conf.GenerateOPRFSeed(),
 	}
 
-	s, _ := p.Server()
-	serverSecretKey, pks := s.KeyGen()
+	serverSecretKey, pks := conf.KeyGen()
 	test.serverSecretKey = serverSecretKey
 	test.serverPublicKey = pks
 
@@ -82,7 +81,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 		}
 
 		credID = internal.RandomBytes(32)
-		pks, err := server.Group.NewElement().Decode(p.serverPublicKey)
+		pks, err := server.Deserialize.DecodeAkePublicKey(p.serverPublicKey)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}

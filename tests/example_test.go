@@ -17,7 +17,6 @@ import (
 	"github.com/bytemare/crypto/ksf"
 
 	"github.com/bytemare/opaque"
-	"github.com/bytemare/opaque/internal"
 )
 
 func isSameConf(a, b *opaque.Configuration) bool {
@@ -43,7 +42,9 @@ func isSameConf(a, b *opaque.Configuration) bool {
 	return bytes.Equal(a.Context, b.Context)
 }
 
-func ExampleConfiguration() {
+// Example_configuration shows how to set up the same configuration in two different ways and hot to serialize and
+// deserialize a configuration.
+func Example_configuration() {
 	// Note that applications must use the same configuration throughout their lifecycle, and be the same on both client
 	// and server. The two following configurations are the same, and are recommended.
 
@@ -80,10 +81,12 @@ func ExampleConfiguration() {
 	// Output: OPAQUE configuration is easy!
 }
 
-func ExampleClient() {
+// Example_clientSetup demonstrates how to create a client role from a configuration.
+func Example_clientSetup() {
 	// First, load or instantiate a configuration.
 	conf := opaque.DefaultConfiguration()
 
+	// On each protocol run, the following produces a client role.
 	client, err := conf.Client()
 	if client == nil || err != nil {
 		log.Fatalf("Oh no! Something went wrong setting up the client! %v", err)
@@ -94,12 +97,20 @@ func ExampleClient() {
 	// Output: OPAQUE configuration is easy!
 }
 
-func ExampleServer() {
+// Example_serverSetup demonstrates how to create a server role from a configuration.
+func Example_serverSetup() {
 	// First, load or instantiate a configuration.
 	conf := opaque.DefaultConfiguration()
 
-	server, err := conf.Server()
+	// The very first time you set up your app, you need to create the following values and securely store them.
+	serverPrivateKey, serverPublicKey = conf.KeyGen()
+	secretOprfSeed = conf.GenerateOPRFSeed()
+	if serverPrivateKey == nil || serverPublicKey == nil || secretOprfSeed == nil {
+		log.Fatalf("Oh no! Something went wrong setting up the server secrets!")
+	}
 
+	// Then, on each protocol run, the following produces a server role.
+	server, err := conf.Server()
 	if server == nil || err != nil {
 		log.Fatalf("Oh no! Something went wrong setting up the server! %v", err)
 	}
@@ -114,18 +125,14 @@ var (
 	secretOprfSeed, serverPrivateKey, serverPublicKey []byte
 )
 
-func ExampleRegistration() {
-	// We assume the server is already set up with the following values. secret* values are internal secret to the
-	// server.
-	// They can be unique for all clients, and must be the same for a client between registration and login. It's safe
-	// to use these same values across clients as long as they remain secret.
+// Example_registration demonstrates in a single function the interactions between a client and a server for the
+// registration phase. This is of course a proof-of-concept demonstration, as client and server execute separately.
+func Example_registration() {
+	// The server uses a secret global OPRF seed that can be unique for each client or the same for all, but must be
+	// the same for a given client between registration and  all login sessions.
 	conf := opaque.DefaultConfiguration()
-	secretOprfSeed = internal.RandomBytes(conf.Hash.Size())
-	s, err := conf.Server()
-	if err != nil {
-		panic(err)
-	}
-	serverPrivateKey, serverPublicKey = s.KeyGen()
+	secretOprfSeed = conf.GenerateOPRFSeed()
+	serverPrivateKey, serverPublicKey = conf.KeyGen()
 
 	// Secret client information.
 	password := []byte("password")
@@ -133,6 +140,7 @@ func ExampleRegistration() {
 	// Information shared by both client and server.
 	serverID := []byte("server")
 	clientID := []byte("client")
+	conf = opaque.DefaultConfiguration()
 
 	// Runtime setup
 	client, err := conf.Client()
@@ -145,63 +153,78 @@ func ExampleRegistration() {
 		panic(err)
 	}
 
+	// Messages and output client credential identifier
+	var message1, message2, message3 []byte
+	var credID []byte
+
 	// Client starts, serializes the message, and sends it to the server.
-	c1 := client.RegistrationInit(password)
-	c1s := c1.Serialize()
+	{
+		c1 := client.RegistrationInit(password)
+		message1 = c1.Serialize()
+	}
 
 	// The server receives the encoded message, decodes it, interprets it, and returns its response.
-	s1, err := server.Deserialize.RegistrationRequest(c1s)
-	if err != nil {
-		panic(err)
+	{
+		s1, err := server.Deserialize.RegistrationRequest(message1)
+		if err != nil {
+			panic(err)
+		}
+
+		// The server creates a database entry for the client and creates a credential identifier that must absolutely
+		// be unique among all clients.
+		credID = opaque.RandomBytes(64)
+		pks, err := server.Deserialize.DecodeAkePublicKey(serverPublicKey)
+		if err != nil {
+			panic(err)
+		}
+
+		s2 := server.RegistrationResponse(s1, pks, credID, secretOprfSeed)
+
+		// The server responds with its serialized response.
+		message2 = s2.Serialize()
 	}
-
-	// clientID must absolutely be unique among all clients.
-	credID := internal.RandomBytes(64)
-	pks, err := server.Group.NewElement().Decode(serverPublicKey)
-	if err != nil {
-		panic(err)
-	}
-
-	s2 := server.RegistrationResponse(s1, pks, credID, secretOprfSeed)
-
-	// The server responds with its serialized response.
-	s2s := s2.Serialize()
 
 	// The client deserializes the responses, and sends back its final client record containing the envelope.
-	c2, err := client.Deserialize.RegistrationResponse(s2s)
-	if err != nil {
-		panic(err)
+	{
+		c2, err := client.Deserialize.RegistrationResponse(message2)
+		if err != nil {
+			panic(err)
+		}
+
+		// This also generates a client-only secret export_key, that the client can use for other purposes (e.g. encrypt
+		// information to store on the server, and that the server can't decrypt). We don't use in the example here.
+		c3, _ := client.RegistrationFinalize(c2, clientID, serverID)
+		message3 = c3.Serialize()
 	}
 
-	// This also generates a client-only secret export_key, that the client can use for other purposes (e.g. encrypt
-	// information to store on the server, and that the server can't decrypt). We don't use in the example here.
-	c3, _ := client.RegistrationFinalize(c2, clientID, serverID)
-	c3s := c3.Serialize()
+	// Server registers the client record.
+	{
+		upload, err := server.Deserialize.RegistrationRecord(message3)
+		if err != nil {
+			panic(err)
+		}
 
-	// Server registers the client upload
-	upload, err := server.Deserialize.RegistrationRecord(c3s)
-	if err != nil {
-		panic(err)
-	}
+		exampleClientRecord = &opaque.ClientRecord{
+			CredentialIdentifier: credID,
+			ClientIdentity:       clientID,
+			RegistrationRecord:   upload,
+		}
 
-	exampleClientRecord = &opaque.ClientRecord{
-		CredentialIdentifier: credID,
-		ClientIdentity:       clientID,
-		RegistrationRecord:   upload,
-	}
-
-	if exampleClientRecord.RegistrationRecord != nil {
-		fmt.Println("OPAQUE registration is easy!")
-	} else {
-		log.Fatalln("Oh no! Something went wrong storing the client record.")
+		if exampleClientRecord.RegistrationRecord != nil {
+			fmt.Println("OPAQUE registration is easy!")
+		} else {
+			log.Fatalln("Oh no! Something went wrong storing the client record.")
+		}
 	}
 
 	// Output: OPAQUE registration is easy!
 }
 
-func ExampleLoginKeyExchange() {
+// Example_loginKeyExchange demonstrates in a single function the interactions between a client and a server for the
+// login phase. This is of course a proof-of-concept demonstration, as client and server execute separately.
+func Example_loginKeyExchange() {
 	// For the purpose of this demo, we consider the following registration has already happened.
-	ExampleRegistration()
+	Example_registration()
 
 	// Secret client information.
 	password := []byte("password")
@@ -222,58 +245,68 @@ func ExampleLoginKeyExchange() {
 		panic(err)
 	}
 
-	// The client initiates the ball and sends the serialized ke1 to the server
-	ke1 := client.LoginInit(password)
-	message1 := ke1.Serialize()
+	// Messages and output values
+	var message1, message2, message3 []byte
+	var clientSessionKey, serverSessionKey []byte
 
-	// The server interprets ke1, and sends back ke2
-	ke1s, err := server.Deserialize.KE1(message1)
-	if err != nil {
-		panic(err)
+	// The client initiates the ball and sends the serialized ke1 to the server.
+	{
+		ke1 := client.LoginInit(password)
+		message1 = ke1.Serialize()
 	}
 
-	ke2, err := server.LoginInit(ke1s, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed,
-		exampleClientRecord)
-	if err != nil {
-		panic(err)
+	// The server interprets ke1, and sends back ke2.
+	{
+		ke1s, err := server.Deserialize.KE1(message1)
+		if err != nil {
+			panic(err)
+		}
+
+		ke2, err := server.LoginInit(ke1s, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed,
+			exampleClientRecord)
+		if err != nil {
+			panic(err)
+		}
+
+		message2 = ke2.Serialize()
 	}
 
-	message2 := ke2.Serialize()
-
-	// The client interprets ke2. If the everything went fine, the server is considered trustworthy and the client
+	// The client interprets ke2. If everything went fine, the server is considered trustworthy and the client
 	// can use the shared session key and secret export key.
-	ke2c, err := client.Deserialize.KE2(message2)
-	if err != nil {
-		panic(err)
-	}
+	{
+		ke2c, err := client.Deserialize.KE2(message2)
+		if err != nil {
+			panic(err)
+		}
 
-	// In this example, we don't use the secret export key. The client sends the serialized ke3 to the server.
-	ke3, _, err := client.LoginFinish(clientID, serverID, ke2c)
-	if err != nil {
-		panic(err)
-	}
+		// In this example, we don't use the secret export key. The client sends the serialized ke3 to the server.
+		ke3, _, err := client.LoginFinish(clientID, serverID, ke2c)
+		if err != nil {
+			panic(err)
+		}
 
-	clientSessionKey := client.SessionKey()
-	if clientSessionKey == nil {
-		log.Fatalln("Oh no! Something went wrong!")
-	}
+		message3 = ke3.Serialize()
 
-	message3 := ke3.Serialize()
+		// If no error occurred, the server can be trusted, and the client can use the session key.
+		clientSessionKey = client.SessionKey()
+	}
 
 	// The server must absolutely validate this last message to authenticate the client and continue. If this message
 	// does not return successfully, the server must not send any secret or sensitive information and immediately cease
 	// the connection.
-	ke3s, err := server.Deserialize.KE3(message3)
-	if err != nil {
-		panic(err)
-	}
+	{
+		ke3s, err := server.Deserialize.KE3(message3)
+		if err != nil {
+			panic(err)
+		}
 
-	if err := server.LoginFinish(ke3s); err != nil {
-		panic(err)
-	}
+		if err := server.LoginFinish(ke3s); err != nil {
+			panic(err)
+		}
 
-	// If server.LoginFinish() returns successfully, we can trust the client and safely extract the shared session key.
-	serverSessionKey := server.SessionKey()
+		// If no error occurred, the server can trust the client and safely extract the shared session key.
+		serverSessionKey = server.SessionKey()
+	}
 
 	// The following test does not exist in the real world and simply proves the point that the keys match.
 	if !bytes.Equal(clientSessionKey, serverSessionKey) {
