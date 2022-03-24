@@ -6,11 +6,10 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-package opaque
+package opaque_test
 
 import (
 	"crypto"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -106,95 +105,6 @@ func fuzzServerConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Serv
 	return server
 }
 
-type ByteToHex []byte
-
-func (j ByteToHex) MarshalJSON() ([]byte, error) {
-	return json.Marshal(hex.EncodeToString(j))
-}
-
-func (j *ByteToHex) UnmarshalJSON(b []byte) error {
-	bs := strings.Trim(string(b), "\"")
-
-	dst, err := hex.DecodeString(bs)
-	if err != nil {
-		return err
-	}
-
-	*j = dst
-	return nil
-}
-
-/*
-	Test test vectors
-*/
-
-type config struct {
-	Context ByteToHex `json:"Context"`
-	// EnvelopeMode string    `json:"EnvelopeMode"`
-	Fake  string    `json:"Fake"`
-	Group string    `json:"Group"`
-	Hash  string    `json:"Hash"`
-	KDF   string    `json:"KDF"`
-	MAC   string    `json:"MAC"`
-	KSF   string    `json:"KSF"`
-	Name  string    `json:"Name"`
-	OPRF  ByteToHex `json:"OPRF"`
-}
-
-type inputs struct {
-	BlindLogin            ByteToHex `json:"blind_login"`
-	BlindRegistration     ByteToHex `json:"blind_registration"`
-	ClientIdentity        ByteToHex `json:"client_identity,omitempty"`
-	Context               ByteToHex `json:"context"`
-	ClientKeyshare        ByteToHex `json:"client_keyshare"`
-	ClientNonce           ByteToHex `json:"client_nonce"`
-	ClientPrivateKeyshare ByteToHex `json:"client_private_keyshare"`
-	CredentialIdentifier  ByteToHex `json:"credential_identifier"`
-	EnvelopeNonce         ByteToHex `json:"envelope_nonce"`
-	MaskingNonce          ByteToHex `json:"masking_nonce"`
-	OprfKey               ByteToHex `json:"oprf_key"`
-	OprfSeed              ByteToHex `json:"oprf_seed"`
-	Password              ByteToHex `json:"password"`
-	ServerIdentity        ByteToHex `json:"server_identity,omitempty"`
-	ServerKeyshare        ByteToHex `json:"server_keyshare"`
-	ServerNonce           ByteToHex `json:"server_nonce"`
-	ServerPrivateKey      ByteToHex `json:"server_private_key"`
-	ServerPrivateKeyshare ByteToHex `json:"server_private_keyshare"`
-	ServerPublicKey       ByteToHex `json:"server_public_key"`
-	KE1                   ByteToHex `json:"KE1"`               // Used for fake credentials tests
-	ClientPublicKey       ByteToHex `json:"client_public_key"` // Used for fake credentials tests
-	MaskingKey            ByteToHex `json:"masking_key"`       // Used for fake credentials tests
-}
-
-type intermediates struct {
-	AuthKey         ByteToHex `json:"auth_key"`       //
-	ClientMacKey    ByteToHex `json:"client_mac_key"` //
-	ClientPublicKey ByteToHex `json:"client_public_key"`
-	Envelope        ByteToHex `json:"envelope"`         //
-	HandshakeSecret ByteToHex `json:"handshake_secret"` //
-	MaskingKey      ByteToHex `json:"masking_key"`
-	RandomPWD       ByteToHex `json:"randomized_pwd"` //
-	ServerMacKey    ByteToHex `json:"server_mac_key"` //
-}
-
-type outputs struct {
-	KE1                  ByteToHex `json:"KE1"`                   //
-	KE2                  ByteToHex `json:"KE2"`                   //
-	KE3                  ByteToHex `json:"KE3"`                   //
-	ExportKey            ByteToHex `json:"export_key"`            //
-	RegistrationRequest  ByteToHex `json:"registration_request"`  //
-	RegistrationResponse ByteToHex `json:"registration_response"` //
-	RegistrationRecord   ByteToHex `json:"registration_upload"`   //
-	SessionKey           ByteToHex `json:"session_key"`           //
-}
-
-type vector struct {
-	Config        config        `json:"config"`
-	Inputs        inputs        `json:"inputs"`
-	Intermediates intermediates `json:"intermediates"`
-	Outputs       outputs       `json:"outputs"`
-}
-
 func fuzzLoadVectors(path string) ([]*vector, error) {
 	contents, err := os.ReadFile(path)
 	if err != nil {
@@ -208,69 +118,6 @@ func fuzzLoadVectors(path string) ([]*vector, error) {
 	}
 
 	return v, nil
-}
-
-func hashToHash(h string) crypto.Hash {
-	switch h {
-	case "SHA256":
-		return crypto.SHA256
-	case "SHA512":
-		return crypto.SHA512
-	default:
-		return 0
-	}
-}
-
-func kdfToHash(h string) crypto.Hash {
-	switch h {
-	case "HKDF-SHA256":
-		return crypto.SHA256
-	case "HKDF-SHA512":
-		return crypto.SHA512
-	default:
-		return 0
-	}
-}
-
-func macToHash(h string) crypto.Hash {
-	switch h {
-	case "HMAC-SHA256":
-		return crypto.SHA256
-	case "HMAC-SHA512":
-		return crypto.SHA512
-	default:
-		return 0
-	}
-}
-
-func ksfToKSF(h string) ksf.Identifier {
-	switch h {
-	case "Identity":
-		return 0
-	case "Scrypt":
-		return ksf.Scrypt
-	default:
-		return 0
-	}
-}
-
-func groupToGroup(g string) opaque.Group {
-	switch g {
-	case "ristretto255":
-		return opaque.RistrettoSha512
-	case "decaf448":
-		panic("group not supported")
-	case "P256_XMD:SHA-256_SSWU_RO_":
-		return opaque.P256Sha256
-	case "P384_XMD:SHA-384_SSWU_RO_":
-		return opaque.P384Sha512
-	case "P521_XMD:SHA-512_SSWU_RO_":
-		return opaque.P521Sha512
-	// case "curve25519_XMD:SHA-512_ELL2_RO_":
-	//	return opaque.Curve25519Sha512
-	default:
-		panic("group not recognised")
-	}
 }
 
 func FuzzConfiguration(f *testing.F) {
