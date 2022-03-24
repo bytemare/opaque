@@ -23,7 +23,7 @@ var errInvalidInput = errors.New("invalid input - OPRF input deterministically m
 
 // Client implements the OPRF client and holds its state.
 type Client struct {
-	*oprf
+	Ciphersuite
 	input []byte
 	blind *group.Scalar
 }
@@ -36,10 +36,10 @@ func (c *Client) SetBlind(blind *group.Scalar) {
 // Blind masks the input.
 func (c *Client) Blind(input []byte) *group.Point {
 	if c.blind == nil {
-		c.blind = c.NewScalar().Random()
+		c.blind = c.Group().NewScalar().Random()
 	}
 
-	p := c.HashToGroup(input, c.dst(tag.OPRFPointPrefix))
+	p := c.Group().HashToGroup(input, c.dst(tag.OPRFPointPrefix))
 	if p.IsIdentity() {
 		panic(errInvalidInput)
 	}
@@ -49,27 +49,16 @@ func (c *Client) Blind(input []byte) *group.Point {
 	return p.Mult(c.blind)
 }
 
-func (o *oprf) hash(input ...[]byte) []byte {
-	h := suiteToHash[o.Group].New()
-	h.Reset()
-
-	for _, i := range input {
-		_, _ = h.Write(i)
-	}
-
-	return h.Sum(nil)
-}
-
-func (o *oprf) hashTranscript(input, unblinded []byte) []byte {
+func (c *Client) hashTranscript(input, unblinded []byte) []byte {
 	encInput := encoding.EncodeVector(input)
 	encElement := encoding.EncodeVector(unblinded)
 	encDST := []byte(tag.OPRFFinalize)
 
-	return o.hash(encInput, encElement, encDST)
+	return c.Ciphersuite.hash(encInput, encElement, encDST)
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
 func (c *Client) Finalize(evaluation *group.Point) []byte {
-	u := encoding.SerializePoint(evaluation.InvertMult(c.blind), c.Group)
+	u := encoding.SerializePoint(evaluation.InvertMult(c.blind), c.Ciphersuite.Group())
 	return c.hashTranscript(c.input, u)
 }

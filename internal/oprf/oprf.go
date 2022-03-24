@@ -55,6 +55,25 @@ func (c Ciphersuite) register(h crypto.Hash) {
 	suiteToHash[c.Group()] = h
 }
 
+func (c Ciphersuite) dst(prefix string) []byte {
+	return encoding.Concat([]byte(prefix), c.contextString())
+}
+
+func (c Ciphersuite) contextString() []byte {
+	return encoding.Concat3([]byte(tag.OPRF), encoding.I2OSP(int(base), 1), encoding.I2OSP(int(c), 2))
+}
+
+func (c Ciphersuite) hash(input ...[]byte) []byte {
+	h := suiteToHash[c.Group()].New()
+	h.Reset()
+
+	for _, i := range input {
+		_, _ = h.Write(i)
+	}
+
+	return h.Sum(nil)
+}
+
 // Available returns whether the Ciphersuite has been registered of not.
 func (c Ciphersuite) Available() bool {
 	_, ok := suiteToHash[c.Group()]
@@ -71,29 +90,9 @@ func (c Ciphersuite) SerializePoint(p *group.Point) []byte {
 	return encoding.SerializePoint(p, c.Group())
 }
 
-func contextString(id Ciphersuite) []byte {
-	return encoding.Concat3([]byte(tag.OPRF), encoding.I2OSP(int(base), 1), encoding.I2OSP(int(id), 2))
-}
-
-func (c Ciphersuite) oprf() *oprf {
-	return &oprf{
-		Group:         c.Group(),
-		contextString: contextString(c),
-	}
-}
-
-type oprf struct {
-	group.Group
-	contextString []byte
-}
-
-func (o *oprf) dst(prefix string) []byte {
-	return encoding.Concat([]byte(prefix), o.contextString)
-}
-
 // DeriveKey returns a scalar mapped from the input.
 func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
-	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), contextString(c))
+	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), c.contextString())
 	deriveInput := encoding.Concat(seed, encoding.EncodeVector(info))
 
 	var counter uint8
@@ -113,5 +112,5 @@ func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
 
 // Client returns an OPRF client.
 func (c Ciphersuite) Client() *Client {
-	return &Client{oprf: c.oprf()}
+	return &Client{Ciphersuite: c}
 }
