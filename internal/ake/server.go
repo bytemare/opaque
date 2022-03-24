@@ -53,7 +53,7 @@ func (s *Server) SetValues(id group.Group, esk *group.Scalar, nonce []byte, nonc
 
 // Response produces a 3DH server response message.
 func (s *Server) Response(
-	p *internal.Parameters,
+	conf *internal.Configuration,
 	serverIdentity []byte,
 	serverSecretKey *group.Scalar,
 	clientIdentity []byte,
@@ -61,7 +61,7 @@ func (s *Server) Response(
 	ke1 *message.KE1,
 	response *cred.CredentialResponse,
 ) *message.KE2 {
-	epk := s.SetValues(p.Group, nil, nil, p.NonceLen)
+	epk := s.SetValues(conf.Group, nil, nil, conf.NonceLen)
 
 	ke2 := &message.KE2{
 		CredentialResponse: response,
@@ -69,8 +69,8 @@ func (s *Server) Response(
 		EpkS:               epk,
 	}
 
-	ikm := k3dh(p.Group, ke1.EpkU, s.esk, ke1.EpkU, serverSecretKey, clientPublicKey, s.esk)
-	sessionSecret, serverMac, clientMac := core3DH(p, ikm, clientIdentity, serverIdentity, ke1.Serialize(), ke2)
+	ikm := k3dh(conf.Group, ke1.EpkU, s.esk, ke1.EpkU, serverSecretKey, clientPublicKey, s.esk)
+	sessionSecret, serverMac, clientMac := core3DH(conf, ikm, clientIdentity, serverIdentity, ke1.Serialize(), ke2)
 	s.sessionSecret = sessionSecret
 	s.clientMac = clientMac
 	ke2.Mac = serverMac
@@ -79,8 +79,8 @@ func (s *Server) Response(
 }
 
 // Finalize verifies the authentication tag contained in ke3.
-func (s *Server) Finalize(p *internal.Parameters, ke3 *message.KE3) bool {
-	return p.MAC.Equal(s.clientMac, ke3.Mac)
+func (s *Server) Finalize(conf *internal.Configuration, ke3 *message.KE3) bool {
+	return conf.MAC.Equal(s.clientMac, ke3.Mac)
 }
 
 // SessionKey returns the secret shared session key if a previous call to Response() was successful.

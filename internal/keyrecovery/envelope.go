@@ -38,13 +38,13 @@ func (e *Envelope) Serialize() []byte {
 	return encoding.Concat(e.Nonce, e.AuthTag)
 }
 
-func exportKey(p *internal.Parameters, randomizedPwd, nonce []byte) []byte {
-	return p.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExportKey), p.KDF.Size())
+func exportKey(conf *internal.Configuration, randomizedPwd, nonce []byte) []byte {
+	return conf.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExportKey), conf.KDF.Size())
 }
 
-func authTag(p *internal.Parameters, randomizedPwd, nonce, ctc []byte) []byte {
-	authKey := p.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.AuthKey), p.KDF.Size())
-	return p.MAC.MAC(authKey, encoding.Concat(nonce, ctc))
+func authTag(conf *internal.Configuration, randomizedPwd, nonce, ctc []byte) []byte {
+	authKey := conf.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.AuthKey), conf.KDF.Size())
+	return conf.MAC.MAC(authKey, encoding.Concat(nonce, ctc))
 }
 
 // cleartextCredentials assumes that clientPublicKey, serverPublicKey are non-nil valid group elements.
@@ -62,21 +62,21 @@ func cleartextCredentials(clientPublicKey, serverPublicKey, idc, ids []byte) []b
 
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
 func Store(
-	p *internal.Parameters,
+	conf *internal.Configuration,
 	randomizedPwd, serverPublicKey []byte,
 	creds *Credentials,
 ) (env *Envelope, pku *group.Point, export []byte) {
 	// testing: integrated to support testing with set nonce
 	nonce := creds.EnvelopeNonce
 	if nonce == nil {
-		nonce = internal.RandomBytes(p.NonceLen)
+		nonce = internal.RandomBytes(conf.NonceLen)
 	}
 
-	pku = getPubkey(p, randomizedPwd, nonce)
+	pku = getPubkey(conf, randomizedPwd, nonce)
 
-	ctc := cleartextCredentials(encoding.SerializePoint(pku, p.Group), serverPublicKey, creds.Idc, creds.Ids)
-	auth := authTag(p, randomizedPwd, nonce, ctc)
-	export = exportKey(p, randomizedPwd, nonce)
+	ctc := cleartextCredentials(encoding.SerializePoint(pku, conf.Group), serverPublicKey, creds.Idc, creds.Ids)
+	auth := authTag(conf, randomizedPwd, nonce, ctc)
+	export = exportKey(conf, randomizedPwd, nonce)
 
 	env = &Envelope{
 		Nonce:   nonce,
@@ -88,19 +88,19 @@ func Store(
 
 // Recover assumes that the envelope's inner envelope has been previously checked to be of correct size.
 func Recover(
-	p *internal.Parameters,
+	conf *internal.Configuration,
 	randomizedPwd, serverPublicKey, idc, ids []byte,
 	envelope *Envelope,
 ) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, export []byte, err error) {
-	clientSecretKey, clientPublicKey = recoverKeys(p, randomizedPwd, envelope.Nonce)
-	ctc := cleartextCredentials(encoding.SerializePoint(clientPublicKey, p.Group), serverPublicKey, idc, ids)
+	clientSecretKey, clientPublicKey = recoverKeys(conf, randomizedPwd, envelope.Nonce)
+	ctc := cleartextCredentials(encoding.SerializePoint(clientPublicKey, conf.Group), serverPublicKey, idc, ids)
 
-	expectedTag := authTag(p, randomizedPwd, envelope.Nonce, ctc)
-	if !p.MAC.Equal(expectedTag, envelope.AuthTag) {
+	expectedTag := authTag(conf, randomizedPwd, envelope.Nonce, ctc)
+	if !conf.MAC.Equal(expectedTag, envelope.AuthTag) {
 		return nil, nil, nil, errEnvelopeInvalidMac
 	}
 
-	export = exportKey(p, randomizedPwd, envelope.Nonce)
+	export = exportKey(conf, randomizedPwd, envelope.Nonce)
 
 	return clientSecretKey, clientPublicKey, export, nil
 }

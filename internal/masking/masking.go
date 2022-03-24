@@ -32,17 +32,17 @@ type Keys struct {
 
 // Mask encrypts the serverPublicKey and the envelope under nonceIn and the maskingKey.
 func Mask(
-	p *internal.Parameters,
+	conf *internal.Configuration,
 	nonceIn, maskingKey, serverPublicKey, envelope []byte,
 ) (nonce, maskedResponse []byte) {
 	// testing: integrated to support testing, to force values.
 	nonce = nonceIn
 	if len(nonce) == 0 {
-		nonce = internal.RandomBytes(p.NonceLen)
+		nonce = internal.RandomBytes(conf.NonceLen)
 	}
 
 	clear := encoding.Concat(serverPublicKey, envelope)
-	maskedResponse = p.XorResponse(maskingKey, nonce, clear)
+	maskedResponse = conf.XorResponse(maskingKey, nonce, clear)
 
 	return nonce, maskedResponse
 }
@@ -50,19 +50,19 @@ func Mask(
 // Unmask decrypts the maskedResponse and returns the server's public key and the client key on success.
 // This function assumes that maskedResponse has been checked to be of length pointLength + envelope size.
 func Unmask(
-	p *internal.Parameters,
+	conf *internal.Configuration,
 	randomizedPwd, nonce, maskedResponse []byte,
 ) (serverPublicKey *group.Point, serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
-	maskingKey := p.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), p.Hash.Size())
-	clear := p.XorResponse(maskingKey, nonce, maskedResponse)
-	serverPublicKeyBytes = clear[:encoding.PointLength[p.Group]]
-	env := clear[encoding.PointLength[p.Group]:]
+	maskingKey := conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), conf.Hash.Size())
+	clear := conf.XorResponse(maskingKey, nonce, maskedResponse)
+	serverPublicKeyBytes = clear[:encoding.PointLength[conf.Group]]
+	env := clear[encoding.PointLength[conf.Group]:]
 	envelope = &keyrecovery.Envelope{
-		Nonce:   env[:p.NonceLen],
-		AuthTag: env[p.NonceLen:],
+		Nonce:   env[:conf.NonceLen],
+		AuthTag: env[conf.NonceLen:],
 	}
 
-	serverPublicKey, err = p.Group.NewElement().Decode(serverPublicKeyBytes)
+	serverPublicKey, err = conf.Group.NewElement().Decode(serverPublicKeyBytes)
 	if err != nil {
 		return nil, nil, nil, errInvalidPKS
 	}
