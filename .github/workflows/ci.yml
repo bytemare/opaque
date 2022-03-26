@@ -23,17 +23,17 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # pin@v2
         with:
           fetch-depth: 0
       - name: Setup Go-${{ matrix.GOVER }}
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # pin@v2
         with:
           go-version: ${{ matrix.GOVER }}
 
       # Linting
       - name: Linting
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@5c56cd6c9dc07901af25baab6f2b0d9f3b7c3018 # pin@v2
         with:
           version: latest
           args: --config=./.github/.golangci.yml ./...
@@ -44,11 +44,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # pin@v2
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # pin@v2
         with:
           go-version: '1.18'
 
@@ -62,11 +62,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # pin@v2
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@bfdd3570ce990073878bf10f6b2d79082de49492 # pin@v2
         with:
           go-version: '1.18'
 
@@ -76,13 +76,13 @@ jobs:
 
       # Codecov
       - name: Codecov
-        uses: codecov/codecov-action@v1
+        uses: codecov/codecov-action@29386c70ef20e286228c72b668a06fd0e8399192 # pin@v1
         with:
           file: ./coverage.out
 
       # Sonar
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
+        uses: SonarSource/sonarcloud-github-action@25b0be1ad1c39388799624b0d0914282bc36ac8e # pin@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -90,8 +90,6 @@ jobs:
           args: >
             -Dsonar.projectKey=bytemare_opaque
             -Dsonar.organization=bytemare-github
-            -Dsonar.go.coverage.reportPaths=coverage.out
-            -Dsonar.sources=.
-            -Dsonar.test.exclusions=tests/**
-            -Dsonar.tests=tests/
+            -Dsonar.go.coverage.reportPaths=coverage.out -Dsonar.sources=.
+            -Dsonar.test.exclusions=tests/** -Dsonar.tests=tests/
             -Dsonar.verbose=true
