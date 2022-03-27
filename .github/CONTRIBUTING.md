@@ -28,10 +28,12 @@ Please note that changes that are purely cosmetic and do not add anything substa
 
 ### Coding Convention
 
-This project tries to be as Go idiomatic as possible. Conventions from [Effective Go](https://golang.org/doc/effective_go) apply here. Tests use a very opinionated linting configuration that you can use before committing to your changes.
+This project tries to be as Go idiomatic as possible. Conventions from [Effective Go](https://golang.org/doc/effective_go) apply here. Tests use a very opinionated linting configuration that you should use before committing to your changes.
 
 ### Licence
 
 By contributing to this project, you agree that your contributions will be licensed under the project's [License](https://github.com/bytemare/opaque/blob/main/LICENSE).
+
+All contributions (including pull requests) must agree to the [Developer Certificate of Origin (DCO) version 1.1](http://developercertificate.org). It states that the contributor has the right to submit the patch for inclusion into the project. Simply submitting a contribution implies this agreement, however, please include the "Signed-off-by" git tag in every commit (this tag is a conventional way to confirm that you agree to the DCO).
 
 Thanks! :heart:
