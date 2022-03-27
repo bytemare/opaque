@@ -1,6 +1,13 @@
 name: Snyk
 
-on: push
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ main ]
+  schedule:
+    - cron: '31 10 * * 0'
 
 permissions:
   contents: read
@@ -17,7 +24,3 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           args: --sarif-file-output=snyk.sarif
-      - name: Upload result to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v1 # pin@v1
-        with:
-          sarif_file: snyk.sarif
