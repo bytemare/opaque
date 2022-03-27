@@ -5,6 +5,9 @@ on: push
 permissions:
   contents: read
 
+permissions:
+  contents: read
+
 jobs:
   snyk:
     name: Snyk
