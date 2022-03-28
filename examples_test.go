@@ -15,6 +15,7 @@ import (
 	"log"
 
 	"github.com/bytemare/crypto/ksf"
+
 	"github.com/bytemare/opaque"
 )
 
@@ -305,10 +306,4 @@ func Example_loginKeyExchange() {
 	// Output: OPAQUE server values initialized.
 	// OPAQUE registration is easy!
 	// OPAQUE is much awesome!
-}
-
-func Example_deserializer() {
-	conf := opaque.DefaultConfiguration()
-
-	conf.
 }

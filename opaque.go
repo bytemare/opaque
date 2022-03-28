@@ -91,6 +91,19 @@ type Configuration struct {
 	Context []byte
 }
 
+// DefaultConfiguration returns a default configuration with strong parameters.
+func DefaultConfiguration() *Configuration {
+	return &Configuration{
+		OPRF:    RistrettoSha512,
+		KDF:     crypto.SHA512,
+		MAC:     crypto.SHA512,
+		Hash:    crypto.SHA512,
+		KSF:     ksf.Scrypt,
+		AKE:     RistrettoSha512,
+		Context: nil,
+	}
+}
+
 // Client returns a newly instantiated Client from the Configuration.
 func (c *Configuration) Client() (*Client, error) {
 	return NewClient(c)
@@ -164,6 +177,17 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 	return ip, nil
 }
 
+// Deserializer returns a pointer to a Deserializer structure allowing deserialization of messages in the given
+// configuration.
+func (c *Configuration) Deserializer() (*Deserializer, error) {
+	i, err := c.toInternal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Deserializer{i}, nil
+}
+
 // Serialize returns the byte encoding of the Configuration structure.
 func (c *Configuration) Serialize() []byte {
 	b := []byte{
@@ -204,29 +228,6 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	}
 
 	return c, err
-}
-
-// DefaultConfiguration returns a default configuration with strong parameters.
-func DefaultConfiguration() *Configuration {
-	return &Configuration{
-		OPRF:    RistrettoSha512,
-		KDF:     crypto.SHA512,
-		MAC:     crypto.SHA512,
-		Hash:    crypto.SHA512,
-		KSF:     ksf.Scrypt,
-		AKE:     RistrettoSha512,
-		Context: nil,
-	}
-}
-
-// ClientRecord is a server-side structure enabling the storage of user relevant information.
-type ClientRecord struct {
-	CredentialIdentifier []byte
-	ClientIdentity       []byte
-	*message.RegistrationRecord
-
-	// testing
-	TestMaskNonce []byte
 }
 
 // Deserializer exposes the message deserialization functions.
@@ -275,6 +276,16 @@ func (s *Deserializer) DecodeAkePrivateKey(encoded []byte) (*group.Scalar, error
 // DecodeAkePublicKey takes a serialized public key (a point) and attempts to return it's decoded form.
 func (s *Deserializer) DecodeAkePublicKey(encoded []byte) (*group.Point, error) {
 	return s.internal.Group.NewElement().Decode(encoded)
+}
+
+// ClientRecord is a server-side structure enabling the storage of user relevant information.
+type ClientRecord struct {
+	CredentialIdentifier []byte
+	ClientIdentity       []byte
+	*message.RegistrationRecord
+
+	// testing
+	TestMaskNonce []byte
 }
 
 // GetFakeEnvelope returns a byte array filled with 0s the length of a legitimate envelope size in the configuration's.
