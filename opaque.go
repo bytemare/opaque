@@ -91,6 +91,19 @@ type Configuration struct {
 	Context []byte
 }
 
+// DefaultConfiguration returns a default configuration with strong parameters.
+func DefaultConfiguration() *Configuration {
+	return &Configuration{
+		OPRF:    RistrettoSha512,
+		KDF:     crypto.SHA512,
+		MAC:     crypto.SHA512,
+		Hash:    crypto.SHA512,
+		KSF:     ksf.Scrypt,
+		AKE:     RistrettoSha512,
+		Context: nil,
+	}
+}
+
 // Client returns a newly instantiated Client from the Configuration.
 func (c *Configuration) Client() (*Client, error) {
 	return NewClient(c)
@@ -164,6 +177,17 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 	return ip, nil
 }
 
+// Deserializer returns a pointer to a Deserializer structure allowing deserialization of messages in the given
+// configuration.
+func (c *Configuration) Deserializer() (*Deserializer, error) {
+	conf, err := c.toInternal()
+	if err != nil {
+		return nil, err
+	}
+
+	return &Deserializer{conf: conf}, nil
+}
+
 // Serialize returns the byte encoding of the Configuration structure.
 func (c *Configuration) Serialize() []byte {
 	b := []byte{
@@ -206,19 +230,6 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	return c, err
 }
 
-// DefaultConfiguration returns a default configuration with strong parameters.
-func DefaultConfiguration() *Configuration {
-	return &Configuration{
-		OPRF:    RistrettoSha512,
-		KDF:     crypto.SHA512,
-		MAC:     crypto.SHA512,
-		Hash:    crypto.SHA512,
-		KSF:     ksf.Scrypt,
-		AKE:     RistrettoSha512,
-		Context: nil,
-	}
-}
-
 // ClientRecord is a server-side structure enabling the storage of user relevant information.
 type ClientRecord struct {
 	CredentialIdentifier []byte
@@ -227,54 +238,6 @@ type ClientRecord struct {
 
 	// testing
 	TestMaskNonce []byte
-}
-
-// Deserializer exposes the message deserialization functions.
-type Deserializer struct {
-	internal *internal.Configuration
-}
-
-// RegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized
-// RegistrationRequest structure.
-func (s *Deserializer) RegistrationRequest(registrationRequest []byte) (*message.RegistrationRequest, error) {
-	return s.internal.DeserializeRegistrationRequest(registrationRequest)
-}
-
-// RegistrationResponse takes a serialized RegistrationResponse message and returns a deserialized
-// RegistrationResponse structure.
-func (s *Deserializer) RegistrationResponse(registrationResponse []byte) (*message.RegistrationResponse, error) {
-	return s.internal.DeserializeRegistrationResponse(registrationResponse)
-}
-
-// RegistrationRecord takes a serialized RegistrationRecord message and returns a deserialized
-// RegistrationRecord structure.
-func (s *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationRecord, error) {
-	return s.internal.DeserializeRegistrationRecord(record)
-}
-
-// KE1 takes a serialized KE1 message and returns a deserialized KE1 structure.
-func (s *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
-	return s.internal.DeserializeKE1(ke1)
-}
-
-// KE2 takes a serialized KE2 message and returns a deserialized KE2 structure.
-func (s *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
-	return s.internal.DeserializeKE2(ke2)
-}
-
-// KE3 takes a serialized KE3 message and returns a deserialized KE3 structure.
-func (s *Deserializer) KE3(ke3 []byte) (*message.KE3, error) {
-	return s.internal.DeserializeKE3(ke3)
-}
-
-// DecodeAkePrivateKey takes a serialized private key (a scalar) and attempts to return it's decoded form.
-func (s *Deserializer) DecodeAkePrivateKey(encoded []byte) (*group.Scalar, error) {
-	return s.internal.Group.NewScalar().Decode(encoded)
-}
-
-// DecodeAkePublicKey takes a serialized public key (a point) and attempts to return it's decoded form.
-func (s *Deserializer) DecodeAkePublicKey(encoded []byte) (*group.Point, error) {
-	return s.internal.Group.NewElement().Decode(encoded)
 }
 
 // GetFakeEnvelope returns a byte array filled with 0s the length of a legitimate envelope size in the configuration's.

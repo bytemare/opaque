@@ -18,7 +18,6 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/keyrecovery"
 	"github.com/bytemare/opaque/internal/masking"
-	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
@@ -29,7 +28,7 @@ var (
 	errInvalidMaskedLength = errors.New("invalid masked response length")
 
 	// errKe1Missing happens when LoginFinish is called and the client has no Ke1 in state.
-	errKe1Missing = errors.New("missing KE1 in client")
+	errKe1Missing = errors.New("missing KE1 in client state")
 )
 
 // Client represents an OPAQUE Client, exposing its functions and holding its state.
@@ -54,7 +53,7 @@ func NewClient(c *Configuration) (*Client, error) {
 	return &Client{
 		OPRF:        conf.OPRF.Client(),
 		Ake:         ake.NewClient(),
-		Deserialize: &Deserializer{conf},
+		Deserialize: &Deserializer{conf: conf},
 		conf:        conf,
 	}, nil
 }
@@ -83,27 +82,27 @@ func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest 
 // This function is primarily used for testing purposes and will most probably be removed at some point.
 func (c *Client) RegistrationFinalizeWithNonce(
 	resp *message.RegistrationResponse,
-	idc, ids, envelopeNonce []byte,
+	clientIdentity, serverIdentity, envelopeNonce []byte,
 ) (upload *message.RegistrationRecord, exportKey []byte) {
-	return c.registrationFinalize(idc, ids, envelopeNonce, resp)
+	return c.registrationFinalize(clientIdentity, serverIdentity, envelopeNonce, resp)
 }
 
 // RegistrationFinalize returns a RegistrationRecord message given the identities and the server's RegistrationResponse.
 func (c *Client) RegistrationFinalize(
 	resp *message.RegistrationResponse,
-	idc, ids []byte,
-) (upload *message.RegistrationRecord, exportKey []byte) {
-	return c.registrationFinalize(idc, ids, nil, resp)
+	clientIdentity, serverIdentity []byte,
+) (record *message.RegistrationRecord, exportKey []byte) {
+	return c.registrationFinalize(clientIdentity, serverIdentity, nil, resp)
 }
 
 func (c *Client) registrationFinalize(
-	idc, ids, envelopeNonce []byte,
+	clientIdentity, serverIdentity, envelopeNonce []byte,
 	resp *message.RegistrationResponse,
 ) (upload *message.RegistrationRecord, exportKey []byte) {
 	creds2 := &keyrecovery.Credentials{
-		Idc:           idc,
-		Ids:           ids,
-		EnvelopeNonce: envelopeNonce,
+		ClientIdentity: clientIdentity,
+		ServerIdentity: serverIdentity,
+		EnvelopeNonce:  envelopeNonce,
 	}
 
 	// this check is very important: it verifies the server's public key validity in the group.
@@ -113,7 +112,7 @@ func (c *Client) registrationFinalize(
 
 	randomizedPwd := c.buildPRK(resp.EvaluatedMessage)
 	maskingKey := c.conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.conf.KDF.Size())
-	envU, clientPublicKey, exportKey := keyrecovery.Store(
+	envelope, clientPublicKey, exportKey := keyrecovery.Store(
 		c.conf,
 		randomizedPwd,
 		encoding.SerializePoint(resp.Pks, c.conf.Group),
@@ -123,7 +122,7 @@ func (c *Client) registrationFinalize(
 	return &message.RegistrationRecord{
 		PublicKey:  clientPublicKey,
 		MaskingKey: maskingKey,
-		Envelope:   envU.Serialize(),
+		Envelope:   envelope.Serialize(),
 	}, exportKey
 }
 
@@ -131,7 +130,7 @@ func (c *Client) registrationFinalize(
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) LoginInit(password []byte) *message.KE1 {
 	m := c.OPRF.Blind(password)
-	credReq := &cred.CredentialRequest{BlindedMessage: m}
+	credReq := &message.CredentialRequest{BlindedMessage: m}
 	ke1 := c.Ake.Start(c.conf.Group)
 	ke1.CredentialRequest = credReq
 	c.Ake.Ke1 = ke1.Serialize()
@@ -141,7 +140,10 @@ func (c *Client) LoginInit(password []byte) *message.KE1 {
 
 // LoginFinish returns a KE3 message given the server's KE2 response message and the identities. If the idc
 // or ids parameters are nil, the client and server's public keys are taken as identities for both.
-func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE3, exportKey []byte, err error) {
+func (c *Client) LoginFinish(
+	clientIdentity, serverIdentity []byte,
+	ke2 *message.KE2,
+) (ke3 *message.KE3, exportKey []byte, err error) {
 	if len(c.Ake.Ke1) == 0 {
 		return nil, nil, errKe1Missing
 	}
@@ -163,21 +165,27 @@ func (c *Client) LoginFinish(idc, ids []byte, ke2 *message.KE2) (ke3 *message.KE
 
 	// Recover the client keys.
 	clientSecretKey, clientPublicKey,
-		exportKey, err := keyrecovery.Recover(c.conf, randomizedPwd, serverPublicKeyBytes, idc, ids, envelope)
+		exportKey, err := keyrecovery.Recover(
+		c.conf,
+		randomizedPwd,
+		serverPublicKeyBytes,
+		clientIdentity,
+		serverIdentity,
+		envelope)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	// Finalize the AKE.
-	if idc == nil {
-		idc = encoding.SerializePoint(clientPublicKey, c.conf.Group)
+	if clientIdentity == nil {
+		clientIdentity = encoding.SerializePoint(clientPublicKey, c.conf.Group)
 	}
 
-	if ids == nil {
-		ids = serverPublicKeyBytes
+	if serverIdentity == nil {
+		serverIdentity = serverPublicKeyBytes
 	}
 
-	ke3, err = c.Ake.Finalize(c.conf, idc, clientSecretKey, ids, serverPublicKey, ke2)
+	ke3, err = c.Ake.Finalize(c.conf, clientIdentity, clientSecretKey, serverIdentity, serverPublicKey, ke2)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -15,7 +15,6 @@ import (
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
-	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -38,8 +37,8 @@ func NewServer() *Server {
 
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
-func (s *Server) SetValues(id group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Point {
-	es, nonce := setValues(id, esk, nonce, nonceLen)
+func (s *Server) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Point {
+	es, nonce := setValues(g, esk, nonce, nonceLen)
 	if s.esk == nil || (esk != nil && s.esk != es) {
 		s.esk = es
 	}
@@ -48,7 +47,7 @@ func (s *Server) SetValues(id group.Group, esk *group.Scalar, nonce []byte, nonc
 		s.nonceS = nonce
 	}
 
-	return id.Base().Mult(s.esk)
+	return g.Base().Mult(s.esk)
 }
 
 // Response produces a 3DH server response message.
@@ -59,7 +58,7 @@ func (s *Server) Response(
 	clientIdentity []byte,
 	clientPublicKey *group.Point,
 	ke1 *message.KE1,
-	response *cred.CredentialResponse,
+	response *message.CredentialResponse,
 ) *message.KE2 {
 	epk := s.SetValues(conf.Group, nil, nil, conf.NonceLen)
 
