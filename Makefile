@@ -22,16 +22,15 @@ fmt:
 	@gofumpt -w -extra .
 	@gci write --Section Standard --Section Default --Section "Prefix($(shell go list -m))" .
 
-.PHONY: lint
-
-lint:
-	@echo "Linting ..."
-	@if golangci-lint run --config=./.github/.golangci.yml ./...; then echo "Linting OK"; else return 1; fi;
-
 .PHONY: license
 license:
 	@echo "Checking License headers ..."
 	@if addlicense -check -v -f .github/licence-header.tmpl *; then echo "License headers OK"; else return 1; fi;
+
+.PHONY: lint
+lint: license
+	@echo "Linting ..."
+	@if golangci-lint run --config=./.github/.golangci.yml ./...; then echo "Linting OK"; else return 1; fi;
 
 .PHONY: test
 test:
