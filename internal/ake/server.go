@@ -38,8 +38,8 @@ func NewServer() *Server {
 
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
-func (s *Server) SetValues(id group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Point {
-	es, nonce := setValues(id, esk, nonce, nonceLen)
+func (s *Server) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Point {
+	es, nonce := setValues(g, esk, nonce, nonceLen)
 	if s.esk == nil || (esk != nil && s.esk != es) {
 		s.esk = es
 	}
@@ -48,7 +48,7 @@ func (s *Server) SetValues(id group.Group, esk *group.Scalar, nonce []byte, nonc
 		s.nonceS = nonce
 	}
 
-	return id.Base().Mult(s.esk)
+	return g.Base().Mult(s.esk)
 }
 
 // Response produces a 3DH server response message.

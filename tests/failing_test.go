@@ -293,13 +293,13 @@ func getBad25519Scalar() []byte {
 	return decoded
 }
 
-func badScalar(t *testing.T, ci group.Group, curve elliptic.Curve) []byte {
+func badScalar(t *testing.T, g group.Group, curve elliptic.Curve) []byte {
 	order := curve.Params().P
 	exceeded := new(big.Int).Add(order, big.NewInt(2)).Bytes()
 
-	_, err := ci.NewScalar().Decode(exceeded)
+	_, err := g.NewScalar().Decode(exceeded)
 	if err == nil {
-		t.Errorf("Exceeding order did not yield an error for group %s", ci)
+		t.Errorf("Exceeding order did not yield an error for group %s", g)
 	}
 
 	return exceeded

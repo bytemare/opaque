@@ -23,8 +23,8 @@ var errEnvelopeInvalidMac = errors.New("recover envelope: invalid envelope authe
 
 // Credentials structure is currently used for testing purposes.
 type Credentials struct {
-	Idc, Ids                    []byte
-	EnvelopeNonce, MaskingNonce []byte // testing: integrated to support testing
+	ClientIdentity, ServerIdentity []byte
+	EnvelopeNonce, MaskingNonce    []byte // testing: integrated to support testing
 }
 
 // Envelope represents the OPAQUE envelope.
@@ -48,16 +48,20 @@ func authTag(conf *internal.Configuration, randomizedPwd, nonce, ctc []byte) []b
 }
 
 // cleartextCredentials assumes that clientPublicKey, serverPublicKey are non-nil valid group elements.
-func cleartextCredentials(clientPublicKey, serverPublicKey, idc, ids []byte) []byte {
-	if ids == nil {
-		ids = serverPublicKey
+func cleartextCredentials(clientPublicKey, serverPublicKey, clientIdentity, serverIdentity []byte) []byte {
+	if clientIdentity == nil {
+		clientIdentity = clientPublicKey
 	}
 
-	if idc == nil {
-		idc = clientPublicKey
+	if serverIdentity == nil {
+		serverIdentity = serverPublicKey
 	}
 
-	return encoding.Concat3(serverPublicKey, encoding.EncodeVector(ids), encoding.EncodeVector(idc))
+	return encoding.Concat3(
+		serverPublicKey,
+		encoding.EncodeVector(clientIdentity),
+		encoding.EncodeVector(serverIdentity),
+	)
 }
 
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
@@ -73,8 +77,12 @@ func Store(
 	}
 
 	pku = getPubkey(conf, randomizedPwd, nonce)
-
-	ctc := cleartextCredentials(encoding.SerializePoint(pku, conf.Group), serverPublicKey, creds.Idc, creds.Ids)
+	ctc := cleartextCredentials(
+		encoding.SerializePoint(pku, conf.Group),
+		serverPublicKey,
+		creds.ClientIdentity,
+		creds.ServerIdentity,
+	)
 	auth := authTag(conf, randomizedPwd, nonce, ctc)
 	export = exportKey(conf, randomizedPwd, nonce)
 
@@ -86,14 +94,19 @@ func Store(
 	return env, pku, export
 }
 
-// Recover assumes that the envelope's inner envelope has been previously checked to be of correct size.
+// Recover returns the client's private and public key, as well as the secret export key.
 func Recover(
 	conf *internal.Configuration,
-	randomizedPwd, serverPublicKey, idc, ids []byte,
+	randomizedPwd, serverPublicKey, clientIdentity, serverIdentity []byte,
 	envelope *Envelope,
 ) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, export []byte, err error) {
 	clientSecretKey, clientPublicKey = recoverKeys(conf, randomizedPwd, envelope.Nonce)
-	ctc := cleartextCredentials(encoding.SerializePoint(clientPublicKey, conf.Group), serverPublicKey, idc, ids)
+	ctc := cleartextCredentials(
+		encoding.SerializePoint(clientPublicKey, conf.Group),
+		serverPublicKey,
+		clientIdentity,
+		serverIdentity,
+	)
 
 	expectedTag := authTag(conf, randomizedPwd, envelope.Nonce, ctc)
 	if !conf.MAC.Equal(expectedTag, envelope.AuthTag) {
