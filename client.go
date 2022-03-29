@@ -18,7 +18,6 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/keyrecovery"
 	"github.com/bytemare/opaque/internal/masking"
-	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
@@ -54,7 +53,7 @@ func NewClient(c *Configuration) (*Client, error) {
 	return &Client{
 		OPRF:        conf.OPRF.Client(),
 		Ake:         ake.NewClient(),
-		Deserialize: &Deserializer{conf},
+		Deserialize: &Deserializer{conf: conf},
 		conf:        conf,
 	}, nil
 }
@@ -131,7 +130,7 @@ func (c *Client) registrationFinalize(
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) LoginInit(password []byte) *message.KE1 {
 	m := c.OPRF.Blind(password)
-	credReq := &cred.CredentialRequest{BlindedMessage: m}
+	credReq := &message.CredentialRequest{BlindedMessage: m}
 	ke1 := c.Ake.Start(c.conf.Group)
 	ke1.CredentialRequest = credReq
 	c.Ake.Ke1 = ke1.Serialize()

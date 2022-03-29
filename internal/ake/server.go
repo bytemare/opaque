@@ -15,7 +15,6 @@ import (
 	"github.com/bytemare/crypto/group"
 
 	"github.com/bytemare/opaque/internal"
-	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -59,7 +58,7 @@ func (s *Server) Response(
 	clientIdentity []byte,
 	clientPublicKey *group.Point,
 	ke1 *message.KE1,
-	response *cred.CredentialResponse,
+	response *message.CredentialResponse,
 ) *message.KE2 {
 	epk := s.SetValues(conf.Group, nil, nil, conf.NonceLen)
 

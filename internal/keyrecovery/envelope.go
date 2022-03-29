@@ -59,8 +59,8 @@ func cleartextCredentials(clientPublicKey, serverPublicKey, clientIdentity, serv
 
 	return encoding.Concat3(
 		serverPublicKey,
-		encoding.EncodeVector(clientIdentity),
 		encoding.EncodeVector(serverIdentity),
+		encoding.EncodeVector(clientIdentity),
 	)
 }
 

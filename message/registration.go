@@ -32,7 +32,7 @@ type RegistrationResponse struct {
 	C                oprf.Ciphersuite
 	G                group.Group
 	EvaluatedMessage *group.Point `json:"evaluated_message"`
-	Pks              *group.Point `json:"pks"`
+	Pks              *group.Point `json:"server_public_key"`
 }
 
 // Serialize returns the byte encoding of RegistrationResponse.
@@ -43,9 +43,9 @@ func (r *RegistrationResponse) Serialize() []byte {
 // RegistrationRecord represents the client record sent as the last registration message by the client to the server.
 type RegistrationRecord struct {
 	G          group.Group
-	PublicKey  *group.Point `json:"pku"`
-	MaskingKey []byte       `json:"msk"`
-	Envelope   []byte       `json:"env"`
+	PublicKey  *group.Point `json:"client_public_key"`
+	MaskingKey []byte       `json:"making_key"`
+	Envelope   []byte       `json:"envelope"`
 }
 
 // Serialize returns the byte encoding of RegistrationRecord.

@@ -18,7 +18,6 @@ import (
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/masking"
-	cred "github.com/bytemare/opaque/internal/message"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
@@ -68,7 +67,7 @@ func NewServer(c *Configuration) (*Server, error) {
 	}
 
 	return &Server{
-		Deserialize: &Deserializer{conf},
+		Deserialize: &Deserializer{conf: conf},
 		conf:        conf,
 		Ake:         ake.NewServer(),
 	}, nil
@@ -107,11 +106,11 @@ func (s *Server) RegistrationResponse(
 }
 
 func (s *Server) credentialResponse(
-	req *cred.CredentialRequest,
+	req *message.CredentialRequest,
 	serverPublicKey []byte,
 	record *message.RegistrationRecord,
 	credentialIdentifier, oprfSeed, maskingNonce []byte,
-) *cred.CredentialResponse {
+) *message.CredentialResponse {
 	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
 
 	maskingNonce, maskedResponse := masking.Mask(
@@ -122,7 +121,7 @@ func (s *Server) credentialResponse(
 		record.Envelope,
 	)
 
-	return &cred.CredentialResponse{
+	return &message.CredentialResponse{
 		EvaluatedMessage: z,
 		MaskingNonce:     maskingNonce,
 		MaskedResponse:   maskedResponse,

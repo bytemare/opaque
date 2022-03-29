@@ -180,12 +180,12 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 // Deserializer returns a pointer to a Deserializer structure allowing deserialization of messages in the given
 // configuration.
 func (c *Configuration) Deserializer() (*Deserializer, error) {
-	i, err := c.toInternal()
+	conf, err := c.toInternal()
 	if err != nil {
 		return nil, err
 	}
 
-	return &Deserializer{i}, nil
+	return &Deserializer{conf: conf}, nil
 }
 
 // Serialize returns the byte encoding of the Configuration structure.
@@ -228,54 +228,6 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	}
 
 	return c, err
-}
-
-// Deserializer exposes the message deserialization functions.
-type Deserializer struct {
-	internal *internal.Configuration
-}
-
-// RegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized
-// RegistrationRequest structure.
-func (s *Deserializer) RegistrationRequest(registrationRequest []byte) (*message.RegistrationRequest, error) {
-	return s.internal.DeserializeRegistrationRequest(registrationRequest)
-}
-
-// RegistrationResponse takes a serialized RegistrationResponse message and returns a deserialized
-// RegistrationResponse structure.
-func (s *Deserializer) RegistrationResponse(registrationResponse []byte) (*message.RegistrationResponse, error) {
-	return s.internal.DeserializeRegistrationResponse(registrationResponse)
-}
-
-// RegistrationRecord takes a serialized RegistrationRecord message and returns a deserialized
-// RegistrationRecord structure.
-func (s *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationRecord, error) {
-	return s.internal.DeserializeRegistrationRecord(record)
-}
-
-// KE1 takes a serialized KE1 message and returns a deserialized KE1 structure.
-func (s *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
-	return s.internal.DeserializeKE1(ke1)
-}
-
-// KE2 takes a serialized KE2 message and returns a deserialized KE2 structure.
-func (s *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
-	return s.internal.DeserializeKE2(ke2)
-}
-
-// KE3 takes a serialized KE3 message and returns a deserialized KE3 structure.
-func (s *Deserializer) KE3(ke3 []byte) (*message.KE3, error) {
-	return s.internal.DeserializeKE3(ke3)
-}
-
-// DecodeAkePrivateKey takes a serialized private key (a scalar) and attempts to return it's decoded form.
-func (s *Deserializer) DecodeAkePrivateKey(encoded []byte) (*group.Scalar, error) {
-	return s.internal.Group.NewScalar().Decode(encoded)
-}
-
-// DecodeAkePublicKey takes a serialized public key (a point) and attempts to return it's decoded form.
-func (s *Deserializer) DecodeAkePublicKey(encoded []byte) (*group.Point, error) {
-	return s.internal.Group.NewElement().Decode(encoded)
 }
 
 // ClientRecord is a server-side structure enabling the storage of user relevant information.
