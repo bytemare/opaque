@@ -10,6 +10,7 @@ package opaque
 
 import (
 	"errors"
+	"log"
 
 	"github.com/bytemare/crypto/group"
 
@@ -174,6 +175,7 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 	}
 
 	return &message.KE1{
+		G: d.conf.Group,
 		CredentialRequest: &message.CredentialRequest{
 			C:              d.conf.OPRF,
 			BlindedMessage: blindedMessage,
@@ -221,7 +223,10 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 		return nil, errInvalidServerEPK
 	}
 
+	log.Printf("group %v", d.conf.Group)
+
 	return &message.KE2{
+		G:                  d.conf.Group,
 		CredentialResponse: cresp,
 		NonceS:             nonceS,
 		EpkS:               epks,

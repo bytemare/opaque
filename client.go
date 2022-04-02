@@ -74,7 +74,10 @@ func (c *Client) buildPRK(evaluation *group.Point) []byte {
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
 func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest {
 	m := c.OPRF.Blind(password)
-	return &message.RegistrationRequest{BlindedMessage: m}
+	return &message.RegistrationRequest{
+		C:              c.conf.OPRF,
+		BlindedMessage: m,
+	}
 }
 
 // RegistrationFinalizeWithNonce returns a RegistrationRecord message given the identities, server's
@@ -120,6 +123,7 @@ func (c *Client) registrationFinalize(
 	)
 
 	return &message.RegistrationRecord{
+		G:          c.conf.Group,
 		PublicKey:  clientPublicKey,
 		MaskingKey: maskingKey,
 		Envelope:   envelope.Serialize(),
@@ -130,7 +134,10 @@ func (c *Client) registrationFinalize(
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) LoginInit(password []byte) *message.KE1 {
 	m := c.OPRF.Blind(password)
-	credReq := &message.CredentialRequest{BlindedMessage: m}
+	credReq := &message.CredentialRequest{
+		C:              c.conf.OPRF,
+		BlindedMessage: m,
+	}
 	ke1 := c.Ake.Start(c.conf.Group)
 	ke1.CredentialRequest = credReq
 	c.Ake.Ke1 = ke1.Serialize()

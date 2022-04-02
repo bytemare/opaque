@@ -63,6 +63,7 @@ func (s *Server) Response(
 	epk := s.SetValues(conf.Group, nil, nil, conf.NonceLen)
 
 	ke2 := &message.KE2{
+		G:                  conf.Group,
 		CredentialResponse: response,
 		NonceS:             s.nonceS,
 		EpkS:               epk,

@@ -53,6 +53,7 @@ func (c *Client) Start(cs group.Group) *message.KE1 {
 	epk := c.SetValues(cs, nil, nil, 32)
 
 	return &message.KE1{
+		G:      cs,
 		NonceU: c.nonceU,
 		EpkU:   epk,
 	}

@@ -58,13 +58,13 @@ func SerializeScalar(s *group.Scalar, g group.Group) []byte {
 }
 
 // SerializePoint pads the given element if necessary.
-func SerializePoint(e *group.Point, g group.Group) []byte {
-	return PadPoint(e.Bytes(), g)
-}
+func SerializePoint(p *group.Point, g group.Group) []byte {
+	length, ok := PointLength[g]
+	if !ok {
+		panic("invalid group identifier")
+	}
 
-// PadPoint pads the encoded element if necessary.
-func PadPoint(point []byte, g group.Group) []byte {
-	length := PointLength[g]
+	point := p.Bytes()
 
 	for len(point) < length {
 		point = append([]byte{0x00}, point...)

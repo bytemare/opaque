@@ -100,6 +100,7 @@ func (s *Server) RegistrationResponse(
 
 	return &message.RegistrationResponse{
 		C:                s.conf.OPRF,
+		G:                s.conf.Group,
 		EvaluatedMessage: z,
 		Pks:              serverPublicKey,
 	}
@@ -122,6 +123,7 @@ func (s *Server) credentialResponse(
 	)
 
 	return &message.CredentialResponse{
+		C:                s.conf.OPRF,
 		EvaluatedMessage: z,
 		MaskingNonce:     maskingNonce,
 		MaskedResponse:   maskedResponse,
