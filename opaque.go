@@ -57,11 +57,11 @@ const (
 )
 
 var (
+	errInvalidOPRFid = errors.New("invalid OPRF group id")
 	errInvalidKDFid  = errors.New("invalid KDF id")
 	errInvalidMACid  = errors.New("invalid MAC id")
 	errInvalidHASHid = errors.New("invalid Hash id")
 	errInvalidKSFid  = errors.New("invalid KSF id")
-	errInvalidOPRFid = errors.New("invalid OPRF group id")
 	errInvalidAKEid  = errors.New("invalid AKE group id")
 )
 
@@ -124,8 +124,12 @@ func (c *Configuration) KeyGen() (secretKey, publicKey []byte) {
 	return ake.KeyGen(group.Group(c.AKE))
 }
 
-// verify returns an error on the first non-compliant parameter, ni otherwise.
+// verify returns an error on the first non-compliant parameter, nil otherwise.
 func (c *Configuration) verify() error {
+	if !oprf.Ciphersuite(c.OPRF).Available() {
+		return errInvalidOPRFid
+	}
+
 	if !hash.Hashing(c.KDF).Available() {
 		return errInvalidKDFid
 	}
@@ -140,10 +144,6 @@ func (c *Configuration) verify() error {
 
 	if c.KSF != 0 && !c.KSF.Available() {
 		return errInvalidKSFid
-	}
-
-	if !oprf.Ciphersuite(c.OPRF).Available() {
-		return errInvalidOPRFid
 	}
 
 	if !group.Group(c.AKE).Available() {
@@ -223,11 +223,11 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		Context: ctx,
 	}
 
-	if _err := c.verify(); err != nil {
-		return nil, _err
+	if err = c.verify(); err != nil {
+		return nil, err
 	}
 
-	return c, err
+	return c, nil
 }
 
 // ClientRecord is a server-side structure enabling the storage of user relevant information.
