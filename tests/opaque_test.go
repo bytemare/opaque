@@ -10,10 +10,19 @@ package opaque_test
 
 import (
 	"bytes"
+	"crypto"
+	"errors"
+	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/bytemare/crypto/group"
+	"github.com/bytemare/crypto/ksf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/oprf"
 )
 
 const dbgErr = "%v"
@@ -197,4 +206,162 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	}
 
 	return exportKeyLogin
+}
+
+/*
+	The following tests look for failing conditions.
+*/
+
+func TestNilConfiguration(t *testing.T) {
+	def := opaque.DefaultConfiguration()
+	g := group.Group(def.AKE)
+	defaultConfiguration := &internal.Configuration{
+		KDF:             internal.NewKDF(def.KDF),
+		MAC:             internal.NewMac(def.MAC),
+		Hash:            internal.NewHash(def.Hash),
+		KSF:             internal.NewKSF(def.KSF),
+		NonceLen:        internal.NonceLength,
+		OPRFPointLength: encoding.PointLength[g],
+		AkePointLength:  encoding.PointLength[g],
+		Group:           g,
+		OPRF:            oprf.Ciphersuite(g),
+		Context:         def.Context,
+	}
+
+	s, _ := opaque.NewServer(nil)
+	if reflect.DeepEqual(s.GetConf(), defaultConfiguration) {
+		t.Errorf("server did not default to correct configuration")
+	}
+
+	c, _ := opaque.NewClient(nil)
+	if reflect.DeepEqual(c.GetConf(), defaultConfiguration) {
+		t.Errorf("client did not default to correct configuration")
+	}
+}
+
+func TestDeserializeConfiguration_Short(t *testing.T) {
+	r9 := internal.RandomBytes(7)
+
+	if _, err := opaque.DeserializeConfiguration(r9); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
+		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r9. want %q, got %q",
+			internal.ErrConfigurationInvalidLength, err)
+	}
+}
+
+func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
+	d := opaque.DefaultConfiguration().Serialize()
+	d[7] = 3
+
+	expected := "decoding the configuration context: "
+	if _, err := opaque.DeserializeConfiguration(d); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		t.Errorf(
+			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
+			expected,
+			err,
+		)
+	}
+}
+
+func TestBadConfiguration(t *testing.T) {
+	setBadValue := func(pos, val int) []byte {
+		b := opaque.DefaultConfiguration().Serialize()
+		b[pos] = byte(val)
+		return b
+	}
+
+	tests := []struct {
+		name    string
+		makeBad func() []byte
+		error   string
+	}{
+		{
+			name: "Bad OPRF",
+			makeBad: func() []byte {
+				return setBadValue(0, 0)
+			},
+			error: "invalid OPRF group id",
+		},
+		{
+			name: "Bad KDF",
+			makeBad: func() []byte {
+				return setBadValue(1, 0)
+			},
+			error: "invalid KDF id",
+		},
+		{
+			name: "Bad MAC",
+			makeBad: func() []byte {
+				return setBadValue(2, 0)
+			},
+			error: "invalid MAC id",
+		},
+		{
+			name: "Bad Hash",
+			makeBad: func() []byte {
+				return setBadValue(3, 0)
+			},
+			error: "invalid Hash id",
+		},
+		{
+			name: "Bad KSF",
+			makeBad: func() []byte {
+				return setBadValue(4, 10)
+			},
+			error: "invalid KSF id",
+		},
+		{
+			name: "Bad AKE",
+			makeBad: func() []byte {
+				return setBadValue(5, 0)
+			},
+			error: "invalid AKE group id",
+		},
+	}
+
+	convertToBadConf := func(encoded []byte) *opaque.Configuration {
+		return &opaque.Configuration{
+			OPRF:    opaque.Group(encoded[0]),
+			KDF:     crypto.Hash(encoded[1]),
+			MAC:     crypto.Hash(encoded[2]),
+			Hash:    crypto.Hash(encoded[3]),
+			KSF:     ksf.Identifier(encoded[4]),
+			AKE:     opaque.Group(encoded[5]),
+			Context: encoded[5:],
+		}
+	}
+
+	for _, badConf := range tests {
+		t.Run(badConf.name, func(t *testing.T) {
+			// Test Deserialization for bad conf
+			badEncoded := badConf.makeBad()
+			_, err := opaque.DeserializeConfiguration(badEncoded)
+			if err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+				t.Fatalf(
+					"Expected error for %s. Want %q, got %q.\n\tEncoded: %v",
+					badConf.name,
+					badConf.error,
+					err,
+					badEncoded,
+				)
+			}
+
+			// Test bad configuration for client, server, and deserializer setup
+			bad := convertToBadConf(badEncoded)
+
+			_, err = bad.Client()
+			if err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+				t.Fatalf("Expected error for %s / client. Want %q, got %q", badConf.name, badConf.error, err)
+			}
+
+			_, err = bad.Server()
+			if err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+				t.Fatalf("Expected error for %s / server. Want %q, got %q", badConf.name, badConf.error, err)
+			}
+
+			_, err = bad.Deserializer()
+			if err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+				t.Fatalf("Expected error for %s / deserializer. Want %q, got %q", badConf.name, badConf.error, err)
+			}
+		})
+	}
 }

@@ -1,0 +1,215 @@
+// SPDX-License-Identifier: MIT
+//
+// Copyright (C) 2021 Daniel Bourdrez. All Rights Reserved.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree or at
+// https://spdx.org/licenses/MIT.html
+
+package opaque_test
+
+import (
+	"crypto"
+	"crypto/elliptic"
+	"encoding/hex"
+	"fmt"
+	"math/big"
+	"testing"
+
+	"github.com/bytemare/crypto/group"
+	"github.com/bytemare/crypto/ksf"
+
+	"github.com/bytemare/opaque"
+	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/keyrecovery"
+	"github.com/bytemare/opaque/internal/oprf"
+	"github.com/bytemare/opaque/internal/tag"
+	"github.com/bytemare/opaque/message"
+)
+
+// helper functions
+
+type configuration struct {
+	Conf  *opaque.Configuration
+	Curve elliptic.Curve
+}
+
+var confs = []configuration{
+	{
+		Conf:  opaque.DefaultConfiguration(),
+		Curve: nil,
+	},
+	{
+		Conf: &opaque.Configuration{
+			OPRF: opaque.P256Sha256,
+			KDF:  crypto.SHA256,
+			MAC:  crypto.SHA256,
+			Hash: crypto.SHA256,
+			KSF:  ksf.Scrypt,
+			AKE:  opaque.P256Sha256,
+		},
+		Curve: elliptic.P256(),
+	},
+	{
+		Conf: &opaque.Configuration{
+			OPRF: opaque.P384Sha512,
+			KDF:  crypto.SHA512,
+			MAC:  crypto.SHA512,
+			Hash: crypto.SHA512,
+			KSF:  ksf.Scrypt,
+			AKE:  opaque.P384Sha512,
+		},
+		Curve: elliptic.P384(),
+	},
+	{
+		Conf: &opaque.Configuration{
+			OPRF: opaque.P521Sha512,
+			KDF:  crypto.SHA512,
+			MAC:  crypto.SHA512,
+			Hash: crypto.SHA512,
+			KSF:  ksf.Scrypt,
+			AKE:  opaque.P521Sha512,
+		},
+		Curve: elliptic.P521(),
+	},
+	//{
+	//	Conf: &opaque.Configuration{
+	//		OPRF: opaque.RistrettoSha512,
+	//		KDF:  crypto.SHA512,
+	//		MAC:  crypto.SHA512,
+	//		Hash: crypto.SHA512,
+	//		KSF:  ksf.Scrypt,
+	//		Mode: opaque.Internal,
+	//		AKE:  opaque.Curve25519Sha512,
+	//	},
+	//	Curve: nil,
+	//},
+}
+
+func getBadRistrettoScalar() []byte {
+	a := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	decoded, _ := hex.DecodeString(a)
+
+	return decoded
+}
+
+func getBadRistrettoElement() []byte {
+	a := "2a292df7e32cababbd9de088d1d1abec9fc0440f637ed2fba145094dc14bea08"
+	decoded, _ := hex.DecodeString(a)
+
+	return decoded
+}
+
+func getBad25519Element() []byte {
+	a := "efffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"
+	decoded, _ := hex.DecodeString(a)
+
+	return decoded
+}
+
+func getBad25519Scalar() []byte {
+	a := "ecd3f55c1a631258d69cf7a2def9de1400000000000000000000000000000011"
+	decoded, _ := hex.DecodeString(a)
+
+	return decoded
+}
+
+func badScalar(t *testing.T, g group.Group, curve elliptic.Curve) []byte {
+	order := curve.Params().P
+	exceeded := new(big.Int).Add(order, big.NewInt(2)).Bytes()
+
+	_, err := g.NewScalar().Decode(exceeded)
+	if err == nil {
+		t.Errorf("Exceeding order did not yield an error for group %s", g)
+	}
+
+	return exceeded
+}
+
+func getBadNistElement(t *testing.T, id group.Group) []byte {
+	size := encoding.PointLength[id]
+	element := internal.RandomBytes(size)
+	// detag compression
+	element[0] = 4
+
+	// test if invalid compression is detected
+	_, err := id.NewElement().Decode(element)
+	if err == nil {
+		t.Errorf("detagged compressed point did not yield an error for group %s", id)
+	}
+
+	return element
+}
+
+func getBadElement(t *testing.T, c configuration) []byte {
+	switch c.Conf.AKE {
+	case opaque.RistrettoSha512:
+		return getBadRistrettoElement()
+	// case opaque.Curve25519Sha512:
+	//	return getBad25519Element()
+	default:
+		return getBadNistElement(t, group.Group(c.Conf.AKE))
+	}
+}
+
+func getBadScalar(t *testing.T, c configuration) []byte {
+	switch c.Conf.AKE {
+	case opaque.RistrettoSha512:
+		return getBadRistrettoScalar()
+	// case opaque.Curve25519Sha512:
+	//	return getBad25519Scalar()
+	default:
+		return badScalar(t, oprf.Ciphersuite(c.Conf.AKE).Group(), c.Curve)
+	}
+}
+
+func buildRecord(
+	credID, oprfSeed, password, pks []byte,
+	client *opaque.Client,
+	server *opaque.Server,
+) *opaque.ClientRecord {
+	conf := server.GetConf()
+	r1 := client.RegistrationInit(password)
+	pk, err := conf.Group.NewElement().Decode(pks)
+	if err != nil {
+		panic(err)
+	}
+	r2 := server.RegistrationResponse(r1, pk, credID, oprfSeed)
+	r3, _ := client.RegistrationFinalize(r2, nil, nil)
+
+	return &opaque.ClientRecord{
+		CredentialIdentifier: credID,
+		ClientIdentity:       nil,
+		RegistrationRecord:   r3,
+		TestMaskNonce:        nil,
+	}
+}
+
+func buildPRK(client *opaque.Client, evaluation *group.Point) ([]byte, error) {
+	conf := client.GetConf()
+	unblinded := client.OPRF.Finalize(evaluation)
+	hardened := conf.KSF.Harden(unblinded, nil, conf.OPRFPointLength)
+
+	return conf.KDF.Extract(nil, hardened), nil
+}
+
+func getEnvelope(client *opaque.Client, ke2 *message.KE2) (*keyrecovery.Envelope, []byte, error) {
+	conf := client.GetConf()
+	randomizedPwd, err := buildPRK(client, ke2.EvaluatedMessage)
+	if err != nil {
+		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
+	}
+
+	maskingKey := conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), conf.Hash.Size())
+
+	clear := conf.XorResponse(maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
+	e := clear[encoding.PointLength[conf.Group]:]
+
+	env := &keyrecovery.Envelope{
+		Nonce:   e[:conf.NonceLen],
+		AuthTag: e[conf.NonceLen:],
+	}
+
+	return env, randomizedPwd, nil
+}
