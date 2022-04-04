@@ -10,6 +10,7 @@ package opaque
 
 import (
 	"errors"
+	"log"
 
 	"github.com/bytemare/crypto/group"
 
@@ -44,10 +45,6 @@ func (d *Deserializer) RegistrationRequest(registrationRequest []byte) (*message
 		return nil, errInvalidBlindedData
 	}
 
-	if blindedMessage.IsIdentity() {
-		return nil, errInvalidBlindedData
-	}
-
 	return &message.RegistrationRequest{C: d.conf.OPRF, BlindedMessage: blindedMessage}, nil
 }
 
@@ -69,16 +66,8 @@ func (d *Deserializer) RegistrationResponse(registrationResponse []byte) (*messa
 		return nil, errInvalidEvaluatedData
 	}
 
-	if evaluatedMessage.IsIdentity() {
-		return nil, errInvalidEvaluatedData
-	}
-
 	pks, err := d.conf.Group.NewElement().Decode(registrationResponse[d.conf.OPRFPointLength:])
 	if err != nil {
-		return nil, errInvalidServerPK
-	}
-
-	if pks.IsIdentity() {
 		return nil, errInvalidServerPK
 	}
 
@@ -110,10 +99,6 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 		return nil, errInvalidClientPK
 	}
 
-	if pku.IsIdentity() {
-		return nil, errInvalidClientPK
-	}
-
 	return &message.RegistrationRecord{
 		G:          d.conf.Group,
 		PublicKey:  pku,
@@ -128,10 +113,6 @@ func (d *Deserializer) deserializeCredentialResponse(
 ) (*message.CredentialResponse, error) {
 	data, err := d.conf.Group.NewElement().Decode(input[:d.conf.OPRFPointLength])
 	if err != nil {
-		return nil, errInvalidEvaluatedData
-	}
-
-	if data.IsIdentity() {
 		return nil, errInvalidEvaluatedData
 	}
 
@@ -158,10 +139,6 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 		return nil, errInvalidBlindedData
 	}
 
-	if blindedMessage.IsIdentity() {
-		return nil, errInvalidBlindedData
-	}
-
 	nonceU := ke1[d.conf.OPRFPointLength : d.conf.OPRFPointLength+d.conf.NonceLen]
 
 	epku, err := d.conf.Group.NewElement().Decode(ke1[d.conf.OPRFPointLength+d.conf.NonceLen:])
@@ -169,11 +146,8 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 		return nil, errInvalidClientEPK
 	}
 
-	if epku.IsIdentity() {
-		return nil, errInvalidClientEPK
-	}
-
 	return &message.KE1{
+		G: d.conf.Group,
 		CredentialRequest: &message.CredentialRequest{
 			C:              d.conf.OPRF,
 			BlindedMessage: blindedMessage,
@@ -217,11 +191,10 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 		return nil, errInvalidServerEPK
 	}
 
-	if epks.IsIdentity() {
-		return nil, errInvalidServerEPK
-	}
+	log.Printf("group %v", d.conf.Group)
 
 	return &message.KE2{
+		G:                  d.conf.Group,
 		CredentialResponse: cresp,
 		NonceS:             nonceS,
 		EpkS:               epks,

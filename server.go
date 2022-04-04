@@ -41,9 +41,6 @@ var (
 	// ErrInvalidOPRFSeedLength indicates that the OPRF seed is not of right length.
 	ErrInvalidOPRFSeedLength = errors.New("input OPRF seed length is invalid (must be of hash output length)")
 
-	// ErrIdentityPKS indicates that the server public key is the group's identity point.
-	ErrIdentityPKS = errors.New("invalid server public key: pks is identity point")
-
 	// ErrZeroSKS indicates that the server's private key is a zero scalar.
 	ErrZeroSKS = errors.New("server private key is zero")
 )
@@ -100,6 +97,7 @@ func (s *Server) RegistrationResponse(
 
 	return &message.RegistrationResponse{
 		C:                s.conf.OPRF,
+		G:                s.conf.Group,
 		EvaluatedMessage: z,
 		Pks:              serverPublicKey,
 	}
@@ -122,6 +120,7 @@ func (s *Server) credentialResponse(
 	)
 
 	return &message.CredentialResponse{
+		C:                s.conf.OPRF,
 		EvaluatedMessage: z,
 		MaskingNonce:     maskingNonce,
 		MaskedResponse:   maskedResponse,
@@ -149,13 +148,9 @@ func (s *Server) verifyInitInput(
 		return nil, ErrInvalidOPRFSeedLength
 	}
 
-	pks, err := s.conf.Group.NewElement().Decode(serverPublicKey)
+	_, err = s.conf.Group.NewElement().Decode(serverPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("invalid server public key: %w", err)
-	}
-
-	if pks.IsIdentity() {
-		return nil, ErrIdentityPKS
 	}
 
 	if len(record.Envelope) != s.conf.EnvelopeSize {

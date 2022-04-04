@@ -11,8 +11,10 @@ package opaque_test
 import (
 	"bytes"
 	"crypto"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"reflect"
 
 	"github.com/bytemare/crypto/ksf"
 
@@ -107,6 +109,105 @@ func Example_serverSetup() {
 	fmt.Println("OPAQUE server values initialized.")
 
 	// Output: OPAQUE server values initialized.
+}
+
+// Example_Deserialization demonstrates a couple of ways to deserialize OPAQUE protocol messages.
+// Messages are formatted in function of the configuration context they are exchanged in. Hence,
+// we need the corresponding configuration. We can then directly deserialize messages from a
+// Configuration or pass them to Client or Server instances which can do it as well.
+// You must know in advance what message you are expecting, and call the appropriate
+// deserialization function.
+func Example_deserialization() {
+	// Let's work with this RegistrationRequest message we received on the wire.
+	registrationMessage := []byte{
+		152,
+		87,
+		225,
+		105,
+		74,
+		245,
+		80,
+		197,
+		21,
+		229,
+		106,
+		145,
+		3,
+		41,
+		42,
+		208,
+		122,
+		1,
+		75,
+		2,
+		7,
+		8,
+		211,
+		223,
+		87,
+		172,
+		75,
+		21,
+		31,
+		88,
+		211,
+		35,
+	}
+
+	// Pick your configuration.
+	conf := opaque.DefaultConfiguration()
+
+	// You can directly deserialize and test the message's validity in that configuration by getting a deserializer.
+	deserializer, err := conf.Deserializer()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	requestD, err := deserializer.RegistrationRequest(registrationMessage)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// Or if you already have a Server instance, you can use that also.
+	server, err := conf.Server()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	requestS, err := server.Deserialize.RegistrationRequest(registrationMessage)
+	if err != nil {
+		// The error message will tell us what's wrong.
+		log.Fatalln(err)
+	}
+
+	// Alternatively, a Client instance can do that as well.
+	client, err := conf.Client()
+	if err != nil {
+		// The error message will tell us what's wrong.
+		log.Fatalln(err)
+	}
+
+	requestC, err := client.Deserialize.RegistrationRequest(registrationMessage)
+	if err != nil {
+		// The error message will tell us what's wrong.
+		log.Fatalln(err)
+	}
+
+	// All these yield the same message. The following is just a test to proof that point.
+	{
+		if !reflect.DeepEqual(requestD, requestS) ||
+			!reflect.DeepEqual(requestD, requestC) ||
+			!reflect.DeepEqual(requestS, requestC) {
+			log.Fatalf("Unexpected divergent RegistrationMessages:\n\t- %v\n\t- %v\n\t- %v",
+				hex.EncodeToString(requestD.Serialize()),
+				hex.EncodeToString(requestS.Serialize()),
+				hex.EncodeToString(requestC.Serialize()))
+		}
+
+		fmt.Println("OPAQUE messages deserialization is easy!")
+	}
+
+	// Output: OPAQUE messages deserialization is easy!
 }
 
 // Example_Registration demonstrates in a single function the interactions between a client and a server for the
@@ -306,4 +407,160 @@ func Example_loginKeyExchange() {
 	// Output: OPAQUE server values initialized.
 	// OPAQUE registration is easy!
 	// OPAQUE is much awesome!
+}
+
+// Example_FakeResponse shows how to counter some client enumeration attacks by faking an existing client entry.
+// Precompute the fake client record, and return it when no valid record was found.
+// Use this with the server's LoginInit function whenever a client wants to retrieve an envelope but a client
+// entry does not exist. Failing to do so results in an attacker being able to enumerate users.
+func Example_fakeResponse() {
+	// The server must have been set up with its long term values once. So we're calling this, here, for the demo.
+	{
+		Example_serverSetup()
+	}
+
+	// Precompute the fake client record, and return it when no valid record was found. The malicious client will
+	// purposefully fail, but can't determine the difference with an existing client record. Choose the same
+	// configuration as in your app.
+	conf := opaque.DefaultConfiguration()
+	fakeRecord, err := conf.GetFakeRecord([]byte("fake_client"))
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// Later, during protocol execution, l et's say this is the fraudulent login message we received,
+	// for which no client entry exists.
+	message1 := []byte{
+		180,
+		211,
+		102,
+		100,
+		94,
+		122,
+		227,
+		128,
+		249,
+		212,
+		118,
+		225,
+		49,
+		158,
+		103,
+		193,
+		130,
+		31,
+		122,
+		93,
+		61,
+		251,
+		252,
+		78,
+		38,
+		199,
+		137,
+		131,
+		81,
+		151,
+		145,
+		57,
+		14,
+		165,
+		40,
+		252,
+		96,
+		155,
+		67,
+		147,
+		176,
+		53,
+		62,
+		133,
+		253,
+		187,
+		32,
+		198,
+		6,
+		124,
+		17,
+		145,
+		159,
+		64,
+		217,
+		61,
+		139,
+		178,
+		41,
+		150,
+		127,
+		194,
+		135,
+		140,
+		32,
+		151,
+		134,
+		239,
+		75,
+		150,
+		11,
+		251,
+		254,
+		16,
+		72,
+		28,
+		31,
+		211,
+		1,
+		48,
+		15,
+		199,
+		45,
+		196,
+		35,
+		74,
+		30,
+		130,
+		155,
+		85,
+		108,
+		114,
+		15,
+		144,
+		77,
+		48,
+	}
+
+	// Continue as usual, using the fake record in lieu of the (non-)existing one. The server the sends
+	// back the serialized ke2 message message2.
+	var message2 []byte
+	{
+		serverID := []byte("server")
+		server, err := conf.Server()
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		ke1, err := server.Deserialize.KE1(message1)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		ke2, err := server.LoginInit(ke1, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed, fakeRecord)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		message2 = ke2.Serialize()
+	}
+
+	// The following is just a test to check everything went fine.
+	{
+		if len(message2) == 0 {
+			log.Fatalln("Fake KE2 is unexpectedly empty.")
+		}
+
+		fmt.Println("Thwarting OPAQUE client enumeration is easy!")
+	}
+
+	// Output: OPAQUE server values initialized.
+	// Thwarting OPAQUE client enumeration is easy!
 }

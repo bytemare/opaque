@@ -18,9 +18,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bytemare/crypto/hash"
 	"github.com/bytemare/crypto/ksf"
 
 	"github.com/bytemare/opaque"
+	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
@@ -135,10 +137,6 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 		panic(err)
 	}
 
-	if pks.IsIdentity() {
-		panic("identity")
-	}
-
 	regResp := server.RegistrationResponse(regReq, pks, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
 
 	vRegResp, err := client.Deserialize.RegistrationResponse(v.Outputs.RegistrationResponse)
@@ -180,6 +178,16 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	}
 }
 
+func getFakeEnvelope(c *opaque.Configuration) []byte {
+	if !hash.Hashing(c.MAC).Available() {
+		panic(nil)
+	}
+
+	envelopeSize := internal.NonceLength + internal.NewMac(c.MAC).Size()
+
+	return make([]byte, envelopeSize)
+}
+
 func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 	// Client
 	client, _ := conf.Client()
@@ -211,7 +219,7 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 
 		record.RegistrationRecord = upload
 	} else {
-		rec, err := server.Deserialize.RegistrationRecord(encoding.Concat3(v.Inputs.ClientPublicKey, v.Inputs.MaskingKey, opaque.GetFakeEnvelope(conf)))
+		rec, err := server.Deserialize.RegistrationRecord(encoding.Concat3(v.Inputs.ClientPublicKey, v.Inputs.MaskingKey, getFakeEnvelope(conf)))
 		if err != nil {
 			t.Fatal(err)
 		}
