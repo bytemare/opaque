@@ -212,14 +212,12 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 
 	scalar := i.Group.NewScalar().Random()
 	publicKey := i.Group.Base().Mult(scalar)
-	maskingKey := RandomBytes(i.KDF.Size())
-	envelope := make([]byte, internal.NonceLength+i.MAC.Size())
 
 	regRecord := &message.RegistrationRecord{
 		G:          i.Group,
 		PublicKey:  publicKey,
-		MaskingKey: maskingKey,
-		Envelope:   envelope,
+		MaskingKey: RandomBytes(i.KDF.Size()),
+		Envelope:   make([]byte, internal.NonceLength+i.MAC.Size()),
 	}
 
 	return &ClientRecord{
