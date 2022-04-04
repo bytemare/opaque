@@ -74,6 +74,7 @@ func (c *Client) buildPRK(evaluation *group.Point) []byte {
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
 func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest {
 	m := c.OPRF.Blind(password)
+
 	return &message.RegistrationRequest{
 		C:              c.conf.OPRF,
 		BlindedMessage: m,

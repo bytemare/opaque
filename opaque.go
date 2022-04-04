@@ -202,6 +202,34 @@ func (c *Configuration) Serialize() []byte {
 	return encoding.Concat(b, encoding.EncodeVector(c.Context))
 }
 
+// GetFakeRecord creates a fake Client record to be used when no existing client record exists,
+// to defend against client enumeration techniques.
+func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecord, error) {
+	i, err := c.toInternal()
+	if err != nil {
+		return nil, err
+	}
+
+	scalar := i.Group.NewScalar().Random()
+	publicKey := i.Group.Base().Mult(scalar)
+	maskingKey := RandomBytes(i.KDF.Size())
+	envelope := make([]byte, internal.NonceLength+i.MAC.Size())
+
+	regRecord := &message.RegistrationRecord{
+		G:          i.Group,
+		PublicKey:  publicKey,
+		MaskingKey: maskingKey,
+		Envelope:   envelope,
+	}
+
+	return &ClientRecord{
+		CredentialIdentifier: credentialIdentifier,
+		ClientIdentity:       nil,
+		RegistrationRecord:   regRecord,
+		TestMaskNonce:        nil,
+	}, nil
+}
+
 // DeserializeConfiguration decodes the input and returns a Parameter structure.
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	if len(encoded) < confLength+2 { // corresponds to the configuration length + 2-byte encoding of empty context
@@ -223,7 +251,7 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		Context: ctx,
 	}
 
-	if err = c.verify(); err != nil {
+	if err := c.verify(); err != nil {
 		return nil, err
 	}
 
@@ -238,18 +266,6 @@ type ClientRecord struct {
 
 	// testing
 	TestMaskNonce []byte
-}
-
-// GetFakeEnvelope returns a byte array filled with 0s the length of a legitimate envelope size in the configuration's.
-// This fake envelope byte array is used in the client enumeration mitigation scheme.
-func GetFakeEnvelope(c *Configuration) []byte {
-	if !hash.Hashing(c.MAC).Available() {
-		panic(errInvalidMACid)
-	}
-
-	envelopeSize := internal.NonceLength + internal.NewMac(c.MAC).Size()
-
-	return make([]byte, envelopeSize)
 }
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).

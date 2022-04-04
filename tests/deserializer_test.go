@@ -1,3 +1,11 @@
+// SPDX-License-Identifier: MIT
+//
+// Copyright (C) 2021 Daniel Bourdrez. All Rights Reserved.
+//
+// This source code is licensed under the MIT license found in the
+// LICENSE file in the root directory of this source tree or at
+// https://spdx.org/licenses/MIT.html
+
 package opaque_test
 
 import (
@@ -16,6 +24,30 @@ var errInvalidMessageLength = errors.New("invalid message length for the configu
 /*
 	Message Deserialization
 */
+
+func TestDeserializer(t *testing.T) {
+	// Test valid configurations
+	for _, conf := range confs {
+		if _, err := conf.Conf.Deserializer(); err != nil {
+			t.Fatalf("unexpected error on valid configuration: %v", err)
+		}
+	}
+
+	// Test for an invalid configuration.
+	conf := &opaque.Configuration{
+		OPRF:    0,
+		KDF:     0,
+		MAC:     0,
+		Hash:    0,
+		KSF:     0,
+		AKE:     0,
+		Context: nil,
+	}
+
+	if _, err := conf.Deserializer(); err == nil {
+		t.Fatal("expected error on invalid configuration")
+	}
+}
 
 func TestDeserializeRegistrationRequest(t *testing.T) {
 	c := opaque.DefaultConfiguration()

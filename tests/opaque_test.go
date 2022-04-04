@@ -208,6 +208,43 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	return exportKeyLogin
 }
 
+func isSameConf(a, b *opaque.Configuration) bool {
+	if a.OPRF != b.OPRF {
+		return false
+	}
+	if a.KDF != b.KDF {
+		return false
+	}
+	if a.MAC != b.MAC {
+		return false
+	}
+	if a.Hash != b.Hash {
+		return false
+	}
+	if a.KSF != b.KSF {
+		return false
+	}
+	if a.AKE != b.AKE {
+		return false
+	}
+
+	return bytes.Equal(a.Context, b.Context)
+}
+
+func TestConfiguration_Deserialization(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+	ser := conf.Serialize()
+
+	conf2, err := opaque.DeserializeConfiguration(ser)
+	if err != nil {
+		t.Fatalf("unexpected error on valid configuration: %v", err)
+	}
+
+	if !isSameConf(conf, conf2) {
+		t.Fatalf("Unexpected inequality:\n\t%v\n\t%v", conf, conf2)
+	}
+}
+
 /*
 	The following tests look for failing conditions.
 */
@@ -363,5 +400,29 @@ func TestBadConfiguration(t *testing.T) {
 				t.Fatalf("Expected error for %s / deserializer. Want %q, got %q", badConf.name, badConf.error, err)
 			}
 		})
+	}
+}
+
+func TestFakeRecord(t *testing.T) {
+	// Test valid configurations
+	for _, conf := range confs {
+		if _, err := conf.Conf.GetFakeRecord(nil); err != nil {
+			t.Fatalf("unexpected error on valid configuration: %v", err)
+		}
+	}
+
+	// Test for an invalid configuration.
+	conf := &opaque.Configuration{
+		OPRF:    0,
+		KDF:     0,
+		MAC:     0,
+		Hash:    0,
+		KSF:     0,
+		AKE:     0,
+		Context: nil,
+	}
+
+	if _, err := conf.GetFakeRecord(nil); err == nil {
+		t.Fatal("expected error on invalid configuration")
 	}
 }
