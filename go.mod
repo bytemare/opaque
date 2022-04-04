@@ -2,7 +2,7 @@ module github.com/bytemare/opaque
 
 go 1.18
 
-require github.com/bytemare/crypto v0.2.6
+require github.com/bytemare/crypto v0.2.7
 
 require (
 	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
