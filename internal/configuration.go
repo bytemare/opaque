@@ -6,18 +6,17 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-// Package internal provides structures and functions to operate OPAQUE that are not part of the public API.
+// Package internal provides values, structures, and functions to operate OPAQUE that are not part of the public API.
 package internal
 
 import (
 	cryptorand "crypto/rand"
+	"errors"
 	"fmt"
 
 	"github.com/bytemare/crypto/group"
 
-	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
-	"github.com/bytemare/opaque/internal/tag"
 )
 
 const (
@@ -27,6 +26,9 @@ const (
 	// SeedLength is the default length used for seeds.
 	SeedLength = 32
 )
+
+// ErrConfigurationInvalidLength happens when deserializing a configuration of invalid length.
+var ErrConfigurationInvalidLength = errors.New("invalid encoded configuration length")
 
 // Configuration is the internal representation of the instance runtime parameters.
 type Configuration struct {
@@ -52,15 +54,4 @@ func RandomBytes(length int) []byte {
 	}
 
 	return r
-}
-
-// XorResponse is used to encrypt and decrypt the response in KE2.
-func (c *Configuration) XorResponse(key, nonce, in []byte) []byte {
-	pad := c.KDF.Expand(
-		key,
-		encoding.SuffixString(nonce, tag.CredentialResponsePad),
-		encoding.PointLength[c.Group]+c.EnvelopeSize,
-	)
-
-	return Xor(pad, in)
 }
