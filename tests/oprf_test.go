@@ -26,11 +26,6 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 )
 
-func TestOPRFString(t *testing.T) {
-	p := oprf.RistrettoSha512
-	fmt.Println(p)
-}
-
 type oprfVector struct {
 	DST       string           `json:"groupDST"`
 	Hash      string           `json:"hash"`
