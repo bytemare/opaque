@@ -149,7 +149,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		// tamper the envelope
 		env.AuthTag = internal.RandomBytes(client.GetConf().MAC.Size())
 		clear := encoding.Concat(pks, env.Serialize())
-		ke2.MaskedResponse = server.GetConf().XorResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
+		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
 
 		// too short
 		expected := "recover envelope: invalid envelope authentication tag"
@@ -221,7 +221,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		env.AuthTag = authTag
 
 		clear := encoding.Concat(badpks, env.Serialize())
-		ke2.MaskedResponse = server.GetConf().XorResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
+		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
 
 		expected = "invalid server public key"
 		if _, _, err := client.LoginFinish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
@@ -231,7 +231,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		// replace PKS
 		fakepks := server.GetConf().Group.Base().Mult(server.GetConf().Group.NewScalar().Random()).Bytes()
 		clear = encoding.Concat(fakepks, env.Serialize())
-		ke2.MaskedResponse = server.GetConf().XorResponse(rec.MaskingKey, ke2.MaskingNonce, clear)
+		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
 
 		expected = "recover envelope: invalid envelope authentication tag"
 		if _, _, err := client.LoginFinish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {

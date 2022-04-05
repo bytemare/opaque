@@ -6,13 +6,10 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-// Package opaque implements the OPAQUE asymmetric password-authenticated key exchange protocol.
-//
-// OPAQUE is an asymmetric Password Authenticated Key Exchange (PAKE).
-//
-// This package implements the official OPAQUE definition. For protocol details, please refer to the IETF protocol
-// document at https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque.
-//
+// Package opaque implements OPAQUE, an asymmetric password-authenticated key exchange protocol that is secure against
+// pre-computation attacks. It enables a client to authenticate to a server without ever revealing its password to the
+// server. Protocol details can be found on the IETF RFC page (https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque)
+// and on the GitHub specification repository (https://github.com/cfrg/draft-irtf-cfrg-opaque).
 package opaque
 
 import (

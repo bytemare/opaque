@@ -186,6 +186,23 @@ func buildRecord(
 	}
 }
 
+func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
+	pad := c.KDF.Expand(
+		key,
+		encoding.SuffixString(nonce, tag.CredentialResponsePad),
+		encoding.PointLength[c.Group]+c.EnvelopeSize,
+	)
+
+	dst := make([]byte, len(pad))
+
+	// if the size is fixed, we could unroll the loop
+	for i, r := range pad {
+		dst[i] = r ^ in[i]
+	}
+
+	return dst
+}
+
 func buildPRK(client *opaque.Client, evaluation *group.Point) ([]byte, error) {
 	conf := client.GetConf()
 	unblinded := client.OPRF.Finalize(evaluation)
@@ -203,7 +220,7 @@ func getEnvelope(client *opaque.Client, ke2 *message.KE2) (*keyrecovery.Envelope
 
 	maskingKey := conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), conf.Hash.Size())
 
-	clear := conf.XorResponse(maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
+	clear := xorResponse(conf, maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
 	e := clear[encoding.PointLength[conf.Group]:]
 
 	env := &keyrecovery.Envelope{

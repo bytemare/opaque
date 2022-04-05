@@ -6,7 +6,6 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-// Package keyrecovery provides utility functions and structures allowing credential management.
 package keyrecovery
 
 import (

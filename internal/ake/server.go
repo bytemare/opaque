@@ -6,7 +6,6 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-// Package ake provides high-level functions for the 3DH AKE.
 package ake
 
 import (

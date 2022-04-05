@@ -42,7 +42,7 @@ func Mask(
 	}
 
 	clear := encoding.Concat(serverPublicKey, envelope)
-	maskedResponse = conf.XorResponse(maskingKey, nonce, clear)
+	maskedResponse = xorResponse(conf, maskingKey, nonce, clear)
 
 	return nonce, maskedResponse
 }
@@ -54,7 +54,7 @@ func Unmask(
 	randomizedPwd, nonce, maskedResponse []byte,
 ) (serverPublicKey *group.Point, serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
 	maskingKey := conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), conf.Hash.Size())
-	clear := conf.XorResponse(maskingKey, nonce, maskedResponse)
+	clear := xorResponse(conf, maskingKey, nonce, maskedResponse)
 	serverPublicKeyBytes = clear[:encoding.PointLength[conf.Group]]
 	env := clear[encoding.PointLength[conf.Group]:]
 	envelope = &keyrecovery.Envelope{
@@ -68,4 +68,24 @@ func Unmask(
 	}
 
 	return serverPublicKey, serverPublicKeyBytes, envelope, nil
+}
+
+// xorResponse is used to encrypt and decrypt the response in KE2.
+// It returns a new byte slice containing the byte-by-byte xor-ing of the in argument and a constructed pad,
+// which must be of the same length.
+func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
+	pad := c.KDF.Expand(
+		key,
+		encoding.SuffixString(nonce, tag.CredentialResponsePad),
+		encoding.PointLength[c.Group]+c.EnvelopeSize,
+	)
+
+	dst := make([]byte, len(pad))
+
+	// if the size is fixed, we could unroll the loop
+	for i, r := range pad {
+		dst[i] = r ^ in[i]
+	}
+
+	return dst
 }

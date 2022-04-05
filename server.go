@@ -140,12 +140,12 @@ func (s *Server) verifyInitInput(
 		return nil, ErrZeroSKS
 	}
 
-	if len(serverPublicKey) != s.conf.AkePointLength {
-		return nil, ErrInvalidPksLength
-	}
-
 	if len(oprfSeed) != s.conf.Hash.Size() {
 		return nil, ErrInvalidOPRFSeedLength
+	}
+
+	if len(serverPublicKey) != s.conf.AkePointLength {
+		return nil, ErrInvalidPksLength
 	}
 
 	_, err = s.conf.Group.NewElement().Decode(serverPublicKey)
@@ -156,6 +156,9 @@ func (s *Server) verifyInitInput(
 	if len(record.Envelope) != s.conf.EnvelopeSize {
 		return nil, ErrInvalidEnvelopeLength
 	}
+
+	// We've checked that the server's public key and the client's envelope are of correct length,
+	// thus ensuring that the subsequent xor-ing input is the same length as the encryption pad.
 
 	return sks, nil
 }

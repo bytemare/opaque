@@ -27,22 +27,12 @@ var (
 )
 
 func isSameConf(a, b *opaque.Configuration) bool {
-	if a.OPRF != b.OPRF {
-		return false
-	}
-	if a.KDF != b.KDF {
-		return false
-	}
-	if a.MAC != b.MAC {
-		return false
-	}
-	if a.Hash != b.Hash {
-		return false
-	}
-	if a.KSF != b.KSF {
-		return false
-	}
-	if a.AKE != b.AKE {
+	if a.OPRF != b.OPRF ||
+		a.KDF != b.KDF ||
+		a.MAC != b.MAC ||
+		a.Hash != b.Hash ||
+		a.KSF != b.KSF ||
+		a.AKE != b.AKE {
 		return false
 	}
 
@@ -72,29 +62,32 @@ func Example_configuration() {
 		log.Fatalln("Oh no! Configurations differ!")
 	}
 
-	// A configuration can be saved in an app with this 8-byte array, and decoded at runtime.
-	// Any additional 'Context' is also added.
+	// A configuration can be saved encoded and saved, and later loaded and decoded at runtime.
+	// Any additional 'Context' is also included.
 	encoded := defaultConf.Serialize()
+	fmt.Printf("Encoded Configuration: %s\n", hex.EncodeToString(encoded))
 
-	decodedConf, err := opaque.DeserializeConfiguration(encoded)
+	// This how you decode that configuration.
+	conf, err := opaque.DeserializeConfiguration(encoded)
 	if err != nil {
 		log.Fatalf("Oh no! Decoding the configurations failed! %v", err)
 	}
 
-	if !isSameConf(defaultConf, decodedConf) {
+	if !isSameConf(defaultConf, conf) {
 		log.Fatalln("Oh no! Something went wrong in decoding the configuration!")
 	}
 
 	fmt.Println("OPAQUE configuration is easy!")
 
-	// Output: OPAQUE configuration is easy!
+	// Output: Encoded Configuration: 0107070702010000
+	// OPAQUE configuration is easy!
 }
 
 // Example_ServerSetup shows how to set up the long term values for the OPAQUE server.
 // - The secret OPRF seed can be unique for each client or the same for all, but must be
-//	 the same for a given client between registration and all login sessions.
+// the same for a given client between registration and all login sessions.
 // - The AKE key pair can also be the same for all clients or unique, but must be
-//	 the same for a given client between registration and all login sessions.
+// the same for a given client between registration and all login sessions.
 func Example_serverSetup() {
 	// This a straightforward way to use a secure and efficient configuration.
 	// They have to be run only once in the application's lifecycle, and the output values must be stored appropriately.
@@ -112,47 +105,13 @@ func Example_serverSetup() {
 }
 
 // Example_Deserialization demonstrates a couple of ways to deserialize OPAQUE protocol messages.
-// Messages are formatted in function of the configuration context they are exchanged in. Hence,
-// we need the corresponding configuration. We can then directly deserialize messages from a
-// Configuration or pass them to Client or Server instances which can do it as well.
-// You must know in advance what message you are expecting, and call the appropriate
-// deserialization function.
+// Message interpretation depends on the configuration context it's exchanged in. Hence, we need the corresponding
+// configuration. We can then directly deserialize messages from a Configuration or pass them to Client or Server
+// instances which can do it as well.
+// You must know in advance what message you are expecting, and call the appropriate deserialization function.
 func Example_deserialization() {
-	// Let's work with this RegistrationRequest message we received on the wire.
-	registrationMessage := []byte{
-		152,
-		87,
-		225,
-		105,
-		74,
-		245,
-		80,
-		197,
-		21,
-		229,
-		106,
-		145,
-		3,
-		41,
-		42,
-		208,
-		122,
-		1,
-		75,
-		2,
-		7,
-		8,
-		211,
-		223,
-		87,
-		172,
-		75,
-		21,
-		31,
-		88,
-		211,
-		35,
-	}
+	// Let's say we have this RegistrationRequest message we received on the wire.
+	registrationMessage, _ := hex.DecodeString("9857e1694af550c515e56a9103292ad07a014b020708d3df57ac4b151f58d323")
 
 	// Pick your configuration.
 	conf := opaque.DefaultConfiguration()
@@ -308,7 +267,8 @@ func Example_registration() {
 }
 
 // Example_LoginKeyExchange demonstrates in a single function the interactions between a client and a server for the
-// login phase. This is of course a proof-of-concept demonstration, as client and server execute separately.
+// login phase.
+// This is of course a proof-of-concept demonstration, as client and server execute separately.
 func Example_loginKeyExchange() {
 	// For the purpose of this demo, we consider the following registration has already happened.
 	{
@@ -428,106 +388,11 @@ func Example_fakeResponse() {
 		log.Fatalln(err)
 	}
 
-	// Later, during protocol execution, l et's say this is the fraudulent login message we received,
+	// Later, during protocol execution, let's say this is the fraudulent login message we received,
 	// for which no client entry exists.
-	message1 := []byte{
-		180,
-		211,
-		102,
-		100,
-		94,
-		122,
-		227,
-		128,
-		249,
-		212,
-		118,
-		225,
-		49,
-		158,
-		103,
-		193,
-		130,
-		31,
-		122,
-		93,
-		61,
-		251,
-		252,
-		78,
-		38,
-		199,
-		137,
-		131,
-		81,
-		151,
-		145,
-		57,
-		14,
-		165,
-		40,
-		252,
-		96,
-		155,
-		67,
-		147,
-		176,
-		53,
-		62,
-		133,
-		253,
-		187,
-		32,
-		198,
-		6,
-		124,
-		17,
-		145,
-		159,
-		64,
-		217,
-		61,
-		139,
-		178,
-		41,
-		150,
-		127,
-		194,
-		135,
-		140,
-		32,
-		151,
-		134,
-		239,
-		75,
-		150,
-		11,
-		251,
-		254,
-		16,
-		72,
-		28,
-		31,
-		211,
-		1,
-		48,
-		15,
-		199,
-		45,
-		196,
-		35,
-		74,
-		30,
-		130,
-		155,
-		85,
-		108,
-		114,
-		15,
-		144,
-		77,
-		48,
-	}
+	message1, _ := hex.DecodeString("b4d366645e7ae380f9d476e1319e67c1821f7a5d3dfbfc4e26c7898351979139" +
+		"0ea528fc609b4393b0353e85fdbb20c6067c11919f40d93d8bb229967fc2878c" +
+		"209786ef4b960bfbfe10481c1fd301300fc72dc4234a1e829b556c720f904d30")
 
 	// Continue as usual, using the fake record in lieu of the (non-)existing one. The server the sends
 	// back the serialized ke2 message message2.
