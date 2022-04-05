@@ -1,10 +1,8 @@
 name: OPAQUE
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [ main ]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -55,7 +53,6 @@ jobs:
 
   analyze:
     name: Analyze
-    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
@@ -87,6 +84,8 @@ jobs:
           args: >
             -Dsonar.projectKey=bytemare_opaque
             -Dsonar.organization=bytemare-github
-            -Dsonar.go.coverage.reportPaths=coverage.out -Dsonar.sources=.
-            -Dsonar.test.exclusions=tests/** -Dsonar.tests=tests/
+            -Dsonar.go.coverage.reportPaths=coverage.out
+            -Dsonar.sources=.
+            -Dsonar.test.exclusions=examples_test.go,tests/**
+            -Dsonar.tests=tests/
             -Dsonar.verbose=true

@@ -9,7 +9,9 @@
 // Package encoding provides encoding utilities.
 package encoding
 
-import "github.com/bytemare/crypto/group"
+import (
+	"github.com/bytemare/crypto/group"
+)
 
 const (
 	ristrettoPointLength   = 32
@@ -46,7 +48,10 @@ var PointLength = map[group.Group]int{
 
 // SerializeScalar pads the given scalar if necessary.
 func SerializeScalar(s *group.Scalar, g group.Group) []byte {
-	length := ScalarLength[g]
+	length, ok := ScalarLength[g]
+	if !ok {
+		panic("invalid group identifier")
+	}
 
 	e := s.Bytes()
 
