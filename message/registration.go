@@ -6,7 +6,6 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-// Package message provides message structures for the OPAQUE protocol.
 package message
 
 import (
