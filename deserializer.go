@@ -10,7 +10,6 @@ package opaque
 
 import (
 	"errors"
-	"log"
 
 	"github.com/bytemare/crypto/group"
 
@@ -190,8 +189,6 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 	if err != nil {
 		return nil, errInvalidServerEPK
 	}
-
-	log.Printf("group %v", d.conf.Group)
 
 	return &message.KE2{
 		G:                  d.conf.Group,
