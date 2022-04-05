@@ -10,8 +10,6 @@
 package encoding
 
 import (
-	"log"
-
 	"github.com/bytemare/crypto/group"
 )
 
@@ -74,7 +72,6 @@ func SerializePoint(p *group.Point, g group.Group) []byte {
 	point := p.Bytes()
 
 	for len(point) < length {
-		log.Println("pad")
 		point = append([]byte{0x00}, point...)
 	}
 
