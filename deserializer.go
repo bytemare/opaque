@@ -10,7 +10,6 @@ package opaque
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/bytemare/crypto/group"
 
@@ -31,10 +30,6 @@ var (
 // Deserializer exposes the message deserialization functions.
 type Deserializer struct {
 	conf *internal.Configuration
-}
-
-func (d *Deserializer) String() string {
-	return fmt.Sprint(d.conf)
 }
 
 // RegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized
