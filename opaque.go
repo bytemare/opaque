@@ -49,9 +49,16 @@ const (
 
 	// Curve25519Sha512 identifies a group over Curve25519 with SHA2-512 hash-to-group hashing.
 	// Curve25519Sha512 = Group(group.Curve25519Sha512).
-
-	confLength = 6
 )
+
+func (g Group) Available() bool {
+	return g == RistrettoSha512 ||
+		g == P256Sha256 ||
+		g == P384Sha512 ||
+		g == P521Sha512
+}
+
+const confLength = 6
 
 var (
 	errInvalidOPRFid = errors.New("invalid OPRF group id")
@@ -123,7 +130,7 @@ func (c *Configuration) KeyGen() (secretKey, publicKey []byte) {
 
 // verify returns an error on the first non-compliant parameter, nil otherwise.
 func (c *Configuration) verify() error {
-	if !oprf.Ciphersuite(c.OPRF).Available() {
+	if !c.OPRF.Available() || !oprf.Ciphersuite(c.OPRF).Available() {
 		return errInvalidOPRFid
 	}
 
@@ -143,7 +150,7 @@ func (c *Configuration) verify() error {
 		return errInvalidKSFid
 	}
 
-	if !group.Group(c.AKE).Available() {
+	if !c.AKE.Available() || !group.Group(c.AKE).Available() {
 		return errInvalidAKEid
 	}
 
