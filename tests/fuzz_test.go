@@ -366,7 +366,11 @@ func FuzzDeserializeKE1(f *testing.F) {
 
 func isValidAKEPoint(conf *internal.Configuration, input []byte, err error) error {
 	e, _err := conf.Group.NewElement().Decode(input)
-	if _err == nil && !e.IsIdentity() {
+	if _err == nil {
+		if e.IsIdentity() {
+			return errors.New("point is identity/infinity")
+		}
+
 		return fmt.Errorf("got %q but point is valid", err)
 	}
 
@@ -375,7 +379,11 @@ func isValidAKEPoint(conf *internal.Configuration, input []byte, err error) erro
 
 func isValidOPRFPoint(conf *internal.Configuration, input []byte, err error) error {
 	e, _err := conf.OPRF.Group().NewElement().Decode(input)
-	if _err == nil && !e.IsIdentity() {
+	if _err == nil {
+		if e.IsIdentity() {
+			return errors.New("point is identity/infinity")
+		}
+
 		return fmt.Errorf("got %q but point is valid", err)
 	}
 
