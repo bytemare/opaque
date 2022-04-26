@@ -10,6 +10,7 @@ package opaque
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/bytemare/crypto/group"
 
@@ -30,6 +31,10 @@ var (
 // Deserializer exposes the message deserialization functions.
 type Deserializer struct {
 	conf *internal.Configuration
+}
+
+func (d *Deserializer) String() string {
+	return fmt.Sprint(d.conf)
 }
 
 // RegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized
@@ -106,11 +111,23 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 	}, nil
 }
 
+func (d *Deserializer) deserializeCredentialRequest(input []byte) (*message.CredentialRequest, error) {
+	blindedMessage, err := d.conf.OPRF.Group().NewElement().Decode(input[:d.conf.OPRFPointLength])
+	if err != nil {
+		return nil, errInvalidBlindedData
+	}
+
+	return &message.CredentialRequest{
+		C:              d.conf.OPRF,
+		BlindedMessage: blindedMessage,
+	}, nil
+}
+
 func (d *Deserializer) deserializeCredentialResponse(
 	input []byte,
 	maxResponseLength int,
 ) (*message.CredentialResponse, error) {
-	data, err := d.conf.Group.NewElement().Decode(input[:d.conf.OPRFPointLength])
+	data, err := d.conf.OPRF.Group().NewElement().Decode(input[:d.conf.OPRFPointLength])
 	if err != nil {
 		return nil, errInvalidEvaluatedData
 	}
@@ -133,9 +150,9 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 		return nil, errInvalidMessageLength
 	}
 
-	blindedMessage, err := d.conf.Group.NewElement().Decode(ke1[:d.conf.OPRFPointLength])
+	request, err := d.deserializeCredentialRequest(ke1)
 	if err != nil {
-		return nil, errInvalidBlindedData
+		return nil, err
 	}
 
 	nonceU := ke1[d.conf.OPRFPointLength : d.conf.OPRFPointLength+d.conf.NonceLen]
@@ -146,13 +163,10 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 	}
 
 	return &message.KE1{
-		G: d.conf.Group,
-		CredentialRequest: &message.CredentialRequest{
-			C:              d.conf.OPRF,
-			BlindedMessage: blindedMessage,
-		},
-		NonceU: nonceU,
-		EpkU:   epku,
+		G:                 d.conf.Group,
+		CredentialRequest: request,
+		NonceU:            nonceU,
+		EpkU:              epku,
 	}, nil
 }
 
