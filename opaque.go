@@ -51,6 +51,8 @@ const (
 	// Curve25519Sha512 = Group(group.Curve25519Sha512).
 )
 
+// Available returns whether the Group byte is recognized in this implementation. This allows to fail early when
+// working with multiple versions not using the same configuration and Group.
 func (g Group) Available() bool {
 	return g == RistrettoSha512 ||
 		g == P256Sha256 ||
