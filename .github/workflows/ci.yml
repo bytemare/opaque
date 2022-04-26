@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        GOVER: [ '1.18' ]
+        GOVER: [ '1.17' ] # Use 1.17 for now as some linters are not updated for 1.18 yet
 
     steps:
       - name: Checkout repo
