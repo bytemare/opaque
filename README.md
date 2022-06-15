@@ -22,7 +22,7 @@ correspond to the [official draft versions](https://datatracker.ietf.org/doc/dra
 
 #### References
 - [The original paper](https://eprint.iacr.org/2018/163.pdf) from Jarecki, Krawczyk, and Xu.
-- [OPAQUE is used in WhatsApp](https://engineering.fb.com/2021/09/10/security/whatsapp-e2ee-backups) to enable end-to-end encrypted backups.
+- [OPAQUE is used in WhatsApp](https://www.whatsapp.com/security/WhatsApp_Security_Encrypted_Backups_Whitepaper.pdf) to enable end-to-end encrypted backups.
 - [The GitHub repo](https://github.com/cfrg/draft-irtf-cfrg-opaque) where the draft is being specified.
 
 ## Installation
