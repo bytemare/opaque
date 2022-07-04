@@ -17,7 +17,7 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
-var errAkeInvalidServerMac = errors.New(" AKE finalization: invalid server mac")
+var ErrInvalidServerMac = errors.New("ake finalization: invalid server mac")
 
 // Client exposes the client's AKE functions and holds its state.
 type Client struct {
@@ -72,7 +72,7 @@ func (c *Client) Finalize(
 	sessionSecret, serverMac, clientMac := core3DH(conf, ikm, clientIdentity, serverIdentity, c.Ke1, ke2)
 
 	if !conf.MAC.Equal(serverMac, ke2.Mac) {
-		return nil, errAkeInvalidServerMac
+		return nil, ErrInvalidServerMac
 	}
 
 	c.sessionSecret = sessionSecret

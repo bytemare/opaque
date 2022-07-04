@@ -9,6 +9,8 @@
 package opaque_test
 
 import (
+	"errors"
+	"github.com/bytemare/opaque/internal/ake"
 	"strings"
 	"testing"
 
@@ -257,8 +259,10 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 		ke2, _ := server.LoginInit(ke1, nil, sks, pks, oprfSeed, rec)
 
 		ke2.Mac = internal.RandomBytes(client.GetConf().MAC.Size())
-		expected := " AKE finalization: invalid server mac"
-		if _, _, err := client.LoginFinish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+
+		_, _, err := client.LoginFinish(nil, nil, ke2)
+
+		if !errors.Is(err, ake.ErrInvalidServerMac) {
 			t.Fatalf("expected error for invalid epks encoding - got %q", err)
 		}
 	}
