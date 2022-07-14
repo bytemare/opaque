@@ -14,7 +14,7 @@ const (
 	// OPRF tags.
 
 	// OPRF is a string explicitly stating the version name.
-	OPRF = "VOPRF09-"
+	OPRF = "VOPRF10-"
 
 	// DeriveKeyPairInternal is the internal DeriveKeyPair tag as defined in VOPRF.
 	DeriveKeyPairInternal = "DeriveKeyPair"
