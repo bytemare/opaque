@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright (C) 2021 Daniel Bourdrez. All Rights Reserved.
+// Copyright (C) 2020-2022 Daniel Bourdrez. All Rights Reserved.
 //
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree or at
@@ -14,7 +14,7 @@ const (
 	// OPRF tags.
 
 	// OPRF is a string explicitly stating the version name.
-	OPRF = "VOPRF09-"
+	OPRF = "VOPRF10-"
 
 	// DeriveKeyPairInternal is the internal DeriveKeyPair tag as defined in VOPRF.
 	DeriveKeyPairInternal = "DeriveKeyPair"

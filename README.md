@@ -11,6 +11,8 @@ This implementation is developed by one of the authors of the RFC [Internet Draf
 The main branch is in sync with the latest developments of the draft, and [the releases](https://github.com/bytemare/opaque/releases)
 correspond to the [official draft versions](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque).
 
+This package is continuously fuzzed on Fuzzbuzz.
+
 #### What is OPAQUE?
 
 > OPAQUE is a PKI-free secure aPAKE that is secure against pre-computation attacks. OPAQUE provides forward secrecy with
