@@ -3,6 +3,10 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/bytemare/opaque.svg)](https://pkg.go.dev/github.com/bytemare/opaque)
 [![codecov](https://codecov.io/gh/bytemare/opaque/branch/main/graph/badge.svg?token=5bQfB0OctA)](https://codecov.io/gh/bytemare/opaque)
 
+```
+  import "github.com/bytemare/opaque"
+```
+
 This package implements [OPAQUE](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque), an asymmetric password-authenticated
 key exchange protocol that is secure against pre-computation attacks. It enables a client to authenticate to a server
 without ever revealing its password to the server. 
@@ -25,12 +29,6 @@ This package is continuously fuzzed on Fuzzbuzz.
 - [The original paper](https://eprint.iacr.org/2018/163.pdf) from Jarecki, Krawczyk, and Xu.
 - [OPAQUE is used in WhatsApp](https://www.whatsapp.com/security/WhatsApp_Security_Encrypted_Backups_Whitepaper.pdf) to enable end-to-end encrypted backups.
 - [The GitHub repo](https://github.com/cfrg/draft-irtf-cfrg-opaque) where the draft is being specified.
-
-## Installation
-
-```
-  go get github.com/bytemare/opaque@latest
-```
 
 ## Documentation [![Go Reference](https://pkg.go.dev/badge/github.com/bytemare/opaque.svg)](https://pkg.go.dev/github.com/bytemare/opaque)
 
