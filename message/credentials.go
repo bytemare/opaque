@@ -21,6 +21,7 @@ type CredentialRequest struct {
 	BlindedMessage *group.Point `json:"blinded_message"`
 }
 
+// NewCredentialRequest returns a populated CredentialRequest.
 func NewCredentialRequest(ciphersuite oprf.Ciphersuite, message *group.Point) *CredentialRequest {
 	return &CredentialRequest{
 		ciphersuite:    ciphersuite,
@@ -41,6 +42,7 @@ type CredentialResponse struct {
 	MaskedResponse   []byte       `json:"masked_response"`
 }
 
+// NewCredentialResponse returns a populated CredentialResponse.
 func NewCredentialResponse(
 	ciphersuite oprf.Ciphersuite,
 	message *group.Point,
