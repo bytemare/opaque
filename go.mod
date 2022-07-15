@@ -9,6 +9,6 @@ require (
 	github.com/armfazh/h2c-go-ref v0.0.0-20220222212046-ff45165972af // indirect
 	github.com/armfazh/tozan-ecc v0.1.4 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
-	golang.org/x/crypto v0.0.0-20220321153916-2c7772ba3064 // indirect
-	golang.org/x/sys v0.0.0-20220327210214-530d0810a4d0 // indirect
+	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
+	golang.org/x/sys v0.0.0-20220712014510-0a85c31ab51e // indirect
 )

@@ -135,12 +135,8 @@ func (c *Client) registrationFinalize(
 // clientInfo is optional client information sent in clear, and only authenticated in KE3.
 func (c *Client) LoginInit(password []byte) *message.KE1 {
 	m := c.OPRF.Blind(password)
-	credReq := &message.CredentialRequest{
-		C:              c.conf.OPRF,
-		BlindedMessage: m,
-	}
 	ke1 := c.Ake.Start(c.conf.Group)
-	ke1.CredentialRequest = credReq
+	ke1.CredentialRequest = message.NewCredentialRequest(c.conf.OPRF, m)
 	c.Ake.Ke1 = ke1.Serialize()
 
 	return ke1

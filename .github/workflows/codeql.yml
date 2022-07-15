@@ -24,16 +24,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579 # pin@v2
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # pin@v2
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@883476649888a9e8e219d5b2e6b789dc024f690c # pin@v1
+        uses: github/codeql-action/init@f7b6c0021b777684992d895a563fc3a0e425783a # pin@v1
         with:
           languages: go
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@883476649888a9e8e219d5b2e6b789dc024f690c # pin@v1
+        uses: github/codeql-action/autobuild@f7b6c0021b777684992d895a563fc3a0e425783a # pin@v1
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@883476649888a9e8e219d5b2e6b789dc024f690c # pin@v1
+        uses: github/codeql-action/analyze@f7b6c0021b777684992d895a563fc3a0e425783a # pin@v1

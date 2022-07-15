@@ -119,12 +119,7 @@ func (s *Server) credentialResponse(
 		record.Envelope,
 	)
 
-	return &message.CredentialResponse{
-		C:                s.conf.OPRF,
-		EvaluatedMessage: z,
-		MaskingNonce:     maskingNonce,
-		MaskedResponse:   maskedResponse,
-	}
+	return message.NewCredentialResponse(s.conf.OPRF, z, maskingNonce, maskedResponse)
 }
 
 func (s *Server) verifyInitInput(

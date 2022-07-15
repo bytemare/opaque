@@ -112,10 +112,7 @@ func (d *Deserializer) deserializeCredentialRequest(input []byte) (*message.Cred
 		return nil, errInvalidBlindedData
 	}
 
-	return &message.CredentialRequest{
-		C:              d.conf.OPRF,
-		BlindedMessage: blindedMessage,
-	}, nil
+	return message.NewCredentialRequest(d.conf.OPRF, blindedMessage), nil
 }
 
 func (d *Deserializer) deserializeCredentialResponse(
@@ -127,12 +124,10 @@ func (d *Deserializer) deserializeCredentialResponse(
 		return nil, errInvalidEvaluatedData
 	}
 
-	return &message.CredentialResponse{
-		C:                d.conf.OPRF,
-		EvaluatedMessage: data,
-		MaskingNonce:     input[d.conf.OPRFPointLength : d.conf.OPRFPointLength+d.conf.NonceLen],
-		MaskedResponse:   input[d.conf.OPRFPointLength+d.conf.NonceLen : maxResponseLength],
-	}, nil
+	return message.NewCredentialResponse(d.conf.OPRF,
+		data,
+		input[d.conf.OPRFPointLength:d.conf.OPRFPointLength+d.conf.NonceLen],
+		input[d.conf.OPRFPointLength+d.conf.NonceLen:maxResponseLength]), nil
 }
 
 func (d *Deserializer) ke1Length() int {

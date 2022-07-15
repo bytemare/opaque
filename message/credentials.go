@@ -17,24 +17,44 @@ import (
 
 // CredentialRequest represents credential request message.
 type CredentialRequest struct {
-	C              oprf.Ciphersuite
+	ciphersuite    oprf.Ciphersuite
 	BlindedMessage *group.Point `json:"blinded_message"`
+}
+
+func NewCredentialRequest(ciphersuite oprf.Ciphersuite, message *group.Point) *CredentialRequest {
+	return &CredentialRequest{
+		ciphersuite:    ciphersuite,
+		BlindedMessage: message,
+	}
 }
 
 // Serialize returns the byte encoding of CredentialRequest.
 func (c *CredentialRequest) Serialize() []byte {
-	return c.C.SerializePoint(c.BlindedMessage)
+	return c.ciphersuite.SerializePoint(c.BlindedMessage)
 }
 
 // CredentialResponse represents credential response message.
 type CredentialResponse struct {
-	C                oprf.Ciphersuite
+	ciphersuite      oprf.Ciphersuite
 	EvaluatedMessage *group.Point `json:"evaluated_message"`
 	MaskingNonce     []byte       `json:"masking_nonce"`
 	MaskedResponse   []byte       `json:"masked_response"`
 }
 
+func NewCredentialResponse(
+	ciphersuite oprf.Ciphersuite,
+	message *group.Point,
+	nonce, response []byte,
+) *CredentialResponse {
+	return &CredentialResponse{
+		ciphersuite:      ciphersuite,
+		EvaluatedMessage: message,
+		MaskingNonce:     nonce,
+		MaskedResponse:   response,
+	}
+}
+
 // Serialize returns the byte encoding of CredentialResponse.
 func (c *CredentialResponse) Serialize() []byte {
-	return encoding.Concat3(c.C.SerializePoint(c.EvaluatedMessage), c.MaskingNonce, c.MaskedResponse)
+	return encoding.Concat3(c.ciphersuite.SerializePoint(c.EvaluatedMessage), c.MaskingNonce, c.MaskedResponse)
 }
