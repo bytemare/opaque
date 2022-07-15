@@ -2,7 +2,6 @@
 [![OPAQUE](https://github.com/bytemare/opaque/actions/workflows/ci.yml/badge.svg)](https://github.com/bytemare/opaque/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/bytemare/opaque.svg)](https://pkg.go.dev/github.com/bytemare/opaque)
 [![codecov](https://codecov.io/gh/bytemare/opaque/branch/main/graph/badge.svg?token=5bQfB0OctA)](https://codecov.io/gh/bytemare/opaque)
-[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fbytemare%2Fopaque.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fbytemare%2Fopaque?ref=badge_shield)
 
 This package implements [OPAQUE](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque), an asymmetric password-authenticated
 key exchange protocol that is secure against pre-computation attacks. It enables a client to authenticate to a server
@@ -11,6 +10,8 @@ without ever revealing its password to the server.
 This implementation is developed by one of the authors of the RFC [Internet Draft](https://github.com/cfrg/draft-irtf-cfrg-opaque).
 The main branch is in sync with the latest developments of the draft, and [the releases](https://github.com/bytemare/opaque/releases)
 correspond to the [official draft versions](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque).
+
+This package is continuously fuzzed on Fuzzbuzz.
 
 #### What is OPAQUE?
 
@@ -22,7 +23,7 @@ correspond to the [official draft versions](https://datatracker.ietf.org/doc/dra
 
 #### References
 - [The original paper](https://eprint.iacr.org/2018/163.pdf) from Jarecki, Krawczyk, and Xu.
-- [OPAQUE is used in WhatsApp](https://engineering.fb.com/2021/09/10/security/whatsapp-e2ee-backups) to enable end-to-end encrypted backups.
+- [OPAQUE is used in WhatsApp](https://www.whatsapp.com/security/WhatsApp_Security_Encrypted_Backups_Whitepaper.pdf) to enable end-to-end encrypted backups.
 - [The GitHub repo](https://github.com/cfrg/draft-irtf-cfrg-opaque) where the draft is being specified.
 
 ## Installation
