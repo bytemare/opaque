@@ -9,12 +9,12 @@
 package keyrecovery
 
 import (
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
+
+	"github.com/bytemare/crypto/group"
 )
 
 func deriveAuthKeyPair(conf *internal.Configuration, randomizedPwd, nonce []byte) (*group.Scalar, *group.Point) {

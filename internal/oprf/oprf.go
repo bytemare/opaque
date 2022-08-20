@@ -13,10 +13,10 @@ package oprf
 import (
 	"crypto"
 
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
+
+	"github.com/bytemare/crypto/group"
 )
 
 // mode distinguishes between the OPRF base mode and the Verifiable mode.

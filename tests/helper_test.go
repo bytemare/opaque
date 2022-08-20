@@ -16,9 +16,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/bytemare/crypto/group"
-	"github.com/bytemare/crypto/ksf"
-
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -26,6 +23,9 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
+
+	"github.com/bytemare/crypto/group"
+	"github.com/bytemare/crypto/ksf"
 )
 
 // helper functions

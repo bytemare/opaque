@@ -14,9 +14,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal/oprf"
+
+	"github.com/bytemare/crypto/group"
 )
 
 const (

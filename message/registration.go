@@ -9,10 +9,10 @@
 package message
 
 import (
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
+
+	"github.com/bytemare/crypto/group"
 )
 
 // RegistrationRequest is the first message of the registration flow, created by the client and sent to the server.

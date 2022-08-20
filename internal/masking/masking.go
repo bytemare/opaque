@@ -12,12 +12,12 @@ package masking
 import (
 	"errors"
 
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/keyrecovery"
 	"github.com/bytemare/opaque/internal/tag"
+
+	"github.com/bytemare/crypto/group"
 )
 
 // errInvalidPKS happens when the server sends an invalid public key.

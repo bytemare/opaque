@@ -17,15 +17,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytemare/crypto/group"
-	"github.com/bytemare/crypto/hash"
-	"github.com/bytemare/crypto/ksf"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
+
+	"github.com/bytemare/crypto/group"
+	"github.com/bytemare/crypto/hash"
+	"github.com/bytemare/crypto/ksf"
 )
 
 // Group identifies the prime-order group with hash-to-curve capability to use in OPRF and AKE.

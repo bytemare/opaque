@@ -16,13 +16,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bytemare/crypto/group"
-	"github.com/bytemare/crypto/ksf"
-
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
+
+	"github.com/bytemare/crypto/group"
+	"github.com/bytemare/crypto/ksf"
 )
 
 const dbgErr = "%v"

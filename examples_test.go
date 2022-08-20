@@ -16,9 +16,9 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/bytemare/crypto/ksf"
-
 	"github.com/bytemare/opaque"
+
+	"github.com/bytemare/crypto/ksf"
 )
 
 var (

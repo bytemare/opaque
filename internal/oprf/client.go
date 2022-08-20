@@ -11,10 +11,10 @@ package oprf
 import (
 	"errors"
 
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
+
+	"github.com/bytemare/crypto/group"
 )
 
 var errInvalidInput = errors.New("invalid input - OPRF input deterministically maps to the group identity element")

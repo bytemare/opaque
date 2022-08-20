@@ -11,10 +11,10 @@ package ake
 import (
 	"errors"
 
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
+
+	"github.com/bytemare/crypto/group"
 )
 
 var errAkeInvalidServerMac = errors.New(" AKE finalization: invalid server mac")

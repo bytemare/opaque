@@ -9,10 +9,10 @@
 package message
 
 import (
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
+
+	"github.com/bytemare/crypto/group"
 )
 
 // CredentialRequest represents credential request message.
