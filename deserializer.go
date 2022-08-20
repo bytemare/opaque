@@ -11,10 +11,10 @@ package opaque
 import (
 	"errors"
 
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
+
+	"github.com/bytemare/crypto/group"
 )
 
 var (

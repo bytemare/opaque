@@ -12,11 +12,11 @@ package keyrecovery
 import (
 	"errors"
 
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
+
+	"github.com/bytemare/crypto/group"
 )
 
 var errEnvelopeInvalidMac = errors.New("recover envelope: invalid envelope authentication tag")

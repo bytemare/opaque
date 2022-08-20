@@ -11,8 +11,6 @@ package opaque
 import (
 	"errors"
 
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -21,6 +19,8 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
+
+	"github.com/bytemare/crypto/group"
 )
 
 var (
@@ -58,7 +58,7 @@ func NewClient(c *Configuration) (*Client, error) {
 	}, nil
 }
 
-// GetConf return the internal configuration.
+// GetConf returns the internal configuration.
 func (c *Client) GetConf() *internal.Configuration {
 	return c.conf
 }

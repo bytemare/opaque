@@ -15,9 +15,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal/encoding"
+
+	"github.com/bytemare/crypto/group"
 )
 
 func TestEncodeVectorLenPanic(t *testing.T) {

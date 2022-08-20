@@ -10,9 +10,9 @@
 package message
 
 import (
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal/encoding"
+
+	"github.com/bytemare/crypto/group"
 )
 
 // KE1 is the first message of the login flow, created by the client and sent to the server.

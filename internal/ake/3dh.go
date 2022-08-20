@@ -10,12 +10,12 @@
 package ake
 
 import (
-	"github.com/bytemare/crypto/group"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
+
+	"github.com/bytemare/crypto/group"
 )
 
 // KeyGen returns private and public keys in the group.
