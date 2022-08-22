@@ -16,7 +16,7 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 var errEnvelopeInvalidMac = errors.New("recover envelope: invalid envelope authentication tag")
@@ -67,9 +67,9 @@ func cleartextCredentials(clientPublicKey, serverPublicKey, clientIdentity, serv
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
 func Store(
 	conf *internal.Configuration,
-	randomizedPwd, serverPublicKey []byte,
+	randomizedPwd []byte, serverPublicKey *group.Element,
 	creds *Credentials,
-) (env *Envelope, pku *group.Point, export []byte) {
+) (env *Envelope, pku *group.Element, export []byte) {
 	// testing: integrated to support testing with set nonce
 	nonce := creds.EnvelopeNonce
 	if nonce == nil {
@@ -79,7 +79,7 @@ func Store(
 	pku = getPubkey(conf, randomizedPwd, nonce)
 	ctc := cleartextCredentials(
 		encoding.SerializePoint(pku, conf.Group),
-		serverPublicKey,
+		encoding.SerializePoint(serverPublicKey, conf.Group),
 		creds.ClientIdentity,
 		creds.ServerIdentity,
 	)
@@ -99,7 +99,7 @@ func Recover(
 	conf *internal.Configuration,
 	randomizedPwd, serverPublicKey, clientIdentity, serverIdentity []byte,
 	envelope *Envelope,
-) (clientSecretKey *group.Scalar, clientPublicKey *group.Point, export []byte, err error) {
+) (clientSecretKey *group.Scalar, clientPublicKey *group.Element, export []byte, err error) {
 	clientSecretKey, clientPublicKey = recoverKeys(conf, randomizedPwd, envelope.Nonce)
 	ctc := cleartextCredentials(
 		encoding.SerializePoint(clientPublicKey, conf.Group),

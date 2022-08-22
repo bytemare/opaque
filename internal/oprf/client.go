@@ -14,7 +14,7 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 var errInvalidInput = errors.New("invalid input - OPRF input deterministically maps to the group identity element")
@@ -32,7 +32,7 @@ func (c *Client) SetBlind(blind *group.Scalar) {
 }
 
 // Blind masks the input.
-func (c *Client) Blind(input []byte) *group.Point {
+func (c *Client) Blind(input []byte) *group.Element {
 	if c.blind == nil {
 		c.blind = c.Group().NewScalar().Random()
 	}
@@ -44,7 +44,7 @@ func (c *Client) Blind(input []byte) *group.Point {
 
 	c.input = input
 
-	return p.Mult(c.blind)
+	return p.Multiply(c.blind)
 }
 
 func (c *Client) hashTranscript(input, unblinded []byte) []byte {
@@ -56,7 +56,9 @@ func (c *Client) hashTranscript(input, unblinded []byte) []byte {
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
-func (c *Client) Finalize(evaluation *group.Point) []byte {
-	u := encoding.SerializePoint(evaluation.InvertMult(c.blind), c.Ciphersuite.Group())
+func (c *Client) Finalize(evaluation *group.Element) []byte {
+	invert := c.blind.Copy().Invert()
+	u := encoding.SerializePoint(evaluation.Copy().Multiply(invert), c.Ciphersuite.Group())
+
 	return c.hashTranscript(c.input, u)
 }

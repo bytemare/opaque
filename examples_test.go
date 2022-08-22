@@ -18,7 +18,7 @@ import (
 
 	"github.com/bytemare/opaque"
 
-	"github.com/bytemare/crypto/ksf"
+	"github.com/bytemare/ksf"
 )
 
 var (
@@ -52,7 +52,7 @@ func Example_configuration() {
 		KDF:     crypto.SHA512,
 		MAC:     crypto.SHA512,
 		Hash:    crypto.SHA512,
-		KSF:     ksf.Scrypt,
+		KSF:     ksf.Argon2id,
 		AKE:     opaque.RistrettoSha512,
 		Context: nil,
 	}
@@ -79,7 +79,7 @@ func Example_configuration() {
 
 	fmt.Println("OPAQUE configuration is easy!")
 
-	// Output: Encoded Configuration: 0107070702010000
+	// Output: Encoded Configuration: 0107070701010000
 	// OPAQUE configuration is easy!
 }
 

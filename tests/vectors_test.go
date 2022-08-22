@@ -24,8 +24,8 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
 
-	"github.com/bytemare/crypto/hash"
-	"github.com/bytemare/crypto/ksf"
+	"github.com/bytemare/hash"
+	"github.com/bytemare/ksf"
 )
 
 type ByteToHex []byte
@@ -144,12 +144,12 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(vRegResp.EvaluatedMessage.Bytes(), regResp.EvaluatedMessage.Bytes()) {
-		t.Logf("%v\n%v", vRegResp.EvaluatedMessage.Bytes(), regResp.EvaluatedMessage.Bytes())
+	if !bytes.Equal(vRegResp.EvaluatedMessage.Encode(), regResp.EvaluatedMessage.Encode()) {
+		t.Logf("%v\n%v", vRegResp.EvaluatedMessage.Encode(), regResp.EvaluatedMessage.Encode())
 		t.Fatal("registration response data do not match")
 	}
 
-	if !bytes.Equal(vRegResp.Pks.Bytes(), regResp.Pks.Bytes()) {
+	if !bytes.Equal(vRegResp.Pks.Encode(), regResp.Pks.Encode()) {
 		t.Fatal("registration response serverPublicKey do not match")
 	}
 
@@ -356,8 +356,8 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 	}
 
 	if !bytes.Equal(
-		vectorKE2.CredentialResponse.EvaluatedMessage.Bytes(),
-		ke2.CredentialResponse.EvaluatedMessage.Bytes(),
+		vectorKE2.CredentialResponse.EvaluatedMessage.Encode(),
+		ke2.CredentialResponse.EvaluatedMessage.Encode(),
 	) {
 		t.Fatal("data do not match")
 	}
@@ -378,7 +378,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal("nonces do not match")
 	}
 
-	if !bytes.Equal(vectorKE2.EpkS.Bytes(), ke2.EpkS.Bytes()) {
+	if !bytes.Equal(vectorKE2.EpkS.Encode(), ke2.EpkS.Encode()) {
 		t.Fatal("epks do not match")
 	}
 
@@ -396,8 +396,8 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 }
 
 func buildOPRFClient(cs oprf.Ciphersuite, blind []byte) *oprf.Client {
-	b, err := cs.Group().NewScalar().Decode(blind)
-	if err != nil {
+	b := cs.Group().NewScalar()
+	if err := b.Decode(blind); err != nil {
 		panic(err)
 	}
 

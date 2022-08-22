@@ -17,16 +17,16 @@ import (
 	"github.com/bytemare/opaque/internal/keyrecovery"
 	"github.com/bytemare/opaque/internal/tag"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
-// errInvalidPKS happens when the server sends an invalid public key.
-var errInvalidPKS = errors.New("invalid server public key")
+// errUnmaskInvalidPKS happens when the client reads an invalid public key while unmasking.
+var errUnmaskInvalidPKS = errors.New("invalid server public key in masked response")
 
 // Keys contains all the output keys from the masking mechanism.
 type Keys struct {
 	ClientSecretKey                  *group.Scalar
-	ClientPublicKey, ServerPublicKey *group.Point
+	ClientPublicKey, ServerPublicKey *group.Element
 	ExportKey, ServerPublicKeyBytes  []byte
 }
 
@@ -52,7 +52,7 @@ func Mask(
 func Unmask(
 	conf *internal.Configuration,
 	randomizedPwd, nonce, maskedResponse []byte,
-) (serverPublicKey *group.Point, serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
+) (serverPublicKey *group.Element, serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
 	maskingKey := conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), conf.Hash.Size())
 	clear := xorResponse(conf, maskingKey, nonce, maskedResponse)
 	serverPublicKeyBytes = clear[:encoding.PointLength[conf.Group]]
@@ -62,9 +62,9 @@ func Unmask(
 		AuthTag: env[conf.NonceLen:],
 	}
 
-	serverPublicKey, err = conf.Group.NewElement().Decode(serverPublicKeyBytes)
-	if err != nil {
-		return nil, nil, nil, errInvalidPKS
+	serverPublicKey = conf.Group.NewElement()
+	if err = serverPublicKey.Decode(serverPublicKeyBytes); err != nil {
+		return nil, nil, nil, errUnmaskInvalidPKS
 	}
 
 	return serverPublicKey, serverPublicKeyBytes, envelope, nil

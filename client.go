@@ -20,7 +20,7 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 var (
@@ -64,7 +64,7 @@ func (c *Client) GetConf() *internal.Configuration {
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation *group.Point) []byte {
+func (c *Client) buildPRK(evaluation *group.Element) []byte {
 	output := c.OPRF.Finalize(evaluation)
 	stretched := c.conf.KSF.Harden(output, nil, c.conf.OPRFPointLength)
 
@@ -109,19 +109,9 @@ func (c *Client) registrationFinalize(
 		EnvelopeNonce:  envelopeNonce,
 	}
 
-	// this check is very important: it verifies the server's public key validity in the group.
-	// if _, err := c.Group.NewElement().Decode(resp.Pks); err != nil {
-	//	return nil, nil, fmt.Errorf("%s : %w", errInvalidPKS, err)
-	// }
-
 	randomizedPwd := c.buildPRK(resp.EvaluatedMessage)
 	maskingKey := c.conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.conf.KDF.Size())
-	envelope, clientPublicKey, exportKey := keyrecovery.Store(
-		c.conf,
-		randomizedPwd,
-		encoding.SerializePoint(resp.Pks, c.conf.Group),
-		creds2,
-	)
+	envelope, clientPublicKey, exportKey := keyrecovery.Store(c.conf, randomizedPwd, resp.Pks, creds2)
 
 	return &message.RegistrationRecord{
 		G:          c.conf.Group,

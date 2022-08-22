@@ -23,9 +23,9 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
 
-	"github.com/bytemare/crypto/group"
-	"github.com/bytemare/crypto/hash"
-	"github.com/bytemare/crypto/ksf"
+	group "github.com/bytemare/crypto"
+	"github.com/bytemare/hash"
+	"github.com/bytemare/ksf"
 )
 
 // Group identifies the prime-order group with hash-to-curve capability to use in OPRF and AKE.
@@ -104,7 +104,7 @@ func DefaultConfiguration() *Configuration {
 		KDF:     crypto.SHA512,
 		MAC:     crypto.SHA512,
 		Hash:    crypto.SHA512,
-		KSF:     ksf.Scrypt,
+		KSF:     ksf.Argon2id,
 		AKE:     RistrettoSha512,
 		Context: nil,
 	}
@@ -217,7 +217,7 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 	}
 
 	scalar := i.Group.NewScalar().Random()
-	publicKey := i.Group.Base().Mult(scalar)
+	publicKey := i.Group.Base().Multiply(scalar)
 
 	regRecord := &message.RegistrationRecord{
 		G:          i.Group,

@@ -17,7 +17,7 @@ import (
 
 	"github.com/bytemare/opaque/internal/encoding"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 func TestEncodeVectorLenPanic(t *testing.T) {
@@ -221,13 +221,13 @@ func expectPanic(expectedError error, f func()) (bool, string) {
 
 func TestSerializeScalarGroups(t *testing.T) {
 	// Valid Configurations
-	for _, conf := range confs {
-		g := group.Group(conf.Conf.AKE)
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		g := group.Group(conf.conf.AKE)
 		s := g.NewScalar().Random()
 		if hasPanic, err := hasPanic(func() { _ = encoding.SerializeScalar(s, g) }); hasPanic {
 			t.Fatalf("unexpected panic for valid group and scalar: %v", err)
 		}
-	}
+	})
 
 	// Invalid Configuration
 	g := group.Group(0)
@@ -239,12 +239,12 @@ func TestSerializeScalarGroups(t *testing.T) {
 
 func TestSerializeScalar(t *testing.T) {
 	length := 16
-	for _, conf := range confs {
-		g := group.Group(conf.Conf.AKE)
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		g := group.Group(conf.conf.AKE)
 		encoded := [32]byte{}
 		encoded[length] = 1
-		s, err := g.NewScalar().Decode(encoded[:])
-		if err != nil {
+		s := g.NewScalar()
+		if err := s.Decode(encoded[:]); err != nil {
 			t.Fatal(err)
 		}
 
@@ -252,18 +252,18 @@ func TestSerializeScalar(t *testing.T) {
 		if len(ser) == length {
 			t.Fatalf("serialization did not pad correctly. Before %d / After %d", length, len(ser))
 		}
-	}
+	})
 }
 
 func TestSerializePointGroups(t *testing.T) {
 	// Valid Configurations
-	for _, conf := range confs {
-		g := group.Group(conf.Conf.AKE)
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		g := group.Group(conf.conf.AKE)
 		p := g.Base()
 		if hasPanic, err := hasPanic(func() { _ = encoding.SerializePoint(p, g) }); hasPanic {
 			t.Fatalf("unexpected panic for valid group and point: %v", err)
 		}
-	}
+	})
 
 	// Invalid Configuration
 	g := group.Group(0)

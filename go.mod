@@ -2,13 +2,16 @@ module github.com/bytemare/opaque
 
 go 1.18
 
-require github.com/bytemare/crypto v0.2.7
+require (
+	github.com/bytemare/crypto v0.3.2
+	github.com/bytemare/hash v0.1.3
+	github.com/bytemare/ksf v0.1.0
+)
 
 require (
-	filippo.io/edwards25519 v1.0.0-rc.1 // indirect
-	github.com/armfazh/h2c-go-ref v0.0.0-20220222212046-ff45165972af // indirect
-	github.com/armfazh/tozan-ecc v0.1.4 // indirect
+	filippo.io/nistec v0.0.0-20220513155737-c4b6d02e738c // indirect
+	github.com/bytemare/hash2curve v0.1.2 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
-	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
-	golang.org/x/sys v0.0.0-20220712014510-0a85c31ab51e // indirect
+	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
+	golang.org/x/sys v0.0.0-20220803195053-6e608f9ce704 // indirect
 )

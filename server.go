@@ -19,7 +19,7 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 var (
@@ -75,7 +75,7 @@ func (s *Server) GetConf() *internal.Configuration {
 	return s.conf
 }
 
-func (s *Server) oprfResponse(element *group.Point, oprfSeed, credentialIdentifier []byte) *group.Point {
+func (s *Server) oprfResponse(element *group.Element, oprfSeed, credentialIdentifier []byte) *group.Element {
 	seed := s.conf.KDF.Expand(
 		oprfSeed,
 		encoding.SuffixString(credentialIdentifier, tag.ExpandOPRF),
@@ -90,7 +90,7 @@ func (s *Server) oprfResponse(element *group.Point, oprfSeed, credentialIdentifi
 // identifiers.
 func (s *Server) RegistrationResponse(
 	req *message.RegistrationRequest,
-	serverPublicKey *group.Point,
+	serverPublicKey *group.Element,
 	credentialIdentifier, oprfSeed []byte,
 ) *message.RegistrationResponse {
 	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
@@ -126,8 +126,8 @@ func (s *Server) verifyInitInput(
 	serverSecretKey, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord,
 ) (*group.Scalar, error) {
-	sks, err := s.conf.Group.NewScalar().Decode(serverSecretKey)
-	if err != nil {
+	sks := s.conf.Group.NewScalar()
+	if err := sks.Decode(serverSecretKey); err != nil {
 		return nil, fmt.Errorf("%v: %w", ErrInvalidServerSecretKey, err)
 	}
 
@@ -143,8 +143,7 @@ func (s *Server) verifyInitInput(
 		return nil, ErrInvalidPksLength
 	}
 
-	_, err = s.conf.Group.NewElement().Decode(serverPublicKey)
-	if err != nil {
+	if err := s.conf.Group.NewElement().Decode(serverPublicKey); err != nil {
 		return nil, fmt.Errorf("invalid server public key: %w", err)
 	}
 

@@ -15,13 +15,13 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 // KeyGen returns private and public keys in the group.
 func KeyGen(id group.Group) (privateKey, publicKey []byte) {
 	scalar := id.NewScalar().Random()
-	point := id.Base().Mult(scalar)
+	point := id.Base().Multiply(scalar)
 
 	return encoding.SerializeScalar(scalar, id), encoding.SerializePoint(point, id)
 }
@@ -82,16 +82,16 @@ func deriveKeys(h *internal.KDF, ikm, context []byte) (serverMacKey, clientMacKe
 
 func k3dh(
 	g group.Group,
-	p1 *group.Point,
+	p1 *group.Element,
 	s1 *group.Scalar,
-	p2 *group.Point,
+	p2 *group.Element,
 	s2 *group.Scalar,
-	p3 *group.Point,
+	p3 *group.Element,
 	s3 *group.Scalar,
 ) []byte {
-	e1 := encoding.SerializePoint(p1.Mult(s1), g)
-	e2 := encoding.SerializePoint(p2.Mult(s2), g)
-	e3 := encoding.SerializePoint(p3.Mult(s3), g)
+	e1 := encoding.SerializePoint(p1.Copy().Multiply(s1), g)
+	e2 := encoding.SerializePoint(p2.Copy().Multiply(s2), g)
+	e3 := encoding.SerializePoint(p3.Copy().Multiply(s3), g)
 
 	return encoding.Concat3(e1, e2, e3)
 }
