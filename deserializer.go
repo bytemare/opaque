@@ -14,7 +14,7 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 var (
@@ -39,8 +39,8 @@ func (d *Deserializer) RegistrationRequest(registrationRequest []byte) (*message
 		return nil, errInvalidMessageLength
 	}
 
-	blindedMessage, err := d.conf.OPRF.Group().NewElement().Decode(registrationRequest[:d.conf.OPRFPointLength])
-	if err != nil {
+	blindedMessage := d.conf.OPRF.Group().NewElement()
+	if err := blindedMessage.Decode(registrationRequest[:d.conf.OPRFPointLength]); err != nil {
 		return nil, errInvalidBlindedData
 	}
 
@@ -58,15 +58,13 @@ func (d *Deserializer) RegistrationResponse(registrationResponse []byte) (*messa
 		return nil, errInvalidMessageLength
 	}
 
-	evaluatedMessage, err := d.conf.OPRF.Group().
-		NewElement().
-		Decode(registrationResponse[:d.conf.OPRFPointLength])
-	if err != nil {
+	evaluatedMessage := d.conf.OPRF.Group().NewElement()
+	if err := evaluatedMessage.Decode(registrationResponse[:d.conf.OPRFPointLength]); err != nil {
 		return nil, errInvalidEvaluatedData
 	}
 
-	pks, err := d.conf.Group.NewElement().Decode(registrationResponse[d.conf.OPRFPointLength:])
-	if err != nil {
+	pks := d.conf.Group.NewElement()
+	if err := pks.Decode(registrationResponse[d.conf.OPRFPointLength:]); err != nil {
 		return nil, errInvalidServerPK
 	}
 
@@ -93,8 +91,8 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 	maskingKey := record[d.conf.AkePointLength : d.conf.AkePointLength+d.conf.Hash.Size()]
 	env := record[d.conf.AkePointLength+d.conf.Hash.Size():]
 
-	pku, err := d.conf.Group.NewElement().Decode(pk)
-	if err != nil {
+	pku := d.conf.Group.NewElement()
+	if err := pku.Decode(pk); err != nil {
 		return nil, errInvalidClientPK
 	}
 
@@ -107,8 +105,8 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 }
 
 func (d *Deserializer) deserializeCredentialRequest(input []byte) (*message.CredentialRequest, error) {
-	blindedMessage, err := d.conf.OPRF.Group().NewElement().Decode(input[:d.conf.OPRFPointLength])
-	if err != nil {
+	blindedMessage := d.conf.OPRF.Group().NewElement()
+	if err := blindedMessage.Decode(input[:d.conf.OPRFPointLength]); err != nil {
 		return nil, errInvalidBlindedData
 	}
 
@@ -119,8 +117,8 @@ func (d *Deserializer) deserializeCredentialResponse(
 	input []byte,
 	maxResponseLength int,
 ) (*message.CredentialResponse, error) {
-	data, err := d.conf.OPRF.Group().NewElement().Decode(input[:d.conf.OPRFPointLength])
-	if err != nil {
+	data := d.conf.OPRF.Group().NewElement()
+	if err := data.Decode(input[:d.conf.OPRFPointLength]); err != nil {
 		return nil, errInvalidEvaluatedData
 	}
 
@@ -147,8 +145,8 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 
 	nonceU := ke1[d.conf.OPRFPointLength : d.conf.OPRFPointLength+d.conf.NonceLen]
 
-	epku, err := d.conf.Group.NewElement().Decode(ke1[d.conf.OPRFPointLength+d.conf.NonceLen:])
-	if err != nil {
+	epku := d.conf.Group.NewElement()
+	if err := epku.Decode(ke1[d.conf.OPRFPointLength+d.conf.NonceLen:]); err != nil {
 		return nil, errInvalidClientEPK
 	}
 
@@ -189,8 +187,8 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 	offset += d.conf.AkePointLength
 	mac := ke2[offset:]
 
-	epks, err := d.conf.Group.NewElement().Decode(epk)
-	if err != nil {
+	epks := d.conf.Group.NewElement()
+	if err := epks.Decode(epk); err != nil {
 		return nil, errInvalidServerEPK
 	}
 
@@ -214,10 +212,20 @@ func (d *Deserializer) KE3(ke3 []byte) (*message.KE3, error) {
 
 // DecodeAkePrivateKey takes a serialized private key (a scalar) and attempts to return it's decoded form.
 func (d *Deserializer) DecodeAkePrivateKey(encoded []byte) (*group.Scalar, error) {
-	return d.conf.Group.NewScalar().Decode(encoded)
+	sk := d.conf.Group.NewScalar()
+	if err := sk.Decode(encoded); err != nil {
+		return nil, err
+	}
+
+	return sk, nil
 }
 
 // DecodeAkePublicKey takes a serialized public key (a point) and attempts to return it's decoded form.
-func (d *Deserializer) DecodeAkePublicKey(encoded []byte) (*group.Point, error) {
-	return d.conf.Group.NewElement().Decode(encoded)
+func (d *Deserializer) DecodeAkePublicKey(encoded []byte) (*group.Element, error) {
+	pk := d.conf.Group.NewElement()
+	if err := pk.Decode(encoded); err != nil {
+		return nil, err
+	}
+
+	return pk, nil
 }

@@ -16,7 +16,7 @@ import (
 
 	"github.com/bytemare/opaque/internal/oprf"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 const (

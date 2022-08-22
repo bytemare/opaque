@@ -22,8 +22,8 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/oprf"
 
-	"github.com/bytemare/crypto/hash"
-	"github.com/bytemare/crypto/ksf"
+	"github.com/bytemare/hash"
+	"github.com/bytemare/ksf"
 )
 
 const (
@@ -365,8 +365,8 @@ func FuzzDeserializeKE1(f *testing.F) {
 }
 
 func isValidAKEPoint(conf *internal.Configuration, input []byte, err error) error {
-	e, _err := conf.Group.NewElement().Decode(input)
-	if _err == nil {
+	e := conf.Group.NewElement()
+	if _err := e.Decode(input); _err == nil {
 		if e.IsIdentity() {
 			return errors.New("point is identity/infinity")
 		}
@@ -378,8 +378,8 @@ func isValidAKEPoint(conf *internal.Configuration, input []byte, err error) erro
 }
 
 func isValidOPRFPoint(conf *internal.Configuration, input []byte, err error) error {
-	e, _err := conf.OPRF.Group().NewElement().Decode(input)
-	if _err == nil {
+	e := conf.OPRF.Group().NewElement()
+	if _err := e.Decode(input); _err == nil {
 		if e.IsIdentity() {
 			return errors.New("point is identity/infinity")
 		}

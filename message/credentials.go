@@ -12,17 +12,17 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 // CredentialRequest represents credential request message.
 type CredentialRequest struct {
 	ciphersuite    oprf.Ciphersuite
-	BlindedMessage *group.Point `json:"blinded_message"`
+	BlindedMessage *group.Element `json:"blinded_message"`
 }
 
 // NewCredentialRequest returns a populated CredentialRequest.
-func NewCredentialRequest(ciphersuite oprf.Ciphersuite, message *group.Point) *CredentialRequest {
+func NewCredentialRequest(ciphersuite oprf.Ciphersuite, message *group.Element) *CredentialRequest {
 	return &CredentialRequest{
 		ciphersuite:    ciphersuite,
 		BlindedMessage: message,
@@ -37,15 +37,15 @@ func (c *CredentialRequest) Serialize() []byte {
 // CredentialResponse represents credential response message.
 type CredentialResponse struct {
 	ciphersuite      oprf.Ciphersuite
-	EvaluatedMessage *group.Point `json:"evaluated_message"`
-	MaskingNonce     []byte       `json:"masking_nonce"`
-	MaskedResponse   []byte       `json:"masked_response"`
+	EvaluatedMessage *group.Element `json:"evaluated_message"`
+	MaskingNonce     []byte         `json:"masking_nonce"`
+	MaskedResponse   []byte         `json:"masked_response"`
 }
 
 // NewCredentialResponse returns a populated CredentialResponse.
 func NewCredentialResponse(
 	ciphersuite oprf.Ciphersuite,
-	message *group.Point,
+	message *group.Element,
 	nonce, response []byte,
 ) *CredentialResponse {
 	return &CredentialResponse{

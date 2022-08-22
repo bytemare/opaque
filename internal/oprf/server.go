@@ -9,10 +9,10 @@
 package oprf
 
 import (
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 // Evaluate evaluates the blinded input with the given key.
-func (c Ciphersuite) Evaluate(privateKey *group.Scalar, blindedElement *group.Point) *group.Point {
-	return blindedElement.Mult(privateKey)
+func (c Ciphersuite) Evaluate(privateKey *group.Scalar, blindedElement *group.Element) *group.Element {
+	return blindedElement.Copy().Multiply(privateKey)
 }

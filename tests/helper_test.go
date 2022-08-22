@@ -13,6 +13,7 @@ import (
 	"crypto/elliptic"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"math/big"
 	"testing"
 
@@ -24,24 +25,31 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 
-	"github.com/bytemare/crypto/group"
-	"github.com/bytemare/crypto/ksf"
+	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ksf"
 )
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 // helper functions
 
 type configuration struct {
-	Conf  *opaque.Configuration
-	Curve elliptic.Curve
+	name  string
+	conf  *opaque.Configuration
+	curve elliptic.Curve
 }
 
-var confs = []configuration{
+var configurationTable = []configuration{
 	{
-		Conf:  opaque.DefaultConfiguration(),
-		Curve: nil,
+		name:  "Ristretto255",
+		conf:  opaque.DefaultConfiguration(),
+		curve: nil,
 	},
 	{
-		Conf: &opaque.Configuration{
+		name: "P256Sha256",
+		conf: &opaque.Configuration{
 			OPRF: opaque.P256Sha256,
 			KDF:  crypto.SHA256,
 			MAC:  crypto.SHA256,
@@ -49,10 +57,11 @@ var confs = []configuration{
 			KSF:  ksf.Scrypt,
 			AKE:  opaque.P256Sha256,
 		},
-		Curve: elliptic.P256(),
+		curve: elliptic.P256(),
 	},
 	{
-		Conf: &opaque.Configuration{
+		name: "P384Sha512",
+		conf: &opaque.Configuration{
 			OPRF: opaque.P384Sha512,
 			KDF:  crypto.SHA512,
 			MAC:  crypto.SHA512,
@@ -60,10 +69,11 @@ var confs = []configuration{
 			KSF:  ksf.Scrypt,
 			AKE:  opaque.P384Sha512,
 		},
-		Curve: elliptic.P384(),
+		curve: elliptic.P384(),
 	},
 	{
-		Conf: &opaque.Configuration{
+		name: "P521Sha512",
+		conf: &opaque.Configuration{
 			OPRF: opaque.P521Sha512,
 			KDF:  crypto.SHA512,
 			MAC:  crypto.SHA512,
@@ -71,20 +81,16 @@ var confs = []configuration{
 			KSF:  ksf.Scrypt,
 			AKE:  opaque.P521Sha512,
 		},
-		Curve: elliptic.P521(),
+		curve: elliptic.P521(),
 	},
-	//{
-	//	Conf: &opaque.Configuration{
-	//		OPRF: opaque.RistrettoSha512,
-	//		KDF:  crypto.SHA512,
-	//		MAC:  crypto.SHA512,
-	//		Hash: crypto.SHA512,
-	//		KSF:  ksf.Scrypt,
-	//		Mode: opaque.Internal,
-	//		AKE:  opaque.Curve25519Sha512,
-	//	},
-	//	Curve: nil,
-	//},
+}
+
+func testAll(t *testing.T, f func(*testing.T, *configuration)) {
+	for _, test := range configurationTable {
+		t.Run(test.name, func(t *testing.T) {
+			f(t, &test)
+		})
+	}
 }
 
 func getBadRistrettoScalar() []byte {
@@ -119,7 +125,7 @@ func badScalar(t *testing.T, g group.Group, curve elliptic.Curve) []byte {
 	order := curve.Params().P
 	exceeded := new(big.Int).Add(order, big.NewInt(2)).Bytes()
 
-	_, err := g.NewScalar().Decode(exceeded)
+	err := g.NewScalar().Decode(exceeded)
 	if err == nil {
 		t.Errorf("Exceeding order did not yield an error for group %s", g)
 	}
@@ -134,7 +140,7 @@ func getBadNistElement(t *testing.T, id group.Group) []byte {
 	element[0] = 4
 
 	// test if invalid compression is detected
-	_, err := id.NewElement().Decode(element)
+	err := id.NewElement().Decode(element)
 	if err == nil {
 		t.Errorf("detagged compressed point did not yield an error for group %s", id)
 	}
@@ -142,25 +148,21 @@ func getBadNistElement(t *testing.T, id group.Group) []byte {
 	return element
 }
 
-func getBadElement(t *testing.T, c configuration) []byte {
-	switch c.Conf.AKE {
+func getBadElement(t *testing.T, c *configuration) []byte {
+	switch c.conf.AKE {
 	case opaque.RistrettoSha512:
 		return getBadRistrettoElement()
-	// case opaque.Curve25519Sha512:
-	//	return getBad25519Element()
 	default:
-		return getBadNistElement(t, group.Group(c.Conf.AKE))
+		return getBadNistElement(t, group.Group(c.conf.AKE))
 	}
 }
 
 func getBadScalar(t *testing.T, c configuration) []byte {
-	switch c.Conf.AKE {
+	switch c.conf.AKE {
 	case opaque.RistrettoSha512:
 		return getBadRistrettoScalar()
-	// case opaque.Curve25519Sha512:
-	//	return getBad25519Scalar()
 	default:
-		return badScalar(t, oprf.Ciphersuite(c.Conf.AKE).Group(), c.Curve)
+		return badScalar(t, oprf.Ciphersuite(c.conf.AKE).Group(), c.curve)
 	}
 }
 
@@ -171,10 +173,12 @@ func buildRecord(
 ) *opaque.ClientRecord {
 	conf := server.GetConf()
 	r1 := client.RegistrationInit(password)
-	pk, err := conf.Group.NewElement().Decode(pks)
-	if err != nil {
+
+	pk := conf.Group.NewElement()
+	if err := pk.Decode(pks); err != nil {
 		panic(err)
 	}
+
 	r2 := server.RegistrationResponse(r1, pk, credID, oprfSeed)
 	r3, _ := client.RegistrationFinalize(r2, nil, nil)
 
@@ -203,23 +207,23 @@ func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
 	return dst
 }
 
-func buildPRK(client *opaque.Client, evaluation *group.Point) ([]byte, error) {
+func buildPRK(client *opaque.Client, evaluation *group.Element) ([]byte, error) {
 	conf := client.GetConf()
 	unblinded := client.OPRF.Finalize(evaluation)
 	hardened := conf.KSF.Harden(unblinded, nil, conf.OPRFPointLength)
 
-	return conf.KDF.Extract(nil, hardened), nil
+	return conf.KDF.Extract(nil, encoding.Concat(unblinded, hardened)), nil
 }
 
 func getEnvelope(client *opaque.Client, ke2 *message.KE2) (*keyrecovery.Envelope, []byte, error) {
 	conf := client.GetConf()
+
 	randomizedPwd, err := buildPRK(client, ke2.EvaluatedMessage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	maskingKey := conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), conf.Hash.Size())
-
+	maskingKey := conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), conf.KDF.Size())
 	clear := xorResponse(conf, maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
 	e := clear[encoding.PointLength[conf.Group]:]
 

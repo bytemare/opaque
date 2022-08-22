@@ -16,14 +16,11 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
-// mode distinguishes between the OPRF base mode and the Verifiable mode.
-type mode byte
-
-// base identifies the OPRF non-verifiable, base mode.
-const base mode = iota
+// base identifies the OPRF non-verifiable, base, mode, encoded on one byte: base = I2OSP(0, 1).
+var base = []byte{0}
 
 // Ciphersuite identifies the OPRF compatible cipher suite to be used.
 type Ciphersuite group.Group
@@ -42,7 +39,7 @@ const (
 	P521Sha512 = Ciphersuite(group.P521Sha512)
 )
 
-var suiteToHash = make(map[group.Group]crypto.Hash)
+var suiteToHash = make(map[group.Group]crypto.Hash, 4)
 
 func init() {
 	RistrettoSha512.register(crypto.SHA512)
@@ -59,8 +56,12 @@ func (c Ciphersuite) dst(prefix string) []byte {
 	return encoding.Concat([]byte(prefix), c.contextString())
 }
 
+func (c Ciphersuite) i2osp() []byte {
+	return []byte{0, byte(c)}
+}
+
 func (c Ciphersuite) contextString() []byte {
-	return encoding.Concat3([]byte(tag.OPRF), encoding.I2OSP(int(base), 1), encoding.I2OSP(int(c), 2))
+	return encoding.Concat3([]byte(tag.OPRF), base, c.i2osp())
 }
 
 func (c Ciphersuite) hash(input ...[]byte) []byte {
@@ -86,7 +87,7 @@ func (c Ciphersuite) Group() group.Group {
 }
 
 // SerializePoint returns the byte encoding of the point padded accordingly.
-func (c Ciphersuite) SerializePoint(p *group.Point) []byte {
+func (c Ciphersuite) SerializePoint(p *group.Element) []byte {
 	return encoding.SerializePoint(p, c.Group())
 }
 

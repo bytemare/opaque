@@ -26,7 +26,7 @@ fmt:
 .PHONY: license
 license:
 	@echo "Checking License headers ..."
-	@if addlicense -check -v -f .github/licence-header.tmpl *; then echo "License headers OK"; else return 1; fi;
+	@if addlicense -check -v -skip yaml -f .github/licence-header.tmpl *; then echo "License headers OK"; else return 1; fi;
 
 .PHONY: lint
 lint: license

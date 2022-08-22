@@ -14,7 +14,7 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 var errAkeInvalidServerMac = errors.New(" AKE finalization: invalid server mac")
@@ -34,7 +34,7 @@ func NewClient() *Client {
 
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
-func (c *Client) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Point {
+func (c *Client) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Element {
 	s, nonce := setValues(g, esk, nonce, nonceLen)
 	if c.esk == nil || (esk != nil && c.esk != s) {
 		c.esk = s
@@ -44,7 +44,7 @@ func (c *Client) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonce
 		c.nonceU = nonce
 	}
 
-	return g.Base().Mult(c.esk)
+	return g.Base().Multiply(c.esk)
 }
 
 // Start initiates the 3DH protocol, and returns a KE1 message with clientInfo.
@@ -65,7 +65,7 @@ func (c *Client) Finalize(
 	clientIdentity []byte,
 	clientSecretKey *group.Scalar,
 	serverIdentity []byte,
-	serverPublicKey *group.Point,
+	serverPublicKey *group.Element,
 	ke2 *message.KE2,
 ) (*message.KE3, error) {
 	ikm := k3dh(conf.Group, ke2.EpkS, c.esk, serverPublicKey, c.esk, ke2.EpkS, clientSecretKey)

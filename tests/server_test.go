@@ -35,27 +35,27 @@ func TestServer_BadRegistrationRequest(t *testing.T) {
 	err1 := "invalid message length"
 	err2 := "blinded data is an invalid point"
 
-	for i, e := range confs {
-		server, _ := e.Conf.Server()
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, _ := conf.conf.Server()
 		if _, err := server.Deserialize.RegistrationRequest(nil); err == nil || !strings.HasPrefix(err.Error(), err1) {
-			t.Fatalf("#%d - expected error. Got %v", i, err)
+			t.Fatalf("expected error. Got %v", err)
 		}
 
-		bad := getBadElement(t, e)
+		bad := getBadElement(t, conf)
 		if _, err := server.Deserialize.RegistrationRequest(bad); err == nil || !strings.HasPrefix(err.Error(), err2) {
-			t.Fatalf("#%d - expected error. Got %v", i, err)
+			t.Fatalf("expected error. Got %v", err)
 		}
-	}
+	})
 }
 
 func TestServerInit_InvalidPublicKey(t *testing.T) {
 	/*
 		Nil and invalid server public key
 	*/
-	for _, conf := range confs {
-		server, _ := conf.Conf.Server()
-		sk, _ := conf.Conf.KeyGen()
-		oprfSeed := internal.RandomBytes(conf.Conf.Hash.Size())
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, _ := conf.conf.Server()
+		sk, _ := conf.conf.KeyGen()
+		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
 
 		expected := "input server public key's length is invalid"
 		if _, err := server.LoginInit(nil, nil, sk, nil, oprfSeed, nil); err == nil ||
@@ -68,56 +68,56 @@ func TestServerInit_InvalidPublicKey(t *testing.T) {
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on bad secret key - got %s", err)
 		}
-	}
+	})
 }
 
 func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 	/*
 		Nil and invalid server public key
 	*/
-	for _, conf := range confs {
-		server, _ := conf.Conf.Server()
-		sk, pk := conf.Conf.KeyGen()
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, _ := conf.conf.Server()
+		sk, pk := conf.conf.KeyGen()
 		expected := opaque.ErrInvalidOPRFSeedLength
 
 		if _, err := server.LoginInit(nil, nil, sk, pk, nil, nil); err == nil || !errors.Is(err, expected) {
 			t.Fatalf("expected error on nil seed - got %s", err)
 		}
 
-		seed := internal.RandomBytes(conf.Conf.Hash.Size() - 1)
+		seed := internal.RandomBytes(conf.conf.Hash.Size() - 1)
 		if _, err := server.LoginInit(nil, nil, sk, pk, seed, nil); err == nil || !errors.Is(err, expected) {
 			t.Fatalf("expected error on bad seed - got %s", err)
 		}
 
-		seed = internal.RandomBytes(conf.Conf.Hash.Size() + 1)
+		seed = internal.RandomBytes(conf.conf.Hash.Size() + 1)
 		if _, err := server.LoginInit(nil, nil, sk, pk, seed, nil); err == nil || !errors.Is(err, expected) {
 			t.Fatalf("expected error on bad seed - got %s", err)
 		}
-	}
+	})
 }
 
 func TestServerInit_NilSecretKey(t *testing.T) {
 	/*
 		Nil server secret key
 	*/
-	for _, conf := range confs {
-		server, _ := conf.Conf.Server()
-		_, pk := conf.Conf.KeyGen()
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, _ := conf.conf.Server()
+		_, pk := conf.conf.KeyGen()
 		expected := "invalid server secret key: "
 
 		if _, err := server.LoginInit(nil, nil, nil, pk, nil, nil); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil secret key - got %s", err)
 		}
-	}
+	})
 }
 
 func TestServerInit_ZeroSecretKey(t *testing.T) {
 	/*
 		Nil server secret key
 	*/
-	for _, conf := range confs {
-		server, _ := conf.Conf.Server()
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, _ := conf.conf.Server()
 		sk := [32]byte{}
 		expected := "server private key is zero"
 
@@ -125,18 +125,18 @@ func TestServerInit_ZeroSecretKey(t *testing.T) {
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil secret key - got %s", err)
 		}
-	}
+	})
 }
 
 func TestServerInit_InvalidEnvelope(t *testing.T) {
 	/*
 		Record envelope of invalid length
 	*/
-	for _, conf := range confs {
-		server, _ := conf.Conf.Server()
-		sk, pk := conf.Conf.KeyGen()
-		oprfSeed := internal.RandomBytes(conf.Conf.Hash.Size())
-		client, _ := conf.Conf.Client()
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, _ := conf.conf.Server()
+		sk, pk := conf.conf.KeyGen()
+		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
+		client, _ := conf.conf.Client()
 		rec := buildRecord(internal.RandomBytes(32), oprfSeed, []byte("yo"), pk, client, server)
 		rec.Envelope = internal.RandomBytes(15)
 
@@ -145,15 +145,15 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil secret key - got %s", err)
 		}
-	}
+	})
 }
 
 func TestServerInit_InvalidData(t *testing.T) {
 	/*
 		Invalid OPRF data in KE1
 	*/
-	for _, conf := range confs {
-		server, _ := conf.Conf.Server()
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, _ := conf.conf.Server()
 		ke1 := encoding.Concatenate(
 			getBadElement(t, conf),
 			internal.RandomBytes(server.GetConf().NonceLen),
@@ -163,17 +163,16 @@ func TestServerInit_InvalidData(t *testing.T) {
 		if _, err := server.Deserialize.KE1(ke1); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on bad oprf request - got %s", err)
 		}
-	}
+	})
 }
 
 func TestServerInit_InvalidEPKU(t *testing.T) {
 	/*
 		Invalid EPKU in KE1
 	*/
-
-	for _, conf := range confs {
-		server, _ := conf.Conf.Server()
-		client, _ := conf.Conf.Client()
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, _ := conf.conf.Server()
+		client, _ := conf.conf.Client()
 		ke1 := client.LoginInit([]byte("yo")).Serialize()
 		badke1 := encoding.Concat(
 			ke1[:server.GetConf().OPRFPointLength+server.GetConf().NonceLen],
@@ -183,7 +182,7 @@ func TestServerInit_InvalidEPKU(t *testing.T) {
 		if _, err := server.Deserialize.KE1(badke1); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on bad epku - got %s", err)
 		}
-	}
+	})
 }
 
 func TestServerFinish_InvalidKE3Mac(t *testing.T) {

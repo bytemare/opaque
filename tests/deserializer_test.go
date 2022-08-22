@@ -16,7 +16,7 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 var errInvalidMessageLength = errors.New("invalid message length for the configuration")
@@ -27,11 +27,11 @@ var errInvalidMessageLength = errors.New("invalid message length for the configu
 
 func TestDeserializer(t *testing.T) {
 	// Test valid configurations
-	for _, conf := range confs {
-		if _, err := conf.Conf.Deserializer(); err != nil {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		if _, err := conf.conf.Deserializer(); err != nil {
 			t.Fatalf("unexpected error on valid configuration: %v", err)
 		}
-	}
+	})
 
 	// Test for an invalid configuration.
 	conf := &opaque.Configuration{
@@ -86,29 +86,29 @@ func TestDeserializeRegistrationResponse(t *testing.T) {
 }
 
 func TestDeserializeRegistrationRecord(t *testing.T) {
-	for _, e := range confs {
-		server, _ := e.Conf.Server()
-		conf := server.GetConf()
-		length := conf.AkePointLength + conf.Hash.Size() + conf.EnvelopeSize + 1
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, _ := conf.conf.Server()
+		c := server.GetConf()
+		length := c.AkePointLength + c.Hash.Size() + c.EnvelopeSize + 1
 		if _, err := server.Deserialize.RegistrationRecord(internal.RandomBytes(length)); err == nil ||
 			err.Error() != errInvalidMessageLength.Error() {
 			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 		}
 
-		badPKu := getBadElement(t, e)
-		rec := encoding.Concat(badPKu, internal.RandomBytes(conf.Hash.Size()+conf.EnvelopeSize))
+		badPKu := getBadElement(t, conf)
+		rec := encoding.Concat(badPKu, internal.RandomBytes(c.Hash.Size()+c.EnvelopeSize))
 
 		expect := "invalid client public key"
 		if _, err := server.Deserialize.RegistrationRecord(rec); err == nil || err.Error() != expect {
 			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", expect, err)
 		}
 
-		client, _ := e.Conf.Client()
+		client, _ := conf.conf.Client()
 		if _, err := client.Deserialize.RegistrationRecord(internal.RandomBytes(length)); err == nil ||
 			err.Error() != errInvalidMessageLength.Error() {
 			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 		}
-	}
+	})
 }
 
 func TestDeserializeKE1(t *testing.T) {

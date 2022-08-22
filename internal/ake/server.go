@@ -14,7 +14,7 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 var errStateNotEmpty = errors.New("existing state is not empty")
@@ -36,7 +36,7 @@ func NewServer() *Server {
 
 // SetValues - testing: integrated to support testing, to force values.
 // There's no effect if esk, epk, and nonce have already been set in a previous call.
-func (s *Server) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Point {
+func (s *Server) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Element {
 	es, nonce := setValues(g, esk, nonce, nonceLen)
 	if s.esk == nil || (esk != nil && s.esk != es) {
 		s.esk = es
@@ -46,7 +46,7 @@ func (s *Server) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonce
 		s.nonceS = nonce
 	}
 
-	return g.Base().Mult(s.esk)
+	return g.Base().Multiply(s.esk)
 }
 
 // Response produces a 3DH server response message.
@@ -55,7 +55,7 @@ func (s *Server) Response(
 	serverIdentity []byte,
 	serverSecretKey *group.Scalar,
 	clientIdentity []byte,
-	clientPublicKey *group.Point,
+	clientPublicKey *group.Element,
 	ke1 *message.KE1,
 	response *message.CredentialResponse,
 ) *message.KE2 {

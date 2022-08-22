@@ -23,7 +23,7 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 type oprfVector struct {
@@ -120,13 +120,13 @@ func (tv *testVector) Decode() (*test, error) {
 func testBlind(t *testing.T, c oprf.Ciphersuite, test *test) {
 	client := c.Client()
 	for i := 0; i < len(test.Input); i++ {
-		s, err := c.Group().NewScalar().Decode(test.Blind[i])
-		if err != nil {
+		s := c.Group().NewScalar()
+		if err := s.Decode(test.Blind[i]); err != nil {
 			t.Fatal(fmt.Errorf("blind decoding to scalar in suite %v errored with %q", c, err))
 		}
 
 		client.SetBlind(s)
-		blinded := client.Blind(test.Input[i]).Bytes()
+		blinded := client.Blind(test.Input[i]).Encode()
 
 		if !bytes.Equal(test.BlindedElement[i], blinded) {
 			t.Fatal("unexpected blinded output")
@@ -136,13 +136,13 @@ func testBlind(t *testing.T, c oprf.Ciphersuite, test *test) {
 
 func testEvaluation(t *testing.T, c oprf.Ciphersuite, privKey *group.Scalar, test *test) {
 	for i := 0; i < len(test.BlindedElement); i++ {
-		b, err := c.Group().NewElement().Decode(test.BlindedElement[i])
-		if err != nil {
+		b := c.Group().NewElement()
+		if err := b.Decode(test.BlindedElement[i]); err != nil {
 			t.Fatal(fmt.Errorf("blind decoding to element in suite %v errored with %q", c, err))
 		}
 
 		ev := c.Evaluate(privKey, b)
-		if !bytes.Equal(test.EvaluationElement[i], ev.Bytes()) {
+		if !bytes.Equal(test.EvaluationElement[i], ev.Encode()) {
 			t.Fatal("unexpected evaluation")
 		}
 	}
@@ -151,13 +151,13 @@ func testEvaluation(t *testing.T, c oprf.Ciphersuite, privKey *group.Scalar, tes
 func testFinalization(t *testing.T, c oprf.Ciphersuite, test *test) {
 	client := c.Client()
 	for i := 0; i < len(test.EvaluationElement); i++ {
-		ev, err := c.Group().NewElement().Decode(test.EvaluationElement[i])
-		if err != nil {
+		ev := c.Group().NewElement()
+		if err := ev.Decode(test.EvaluationElement[i]); err != nil {
 			t.Fatal(fmt.Errorf("blind decoding to element in suite %v errored with %q", c, err))
 		}
 
-		s, err := c.Group().NewScalar().Decode(test.Blind[i])
-		if err != nil {
+		s := c.Group().NewScalar()
+		if err := s.Decode(test.Blind[i]); err != nil {
 			t.Fatal(fmt.Errorf("blind decoding to scalar in suite %v errored with %q", c, err))
 		}
 
@@ -181,8 +181,8 @@ func (v oprfVector) test(t *testing.T) {
 		t.Fatalf("private key decoding errored with %q\nfor sksm %v\n", err, v.SkSm)
 	}
 
-	privKey, err := v.SuiteID.Group().NewScalar().Decode(s)
-	if err != nil {
+	privKey := v.SuiteID.Group().NewScalar()
+	if err := privKey.Decode(s); err != nil {
 		t.Fatal(fmt.Errorf("private key decoding to scalar in suite %v errored with %q", v.SuiteID, err))
 	}
 
@@ -198,8 +198,8 @@ func (v oprfVector) test(t *testing.T) {
 
 	sks := v.SuiteID.DeriveKey(decSeed, decKeyInfo)
 
-	if !sks.Sub(privKey).IsZero() {
-		t.Fatalf(" DeriveKeyPair did not yield the expected key %v\n", hex.EncodeToString(sks.Bytes()))
+	if !sks.Subtract(privKey).IsZero() {
+		t.Fatalf(" DeriveKeyPair did not yield the expected key %v\n", hex.EncodeToString(sks.Encode()))
 	}
 
 	dst, err := hex.DecodeString(v.DST)
