@@ -17,6 +17,9 @@ import (
 	"math/big"
 	"testing"
 
+	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ksf"
+
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -24,9 +27,6 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
-
-	group "github.com/bytemare/crypto"
-	"github.com/bytemare/ksf"
 )
 
 func init() {
@@ -36,9 +36,9 @@ func init() {
 // helper functions
 
 type configuration struct {
-	name  string
-	conf  *opaque.Configuration
 	curve elliptic.Curve
+	conf  *opaque.Configuration
+	name  string
 }
 
 var configurationTable = []configuration{

@@ -15,9 +15,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/bytemare/opaque/internal/encoding"
-
 	group "github.com/bytemare/crypto"
+
+	"github.com/bytemare/opaque/internal/encoding"
 )
 
 func TestEncodeVectorLenPanic(t *testing.T) {
@@ -51,32 +51,32 @@ func TestDecodeVector(t *testing.T) {
 }
 
 type i2ospTest struct {
+	encoded []byte
 	value   int
 	size    int
-	encoded []byte
 }
 
 var I2OSPVectors = []i2ospTest{
 	{
-		0, 1, []byte{0},
+		[]byte{0}, 0, 1,
 	},
 	{
-		1, 1, []byte{1},
+		[]byte{1}, 1, 1,
 	},
 	{
-		255, 1, []byte{0xff},
+		[]byte{0xff}, 255, 1,
 	},
 	{
-		256, 2, []byte{0x01, 0x00},
+		[]byte{0x01, 0x00}, 256, 2,
 	},
 	{
-		65535, 2, []byte{0xff, 0xff},
+		[]byte{0xff, 0xff}, 65535, 2,
 	},
 	{
-		16770000, 3, []byte{0xff, 0xe3, 0xd0},
+		[]byte{0xff, 0xe3, 0xd0}, 16770000, 3,
 	},
 	{
-		4294960000, 4, []byte{0xff, 0xff, 0xe3, 0x80},
+		[]byte{0xff, 0xff, 0xe3, 0x80}, 4294960000, 4,
 	},
 }
 

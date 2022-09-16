@@ -11,10 +11,10 @@ package ake
 import (
 	"errors"
 
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
-
-	group "github.com/bytemare/crypto"
 )
 
 var errStateNotEmpty = errors.New("existing state is not empty")
@@ -31,7 +31,12 @@ type Server struct {
 
 // NewServer returns a new, empty, 3DH server.
 func NewServer() *Server {
-	return &Server{}
+	return &Server{
+		clientMac:     nil,
+		sessionSecret: nil,
+		esk:           nil,
+		nonceS:        nil,
+	}
 }
 
 // SetValues - testing: integrated to support testing, to force values.
@@ -66,6 +71,7 @@ func (s *Server) Response(
 		CredentialResponse: response,
 		NonceS:             s.nonceS,
 		EpkS:               epk,
+		Mac:                nil,
 	}
 
 	ikm := k3dh(conf.Group, ke1.EpkU, s.esk, ke1.EpkU, serverSecretKey, clientPublicKey, s.esk)

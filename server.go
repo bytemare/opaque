@@ -12,14 +12,14 @@ import (
 	"errors"
 	"fmt"
 
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/masking"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
-
-	group "github.com/bytemare/crypto"
 )
 
 var (
@@ -211,7 +211,11 @@ func (s *Server) SetAKEState(state []byte) error {
 		return ErrInvalidState
 	}
 
-	return s.Ake.SetState(state[:s.conf.MAC.Size()], state[s.conf.MAC.Size():])
+	if err := s.Ake.SetState(state[:s.conf.MAC.Size()], state[s.conf.MAC.Size():]); err != nil {
+		return fmt.Errorf("setting AKE state: %w", err)
+	}
+
+	return nil
 }
 
 // SerializeState returns the internal state of the AKE server serialized to bytes.

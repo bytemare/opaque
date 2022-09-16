@@ -14,9 +14,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/bytemare/opaque/internal/oprf"
-
 	group "github.com/bytemare/crypto"
+
+	"github.com/bytemare/opaque/internal/oprf"
 )
 
 const (
@@ -36,13 +36,13 @@ type Configuration struct {
 	MAC             *Mac
 	Hash            *Hash
 	KSF             *KSF
+	Context         []byte
 	NonceLen        int
 	EnvelopeSize    int
 	OPRFPointLength int
 	AkePointLength  int
 	Group           group.Group
 	OPRF            oprf.Ciphersuite
-	Context         []byte
 }
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).

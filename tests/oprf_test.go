@@ -19,43 +19,43 @@ import (
 	"strings"
 	"testing"
 
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
-
-	group "github.com/bytemare/crypto"
 )
 
 type oprfVector struct {
 	DST       string           `json:"groupDST"`
 	Hash      string           `json:"hash"`
 	KeyInfo   string           `json:"keyInfo"`
-	Mode      byte             `json:"mode"`
 	Seed      string           `json:"seed"`
 	SkSm      string           `json:"skSm"`
-	SuiteID   oprf.Ciphersuite `json:"suiteID"`
 	SuiteName string           `json:"suiteName"`
 	Vectors   []testVector     `json:"vectors"`
+	Mode      byte             `json:"mode"`
+	SuiteID   oprf.Ciphersuite `json:"suiteID"`
 }
 
 type test struct {
-	Batch             int
 	Blind             [][]byte
 	BlindedElement    [][]byte
 	EvaluationElement [][]byte
 	Input             [][]byte
 	Output            [][]byte
+	Batch             int
 }
 
 type testVectors []oprfVector
 
 type testVector struct {
-	Batch             int    `json:"Batch"`
 	Blind             string `json:"Blind"`
 	BlindedElement    string `json:"BlindedElement"`
 	EvaluationElement string `json:"EvaluationElement"`
 	Input             string `json:"Input"`
 	Output            string `json:"Output"`
+	Batch             int    `json:"Batch"`
 }
 
 func decodeBatch(nb int, in string) ([][]byte, error) {

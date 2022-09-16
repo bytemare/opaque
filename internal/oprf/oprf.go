@@ -13,11 +13,13 @@ package oprf
 import (
 	"crypto"
 
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
-
-	group "github.com/bytemare/crypto"
 )
+
+const maxDeriveKeyPairTries = 255
 
 // base identifies the OPRF non-verifiable, base, mode, encoded on one byte: base = I2OSP(0, 1).
 var base = []byte{0}
@@ -100,7 +102,7 @@ func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
 	var s *group.Scalar
 
 	for s == nil || s.IsZero() {
-		if counter > 255 {
+		if counter > maxDeriveKeyPairTries {
 			panic("DeriveKeyPairError")
 		}
 
@@ -113,5 +115,9 @@ func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
 
 // Client returns an OPRF client.
 func (c Ciphersuite) Client() *Client {
-	return &Client{Ciphersuite: c}
+	return &Client{
+		Ciphersuite: c,
+		input:       nil,
+		blind:       nil,
+	}
 }

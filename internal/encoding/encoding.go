@@ -19,14 +19,11 @@ var (
 
 // EncodeVectorLen returns the input prepended with a byte encoding of its length.
 func EncodeVectorLen(input []byte, length int) []byte {
-	switch length {
-	case 1:
-		return append(I2OSP(len(input), 1), input...)
-	case 2:
-		return append(I2OSP(len(input), 2), input...)
-	default:
+	if length != 1 && length != 2 {
 		panic(errI2OSPLength)
 	}
+
+	return append(I2OSP(len(input), length), input...)
 }
 
 // EncodeVector returns the input with a two-byte encoding of its length.
