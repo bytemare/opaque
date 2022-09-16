@@ -12,14 +12,14 @@ package keyrecovery
 import (
 	"errors"
 
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
-
-	group "github.com/bytemare/crypto"
 )
 
-var errEnvelopeInvalidMac = errors.New("recover envelope: invalid envelope authentication tag")
+var errEnvelopeInvalidMac = errors.New("invalid envelope authentication tag")
 
 // Credentials structure is currently used for testing purposes.
 type Credentials struct {

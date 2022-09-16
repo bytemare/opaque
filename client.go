@@ -10,6 +10,9 @@ package opaque
 
 import (
 	"errors"
+	"fmt"
+
+	group "github.com/bytemare/crypto"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
@@ -19,8 +22,6 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
-
-	group "github.com/bytemare/crypto"
 )
 
 var (
@@ -107,6 +108,7 @@ func (c *Client) registrationFinalize(
 		ClientIdentity: clientIdentity,
 		ServerIdentity: serverIdentity,
 		EnvelopeNonce:  envelopeNonce,
+		MaskingNonce:   nil,
 	}
 
 	randomizedPwd := c.buildPRK(resp.EvaluatedMessage)
@@ -154,7 +156,7 @@ func (c *Client) LoginFinish(
 	serverPublicKey, serverPublicKeyBytes,
 		envelope, err := masking.Unmask(c.conf, randomizedPwd, ke2.MaskingNonce, ke2.MaskedResponse)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("unmasking: %w", err)
 	}
 
 	// Recover the client keys.
@@ -167,7 +169,7 @@ func (c *Client) LoginFinish(
 		serverIdentity,
 		envelope)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("key recovery: %w", err)
 	}
 
 	// Finalize the AKE.
@@ -181,7 +183,7 @@ func (c *Client) LoginFinish(
 
 	ke3, err = c.Ake.Finalize(c.conf, clientIdentity, clientSecretKey, serverIdentity, serverPublicKey, ke2)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("finalizing AKE: %w", err)
 	}
 
 	return ke3, exportKey, nil

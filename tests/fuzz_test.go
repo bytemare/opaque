@@ -18,12 +18,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bytemare/hash"
+	"github.com/bytemare/ksf"
+
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/oprf"
-
-	"github.com/bytemare/hash"
-	"github.com/bytemare/ksf"
 )
 
 const (

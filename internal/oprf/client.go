@@ -11,19 +11,19 @@ package oprf
 import (
 	"errors"
 
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
-
-	group "github.com/bytemare/crypto"
 )
 
 var errInvalidInput = errors.New("invalid input - OPRF input deterministically maps to the group identity element")
 
 // Client implements the OPRF client and holds its state.
 type Client struct {
-	Ciphersuite
-	input []byte
 	blind *group.Scalar
+	input []byte
+	Ciphersuite
 }
 
 // SetBlind allows to set the blinding scalar to use.

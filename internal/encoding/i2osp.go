@@ -29,11 +29,12 @@ func I2OSP(value, length int) []byte {
 		panic(errLengthNegative)
 	}
 
-	if length > 4 {
+	i2ospMax := 4
+	if length > i2ospMax {
 		panic(errLengthTooBig)
 	}
 
-	out := make([]byte, 4)
+	out := make([]byte, i2ospMax)
 
 	switch v := value; {
 	case v < 0:

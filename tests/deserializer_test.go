@@ -12,11 +12,11 @@ import (
 	"errors"
 	"testing"
 
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
-
-	group "github.com/bytemare/crypto"
 )
 
 var errInvalidMessageLength = errors.New("invalid message length for the configuration")

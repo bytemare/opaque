@@ -9,16 +9,16 @@
 package message
 
 import (
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
-
-	group "github.com/bytemare/crypto"
 )
 
 // CredentialRequest represents credential request message.
 type CredentialRequest struct {
+	BlindedMessage *group.Element `json:"blindedMessage"`
 	ciphersuite    oprf.Ciphersuite
-	BlindedMessage *group.Element `json:"blinded_message"`
 }
 
 // NewCredentialRequest returns a populated CredentialRequest.
@@ -36,10 +36,10 @@ func (c *CredentialRequest) Serialize() []byte {
 
 // CredentialResponse represents credential response message.
 type CredentialResponse struct {
+	EvaluatedMessage *group.Element `json:"evaluatedMessage"`
+	MaskingNonce     []byte         `json:"maskingNonce"`
+	MaskedResponse   []byte         `json:"maskedResponse"`
 	ciphersuite      oprf.Ciphersuite
-	EvaluatedMessage *group.Element `json:"evaluated_message"`
-	MaskingNonce     []byte         `json:"masking_nonce"`
-	MaskedResponse   []byte         `json:"masked_response"`
 }
 
 // NewCredentialResponse returns a populated CredentialResponse.

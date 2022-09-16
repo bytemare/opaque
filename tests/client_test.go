@@ -151,7 +151,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		clear := encoding.Concat(pks, env.Serialize())
 		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
 
-		expected := "recover envelope: invalid envelope authentication tag"
+		expected := "key recovery: invalid envelope authentication tag"
 		if _, _, err := client.LoginFinish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error = %q for invalid envelope mac - got %v", expected, err)
 		}
@@ -222,9 +222,9 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		clear := encoding.Concat(badpks, env.Serialize())
 		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
 
-		expected = "invalid server public key"
+		expected = "unmasking: invalid server public key in masked response"
 		if _, _, err := client.LoginFinish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
-			t.Fatalf("expected error for invalid envelope mac - got %q", err)
+			t.Fatalf("expected error %q for invalid envelope mac - got %q", expected, err)
 		}
 
 		// replace PKS
@@ -233,9 +233,9 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		clear = encoding.Concat(fakepks, env.Serialize())
 		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
 
-		expected = "recover envelope: invalid envelope authentication tag"
+		expected = "key recovery: invalid envelope authentication tag"
 		if _, _, err := client.LoginFinish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
-			t.Fatalf("expected error for invalid envelope mac - got %q", err)
+			t.Fatalf("expected error %q for invalid envelope mac - got %q", expected, err)
 		}
 	})
 }
@@ -257,9 +257,9 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 		ke2, _ := server.LoginInit(ke1, nil, sks, pks, oprfSeed, rec)
 
 		ke2.Mac = internal.RandomBytes(client.GetConf().MAC.Size())
-		expected := " AKE finalization: invalid server mac"
+		expected := "finalizing AKE: invalid server mac"
 		if _, _, err := client.LoginFinish(nil, nil, ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
-			t.Fatalf("expected error for invalid epks encoding - got %q", err)
+			t.Fatalf("expected error %q for invalid epks encoding - got %q", expected, err)
 		}
 	})
 }

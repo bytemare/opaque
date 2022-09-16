@@ -12,12 +12,12 @@ package masking
 import (
 	"errors"
 
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/keyrecovery"
 	"github.com/bytemare/opaque/internal/tag"
-
-	group "github.com/bytemare/crypto"
 )
 
 // errUnmaskInvalidPKS happens when the client reads an invalid public key while unmasking.

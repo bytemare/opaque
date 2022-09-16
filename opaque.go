@@ -17,15 +17,15 @@ import (
 	"errors"
 	"fmt"
 
+	group "github.com/bytemare/crypto"
+	"github.com/bytemare/hash"
+	"github.com/bytemare/ksf"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
-
-	group "github.com/bytemare/crypto"
-	"github.com/bytemare/hash"
-	"github.com/bytemare/ksf"
 )
 
 // Group identifies the prime-order group with hash-to-curve capability to use in OPRF and AKE.
@@ -74,27 +74,13 @@ var (
 // Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
 // as well as KDF, MAC, Hash should be the same.
 type Configuration struct {
-	// OPRF identifies the ciphersuite to use for the OPRF.
-	OPRF Group `json:"oprf"`
-
-	// KDF identifies the hash function to be used for key derivation (e.g. HKDF).
-	KDF crypto.Hash `json:"kdf"`
-
-	// MAC identifies the hash function to be used for message authentication (e.g. HMAC).
-	MAC crypto.Hash `json:"mac"`
-
-	// Hash identifies the hash function to be used for hashing, as defined in github.com/bytemare/crypto/hash.
-	Hash crypto.Hash `json:"hash"`
-
-	// KSF identifies the key stretching function for expensive key derivation on the client,
-	// defined in github.com/bytemare/crypto/ksf.
-	KSF ksf.Identifier `json:"ksf"`
-
-	// AKE identifies the group to use for the AKE.
-	AKE Group `json:"group"`
-
-	// Context is optional shared information to include in the AKE transcript.
 	Context []byte
+	KDF     crypto.Hash    `json:"kdf"`
+	MAC     crypto.Hash    `json:"mac"`
+	Hash    crypto.Hash    `json:"hash"`
+	OPRF    Group          `json:"oprf"`
+	KSF     ksf.Identifier `json:"ksf"`
+	AKE     Group          `json:"group"`
 }
 
 // DefaultConfiguration returns a default configuration with strong parameters.
@@ -166,19 +152,20 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 	}
 
 	g := group.Group(c.AKE)
+	mac := internal.NewMac(c.MAC)
 	ip := &internal.Configuration{
 		OPRF:            oprf.Ciphersuite(c.OPRF),
 		OPRFPointLength: encoding.PointLength[group.Group(c.OPRF)],
 		KDF:             internal.NewKDF(c.KDF),
-		MAC:             internal.NewMac(c.MAC),
+		MAC:             mac,
 		Hash:            internal.NewHash(c.Hash),
 		KSF:             internal.NewKSF(c.KSF),
 		NonceLen:        internal.NonceLength,
+		EnvelopeSize:    internal.NonceLength + mac.Size(),
 		Group:           g,
 		AkePointLength:  encoding.PointLength[g],
 		Context:         c.Context,
 	}
-	ip.EnvelopeSize = ip.NonceLen + ip.MAC.Size()
 
 	return ip, nil
 }

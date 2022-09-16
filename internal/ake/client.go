@@ -11,13 +11,13 @@ package ake
 import (
 	"errors"
 
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
-
-	group "github.com/bytemare/crypto"
 )
 
-var errAkeInvalidServerMac = errors.New(" AKE finalization: invalid server mac")
+var errAkeInvalidServerMac = errors.New("invalid server mac")
 
 // Client exposes the client's AKE functions and holds its state.
 type Client struct {
@@ -29,7 +29,12 @@ type Client struct {
 
 // NewClient returns a new, empty, 3DH client.
 func NewClient() *Client {
-	return &Client{}
+	return &Client{
+		esk:           nil,
+		Ke1:           nil,
+		sessionSecret: nil,
+		nonceU:        nil,
+	}
 }
 
 // SetValues - testing: integrated to support testing, to force values.
@@ -49,12 +54,13 @@ func (c *Client) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonce
 
 // Start initiates the 3DH protocol, and returns a KE1 message with clientInfo.
 func (c *Client) Start(cs group.Group) *message.KE1 {
-	epk := c.SetValues(cs, nil, nil, 32)
+	epk := c.SetValues(cs, nil, nil, internal.NonceLength)
 
 	return &message.KE1{
-		G:      cs,
-		NonceU: c.nonceU,
-		EpkU:   epk,
+		G:                 cs,
+		CredentialRequest: nil,
+		NonceU:            c.nonceU,
+		EpkU:              epk,
 	}
 }
 

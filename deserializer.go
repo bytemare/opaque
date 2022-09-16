@@ -10,11 +10,12 @@ package opaque
 
 import (
 	"errors"
+	"fmt"
+
+	group "github.com/bytemare/crypto"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
-
-	group "github.com/bytemare/crypto"
 )
 
 var (
@@ -214,7 +215,7 @@ func (d *Deserializer) KE3(ke3 []byte) (*message.KE3, error) {
 func (d *Deserializer) DecodeAkePrivateKey(encoded []byte) (*group.Scalar, error) {
 	sk := d.conf.Group.NewScalar()
 	if err := sk.Decode(encoded); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid private key: %w", err)
 	}
 
 	return sk, nil
@@ -224,7 +225,7 @@ func (d *Deserializer) DecodeAkePrivateKey(encoded []byte) (*group.Scalar, error
 func (d *Deserializer) DecodeAkePublicKey(encoded []byte) (*group.Element, error) {
 	pk := d.conf.Group.NewElement()
 	if err := pk.Decode(encoded); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid public key: %w", err)
 	}
 
 	return pk, nil

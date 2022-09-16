@@ -20,7 +20,7 @@ import (
 
 var (
 	errInvalidStateLength = errors.New("invalid state length")
-	errStateExists        = errors.New("existing state is not empty")
+	errStateExists        = errors.New("setting AKE state: existing state is not empty")
 )
 
 /*

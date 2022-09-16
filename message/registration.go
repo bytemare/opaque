@@ -9,16 +9,16 @@
 package message
 
 import (
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
-
-	group "github.com/bytemare/crypto"
 )
 
 // RegistrationRequest is the first message of the registration flow, created by the client and sent to the server.
 type RegistrationRequest struct {
+	BlindedMessage *group.Element `json:"blindedMessage"`
 	C              oprf.Ciphersuite
-	BlindedMessage *group.Element `json:"blinded_message"`
 }
 
 // Serialize returns the byte encoding of RegistrationRequest.
@@ -28,10 +28,10 @@ func (r *RegistrationRequest) Serialize() []byte {
 
 // RegistrationResponse is the second message of the registration flow, created by the server and sent to the client.
 type RegistrationResponse struct {
+	EvaluatedMessage *group.Element `json:"evaluatedMessage"`
+	Pks              *group.Element `json:"serverPublicKey"`
 	C                oprf.Ciphersuite
 	G                group.Group
-	EvaluatedMessage *group.Element `json:"evaluated_message"`
-	Pks              *group.Element `json:"server_public_key"`
 }
 
 // Serialize returns the byte encoding of RegistrationResponse.
@@ -41,10 +41,10 @@ func (r *RegistrationResponse) Serialize() []byte {
 
 // RegistrationRecord represents the client record sent as the last registration message by the client to the server.
 type RegistrationRecord struct {
-	G          group.Group
-	PublicKey  *group.Element `json:"client_public_key"`
-	MaskingKey []byte         `json:"making_key"`
+	PublicKey  *group.Element `json:"clientPublicKey"`
+	MaskingKey []byte         `json:"maskingKey"`
 	Envelope   []byte         `json:"envelope"`
+	G          group.Group
 }
 
 // Serialize returns the byte encoding of RegistrationRecord.
