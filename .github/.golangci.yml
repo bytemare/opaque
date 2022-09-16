@@ -1,24 +1,32 @@
 linters:
   disable-all: true
   enable:
+    - asasalint
     - asciicheck
     - bidichk
     - bodyclose
     - containedctx
     - contextcheck
     - cyclop
-    - deadcode
+    - decorder
     - depguard
     - dogsled
     - dupl
     - durationcheck
     - errcheck
+    - errchkjson
     - errname
     - errorlint
+    - execinquery
+    - exhaustive
+    - exhaustruct
     - exportloopref
     - forbidigo
     - forcetypeassert
     - funlen
+    - gci
+    - gochecknoglobals
+    - gochecknoinits
     - gocognit
     - goconst
     - gocritic
@@ -30,37 +38,45 @@ linters:
     - gofumpt
     - goheader
     - goimports
-    - gomodguard
+    - gomnd
     - gomoddirectives
+    - gomodguard
     - goprintffuncname
     - gosec
     - gosimple
     - govet
-    - ifshort
+    - grouper
     - importas
     - ineffassign
+    - interfacebloat
+    - ireturn
     - lll
+    - logrlint
+    - maintidx
     - makezero
-    #- maligned
-    - megacheck
     - misspell
     - nakedret
     - nestif
     - nilerr
     - nilnil
+    - nlreturn
     - noctx
     - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
     - paralleltest
     - prealloc
     - predeclared
+    - promlinter
+    - reassign
     - revive
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
-    - structcheck
     - stylecheck
-    #- tagliatelle
+    - tagliatelle
     - tenv
+    #- testableexamples
     - testpackage
     - thelper
     - tparallel
@@ -68,19 +84,12 @@ linters:
     - unconvert
     - unparam
     - unused
-    - varcheck
-    #- varnamelen
+    - usestdlibvars
+    - varnamelen
     - wastedassign
     - whitespace
-    #- wrapcheck
+    - wrapcheck
     - wsl
-    #- exhaustive
-    #- exhaustivestruct
-    #- gci
-    #- gochecknoglobals
-    #- gochecknoinits
-    #- gomnd
-    #- nlreturn
   presets:
     - bugs
     - unused
@@ -92,6 +101,10 @@ linters-settings:
   errcheck:
     check-type-assertions: true
     check-blank: true
+    #exclude-functions:
+    #  - io/ioutil.ReadFile
+    #  - io.Copy(*bytes.Buffer)
+    #  - io.Copy(os.Stdout)
   funlen:
     lines: 100
     statements: 50
@@ -130,28 +143,52 @@ linters-settings:
           - operation
           - return
           - assign
+  gosimple:
+    checks: [ "all" ]
   govet:
     check-shadowing: true
-
-    # settings per analyzer
-    settings:
-      printf: # analyzer name, run `go tool vet help` to see all analyzers
-        funcs: # run `go tool vet help printf` to see available settings for `printf` analyzer
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Infof
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Warnf
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Errorf
-          - (github.com/golangci/golangci-lint/pkg/logutils.Log).Fatalf
-
-    # enable or disable analyzers by name
+    disable-all: true
     enable:
+      - asmdecl
+      - assign
+      - atomic
       - atomicalign
-    disable-all: false
+      - bools
+      - buildtag
+      - cgocall
+      - composites
+      - copylocks
+      - deepequalerrors
+      - errorsas
+      - fieldalignment
+      - findcall
+      - framepointer
+      - httpresponse
+      - ifaceassert
+      - loopclosure
+      - lostcancel
+      - nilfunc
+      - nilness
+      - printf
+      - reflectvaluecompare
+      - shadow
+      - shift
+      - sigchanyzer
+      - sortslice
+      - stdmethods
+      - stringintconv
+      - structtag
+      - testinggoroutine
+      - tests
+      - unmarshal
+      - unreachable
+      - unsafeptr
+      - unusedresult
+      - unusedwrite
   lll:
     line-length: 120
     # tab width ('\t') in spaces. Default to 1.
     tab-width: 4
-  maligned:
-    suggest-new: true
   misspell:
     locale: US
   prealloc:
