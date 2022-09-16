@@ -21,8 +21,8 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 
-	"github.com/bytemare/crypto/group"
-	"github.com/bytemare/crypto/ksf"
+	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ksf"
 )
 
 const dbgErr = "%v"
@@ -405,11 +405,11 @@ func TestBadConfiguration(t *testing.T) {
 
 func TestFakeRecord(t *testing.T) {
 	// Test valid configurations
-	for _, conf := range confs {
-		if _, err := conf.Conf.GetFakeRecord(nil); err != nil {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		if _, err := conf.conf.GetFakeRecord(nil); err != nil {
 			t.Fatalf("unexpected error on valid configuration: %v", err)
 		}
-	}
+	})
 
 	// Test for an invalid configuration.
 	conf := &opaque.Configuration{

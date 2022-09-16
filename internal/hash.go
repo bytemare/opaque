@@ -12,8 +12,8 @@ import (
 	"crypto"
 	"crypto/hmac"
 
-	"github.com/bytemare/crypto/hash"
-	"github.com/bytemare/crypto/ksf"
+	"github.com/bytemare/hash"
+	"github.com/bytemare/ksf"
 )
 
 // NewKDF returns a newly instantiated KDF.

@@ -12,15 +12,15 @@ package message
 import (
 	"github.com/bytemare/opaque/internal/encoding"
 
-	"github.com/bytemare/crypto/group"
+	group "github.com/bytemare/crypto"
 )
 
 // KE1 is the first message of the login flow, created by the client and sent to the server.
 type KE1 struct {
 	G group.Group
 	*CredentialRequest
-	NonceU []byte       `json:"client_none"`
-	EpkU   *group.Point `json:"client_ephemeral_pk"`
+	NonceU []byte         `json:"client_none"`
+	EpkU   *group.Element `json:"client_ephemeral_pk"`
 }
 
 // Serialize returns the byte encoding of KE1.
@@ -32,9 +32,9 @@ func (m *KE1) Serialize() []byte {
 type KE2 struct {
 	G group.Group
 	*CredentialResponse
-	NonceS []byte       `json:"server_nonce"`
-	EpkS   *group.Point `json:"server_ephemeral_pk"`
-	Mac    []byte       `json:"server_mac"`
+	NonceS []byte         `json:"server_nonce"`
+	EpkS   *group.Element `json:"server_ephemeral_pk"`
+	Mac    []byte         `json:"server_mac"`
 }
 
 // Serialize returns the byte encoding of KE2.

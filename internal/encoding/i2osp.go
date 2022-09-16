@@ -23,7 +23,7 @@ var (
 	errInputTooLarge = errors.New("input too large for integer")
 )
 
-// I2OSP 32 bit Integer to Octet Stream Primitive on maximum 4 bytes.
+// I2OSP 32-bit Integer to Octet Stream Primitive on maximum 4 bytes.
 func I2OSP(value, length int) []byte {
 	if length <= 0 {
 		panic(errLengthNegative)
