@@ -1,7 +1,7 @@
 filippo.io/nistec v0.0.0-20220513155737-c4b6d02e738c h1:x4epP2lA8b5UYoIFjcVpN+MfJQeX5M5Yilmc1VH0YDw=
 filippo.io/nistec v0.0.0-20220513155737-c4b6d02e738c/go.mod h1:84fxC9mi+MhC2AERXI4LSa8cmSVOzrFikg6hZ4IfCyw=
-github.com/bytemare/crypto v0.3.2 h1:dAt/68zVoYvSEQ8BbLvbbBjqMkuXuk9DTLxJBXpmM2E=
-github.com/bytemare/crypto v0.3.2/go.mod h1:hXn7dxdtvhvrrNb01IB/vJ/yQjIxkq5ZIJOuwTrxJ3k=
+github.com/bytemare/crypto v0.3.3 h1:/zKg0KGDW/AZbLpS7VDMmGTjwkfr3fZzSfVZEliVCFE=
+github.com/bytemare/crypto v0.3.3/go.mod h1:l4WGLrTDFQSxSrbB3d1DknkMe26M3IJHos66ZMAsrE8=
 github.com/bytemare/hash v0.1.3 h1:E2v/+gqvLTjaR8W2JdhqaB2L9161yFBlSXDnYEyMt94=
 github.com/bytemare/hash v0.1.3/go.mod h1:5WJSSK+ftRTLt9fOMHT+S4eXTTAb0Uz+NJJZKHLKovM=
 github.com/bytemare/hash2curve v0.1.2 h1:V/TSdU/WsfYS3Bk73ap+odLCOOm2/B02rKE8lb91djI=
