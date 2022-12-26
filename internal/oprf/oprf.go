@@ -44,6 +44,7 @@ const (
 )
 
 var (
+	suites = make(map[group.Group]Identifier, nbIDs)
 	groups = make(map[Identifier]group.Group, nbIDs)
 	hashes = make(map[Identifier]crypto.Hash, nbIDs)
 )
@@ -57,6 +58,7 @@ func init() {
 
 func (i Identifier) register(g group.Group, h crypto.Hash) {
 	if g.Available() && h.Available() {
+		suites[g] = i
 		groups[i] = g
 		hashes[i] = h
 	} else {
@@ -93,12 +95,21 @@ func (i Identifier) Available() bool {
 		return false
 	}
 
-	// Check for unregistered groups
+	// Check for unregistered groups and hashes
 	if _, ok := groups[i]; !ok {
 		return false
 	}
 
+	if _, ok := hashes[i]; !ok {
+		return false
+	}
+
 	return true
+}
+
+// IDFromGroup returns the OPRF identifier corresponding to the input group.
+func IDFromGroup(g group.Group) Identifier {
+	return suites[g]
 }
 
 // Group returns the Group identifier for the cipher suite.

@@ -80,7 +80,11 @@ func TestClientFinish_BadEvaluation(t *testing.T) {
 		Oprf finalize : evaluation deserialization // element decoding
 	*/
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, _ := conf.conf.Client()
+		client, err := conf.conf.Client()
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		_ = client.LoginInit([]byte("yo"))
 		r2 := encoding.Concat(
 			getBadElement(t, conf),
@@ -107,8 +111,14 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 	credID := internal.RandomBytes(32)
 
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, _ := conf.conf.Client()
-		server, _ := conf.conf.Server()
+		client, err := conf.conf.Client()
+		if err != nil {
+			t.Fatal(err)
+		}
+		server, err := conf.conf.Server()
+		if err != nil {
+			t.Fatal(err)
+		}
 		sks, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
@@ -140,8 +150,14 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 	credID := internal.RandomBytes(32)
 
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, _ := conf.conf.Client()
-		server, _ := conf.conf.Server()
+		client, err := conf.conf.Client()
+		if err != nil {
+			t.Fatal(err)
+		}
+		server, err := conf.conf.Server()
+		if err != nil {
+			t.Fatal(err)
+		}
 		sks, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
@@ -185,8 +201,14 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 	credID := internal.RandomBytes(32)
 
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, _ := conf.conf.Client()
-		server, _ := conf.conf.Server()
+		client, err := conf.conf.Client()
+		if err != nil {
+			t.Fatal(err)
+		}
+		server, err := conf.conf.Server()
+		if err != nil {
+			t.Fatal(err)
+		}
 		sks, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
@@ -255,8 +277,14 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 	credID := internal.RandomBytes(32)
 
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, _ := conf.conf.Client()
-		server, _ := conf.conf.Server()
+		client, err := conf.conf.Client()
+		if err != nil {
+			t.Fatal(err)
+		}
+		server, err := conf.conf.Server()
+		if err != nil {
+			t.Fatal(err)
+		}
 		sks, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)

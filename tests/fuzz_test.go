@@ -23,7 +23,6 @@ import (
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/oprf"
 )
 
 const (
@@ -66,13 +65,13 @@ func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error
 		t.Skip()
 	}
 	if strings.Contains(err.Error(), errInvalidOPRFid.Error()) {
-		if oprf.Identifier(c.OPRF).Available() {
+		if c.OPRF.OPRF().Available() {
 			t.Fatalf("got %q but input is valid: %q", errInvalidOPRFid, c.OPRF)
 		}
 		t.Skip()
 	}
 	if strings.Contains(err.Error(), errInvalidAKEid.Error()) {
-		if oprf.Identifier(c.AKE).Available() {
+		if c.AKE.Group().Available() {
 			t.Fatalf("got %q but input is valid: %q", errInvalidAKEid, c.AKE)
 		}
 		t.Skip()

@@ -13,9 +13,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -179,6 +177,8 @@ func (v oprfVector) test(t *testing.T) {
 		t.Fatalf("private key decoding errored with %q\nfor sksm %v\n", err, v.SkSm)
 	}
 
+	t.Logf("suite: %v", v.SuiteID)
+
 	privKey := v.SuiteID.Group().NewScalar()
 	if err := privKey.Decode(s); err != nil {
 		t.Fatal(fmt.Errorf("private key decoding to scalar in suite %v errored with %q", v.SuiteID, err))
@@ -266,44 +266,5 @@ func TestVOPRFVectors(t *testing.T) {
 		}
 
 		t.Run(string(tv.Mode)+" - "+string(tv.SuiteID), tv.test)
-	}
-}
-
-func TestOPRFVectors(t *testing.T) {
-	if err := filepath.Walk("oprfVectors.json",
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			if info.IsDir() {
-				return nil
-			}
-
-			contents, err := ioutil.ReadFile(path)
-			if err != nil {
-				return err
-			}
-
-			var v testVectors
-			errJSON := json.Unmarshal(contents, &v)
-			if errJSON != nil {
-				return errJSON
-			}
-
-			for _, tv := range v {
-				if tv.Mode != 0x00 {
-					continue
-				}
-
-				if tv.SuiteName == "decaf448-SHAKE256" {
-					continue
-				}
-
-				t.Run(tv.SuiteName, tv.test)
-			}
-			return nil
-		}); err != nil {
-		t.Fatalf("error opening test vectors: %v", err)
 	}
 }

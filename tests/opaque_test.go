@@ -267,7 +267,7 @@ func TestNilConfiguration(t *testing.T) {
 		OPRFPointLength: encoding.PointLength[g],
 		AkePointLength:  encoding.PointLength[g],
 		Group:           g,
-		OPRF:            oprf.Identifier(g),
+		OPRF:            oprf.IDFromGroup(g),
 		Context:         def.Context,
 	}
 

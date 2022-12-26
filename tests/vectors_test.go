@@ -24,7 +24,6 @@ import (
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
-	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -120,8 +119,9 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	// Client
 	client, _ := conf.Client()
 
-	group := oprf.Identifier(conf.OPRF).Group()
-	blind := group.NewScalar()
+	g := conf.OPRF.Group()
+	t.Logf("%v // %v", conf.OPRF, g)
+	blind := g.NewScalar()
 	if err := blind.Decode(v.Inputs.BlindRegistration); err != nil {
 		panic(err)
 	}
@@ -201,8 +201,8 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 	client, _ := conf.Client()
 
 	if !isFake(v.Config.Fake) {
-		group := oprf.Identifier(conf.OPRF).Group()
-		blind := group.NewScalar()
+		g := conf.OPRF.Group()
+		blind := g.NewScalar()
 		if err := blind.Decode(v.Inputs.BlindLogin); err != nil {
 			panic(err)
 		}

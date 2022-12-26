@@ -57,6 +57,16 @@ func (g Group) Available() bool {
 		g == P521Sha512
 }
 
+// OPRF returns the OPRF Identifier used in the Ciphersuite.
+func (g Group) OPRF() oprf.Identifier {
+	return oprf.IDFromGroup(g.Group())
+}
+
+// Group returns the EC Group used in the Ciphersuite.
+func (g Group) Group() group.Group {
+	return group.Group(g)
+}
+
 const confLength = 6
 
 var (
@@ -115,8 +125,12 @@ func (c *Configuration) KeyGen() (secretKey, publicKey []byte) {
 
 // verify returns an error on the first non-compliant parameter, nil otherwise.
 func (c *Configuration) verify() error {
-	if !c.OPRF.Available() || !oprf.Identifier(c.OPRF).Available() {
+	if !c.OPRF.Available() || !c.OPRF.OPRF().Available() {
 		return errInvalidOPRFid
+	}
+
+	if !c.AKE.Available() || !c.AKE.Group().Available() {
+		return errInvalidAKEid
 	}
 
 	if !hash.Hashing(c.KDF).Available() {
@@ -135,10 +149,6 @@ func (c *Configuration) verify() error {
 		return errInvalidKSFid
 	}
 
-	if !c.AKE.Available() || !group.Group(c.AKE).Available() {
-		return errInvalidAKEid
-	}
-
 	return nil
 }
 
@@ -148,11 +158,12 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 		return nil, err
 	}
 
-	g := group.Group(c.AKE)
+	g := c.AKE.Group()
+	o := c.OPRF.OPRF()
 	mac := internal.NewMac(c.MAC)
 	ip := &internal.Configuration{
-		OPRF:            oprf.Identifier(c.OPRF),
-		OPRFPointLength: encoding.PointLength[group.Group(c.OPRF)],
+		OPRF:            o,
+		OPRFPointLength: encoding.PointLength[o.Group()],
 		KDF:             internal.NewKDF(c.KDF),
 		MAC:             mac,
 		Hash:            internal.NewHash(c.Hash),
