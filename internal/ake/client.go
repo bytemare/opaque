@@ -21,45 +21,30 @@ var errAkeInvalidServerMac = errors.New("invalid server mac")
 
 // Client exposes the client's AKE functions and holds its state.
 type Client struct {
-	esk           *group.Scalar
+	values
 	Ke1           []byte
 	sessionSecret []byte
-	nonceU        []byte // testing: integrated to support testing, to force values.
 }
 
 // NewClient returns a new, empty, 3DH client.
 func NewClient() *Client {
 	return &Client{
-		esk:           nil,
+		values: values{
+			ephemeralSecretKey: nil,
+			nonce:              nil,
+		},
 		Ke1:           nil,
 		sessionSecret: nil,
-		nonceU:        nil,
 	}
-}
-
-// SetValues - testing: integrated to support testing, to force values.
-// There's no effect if esk, epk, and nonce have already been set in a previous call.
-func (c *Client) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Element {
-	s, nonce := setValues(g, esk, nonce, nonceLen)
-	if c.esk == nil || (esk != nil && c.esk != s) {
-		c.esk = s
-	}
-
-	if c.nonceU == nil {
-		c.nonceU = nonce
-	}
-
-	return g.Base().Multiply(c.esk)
 }
 
 // Start initiates the 3DH protocol, and returns a KE1 message with clientInfo.
-func (c *Client) Start(cs group.Group) *message.KE1 {
-	epk := c.SetValues(cs, nil, nil, internal.NonceLength)
+func (c *Client) Start(cs group.Group, options Options) *message.KE1 {
+	epk := c.values.setOptions(cs, options)
 
 	return &message.KE1{
-		G:                 cs,
 		CredentialRequest: nil,
-		NonceU:            c.nonceU,
+		NonceU:            c.nonce,
 		EpkU:              epk,
 	}
 }
@@ -68,14 +53,20 @@ func (c *Client) Start(cs group.Group) *message.KE1 {
 // returns a KE3 message.
 func (c *Client) Finalize(
 	conf *internal.Configuration,
-	clientIdentity []byte,
+	identities *Identities,
 	clientSecretKey *group.Scalar,
-	serverIdentity []byte,
 	serverPublicKey *group.Element,
 	ke2 *message.KE2,
 ) (*message.KE3, error) {
-	ikm := k3dh(conf.Group, ke2.EpkS, c.esk, serverPublicKey, c.esk, ke2.EpkS, clientSecretKey)
-	sessionSecret, serverMac, clientMac := core3DH(conf, ikm, clientIdentity, serverIdentity, c.Ke1, ke2)
+	ikm := k3dh(
+		ke2.EpkS,
+		c.ephemeralSecretKey,
+		serverPublicKey,
+		c.ephemeralSecretKey,
+		ke2.EpkS,
+		clientSecretKey,
+	)
+	sessionSecret, serverMac, clientMac := core3DH(conf, identities, ikm, c.Ke1, ke2)
 
 	if !conf.MAC.Equal(serverMac, ke2.Mac) {
 		return nil, errAkeInvalidServerMac

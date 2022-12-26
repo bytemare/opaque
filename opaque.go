@@ -33,22 +33,19 @@ type Group byte
 
 const (
 	// RistrettoSha512 identifies the Ristretto255 group and SHA-512.
-	RistrettoSha512 = Group(oprf.RistrettoSha512)
+	RistrettoSha512 = Group(group.Ristretto255Sha512)
 
 	// decaf448Shake256 identifies the Decaf448 group and Shake-256.
 	// decaf448Shake256 = 2.
 
 	// P256Sha256 identifies the NIST P-256 group and SHA-256.
-	P256Sha256 = Group(oprf.P256Sha256)
+	P256Sha256 = Group(group.P256Sha256)
 
 	// P384Sha512 identifies the NIST P-384 group and SHA-384.
-	P384Sha512 = Group(oprf.P384Sha384)
+	P384Sha512 = Group(group.P384Sha384)
 
 	// P521Sha512 identifies the NIST P-512 group and SHA-512.
-	P521Sha512 = Group(oprf.P521Sha512)
-
-	// Curve25519Sha512 identifies a group over Curve25519 with SHA2-512 hash-to-group hashing.
-	// Curve25519Sha512 = Group(group.Curve25519Sha512).
+	P521Sha512 = Group(group.P521Sha512)
 )
 
 // Available returns whether the Group byte is recognized in this implementation. This allows to fail early when
@@ -207,7 +204,6 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 	publicKey := i.Group.Base().Multiply(scalar)
 
 	regRecord := &message.RegistrationRecord{
-		G:          i.Group,
 		PublicKey:  publicKey,
 		MaskingKey: RandomBytes(i.KDF.Size()),
 		Envelope:   make([]byte, internal.NonceLength+i.MAC.Size()),

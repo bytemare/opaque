@@ -20,12 +20,11 @@ type KE1 struct {
 	*CredentialRequest
 	EpkU   *group.Element `json:"clientEphemeralPublicKey"`
 	NonceU []byte         `json:"clientNonce"`
-	G      group.Group
 }
 
 // Serialize returns the byte encoding of KE1.
 func (m *KE1) Serialize() []byte {
-	return encoding.Concat3(m.CredentialRequest.Serialize(), m.NonceU, encoding.SerializePoint(m.EpkU, m.G))
+	return encoding.Concat3(m.CredentialRequest.Serialize(), m.NonceU, m.EpkU.Encode())
 }
 
 // KE2 is the second message of the login flow, created by the server and sent to the client.
@@ -34,14 +33,13 @@ type KE2 struct {
 	EpkS   *group.Element `json:"serverEphemeralPublicKey"`
 	NonceS []byte         `json:"serverNonce"`
 	Mac    []byte         `json:"serverMac"`
-	G      group.Group
 }
 
 // Serialize returns the byte encoding of KE2.
 func (m *KE2) Serialize() []byte {
 	return encoding.Concat(
 		m.CredentialResponse.Serialize(),
-		encoding.Concat3(m.NonceS, encoding.SerializePoint(m.EpkS, m.G), m.Mac),
+		encoding.Concat3(m.NonceS, m.EpkS.Encode(), m.Mac),
 	)
 }
 
