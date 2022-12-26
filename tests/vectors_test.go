@@ -119,8 +119,14 @@ type vector struct {
 func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	// Client
 	client, _ := conf.Client()
-	client.OPRF = buildOPRFClient(oprf.Ciphersuite(conf.OPRF), v.Inputs.BlindRegistration)
-	regReq := client.RegistrationInit(v.Inputs.Password)
+
+	group := oprf.Ciphersuite(conf.OPRF).Group()
+	blind := group.NewScalar()
+	if err := blind.Decode(v.Inputs.BlindRegistration); err != nil {
+		panic(err)
+	}
+
+	regReq := client.RegistrationInit(v.Inputs.Password, opaque.ClientRegistrationInitOptions{OPRFBlind: blind})
 
 	if !bytes.Equal(v.Outputs.RegistrationRequest, regReq.Serialize()) {
 		t.Fatalf(
@@ -158,11 +164,13 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	}
 
 	// Client
-	upload, exportKey := client.RegistrationFinalizeWithNonce(
+	upload, exportKey := client.RegistrationFinalize(
 		regResp,
-		v.Inputs.ClientIdentity,
-		v.Inputs.ServerIdentity,
-		v.Inputs.EnvelopeNonce,
+		opaque.ClientRegistrationFinalizeOptions{
+			ClientIdentity: v.Inputs.ClientIdentity,
+			ServerIdentity: v.Inputs.ServerIdentity,
+			EnvelopeNonce:  v.Inputs.EnvelopeNonce,
+		},
 	)
 
 	if !bytes.Equal(v.Outputs.ExportKey, exportKey) {
@@ -193,14 +201,23 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 	client, _ := conf.Client()
 
 	if !isFake(v.Config.Fake) {
-		client.OPRF = buildOPRFClient(oprf.Ciphersuite(conf.AKE), v.Inputs.BlindLogin)
+		group := oprf.Ciphersuite(conf.OPRF).Group()
+		blind := group.NewScalar()
+		if err := blind.Decode(v.Inputs.BlindLogin); err != nil {
+			panic(err)
+		}
+
 		esk, err := client.Deserialize.DecodeAkePrivateKey(v.Inputs.ClientPrivateKeyshare)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		client.Ake.SetValues(client.GetConf().Group, esk, v.Inputs.ClientNonce, 32)
-		KE1 := client.LoginInit(v.Inputs.Password)
+		KE1 := client.LoginInit(v.Inputs.Password, opaque.ClientLoginInitOptions{
+			Blind:              blind,
+			EphemeralSecretKey: esk,
+			Nonce:              v.Inputs.ClientNonce,
+			NonceLength:        internal.NonceLength,
+		})
 
 		if !bytes.Equal(v.Outputs.KE1, KE1.Serialize()) {
 			t.Fatalf("KE1 do not match")
@@ -243,7 +260,13 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ke3, exportKey, err := client.LoginFinish(v.Inputs.ClientIdentity, v.Inputs.ServerIdentity, cke2)
+	ke3, exportKey, err := client.LoginFinish(
+		cke2,
+		opaque.ClientLoginFinishOptions{
+			ClientIdentity: v.Inputs.ClientIdentity,
+			ServerIdentity: v.Inputs.ServerIdentity,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +321,6 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.Ake.SetValues(s.GetConf().Group, sks, v.Inputs.ServerNonce, 32)
 
 	var ke1 *message.KE1
 	if isFake(v.Config.Fake) {
@@ -318,6 +340,11 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		v.Inputs.ServerPublicKey,
 		v.Inputs.OprfSeed,
 		record,
+		opaque.ServerLoginInitOptions{
+			EphemeralSecretKey: sks,
+			Nonce:              v.Inputs.ServerNonce,
+			NonceLength:        internal.NonceLength,
+		},
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -393,18 +420,6 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 	if !isFake(v.Config.Fake) && !bytes.Equal(v.Outputs.SessionKey, s.Ake.SessionKey()) {
 		t.Fatalf("Server SessionKey do not match:\n%v\n%v", v.Outputs.SessionKey, s.Ake.SessionKey())
 	}
-}
-
-func buildOPRFClient(cs oprf.Ciphersuite, blind []byte) *oprf.Client {
-	b := cs.Group().NewScalar()
-	if err := b.Decode(blind); err != nil {
-		panic(err)
-	}
-
-	c := cs.Client()
-	c.SetBlind(b)
-
-	return c
 }
 
 func isFake(f string) bool {

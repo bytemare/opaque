@@ -109,7 +109,10 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 			t.Fatalf(dbgErr, err)
 		}
 
-		upload, key := client.RegistrationFinalize(m2, p.username, p.serverID)
+		upload, key := client.RegistrationFinalize(m2, opaque.ClientRegistrationFinalizeOptions{
+			ClientIdentity: p.username,
+			ServerIdentity: p.serverID,
+		})
 		exportKeyReg = key
 
 		m3s = upload.Serialize()
@@ -171,7 +174,10 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 			t.Fatalf(dbgErr, err)
 		}
 
-		ke3, key, err := client.LoginFinish(p.username, p.serverID, m5)
+		ke3, key, err := client.LoginFinish(m5, opaque.ClientLoginFinishOptions{
+			ClientIdentity: p.username,
+			ServerIdentity: p.serverID,
+		})
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}

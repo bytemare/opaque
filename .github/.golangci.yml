@@ -38,7 +38,7 @@ linters:
     - gofumpt
     - goheader
     - goimports
-    - gomnd
+    #- gomnd
     - gomoddirectives
     - gomodguard
     - goprintffuncname
@@ -146,13 +146,16 @@ linters-settings:
   gomnd:
     checks:
       - argument
+      - case
       - condition
+      - operation
       - return
       - assign
     ignored-functions:
       - 'EncodeVectorLen'
       - 'decodeVectorLen'
       - 'encoding.I2OSP'
+      - 'encoding.OS2IP'
       - 'make'
   gosimple:
     checks: [ "all" ]
@@ -243,7 +246,7 @@ issues:
   max-issues-per-linter: 0
   max-same-issues: 0
 
-  # Independently from option `exclude` we use default exclude patterns,
+  # Independently of option `exclude` we use default exclude patterns,
   # it can be disabled by this option. To list all
   # excluded by default patterns execute `golangci-lint run --help`.
   # Default value for this option is true.
@@ -252,5 +255,5 @@ issues:
 run:
   tests: false
 
-#output:
-# format: github-actions
+output:
+ format: github-actions

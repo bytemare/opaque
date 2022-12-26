@@ -9,6 +9,7 @@
 package opaque_test
 
 import (
+	"encoding/hex"
 	"errors"
 	"testing"
 
@@ -164,4 +165,40 @@ func TestDeserializeKE3(t *testing.T) {
 		err.Error() != errInvalidMessageLength.Error() {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
+}
+
+func TestDecodeAkePrivateKey(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		badKey := getBadScalar(t, conf)
+
+		des, err := conf.conf.Deserializer()
+		if err != nil {
+			t.Fatalf("unexpected error on valid configuration: %v", err)
+		}
+
+		if _, err := des.DecodeAkePrivateKey(badKey); err == nil {
+			t.Fatalf("expect error on invalid private key. Group %v, key %v",
+				conf.conf.AKE,
+				hex.EncodeToString(badKey),
+			)
+		}
+	})
+}
+
+func TestDecodeAkePublicKey(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		badKey := getBadElement(t, conf)
+
+		des, err := conf.conf.Deserializer()
+		if err != nil {
+			t.Fatalf("unexpected error on valid configuration: %v", err)
+		}
+
+		if _, err := des.DecodeAkePublicKey(badKey); err == nil {
+			t.Fatalf("expect error on invalid public key. Group %v, key %v",
+				conf.conf.AKE,
+				hex.EncodeToString(badKey),
+			)
+		}
+	})
 }

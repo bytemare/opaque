@@ -96,8 +96,6 @@ func (s *Server) RegistrationResponse(
 	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
 
 	return &message.RegistrationResponse{
-		C:                s.conf.OPRF,
-		G:                s.conf.Group,
 		EvaluatedMessage: z,
 		Pks:              serverPublicKey,
 	}
@@ -119,7 +117,7 @@ func (s *Server) credentialResponse(
 		record.Envelope,
 	)
 
-	return message.NewCredentialResponse(s.conf.OPRF, z, maskingNonce, maskedResponse)
+	return message.NewCredentialResponse(z, maskingNonce, maskedResponse)
 }
 
 func (s *Server) verifyInitInput(
@@ -157,31 +155,53 @@ func (s *Server) verifyInitInput(
 	return sks, nil
 }
 
+// ServerLoginInitOptions enables setting optional values for the session, which default to secure random values if not
+// set.
+type ServerLoginInitOptions struct {
+	// EphemeralSecretKey: optional
+	EphemeralSecretKey *group.Scalar
+	// Nonce: optional
+	Nonce []byte
+	// NonceLength: optional
+	NonceLength uint
+}
+
+func getServerLoginInitOptions(options []ServerLoginInitOptions) *ake.Options {
+	var op ake.Options
+
+	if len(options) != 0 {
+		op.EphemeralSecretKey = options[0].EphemeralSecretKey
+		op.Nonce = options[0].Nonce
+		op.NonceLength = options[0].NonceLength
+	}
+
+	return &op
+}
+
 // LoginInit responds to a KE1 message with a KE2 message given server credentials and client record.
 func (s *Server) LoginInit(
 	ke1 *message.KE1,
 	serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord,
+	options ...ServerLoginInitOptions,
 ) (*message.KE2, error) {
 	sks, err := s.verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed, record)
 	if err != nil {
 		return nil, err
 	}
 
+	op := getServerLoginInitOptions(options)
+
 	response := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
 		record.RegistrationRecord, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce)
 
-	clientIdentity := record.ClientIdentity
-
-	if clientIdentity == nil {
-		clientIdentity = encoding.SerializePoint(record.PublicKey, s.conf.Group)
+	identities := ake.Identities{
+		ClientIdentity: record.ClientIdentity,
+		ServerIdentity: serverIdentity,
 	}
+	identities.SetIdentities(record.PublicKey, serverPublicKey)
 
-	if serverIdentity == nil {
-		serverIdentity = serverPublicKey
-	}
-
-	ke2 := s.Ake.Response(s.conf, serverIdentity, sks, clientIdentity, record.PublicKey, ke1, response)
+	ke2 := s.Ake.Response(s.conf, &identities, sks, record.PublicKey, ke1, response, *op)
 
 	return ke2, nil
 }

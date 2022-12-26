@@ -21,61 +21,51 @@ var errStateNotEmpty = errors.New("existing state is not empty")
 
 // Server exposes the server's AKE functions and holds its state.
 type Server struct {
+	values
 	clientMac     []byte
 	sessionSecret []byte
-
-	// testing: integrated to support testing, to force values.
-	esk    *group.Scalar
-	nonceS []byte
 }
 
 // NewServer returns a new, empty, 3DH server.
 func NewServer() *Server {
 	return &Server{
+		values: values{
+			ephemeralSecretKey: nil,
+			nonce:              nil,
+		},
 		clientMac:     nil,
 		sessionSecret: nil,
-		esk:           nil,
-		nonceS:        nil,
 	}
-}
-
-// SetValues - testing: integrated to support testing, to force values.
-// There's no effect if esk, epk, and nonce have already been set in a previous call.
-func (s *Server) SetValues(g group.Group, esk *group.Scalar, nonce []byte, nonceLen int) *group.Element {
-	es, nonce := setValues(g, esk, nonce, nonceLen)
-	if s.esk == nil || (esk != nil && s.esk != es) {
-		s.esk = es
-	}
-
-	if s.nonceS == nil {
-		s.nonceS = nonce
-	}
-
-	return g.Base().Multiply(s.esk)
 }
 
 // Response produces a 3DH server response message.
 func (s *Server) Response(
 	conf *internal.Configuration,
-	serverIdentity []byte,
+	identities *Identities,
 	serverSecretKey *group.Scalar,
-	clientIdentity []byte,
 	clientPublicKey *group.Element,
 	ke1 *message.KE1,
 	response *message.CredentialResponse,
+	options Options,
 ) *message.KE2 {
-	epk := s.SetValues(conf.Group, nil, nil, conf.NonceLen)
+	epk := s.values.setOptions(conf.Group, options)
 
 	ke2 := &message.KE2{
-		G:                  conf.Group,
 		CredentialResponse: response,
-		NonceS:             s.nonceS,
+		NonceS:             s.nonce,
 		EpkS:               epk,
 		Mac:                nil,
 	}
 
-	ikm := k3dh(conf.Group, ke1.EpkU, s.esk, ke1.EpkU, serverSecretKey, clientPublicKey, s.esk)
-	sessionSecret, serverMac, clientMac := core3DH(conf, ikm, clientIdentity, serverIdentity, ke1.Serialize(), ke2)
+	ikm := k3dh(
+		ke1.EpkU,
+		s.ephemeralSecretKey,
+		ke1.EpkU,
+		serverSecretKey,
+		clientPublicKey,
+		s.ephemeralSecretKey,
+	)
+	sessionSecret, serverMac, clientMac := core3DH(conf, identities, ikm, ke1.Serialize(), ke2)
 	s.sessionSecret = sessionSecret
 	s.clientMac = clientMac
 	ke2.Mac = serverMac

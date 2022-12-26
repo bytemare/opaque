@@ -72,73 +72,145 @@ func (c *Client) buildPRK(evaluation *group.Element) []byte {
 	return c.conf.KDF.Extract(nil, encoding.Concat(output, stretched))
 }
 
+// ClientRegistrationInitOptions enables setting internal client values for the client registration.
+type ClientRegistrationInitOptions struct {
+	// OPRFBlind: optional
+	OPRFBlind *group.Scalar
+}
+
+func getClientRegistrationInitBlind(options []ClientRegistrationInitOptions) *group.Scalar {
+	if len(options) == 0 {
+		return nil
+	}
+
+	return options[0].OPRFBlind
+}
+
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
-func (c *Client) RegistrationInit(password []byte) *message.RegistrationRequest {
-	m := c.OPRF.Blind(password)
+func (c *Client) RegistrationInit(
+	password []byte,
+	options ...ClientRegistrationInitOptions,
+) *message.RegistrationRequest {
+	m := c.OPRF.Blind(password, getClientRegistrationInitBlind(options))
 
 	return &message.RegistrationRequest{
-		C:              c.conf.OPRF,
 		BlindedMessage: m,
 	}
 }
 
-// RegistrationFinalizeWithNonce returns a RegistrationRecord message given the identities, server's
-// RegistrationResponse, and the envelope nonce to be used.
-// This function is primarily used for testing purposes and will most probably be removed at some point.
-func (c *Client) RegistrationFinalizeWithNonce(
-	resp *message.RegistrationResponse,
-	clientIdentity, serverIdentity, envelopeNonce []byte,
-) (upload *message.RegistrationRecord, exportKey []byte) {
-	return c.registrationFinalize(clientIdentity, serverIdentity, envelopeNonce, resp)
+// ClientRegistrationFinalizeOptions enables setting optional client values for the client registration.
+type ClientRegistrationFinalizeOptions struct {
+	// ClientIdentity: optional
+	ClientIdentity []byte
+	// ServerIdentity: optional
+	ServerIdentity []byte
+	// EnvelopeNonce : optional
+	EnvelopeNonce []byte
+}
+
+func initClientRegistrationFinalizeOptions(options []ClientRegistrationFinalizeOptions) *keyrecovery.Credentials {
+	if len(options) == 0 {
+		return &keyrecovery.Credentials{
+			ClientIdentity: nil,
+			ServerIdentity: nil,
+			EnvelopeNonce:  nil,
+		}
+	}
+
+	return &keyrecovery.Credentials{
+		ClientIdentity: options[0].ClientIdentity,
+		ServerIdentity: options[0].ServerIdentity,
+		EnvelopeNonce:  options[0].EnvelopeNonce,
+	}
 }
 
 // RegistrationFinalize returns a RegistrationRecord message given the identities and the server's RegistrationResponse.
 func (c *Client) RegistrationFinalize(
 	resp *message.RegistrationResponse,
-	clientIdentity, serverIdentity []byte,
+	options ...ClientRegistrationFinalizeOptions,
 ) (record *message.RegistrationRecord, exportKey []byte) {
-	return c.registrationFinalize(clientIdentity, serverIdentity, nil, resp)
-}
-
-func (c *Client) registrationFinalize(
-	clientIdentity, serverIdentity, envelopeNonce []byte,
-	resp *message.RegistrationResponse,
-) (upload *message.RegistrationRecord, exportKey []byte) {
-	creds2 := &keyrecovery.Credentials{
-		ClientIdentity: clientIdentity,
-		ServerIdentity: serverIdentity,
-		EnvelopeNonce:  envelopeNonce,
-		MaskingNonce:   nil,
-	}
-
+	credentials := initClientRegistrationFinalizeOptions(options)
 	randomizedPwd := c.buildPRK(resp.EvaluatedMessage)
 	maskingKey := c.conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), c.conf.KDF.Size())
-	envelope, clientPublicKey, exportKey := keyrecovery.Store(c.conf, randomizedPwd, resp.Pks, creds2)
+	envelope, clientPublicKey, exportKey := keyrecovery.Store(c.conf, randomizedPwd, resp.Pks, credentials)
 
 	return &message.RegistrationRecord{
-		G:          c.conf.Group,
 		PublicKey:  clientPublicKey,
 		MaskingKey: maskingKey,
 		Envelope:   envelope.Serialize(),
 	}, exportKey
 }
 
+// ClientLoginInitOptions enables setting optional values for the session, which default to secure random values if not
+// set.
+type ClientLoginInitOptions struct {
+	// Blind: optional
+	Blind *group.Scalar
+	// EphemeralSecretKey: optional
+	EphemeralSecretKey *group.Scalar
+	// Nonce: optional
+	Nonce []byte
+	// NonceLength: optional
+	NonceLength uint
+}
+
+func (c ClientLoginInitOptions) get() (*group.Scalar, ake.Options) {
+	return c.Blind, ake.Options{
+		EphemeralSecretKey: c.EphemeralSecretKey,
+		Nonce:              c.Nonce,
+		NonceLength:        c.NonceLength,
+	}
+}
+
+func getClientLoginInitOptions(options []ClientLoginInitOptions) (*group.Scalar, ake.Options) {
+	if len(options) != 0 {
+		return options[0].get()
+	}
+
+	return nil, ake.Options{
+		EphemeralSecretKey: nil,
+		Nonce:              nil,
+		NonceLength:        internal.NonceLength,
+	}
+}
+
 // LoginInit initiates the authentication process, returning a KE1 message blinding the given password.
-// clientInfo is optional client information sent in clear, and only authenticated in KE3.
-func (c *Client) LoginInit(password []byte) *message.KE1 {
-	m := c.OPRF.Blind(password)
-	ke1 := c.Ake.Start(c.conf.Group)
+func (c *Client) LoginInit(password []byte, options ...ClientLoginInitOptions) *message.KE1 {
+	blind, akeOptions := getClientLoginInitOptions(options)
+	m := c.OPRF.Blind(password, blind)
+	ke1 := c.Ake.Start(c.conf.Group, akeOptions)
 	ke1.CredentialRequest = message.NewCredentialRequest(c.conf.OPRF, m)
 	c.Ake.Ke1 = ke1.Serialize()
 
 	return ke1
 }
 
+// ClientLoginFinishOptions enables setting optional client values for the client registration.
+type ClientLoginFinishOptions struct {
+	// ClientIdentity: optional
+	ClientIdentity []byte
+	// ServerIdentity: optional
+	ServerIdentity []byte
+}
+
+func initClientLoginFinishOptions(options []ClientLoginFinishOptions) *ake.Identities {
+	if len(options) == 0 {
+		return &ake.Identities{
+			ClientIdentity: nil,
+			ServerIdentity: nil,
+		}
+	}
+
+	return &ake.Identities{
+		ClientIdentity: options[0].ClientIdentity,
+		ServerIdentity: options[0].ServerIdentity,
+	}
+}
+
 // LoginFinish returns a KE3 message given the server's KE2 response message and the identities. If the idc
 // or ids parameters are nil, the client and server's public keys are taken as identities for both.
 func (c *Client) LoginFinish(
-	clientIdentity, serverIdentity []byte,
-	ke2 *message.KE2,
+	ke2 *message.KE2, options ...ClientLoginFinishOptions,
 ) (ke3 *message.KE3, exportKey []byte, err error) {
 	if len(c.Ake.Ke1) == 0 {
 		return nil, nil, errKe1Missing
@@ -148,6 +220,8 @@ func (c *Client) LoginFinish(
 	if len(ke2.MaskedResponse) != c.conf.AkePointLength+c.conf.EnvelopeSize {
 		return nil, nil, errInvalidMaskedLength
 	}
+
+	identities := initClientLoginFinishOptions(options)
 
 	// Finalize the OPRF.
 	randomizedPwd := c.buildPRK(ke2.EvaluatedMessage)
@@ -165,23 +239,17 @@ func (c *Client) LoginFinish(
 		c.conf,
 		randomizedPwd,
 		serverPublicKeyBytes,
-		clientIdentity,
-		serverIdentity,
+		identities.ClientIdentity,
+		identities.ServerIdentity,
 		envelope)
 	if err != nil {
 		return nil, nil, fmt.Errorf("key recovery: %w", err)
 	}
 
 	// Finalize the AKE.
-	if clientIdentity == nil {
-		clientIdentity = encoding.SerializePoint(clientPublicKey, c.conf.Group)
-	}
+	identities.SetIdentities(clientPublicKey, serverPublicKeyBytes)
 
-	if serverIdentity == nil {
-		serverIdentity = serverPublicKeyBytes
-	}
-
-	ke3, err = c.Ake.Finalize(c.conf, clientIdentity, clientSecretKey, serverIdentity, serverPublicKey, ke2)
+	ke3, err = c.Ake.Finalize(c.conf, identities, clientSecretKey, serverPublicKey, ke2)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing AKE: %w", err)
 	}

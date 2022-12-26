@@ -26,14 +26,11 @@ type Client struct {
 	Ciphersuite
 }
 
-// SetBlind allows to set the blinding scalar to use.
-func (c *Client) SetBlind(blind *group.Scalar) {
-	c.blind = blind
-}
-
 // Blind masks the input.
-func (c *Client) Blind(input []byte) *group.Element {
-	if c.blind == nil {
+func (c *Client) Blind(input []byte, blind *group.Scalar) *group.Element {
+	if blind != nil {
+		c.blind = blind.Copy()
+	} else {
 		c.blind = c.Group().NewScalar().Random()
 	}
 
@@ -58,7 +55,7 @@ func (c *Client) hashTranscript(input, unblinded []byte) []byte {
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
 func (c *Client) Finalize(evaluation *group.Element) []byte {
 	invert := c.blind.Copy().Invert()
-	u := encoding.SerializePoint(evaluation.Copy().Multiply(invert), c.Ciphersuite.Group())
+	u := evaluation.Copy().Multiply(invert).Encode()
 
 	return c.hashTranscript(c.input, u)
 }

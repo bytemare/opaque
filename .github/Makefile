@@ -1,6 +1,3 @@
-PACKAGES    := $(shell go list ./...)
-COMMIT      := $(shell git rev-parse HEAD)
-
 .PHONY: update
 update:
 	@cd ../
@@ -10,7 +7,10 @@ update:
 	@echo "Updating Github Actions pins..."
 	@$(foreach file, $(wildcard workflows/*.yml), pin-github-action $(file);)
 	@echo "Updating linters..."
-	@go install -u mvdan.cc/gofumpt@latest github.com/daixiang0/gci github.com/segmentio/golines@latest golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
+	@go install mvdan.cc/gofumpt@latest
+	@go install github.com/daixiang0/gci@latest
+	@go install github.com/segmentio/golines@latest
+	@go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
 	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
 
 .PHONY: fmt
@@ -20,8 +20,8 @@ fmt:
 	@go fmt ../...
 	@golines -m 120 -t 4 -w ../
 	@gofumpt -w -extra ../
-	@gci write --Section Standard --Section Default --Section "Prefix($(shell go list -m))" ../
-	@fieldalignment ../...
+	@gci write -s Standard -s Default -s "Prefix($(shell go list -m))" ../
+	@fieldalignment -fix ../...
 
 .PHONY: license
 license:

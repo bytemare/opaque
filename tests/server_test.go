@@ -189,19 +189,20 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	/*
 		ke3 mac is invalid
 	*/
+	password := []byte("yo")
 	conf := opaque.DefaultConfiguration()
 	credId := internal.RandomBytes(32)
 	oprfSeed := internal.RandomBytes(conf.Hash.Size())
 	client, _ := conf.Client()
 	server, _ := conf.Server()
 	sk, pk := conf.KeyGen()
-	rec := buildRecord(credId, oprfSeed, []byte("yo"), pk, client, server)
-	ke1 := client.LoginInit([]byte("yo"))
+	rec := buildRecord(credId, oprfSeed, password, pk, client, server)
+	ke1 := client.LoginInit(password)
 	ke2, err := server.LoginInit(ke1, nil, sk, pk, oprfSeed, rec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ke3, _, err := client.LoginFinish(nil, nil, ke2)
+	ke3, _, err := client.LoginFinish(ke2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,14 +231,14 @@ func TestServerSetAKEState_InvalidInput(t *testing.T) {
 	/*
 		A state already exists.
 	*/
-
+	password := []byte("yo")
 	credId := internal.RandomBytes(32)
 	seed := internal.RandomBytes(conf.Hash.Size())
 	client, _ := conf.Client()
 	server, _ = conf.Server()
 	sk, pk := conf.KeyGen()
-	rec := buildRecord(credId, seed, []byte("yo"), pk, client, server)
-	ke1 := client.LoginInit([]byte("yo"))
+	rec := buildRecord(credId, seed, password, pk, client, server)
+	ke1 := client.LoginInit(password)
 	_, _ = server.LoginInit(ke1, nil, sk, pk, seed, rec)
 	state := server.SerializeState()
 	if err := server.SetAKEState(state); err == nil || err.Error() != errStateExists.Error() {
