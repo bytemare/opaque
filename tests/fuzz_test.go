@@ -66,13 +66,13 @@ func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error
 		t.Skip()
 	}
 	if strings.Contains(err.Error(), errInvalidOPRFid.Error()) {
-		if oprf.Ciphersuite(c.OPRF).Available() {
+		if oprf.Identifier(c.OPRF).Available() {
 			t.Fatalf("got %q but input is valid: %q", errInvalidOPRFid, c.OPRF)
 		}
 		t.Skip()
 	}
 	if strings.Contains(err.Error(), errInvalidAKEid.Error()) {
-		if oprf.Ciphersuite(c.AKE).Available() {
+		if oprf.Identifier(c.AKE).Available() {
 			t.Fatalf("got %q but input is valid: %q", errInvalidAKEid, c.AKE)
 		}
 		t.Skip()

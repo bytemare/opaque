@@ -22,8 +22,8 @@ var errInvalidInput = errors.New("invalid input - OPRF input deterministically m
 // Client implements the OPRF client and holds its state.
 type Client struct {
 	blind *group.Scalar
+	Identifier
 	input []byte
-	Ciphersuite
 }
 
 // Blind masks the input.
@@ -49,7 +49,7 @@ func (c *Client) hashTranscript(input, unblinded []byte) []byte {
 	encElement := encoding.EncodeVector(unblinded)
 	encDST := []byte(tag.OPRFFinalize)
 
-	return c.Ciphersuite.hash(encInput, encElement, encDST)
+	return c.Identifier.hash(encInput, encElement, encDST)
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.

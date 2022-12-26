@@ -36,13 +36,13 @@ type Configuration struct {
 	MAC             *Mac
 	Hash            *Hash
 	KSF             *KSF
+	OPRF            oprf.Identifier
 	Context         []byte
 	NonceLen        int
 	EnvelopeSize    int
 	OPRFPointLength int
 	AkePointLength  int
 	Group           group.Group
-	OPRF            oprf.Ciphersuite
 }
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).

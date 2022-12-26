@@ -27,15 +27,15 @@ import (
 )
 
 type oprfVector struct {
-	DST       string           `json:"groupDST"`
-	Hash      string           `json:"hash"`
-	KeyInfo   string           `json:"keyInfo"`
-	Seed      string           `json:"seed"`
-	SkSm      string           `json:"skSm"`
-	SuiteName string           `json:"suiteName"`
-	Vectors   []testVector     `json:"vectors"`
-	Mode      byte             `json:"mode"`
-	SuiteID   oprf.Ciphersuite `json:"suiteID"`
+	DST       string          `json:"groupDST"`
+	Hash      string          `json:"hash"`
+	KeyInfo   string          `json:"keyInfo"`
+	Seed      string          `json:"seed"`
+	SkSm      string          `json:"skSm"`
+	SuiteName string          `json:"suiteName"`
+	SuiteID   oprf.Identifier `json:"identifier"`
+	Vectors   []testVector    `json:"vectors"`
+	Mode      byte            `json:"mode"`
 }
 
 type test struct {
@@ -117,7 +117,7 @@ func (tv *testVector) Decode() (*test, error) {
 	}, nil
 }
 
-func testBlind(t *testing.T, c oprf.Ciphersuite, test *test) {
+func testBlind(t *testing.T, c oprf.Identifier, test *test) {
 	client := c.Client()
 	for i := 0; i < len(test.Input); i++ {
 		s := c.Group().NewScalar()
@@ -133,7 +133,7 @@ func testBlind(t *testing.T, c oprf.Ciphersuite, test *test) {
 	}
 }
 
-func testEvaluation(t *testing.T, c oprf.Ciphersuite, privKey *group.Scalar, test *test) {
+func testEvaluation(t *testing.T, c oprf.Identifier, privKey *group.Scalar, test *test) {
 	for i := 0; i < len(test.BlindedElement); i++ {
 		b := c.Group().NewElement()
 		if err := b.Decode(test.BlindedElement[i]); err != nil {
@@ -147,7 +147,7 @@ func testEvaluation(t *testing.T, c oprf.Ciphersuite, privKey *group.Scalar, tes
 	}
 }
 
-func testFinalization(t *testing.T, c oprf.Ciphersuite, test *test) {
+func testFinalization(t *testing.T, c oprf.Identifier, test *test) {
 	client := c.Client()
 	for i := 0; i < len(test.EvaluationElement); i++ {
 		ev := c.Group().NewElement()
@@ -169,8 +169,8 @@ func testFinalization(t *testing.T, c oprf.Ciphersuite, test *test) {
 	}
 }
 
-func getDST(prefix []byte, c oprf.Ciphersuite) []byte {
-	return encoding.Concatenate(prefix, []byte(tag.OPRF), encoding.I2OSP(0x00, 1), encoding.I2OSP(int(c), 2))
+func getDST(prefix []byte, c oprf.Identifier) []byte {
+	return encoding.Concatenate(prefix, []byte(tag.OPRFVersionPrefix), []byte(c))
 }
 
 func (v oprfVector) test(t *testing.T) {
@@ -233,6 +233,42 @@ func (v oprfVector) test(t *testing.T) {
 	}
 }
 
+func loadVOPRFVectors(filepath string) (testVectors, error) {
+	contents, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, err
+	}
+
+	var v testVectors
+	errJSON := json.Unmarshal(contents, &v)
+	if errJSON != nil {
+		return nil, errJSON
+	}
+
+	return v, nil
+}
+
+func TestVOPRFVectors(t *testing.T) {
+	vectorFile := "oprfVectors.json"
+
+	v, err := loadVOPRFVectors(vectorFile)
+	if err != nil || v == nil {
+		t.Fatal(err)
+	}
+
+	for _, tv := range v {
+		if tv.Mode != 0x00 {
+			continue
+		}
+
+		if tv.SuiteID == "decaf448-SHAKE256" {
+			continue
+		}
+
+		t.Run(string(tv.Mode)+" - "+string(tv.SuiteID), tv.test)
+	}
+}
+
 func TestOPRFVectors(t *testing.T) {
 	if err := filepath.Walk("oprfVectors.json",
 		func(path string, info os.FileInfo, err error) error {
@@ -260,7 +296,7 @@ func TestOPRFVectors(t *testing.T) {
 					continue
 				}
 
-				if tv.SuiteName == "OPRF(decaf448, SHAKE-256)" {
+				if tv.SuiteName == "decaf448-SHAKE256" {
 					continue
 				}
 

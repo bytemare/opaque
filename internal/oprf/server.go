@@ -13,6 +13,6 @@ import (
 )
 
 // Evaluate evaluates the blinded input with the given key.
-func (c Ciphersuite) Evaluate(privateKey *group.Scalar, blindedElement *group.Element) *group.Element {
+func (i Identifier) Evaluate(privateKey *group.Scalar, blindedElement *group.Element) *group.Element {
 	return blindedElement.Copy().Multiply(privateKey)
 }

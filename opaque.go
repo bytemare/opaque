@@ -115,7 +115,7 @@ func (c *Configuration) KeyGen() (secretKey, publicKey []byte) {
 
 // verify returns an error on the first non-compliant parameter, nil otherwise.
 func (c *Configuration) verify() error {
-	if !c.OPRF.Available() || !oprf.Ciphersuite(c.OPRF).Available() {
+	if !c.OPRF.Available() || !oprf.Identifier(c.OPRF).Available() {
 		return errInvalidOPRFid
 	}
 
@@ -151,7 +151,7 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 	g := group.Group(c.AKE)
 	mac := internal.NewMac(c.MAC)
 	ip := &internal.Configuration{
-		OPRF:            oprf.Ciphersuite(c.OPRF),
+		OPRF:            oprf.Identifier(c.OPRF),
 		OPRFPointLength: encoding.PointLength[group.Group(c.OPRF)],
 		KDF:             internal.NewKDF(c.KDF),
 		MAC:             mac,

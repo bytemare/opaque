@@ -162,7 +162,7 @@ func getBadScalar(t *testing.T, c *configuration) []byte {
 	case opaque.RistrettoSha512:
 		return getBadRistrettoScalar()
 	default:
-		return badScalar(t, oprf.Ciphersuite(c.conf.AKE).Group(), c.curve)
+		return badScalar(t, oprf.Identifier(c.conf.AKE).Group(), c.curve)
 	}
 }
 

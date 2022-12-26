@@ -19,7 +19,7 @@ import (
 
 func deriveAuthKeyPair(conf *internal.Configuration, randomizedPwd, nonce []byte) (*group.Scalar, *group.Element) {
 	seed := conf.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
-	sk := oprf.Ciphersuite(conf.Group).DeriveKey(seed, []byte(tag.DerivePrivateKey))
+	sk := oprf.Identifier(conf.Group).DeriveKey(seed, []byte(tag.DerivePrivateKey))
 
 	return sk, conf.Group.Base().Multiply(sk)
 }

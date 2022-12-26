@@ -120,7 +120,7 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	// Client
 	client, _ := conf.Client()
 
-	group := oprf.Ciphersuite(conf.OPRF).Group()
+	group := oprf.Identifier(conf.OPRF).Group()
 	blind := group.NewScalar()
 	if err := blind.Decode(v.Inputs.BlindRegistration); err != nil {
 		panic(err)
@@ -201,7 +201,7 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 	client, _ := conf.Client()
 
 	if !isFake(v.Config.Fake) {
-		group := oprf.Ciphersuite(conf.OPRF).Group()
+		group := oprf.Identifier(conf.OPRF).Group()
 		blind := group.NewScalar()
 		if err := blind.Decode(v.Inputs.BlindLogin); err != nil {
 			panic(err)
