@@ -11,11 +11,8 @@ package opaque_test
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"testing"
-
-	group "github.com/bytemare/crypto"
 
 	"github.com/bytemare/opaque/internal/encoding"
 )
@@ -217,58 +214,4 @@ func expectPanic(expectedError error, f func()) (bool, string) {
 	}
 
 	return true, ""
-}
-
-func TestSerializeScalarGroups(t *testing.T) {
-	// Valid Configurations
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		g := group.Group(conf.conf.AKE)
-		s := g.NewScalar().Random()
-		if hasPanic, err := hasPanic(func() { _ = encoding.SerializeScalar(s, g) }); hasPanic {
-			t.Fatalf("unexpected panic for valid group and scalar: %v", err)
-		}
-	})
-
-	// Invalid Configuration
-	g := group.Group(0)
-	expect := errors.New("invalid group identifier")
-	if hasPanic, err := expectPanic(expect, func() { _ = encoding.SerializeScalar(nil, g) }); !hasPanic {
-		t.Fatalf("expected panic for invalid group and scalar:\n\twant: %v\n\tgot: %v", expect, err)
-	}
-}
-
-func TestSerializeScalar(t *testing.T) {
-	length := 16
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		g := group.Group(conf.conf.AKE)
-		encoded := [32]byte{}
-		encoded[length] = 1
-		s := g.NewScalar()
-		if err := s.Decode(encoded[:]); err != nil {
-			t.Fatal(err)
-		}
-
-		ser := encoding.SerializeScalar(s, g)
-		if len(ser) == length {
-			t.Fatalf("serialization did not pad correctly. Before %d / After %d", length, len(ser))
-		}
-	})
-}
-
-func TestSerializePointGroups(t *testing.T) {
-	// Valid Configurations
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		g := group.Group(conf.conf.AKE)
-		p := g.Base()
-		if hasPanic, err := hasPanic(func() { _ = encoding.SerializePoint(p, g) }); hasPanic {
-			t.Fatalf("unexpected panic for valid group and point: %v", err)
-		}
-	})
-
-	// Invalid Configuration
-	g := group.Group(0)
-	expect := errors.New("invalid group identifier")
-	if hasPanic, err := expectPanic(expect, func() { _ = encoding.SerializePoint(nil, g) }); !hasPanic {
-		t.Fatalf("expected panic for invalid group and point:\n\twant: %v\n\tgot: %v", expect, err)
-	}
 }

@@ -214,7 +214,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		badpks := getBadElement(t, conf)
 
 		ctc := cleartextCredentials(
-			encoding.SerializePoint(rec.RegistrationRecord.PublicKey, client.GetConf().Group),
+			rec.RegistrationRecord.PublicKey.Encode(),
 			badpks,
 			nil,
 			nil,

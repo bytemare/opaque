@@ -88,11 +88,6 @@ func (c Ciphersuite) Group() group.Group {
 	return group.Group(c)
 }
 
-// SerializePoint returns the byte encoding of the point padded accordingly.
-func (c Ciphersuite) SerializePoint(p *group.Element) []byte {
-	return encoding.SerializePoint(p, c.Group())
-}
-
 // DeriveKey returns a scalar mapped from the input.
 func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
 	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), c.contextString())

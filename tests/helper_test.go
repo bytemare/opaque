@@ -157,7 +157,7 @@ func getBadElement(t *testing.T, c *configuration) []byte {
 	}
 }
 
-func getBadScalar(t *testing.T, c configuration) []byte {
+func getBadScalar(t *testing.T, c *configuration) []byte {
 	switch c.conf.AKE {
 	case opaque.RistrettoSha512:
 		return getBadRistrettoScalar()

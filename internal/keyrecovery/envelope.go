@@ -78,8 +78,8 @@ func Store(
 
 	pku = getPubkey(conf, randomizedPwd, nonce)
 	ctc := cleartextCredentials(
-		encoding.SerializePoint(pku, conf.Group),
-		encoding.SerializePoint(serverPublicKey, conf.Group),
+		pku.Encode(),
+		serverPublicKey.Encode(),
 		creds.ClientIdentity,
 		creds.ServerIdentity,
 	)
@@ -102,7 +102,7 @@ func Recover(
 ) (clientSecretKey *group.Scalar, clientPublicKey *group.Element, export []byte, err error) {
 	clientSecretKey, clientPublicKey = recoverKeys(conf, randomizedPwd, envelope.Nonce)
 	ctc := cleartextCredentials(
-		encoding.SerializePoint(clientPublicKey, conf.Group),
+		clientPublicKey.Encode(),
 		serverPublicKey,
 		clientIdentity,
 		serverIdentity,

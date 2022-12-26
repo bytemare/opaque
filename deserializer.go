@@ -45,7 +45,7 @@ func (d *Deserializer) RegistrationRequest(registrationRequest []byte) (*message
 		return nil, errInvalidBlindedData
 	}
 
-	return &message.RegistrationRequest{C: d.conf.OPRF, BlindedMessage: blindedMessage}, nil
+	return &message.RegistrationRequest{BlindedMessage: blindedMessage}, nil
 }
 
 func (d *Deserializer) registrationResponseLength() int {
@@ -70,8 +70,6 @@ func (d *Deserializer) RegistrationResponse(registrationResponse []byte) (*messa
 	}
 
 	return &message.RegistrationResponse{
-		C:                d.conf.OPRF,
-		G:                d.conf.Group,
 		EvaluatedMessage: evaluatedMessage,
 		Pks:              pks,
 	}, nil
@@ -98,7 +96,6 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 	}
 
 	return &message.RegistrationRecord{
-		G:          d.conf.Group,
 		PublicKey:  pku,
 		MaskingKey: maskingKey,
 		Envelope:   env,
@@ -123,8 +120,7 @@ func (d *Deserializer) deserializeCredentialResponse(
 		return nil, errInvalidEvaluatedData
 	}
 
-	return message.NewCredentialResponse(d.conf.OPRF,
-		data,
+	return message.NewCredentialResponse(data,
 		input[d.conf.OPRFPointLength:d.conf.OPRFPointLength+d.conf.NonceLen],
 		input[d.conf.OPRFPointLength+d.conf.NonceLen:maxResponseLength]), nil
 }
@@ -152,7 +148,6 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 	}
 
 	return &message.KE1{
-		G:                 d.conf.Group,
 		CredentialRequest: request,
 		NonceU:            nonceU,
 		EpkU:              epku,
@@ -194,7 +189,6 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 	}
 
 	return &message.KE2{
-		G:                  d.conf.Group,
 		CredentialResponse: cresp,
 		NonceS:             nonceS,
 		EpkS:               epks,

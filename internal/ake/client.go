@@ -43,7 +43,6 @@ func (c *Client) Start(cs group.Group, options Options) *message.KE1 {
 	epk := c.values.setOptions(cs, options)
 
 	return &message.KE1{
-		G:                 cs,
 		CredentialRequest: nil,
 		NonceU:            c.nonce,
 		EpkU:              epk,
@@ -60,7 +59,6 @@ func (c *Client) Finalize(
 	ke2 *message.KE2,
 ) (*message.KE3, error) {
 	ikm := k3dh(
-		conf.Group,
 		ke2.EpkS,
 		c.ephemeralSecretKey,
 		serverPublicKey,

@@ -96,8 +96,6 @@ func (s *Server) RegistrationResponse(
 	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)
 
 	return &message.RegistrationResponse{
-		C:                s.conf.OPRF,
-		G:                s.conf.Group,
 		EvaluatedMessage: z,
 		Pks:              serverPublicKey,
 	}
@@ -119,7 +117,7 @@ func (s *Server) credentialResponse(
 		record.Envelope,
 	)
 
-	return message.NewCredentialResponse(s.conf.OPRF, z, maskingNonce, maskedResponse)
+	return message.NewCredentialResponse(z, maskingNonce, maskedResponse)
 }
 
 func (s *Server) verifyInitInput(
@@ -201,7 +199,7 @@ func (s *Server) LoginInit(
 		ClientIdentity: record.ClientIdentity,
 		ServerIdentity: serverIdentity,
 	}
-	identities.SetIdentities(s.conf.Group, record.PublicKey, serverPublicKey)
+	identities.SetIdentities(record.PublicKey, serverPublicKey)
 
 	ke2 := s.Ake.Response(s.conf, &identities, sks, record.PublicKey, ke1, response, *op)
 

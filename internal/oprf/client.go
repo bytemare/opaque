@@ -55,7 +55,7 @@ func (c *Client) hashTranscript(input, unblinded []byte) []byte {
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
 func (c *Client) Finalize(evaluation *group.Element) []byte {
 	invert := c.blind.Copy().Invert()
-	u := encoding.SerializePoint(evaluation.Copy().Multiply(invert), c.Ciphersuite.Group())
+	u := evaluation.Copy().Multiply(invert).Encode()
 
 	return c.hashTranscript(c.input, u)
 }

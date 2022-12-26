@@ -51,7 +51,6 @@ func (s *Server) Response(
 	epk := s.values.setOptions(conf.Group, options)
 
 	ke2 := &message.KE2{
-		G:                  conf.Group,
 		CredentialResponse: response,
 		NonceS:             s.nonce,
 		EpkS:               epk,
@@ -59,7 +58,6 @@ func (s *Server) Response(
 	}
 
 	ikm := k3dh(
-		conf.Group,
 		ke1.EpkU,
 		s.ephemeralSecretKey,
 		ke1.EpkU,

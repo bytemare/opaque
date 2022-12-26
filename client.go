@@ -94,7 +94,6 @@ func (c *Client) RegistrationInit(
 	m := c.OPRF.Blind(password, getClientRegistrationInitBlind(options))
 
 	return &message.RegistrationRequest{
-		C:              c.conf.OPRF,
 		BlindedMessage: m,
 	}
 }
@@ -136,7 +135,6 @@ func (c *Client) RegistrationFinalize(
 	envelope, clientPublicKey, exportKey := keyrecovery.Store(c.conf, randomizedPwd, resp.Pks, credentials)
 
 	return &message.RegistrationRecord{
-		G:          c.conf.Group,
 		PublicKey:  clientPublicKey,
 		MaskingKey: maskingKey,
 		Envelope:   envelope.Serialize(),
@@ -249,7 +247,7 @@ func (c *Client) LoginFinish(
 	}
 
 	// Finalize the AKE.
-	identities.SetIdentities(c.conf.Group, clientPublicKey, serverPublicKeyBytes)
+	identities.SetIdentities(clientPublicKey, serverPublicKeyBytes)
 
 	ke3, err = c.Ake.Finalize(c.conf, identities, clientSecretKey, serverPublicKey, ke2)
 	if err != nil {

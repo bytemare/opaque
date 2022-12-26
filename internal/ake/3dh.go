@@ -23,7 +23,7 @@ func KeyGen(id group.Group) (privateKey, publicKey []byte) {
 	scalar := id.NewScalar().Random()
 	point := id.Base().Multiply(scalar)
 
-	return encoding.SerializeScalar(scalar, id), encoding.SerializePoint(point, id)
+	return scalar.Encode(), point.Encode()
 }
 
 // Identities holds the client and server identities.
@@ -33,9 +33,9 @@ type Identities struct {
 }
 
 // SetIdentities sets the client and server identities to their respective public key if not set.
-func (id *Identities) SetIdentities(g group.Group, clientPublicKey *group.Element, serverPublicKey []byte) *Identities {
+func (id *Identities) SetIdentities(clientPublicKey *group.Element, serverPublicKey []byte) *Identities {
 	if id.ClientIdentity == nil {
-		id.ClientIdentity = encoding.SerializePoint(clientPublicKey, g)
+		id.ClientIdentity = clientPublicKey.Encode()
 	}
 
 	if id.ServerIdentity == nil {
@@ -56,6 +56,7 @@ type Options struct {
 }
 
 func initOptions(g group.Group, options *Options) {
+	/* This is currently unreachable as the callers correctly call this function with non-nil options
 	if options == nil {
 		options = &Options{
 			EphemeralSecretKey: nil,
@@ -63,7 +64,7 @@ func initOptions(g group.Group, options *Options) {
 			NonceLength:        0,
 		}
 	}
-
+	*/
 	if options.EphemeralSecretKey == nil {
 		options.EphemeralSecretKey = g.NewScalar().Random()
 	}
@@ -100,7 +101,6 @@ func (v *values) setOptions(g group.Group, options Options) *group.Element {
 }
 
 func k3dh(
-	g group.Group,
 	p1 *group.Element,
 	s1 *group.Scalar,
 	p2 *group.Element,
@@ -108,9 +108,9 @@ func k3dh(
 	p3 *group.Element,
 	s3 *group.Scalar,
 ) []byte {
-	e1 := encoding.SerializePoint(p1.Copy().Multiply(s1), g)
-	e2 := encoding.SerializePoint(p2.Copy().Multiply(s2), g)
-	e3 := encoding.SerializePoint(p3.Copy().Multiply(s3), g)
+	e1 := p1.Copy().Multiply(s1).Encode()
+	e2 := p2.Copy().Multiply(s2).Encode()
+	e3 := p3.Copy().Multiply(s3).Encode()
 
 	return encoding.Concat3(e1, e2, e3)
 }
@@ -154,7 +154,7 @@ func initTranscript(conf *internal.Configuration, identities *Identities, ke1 []
 	encodedServerID := encoding.EncodeVector(identities.ServerIdentity)
 	conf.Hash.Write(encoding.Concatenate([]byte(tag.VersionTag), encoding.EncodeVector(conf.Context),
 		encodedClientID, ke1,
-		encodedServerID, ke2.CredentialResponse.Serialize(), ke2.NonceS, encoding.SerializePoint(ke2.EpkS, conf.Group)))
+		encodedServerID, ke2.CredentialResponse.Serialize(), ke2.NonceS, ke2.EpkS.Encode()))
 }
 
 func deriveKeys(h *internal.KDF, ikm, context []byte) (serverMacKey, clientMacKey, sessionSecret []byte) {
