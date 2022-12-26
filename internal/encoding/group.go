@@ -9,7 +9,6 @@
 package encoding
 
 import (
-	"filippo.io/nistec"
 	group "github.com/bytemare/crypto"
 )
 
@@ -27,22 +26,4 @@ var PointLength = map[group.Group]int{
 	group.P256Sha256: p256PointLength,
 	group.P384Sha384: p384PointLength,
 	group.P521Sha512: p521PointLength,
-}
-
-// SerializePoint pads the given element if necessary.
-func SerializePoint(p *group.Element, g group.Group) []byte {
-	length, ok := PointLength[g]
-	if !ok {
-		panic("invalid group identifier")
-	}
-
-	point := p.Encode()
-
-	nistec.NewP256Point().BytesCompressed()
-
-	for len(point) < length {
-		point = append([]byte{0x00}, point...)
-	}
-
-	return point
 }
