@@ -26,20 +26,107 @@ func KeyGen(id group.Group) (privateKey, publicKey []byte) {
 	return encoding.SerializeScalar(scalar, id), encoding.SerializePoint(point, id)
 }
 
-// setValues - testing: integrated to support testing, to force values.
-// There's no effect if esk, epk, and nonce have already been set in a previous call.
-func setValues(g group.Group, scalar *group.Scalar, nonce []byte, nonceLen int) (s *group.Scalar, n []byte) {
-	if scalar != nil {
-		s = scalar
-	} else {
-		s = g.NewScalar().Random()
+// Identities holds the client and server identities.
+type Identities struct {
+	ClientIdentity []byte
+	ServerIdentity []byte
+}
+
+// SetIdentities sets the client and server identities to their respective public key if not set.
+func (id *Identities) SetIdentities(g group.Group, clientPublicKey *group.Element, serverPublicKey []byte) *Identities {
+	if id.ClientIdentity == nil {
+		id.ClientIdentity = encoding.SerializePoint(clientPublicKey, g)
 	}
 
-	if len(nonce) == 0 {
-		nonce = internal.RandomBytes(nonceLen)
+	if id.ServerIdentity == nil {
+		id.ServerIdentity = serverPublicKey
 	}
 
-	return s, nonce
+	return id
+}
+
+// Options enables setting optional ephemeral values, which default to secure random values if not set.
+type Options struct {
+	// EphemeralSecretKey: optional
+	EphemeralSecretKey *group.Scalar
+	// Nonce: optional
+	Nonce []byte
+	// NonceLength: optional
+	NonceLength uint
+}
+
+func initOptions(g group.Group, options *Options) {
+	if options == nil {
+		options = &Options{
+			EphemeralSecretKey: nil,
+			Nonce:              nil,
+			NonceLength:        0,
+		}
+	}
+
+	if options.EphemeralSecretKey == nil {
+		options.EphemeralSecretKey = g.NewScalar().Random()
+	}
+
+	if options.NonceLength == 0 {
+		options.NonceLength = internal.NonceLength
+	}
+
+	if len(options.Nonce) == 0 {
+		options.Nonce = internal.RandomBytes(int(options.NonceLength))
+	}
+}
+
+type values struct {
+	ephemeralSecretKey *group.Scalar
+	nonce              []byte
+}
+
+// setOptions sets optional values.
+// There's no effect if ephemeralSecretKey and nonce have already been set in a previous call.
+func (v *values) setOptions(g group.Group, options Options) *group.Element {
+	initOptions(g, &options)
+
+	if v.ephemeralSecretKey == nil ||
+		(options.EphemeralSecretKey != nil && options.EphemeralSecretKey != v.ephemeralSecretKey) {
+		v.ephemeralSecretKey = options.EphemeralSecretKey
+	}
+
+	if v.nonce == nil {
+		v.nonce = options.Nonce
+	}
+
+	return g.Base().Multiply(v.ephemeralSecretKey)
+}
+
+func k3dh(
+	g group.Group,
+	p1 *group.Element,
+	s1 *group.Scalar,
+	p2 *group.Element,
+	s2 *group.Scalar,
+	p3 *group.Element,
+	s3 *group.Scalar,
+) []byte {
+	e1 := encoding.SerializePoint(p1.Copy().Multiply(s1), g)
+	e2 := encoding.SerializePoint(p2.Copy().Multiply(s2), g)
+	e3 := encoding.SerializePoint(p3.Copy().Multiply(s3), g)
+
+	return encoding.Concat3(e1, e2, e3)
+}
+
+func core3DH(
+	conf *internal.Configuration, identities *Identities, ikm, ke1 []byte, ke2 *message.KE2,
+) (sessionSecret, macS, macC []byte) {
+	initTranscript(conf, identities, ke1, ke2)
+
+	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, conf.Hash.Sum()) // preamble
+	serverMac := conf.MAC.MAC(serverMacKey, conf.Hash.Sum())                                // transcript2
+	conf.Hash.Write(serverMac)
+	transcript3 := conf.Hash.Sum()
+	clientMac := conf.MAC.MAC(clientMacKey, transcript3)
+
+	return sessionSecret, serverMac, clientMac
 }
 
 func buildLabel(length int, label, context []byte) []byte {
@@ -62,9 +149,9 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func initTranscript(conf *internal.Configuration, clientIdentity, serverIdentity, ke1 []byte, ke2 *message.KE2) {
-	encodedClientID := encoding.EncodeVector(clientIdentity)
-	encodedServerID := encoding.EncodeVector(serverIdentity)
+func initTranscript(conf *internal.Configuration, identities *Identities, ke1 []byte, ke2 *message.KE2) {
+	encodedClientID := encoding.EncodeVector(identities.ClientIdentity)
+	encodedServerID := encoding.EncodeVector(identities.ServerIdentity)
 	conf.Hash.Write(encoding.Concatenate([]byte(tag.VersionTag), encoding.EncodeVector(conf.Context),
 		encodedClientID, ke1,
 		encodedServerID, ke2.CredentialResponse.Serialize(), ke2.NonceS, encoding.SerializePoint(ke2.EpkS, conf.Group)))
@@ -78,36 +165,4 @@ func deriveKeys(h *internal.KDF, ikm, context []byte) (serverMacKey, clientMacKe
 	clientMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacClient), nil)
 
 	return serverMacKey, clientMacKey, sessionSecret
-}
-
-func k3dh(
-	g group.Group,
-	p1 *group.Element,
-	s1 *group.Scalar,
-	p2 *group.Element,
-	s2 *group.Scalar,
-	p3 *group.Element,
-	s3 *group.Scalar,
-) []byte {
-	e1 := encoding.SerializePoint(p1.Copy().Multiply(s1), g)
-	e2 := encoding.SerializePoint(p2.Copy().Multiply(s2), g)
-	e3 := encoding.SerializePoint(p3.Copy().Multiply(s3), g)
-
-	return encoding.Concat3(e1, e2, e3)
-}
-
-func core3DH(
-	conf *internal.Configuration,
-	ikm, clientIdentity, serverIdentity, ke1 []byte,
-	ke2 *message.KE2,
-) (sessionSecret, macS, macC []byte) {
-	initTranscript(conf, clientIdentity, serverIdentity, ke1, ke2)
-
-	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, conf.Hash.Sum()) // preamble
-	serverMac := conf.MAC.MAC(serverMacKey, conf.Hash.Sum())                                // transcript2
-	conf.Hash.Write(serverMac)
-	transcript3 := conf.Hash.Sum()
-	clientMac := conf.MAC.MAC(clientMacKey, transcript3)
-
-	return sessionSecret, serverMac, clientMac
 }

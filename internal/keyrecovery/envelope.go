@@ -24,7 +24,7 @@ var errEnvelopeInvalidMac = errors.New("invalid envelope authentication tag")
 // Credentials structure is currently used for testing purposes.
 type Credentials struct {
 	ClientIdentity, ServerIdentity []byte
-	EnvelopeNonce, MaskingNonce    []byte // testing: integrated to support testing
+	EnvelopeNonce                  []byte // testing: integrated to support testing
 }
 
 // Envelope represents the OPAQUE envelope.

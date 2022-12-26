@@ -125,8 +125,7 @@ func testBlind(t *testing.T, c oprf.Ciphersuite, test *test) {
 			t.Fatal(fmt.Errorf("blind decoding to scalar in suite %v errored with %q", c, err))
 		}
 
-		client.SetBlind(s)
-		blinded := client.Blind(test.Input[i]).Encode()
+		blinded := client.Blind(test.Input[i], s).Encode()
 
 		if !bytes.Equal(test.BlindedElement[i], blinded) {
 			t.Fatal("unexpected blinded output")
@@ -161,8 +160,7 @@ func testFinalization(t *testing.T, c oprf.Ciphersuite, test *test) {
 			t.Fatal(fmt.Errorf("blind decoding to scalar in suite %v errored with %q", c, err))
 		}
 
-		client.SetBlind(s)
-		client.Blind(test.Input[i])
+		client.Blind(test.Input[i], s)
 
 		output := client.Finalize(ev)
 		if !bytes.Equal(test.Output[i], output) {

@@ -242,7 +242,10 @@ func Example_registration() {
 
 		// The client produces its record and a client-only-known secret export_key, that the client can use for other purposes (e.g. encrypt
 		// information to store on the server, and that the server can't decrypt). We don't use in the example here.
-		record, _ := client.RegistrationFinalize(response, clientID, serverID)
+		record, _ := client.RegistrationFinalize(response, opaque.ClientRegistrationFinalizeOptions{
+			ClientIdentity: clientID,
+			ServerIdentity: serverID,
+		})
 		message3 = record.Serialize()
 	}
 
@@ -330,7 +333,10 @@ func Example_loginKeyExchange() {
 		}
 
 		// In this example, we don't use the secret export key. The client sends the serialized ke3 to the server.
-		ke3, _, err := client.LoginFinish(clientID, serverID, ke2)
+		ke3, _, err := client.LoginFinish(ke2, opaque.ClientLoginFinishOptions{
+			ClientIdentity: clientID,
+			ServerIdentity: serverID,
+		})
 		if err != nil {
 			log.Fatalln(err)
 		}

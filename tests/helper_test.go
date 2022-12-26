@@ -180,7 +180,7 @@ func buildRecord(
 	}
 
 	r2 := server.RegistrationResponse(r1, pk, credID, oprfSeed)
-	r3, _ := client.RegistrationFinalize(r2, nil, nil)
+	r3, _ := client.RegistrationFinalize(r2)
 
 	return &opaque.ClientRecord{
 		CredentialIdentifier: credID,
