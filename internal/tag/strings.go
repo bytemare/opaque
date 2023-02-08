@@ -13,8 +13,8 @@ package tag
 const (
 	// OPRF tags.
 
-	// OPRF is a string explicitly stating the version name.
-	OPRF = "VOPRF10-"
+	// OPRFVersionPrefix is a string explicitly stating the version name.
+	OPRFVersionPrefix = "OPRFV1-\x00-"
 
 	// DeriveKeyPairInternal is the internal DeriveKeyPair tag as defined in VOPRF.
 	DeriveKeyPairInternal = "DeriveKeyPair"

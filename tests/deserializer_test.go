@@ -88,7 +88,10 @@ func TestDeserializeRegistrationResponse(t *testing.T) {
 
 func TestDeserializeRegistrationRecord(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		server, _ := conf.conf.Server()
+		server, err := conf.conf.Server()
+		if err != nil {
+			t.Fatal(err)
+		}
 		c := server.GetConf()
 		length := c.AkePointLength + c.Hash.Size() + c.EnvelopeSize + 1
 		if _, err := server.Deserialize.RegistrationRecord(internal.RandomBytes(length)); err == nil ||
@@ -104,7 +107,10 @@ func TestDeserializeRegistrationRecord(t *testing.T) {
 			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", expect, err)
 		}
 
-		client, _ := conf.conf.Client()
+		client, err := conf.conf.Client()
+		if err != nil {
+			t.Fatal(err)
+		}
 		if _, err := client.Deserialize.RegistrationRecord(internal.RandomBytes(length)); err == nil ||
 			err.Error() != errInvalidMessageLength.Error() {
 			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)

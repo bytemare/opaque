@@ -21,7 +21,7 @@ type CredentialRequest struct {
 }
 
 // NewCredentialRequest returns a populated CredentialRequest.
-func NewCredentialRequest(ciphersuite oprf.Ciphersuite, message *group.Element) *CredentialRequest {
+func NewCredentialRequest(ciphersuite oprf.Identifier, message *group.Element) *CredentialRequest {
 	return &CredentialRequest{
 		BlindedMessage: message,
 	}

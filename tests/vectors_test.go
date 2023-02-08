@@ -51,15 +51,15 @@ func (j *ByteToHex) UnmarshalJSON(b []byte) error {
 */
 
 type config struct {
-	Context ByteToHex `json:"Context"`
-	Fake    string    `json:"Fake"`
-	Group   string    `json:"Group"`
-	Hash    string    `json:"Hash"`
-	KDF     string    `json:"KDF"`
-	MAC     string    `json:"MAC"`
-	KSF     string    `json:"KSF"`
-	Name    string    `json:"Name"`
-	OPRF    ByteToHex `json:"OPRF"`
+	Fake    string          `json:"Fake"`
+	Group   string          `json:"Group"`
+	Hash    string          `json:"Hash"`
+	KDF     string          `json:"KDF"`
+	MAC     string          `json:"MAC"`
+	KSF     string          `json:"KSF"`
+	Name    string          `json:"Name"`
+	OPRF    oprf.Identifier `json:"OPRF"`
+	Context ByteToHex       `json:"Context"`
 }
 
 type inputs struct {
@@ -120,8 +120,9 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	// Client
 	client, _ := conf.Client()
 
-	group := oprf.Ciphersuite(conf.OPRF).Group()
-	blind := group.NewScalar()
+	g := conf.OPRF.Group()
+	t.Logf("%v // %v", conf.OPRF, g)
+	blind := g.NewScalar()
 	if err := blind.Decode(v.Inputs.BlindRegistration); err != nil {
 		panic(err)
 	}
@@ -201,8 +202,8 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 	client, _ := conf.Client()
 
 	if !isFake(v.Config.Fake) {
-		group := oprf.Ciphersuite(conf.OPRF).Group()
-		blind := group.NewScalar()
+		g := conf.OPRF.Group()
+		blind := g.NewScalar()
 		if err := blind.Decode(v.Inputs.BlindLogin); err != nil {
 			panic(err)
 		}
@@ -296,9 +297,20 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 	}
 }
 
+func oprfToGroup(oprf oprf.Identifier) opaque.Group {
+	switch oprf {
+	case "ristretto255-SHA512":
+		return opaque.RistrettoSha512
+	case "P256-SHA256":
+		return opaque.P256Sha256
+	default:
+		return 0
+	}
+}
+
 func (v *vector) test(t *testing.T) {
 	p := &opaque.Configuration{
-		OPRF:    opaque.Group(v.Config.OPRF[1]),
+		OPRF:    oprfToGroup(v.Config.OPRF),
 		Hash:    hashToHash(v.Config.Hash),
 		KDF:     kdfToHash(v.Config.KDF),
 		MAC:     macToHash(v.Config.MAC),

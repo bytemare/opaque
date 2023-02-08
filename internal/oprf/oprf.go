@@ -12,6 +12,7 @@ package oprf
 
 import (
 	"crypto"
+	"fmt"
 
 	group "github.com/bytemare/crypto"
 
@@ -19,55 +20,62 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 )
 
-const maxDeriveKeyPairTries = 255
-
-// base identifies the OPRF non-verifiable, base, mode, encoded on one byte: base = I2OSP(0, 1).
-var base = []byte{0}
-
-// Ciphersuite identifies the OPRF compatible cipher suite to be used.
-type Ciphersuite group.Group
+// Identifier of the OPRF compatible cipher suite to be used.
+type Identifier string
 
 const (
-	// RistrettoSha512 is the OPRF cipher suite of the Ristretto255 group and SHA-512.
-	RistrettoSha512 = Ciphersuite(group.Ristretto255Sha512)
+	// Ristretto255Sha512 is the OPRF cipher suite of the Ristretto255 group and SHA-512.
+	Ristretto255Sha512 Identifier = "ristretto255-SHA512"
+
+	// Decaf448Sha512 is the OPRF cipher suite of the Decaf448 group and SHA-512.
+	// decaf448Sha512 Identifier = "decaf448-SHAKE256".
 
 	// P256Sha256 is the OPRF cipher suite of the NIST P-256 group and SHA-256.
-	P256Sha256 = Ciphersuite(group.P256Sha256)
+	P256Sha256 Identifier = "P256-SHA256"
 
 	// P384Sha384 is the OPRF cipher suite of the NIST P-384 group and SHA-384.
-	P384Sha384 = Ciphersuite(group.P384Sha384)
+	P384Sha384 Identifier = "P384-SHA384"
 
 	// P521Sha512 is the OPRF cipher suite of the NIST P-512 group and SHA-512.
-	P521Sha512 = Ciphersuite(group.P521Sha512)
+	P521Sha512 Identifier = "P521-SHA512"
+
+	nbIDs                 = 4
+	maxDeriveKeyPairTries = 255
 )
 
-var suiteToHash = make(map[group.Group]crypto.Hash, 4)
+var (
+	suites = make(map[group.Group]Identifier, nbIDs)
+	groups = make(map[Identifier]group.Group, nbIDs)
+	hashes = make(map[Identifier]crypto.Hash, nbIDs)
+)
 
 func init() {
-	RistrettoSha512.register(crypto.SHA512)
-	P256Sha256.register(crypto.SHA256)
-	P384Sha384.register(crypto.SHA384)
-	P521Sha512.register(crypto.SHA512)
+	Ristretto255Sha512.register(group.Ristretto255Sha512, crypto.SHA512)
+	P256Sha256.register(group.P256Sha256, crypto.SHA256)
+	P384Sha384.register(group.P384Sha384, crypto.SHA384)
+	P521Sha512.register(group.P521Sha512, crypto.SHA512)
 }
 
-func (c Ciphersuite) register(h crypto.Hash) {
-	suiteToHash[c.Group()] = h
+func (i Identifier) register(g group.Group, h crypto.Hash) {
+	if g.Available() && h.Available() {
+		suites[g] = i
+		groups[i] = g
+		hashes[i] = h
+	} else {
+		panic(fmt.Sprintf("OPRF dependencies not available - Group: %v, Hash: %v", g.Available(), h.Available()))
+	}
 }
 
-func (c Ciphersuite) dst(prefix string) []byte {
-	return encoding.Concat([]byte(prefix), c.contextString())
+func (i Identifier) dst(prefix string) []byte {
+	return encoding.Concat([]byte(prefix), i.contextString())
 }
 
-func (c Ciphersuite) i2osp() []byte {
-	return []byte{0, byte(c)}
+func (i Identifier) contextString() []byte {
+	return encoding.Concatenate([]byte(tag.OPRFVersionPrefix), []byte(i))
 }
 
-func (c Ciphersuite) contextString() []byte {
-	return encoding.Concat3([]byte(tag.OPRF), base, c.i2osp())
-}
-
-func (c Ciphersuite) hash(input ...[]byte) []byte {
-	h := suiteToHash[c.Group()].New()
+func (i Identifier) hash(input ...[]byte) []byte {
+	h := hashes[i].New()
 	h.Reset()
 
 	for _, i := range input {
@@ -77,20 +85,41 @@ func (c Ciphersuite) hash(input ...[]byte) []byte {
 	return h.Sum(nil)
 }
 
-// Available returns whether the Ciphersuite has been registered of not.
-func (c Ciphersuite) Available() bool {
-	_, ok := suiteToHash[c.Group()]
-	return ok
+// Available returns whether the Identifier has been registered of not.
+func (i Identifier) Available() bool {
+	// Check for invalid identifiers
+	switch i {
+	case Ristretto255Sha512, P256Sha256, P384Sha384, P521Sha512:
+		break
+	default:
+		return false
+	}
+
+	// Check for unregistered groups and hashes
+	if _, ok := groups[i]; !ok {
+		return false
+	}
+
+	if _, ok := hashes[i]; !ok {
+		return false
+	}
+
+	return true
+}
+
+// IDFromGroup returns the OPRF identifier corresponding to the input group.
+func IDFromGroup(g group.Group) Identifier {
+	return suites[g]
 }
 
 // Group returns the Group identifier for the cipher suite.
-func (c Ciphersuite) Group() group.Group {
-	return group.Group(c)
+func (i Identifier) Group() group.Group {
+	return groups[i]
 }
 
 // DeriveKey returns a scalar mapped from the input.
-func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
-	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), c.contextString())
+func (i Identifier) DeriveKey(seed, info []byte) *group.Scalar {
+	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), i.contextString())
 	deriveInput := encoding.Concat(seed, encoding.EncodeVector(info))
 
 	var counter uint8
@@ -101,7 +130,7 @@ func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
 			panic("DeriveKeyPairError")
 		}
 
-		s = c.Group().HashToScalar(encoding.Concat(deriveInput, []byte{counter}), dst)
+		s = i.Group().HashToScalar(encoding.Concat(deriveInput, []byte{counter}), dst)
 		counter++
 	}
 
@@ -109,10 +138,10 @@ func (c Ciphersuite) DeriveKey(seed, info []byte) *group.Scalar {
 }
 
 // Client returns an OPRF client.
-func (c Ciphersuite) Client() *Client {
+func (i Identifier) Client() *Client {
 	return &Client{
-		Ciphersuite: c,
-		input:       nil,
-		blind:       nil,
+		Identifier: i,
+		input:      nil,
+		blind:      nil,
 	}
 }
