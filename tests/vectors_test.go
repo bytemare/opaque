@@ -24,6 +24,7 @@ import (
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -50,15 +51,15 @@ func (j *ByteToHex) UnmarshalJSON(b []byte) error {
 */
 
 type config struct {
-	Context ByteToHex `json:"Context"`
-	Fake    string    `json:"Fake"`
-	Group   string    `json:"Group"`
-	Hash    string    `json:"Hash"`
-	KDF     string    `json:"KDF"`
-	MAC     string    `json:"MAC"`
-	KSF     string    `json:"KSF"`
-	Name    string    `json:"Name"`
-	OPRF    ByteToHex `json:"OPRF"`
+	Fake    string          `json:"Fake"`
+	Group   string          `json:"Group"`
+	Hash    string          `json:"Hash"`
+	KDF     string          `json:"KDF"`
+	MAC     string          `json:"MAC"`
+	KSF     string          `json:"KSF"`
+	Name    string          `json:"Name"`
+	OPRF    oprf.Identifier `json:"OPRF"`
+	Context ByteToHex       `json:"Context"`
 }
 
 type inputs struct {
@@ -296,9 +297,20 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 	}
 }
 
+func oprfToGroup(oprf oprf.Identifier) opaque.Group {
+	switch oprf {
+	case "ristretto255-SHA512":
+		return opaque.RistrettoSha512
+	case "P256-SHA256":
+		return opaque.P256Sha256
+	default:
+		return 0
+	}
+}
+
 func (v *vector) test(t *testing.T) {
 	p := &opaque.Configuration{
-		OPRF:    opaque.Group(v.Config.OPRF[1]),
+		OPRF:    oprfToGroup(v.Config.OPRF),
 		Hash:    hashToHash(v.Config.Hash),
 		KDF:     kdfToHash(v.Config.KDF),
 		MAC:     macToHash(v.Config.MAC),
