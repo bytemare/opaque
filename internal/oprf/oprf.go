@@ -95,15 +95,6 @@ func (i Identifier) Available() bool {
 		return false
 	}
 
-	// Check for unregistered groups and hashes
-	if _, ok := groups[i]; !ok {
-		return false
-	}
-
-	if _, ok := hashes[i]; !ok {
-		return false
-	}
-
 	return true
 }
 
