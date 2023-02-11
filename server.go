@@ -137,7 +137,7 @@ func (s *Server) verifyInitInput(
 		return nil, ErrInvalidOPRFSeedLength
 	}
 
-	if len(serverPublicKey) != s.conf.AkePointLength {
+	if len(serverPublicKey) != s.conf.Group.ElementLength() {
 		return nil, ErrInvalidPksLength
 	}
 

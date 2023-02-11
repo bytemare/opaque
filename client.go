@@ -67,7 +67,7 @@ func (c *Client) GetConf() *internal.Configuration {
 // buildPRK derives the randomized password from the OPRF output.
 func (c *Client) buildPRK(evaluation *group.Element) []byte {
 	output := c.OPRF.Finalize(evaluation)
-	stretched := c.conf.KSF.Harden(output, nil, c.conf.OPRFPointLength)
+	stretched := c.conf.KSF.Harden(output, nil, c.conf.OPRF.Group().ElementLength())
 
 	return c.conf.KDF.Extract(nil, encoding.Concat(output, stretched))
 }
@@ -217,7 +217,7 @@ func (c *Client) LoginFinish(
 	}
 
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
-	if len(ke2.MaskedResponse) != c.conf.AkePointLength+c.conf.EnvelopeSize {
+	if len(ke2.MaskedResponse) != c.conf.Group.ElementLength()+c.conf.EnvelopeSize {
 		return nil, nil, errInvalidMaskedLength
 	}
 

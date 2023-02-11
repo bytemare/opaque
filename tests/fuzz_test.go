@@ -227,12 +227,13 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 		_, err = server.Deserialize.RegistrationRequest(r1)
 		if err != nil {
 			conf := server.GetConf()
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r1) == conf.OPRFPointLength {
+			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
+				len(r1) == conf.OPRF.Group().ElementLength() {
 				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
-				if err := isValidOPRFPoint(conf, r1[:conf.OPRFPointLength], errInvalidBlindedData); err != nil {
+				if err := isValidOPRFPoint(conf, r1[:conf.OPRF.Group().ElementLength()], errInvalidBlindedData); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -260,20 +261,20 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 		_, err = client.Deserialize.RegistrationResponse(r2)
 		if err != nil {
 			conf := client.GetConf()
-			maxResponseLength := conf.OPRFPointLength + conf.AkePointLength
+			maxResponseLength := conf.OPRF.Group().ElementLength() + conf.Group.ElementLength()
 
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r2) == maxResponseLength {
 				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
-				if err := isValidOPRFPoint(conf, r2[:conf.OPRFPointLength], errInvalidEvaluatedData); err != nil {
+				if err := isValidOPRFPoint(conf, r2[:conf.OPRF.Group().ElementLength()], errInvalidEvaluatedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidServerPK.Error()) {
-				if err := isValidAKEPoint(conf, r2[conf.OPRFPointLength:], errInvalidServerPK); err != nil {
+				if err := isValidAKEPoint(conf, r2[conf.OPRF.Group().ElementLength():], errInvalidServerPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -301,14 +302,14 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 
 		_, err = server.Deserialize.RegistrationRecord(r3)
 		if err != nil {
-			maxMessageLength := conf.AkePointLength + conf.Hash.Size() + conf.EnvelopeSize
+			maxMessageLength := conf.Group.ElementLength() + conf.Hash.Size() + conf.EnvelopeSize
 
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r3) == maxMessageLength {
 				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidClientPK.Error()) {
-				if err := isValidAKEPoint(conf, r3[:conf.AkePointLength], errInvalidClientPK); err != nil {
+				if err := isValidAKEPoint(conf, r3[:conf.Group.ElementLength()], errInvalidClientPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -337,18 +338,18 @@ func FuzzDeserializeKE1(f *testing.F) {
 		if err != nil {
 			conf := server.GetConf()
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
-				len(ke1) == conf.OPRFPointLength+conf.NonceLen+conf.AkePointLength {
+				len(ke1) == conf.OPRF.Group().ElementLength()+conf.NonceLen+conf.Group.ElementLength() {
 				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
-				if err := isValidOPRFPoint(conf, ke1[:conf.OPRFPointLength], errInvalidBlindedData); err != nil {
+				if err := isValidOPRFPoint(conf, ke1[:conf.OPRF.Group().ElementLength()], errInvalidBlindedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidClientEPK.Error()) {
-				if err := isValidOPRFPoint(conf, ke1[conf.OPRFPointLength+conf.NonceLen:], errInvalidClientEPK); err != nil {
+				if err := isValidOPRFPoint(conf, ke1[conf.OPRF.Group().ElementLength()+conf.NonceLen:], errInvalidClientEPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -402,21 +403,23 @@ func FuzzDeserializeKE2(f *testing.F) {
 		_, err = client.Deserialize.KE2(ke2)
 		if err != nil {
 			conf := client.GetConf()
-			maxResponseLength := conf.OPRFPointLength + conf.NonceLen + conf.AkePointLength + conf.EnvelopeSize
+			maxResponseLength := conf.OPRF.Group().
+				ElementLength() +
+				conf.NonceLen + conf.Group.ElementLength() + conf.EnvelopeSize
 
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
-				len(ke2) == maxResponseLength+conf.NonceLen+conf.AkePointLength+conf.MAC.Size() {
+				len(ke2) == maxResponseLength+conf.NonceLen+conf.Group.ElementLength()+conf.MAC.Size() {
 				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
-				if err := isValidOPRFPoint(conf, ke2[:conf.OPRFPointLength], errInvalidEvaluatedData); err != nil {
+				if err := isValidOPRFPoint(conf, ke2[:conf.OPRF.Group().ElementLength()], errInvalidEvaluatedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidServerEPK.Error()) {
-				if err := isValidAKEPoint(conf, ke2[conf.OPRFPointLength+conf.NonceLen:], errInvalidServerEPK); err != nil {
+				if err := isValidAKEPoint(conf, ke2[conf.OPRF.Group().ElementLength()+conf.NonceLen:], errInvalidServerEPK); err != nil {
 					t.Fatal(err)
 				}
 			}

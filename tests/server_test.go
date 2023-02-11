@@ -181,7 +181,7 @@ func TestServerInit_InvalidData(t *testing.T) {
 		ke1 := encoding.Concatenate(
 			getBadElement(t, conf),
 			internal.RandomBytes(server.GetConf().NonceLen),
-			internal.RandomBytes(server.GetConf().AkePointLength),
+			internal.RandomBytes(server.GetConf().Group.ElementLength()),
 		)
 		expected := "blinded data is an invalid point"
 		if _, err := server.Deserialize.KE1(ke1); err == nil || !strings.HasPrefix(err.Error(), expected) {
@@ -205,7 +205,7 @@ func TestServerInit_InvalidEPKU(t *testing.T) {
 		}
 		ke1 := client.LoginInit([]byte("yo")).Serialize()
 		badke1 := encoding.Concat(
-			ke1[:server.GetConf().OPRFPointLength+server.GetConf().NonceLen],
+			ke1[:server.GetConf().OPRF.Group().ElementLength()+server.GetConf().NonceLen],
 			getBadElement(t, conf),
 		)
 		expected := "invalid ephemeral client public key"

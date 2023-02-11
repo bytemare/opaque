@@ -36,12 +36,12 @@ type Deserializer struct {
 // RegistrationRequest takes a serialized RegistrationRequest message and returns a deserialized
 // RegistrationRequest structure.
 func (d *Deserializer) RegistrationRequest(registrationRequest []byte) (*message.RegistrationRequest, error) {
-	if len(registrationRequest) != d.conf.OPRFPointLength {
+	if len(registrationRequest) != d.conf.OPRF.Group().ElementLength() {
 		return nil, errInvalidMessageLength
 	}
 
 	blindedMessage := d.conf.OPRF.Group().NewElement()
-	if err := blindedMessage.Decode(registrationRequest[:d.conf.OPRFPointLength]); err != nil {
+	if err := blindedMessage.Decode(registrationRequest[:d.conf.OPRF.Group().ElementLength()]); err != nil {
 		return nil, errInvalidBlindedData
 	}
 
@@ -49,7 +49,7 @@ func (d *Deserializer) RegistrationRequest(registrationRequest []byte) (*message
 }
 
 func (d *Deserializer) registrationResponseLength() int {
-	return d.conf.OPRFPointLength + d.conf.AkePointLength
+	return d.conf.OPRF.Group().ElementLength() + d.conf.Group.ElementLength()
 }
 
 // RegistrationResponse takes a serialized RegistrationResponse message and returns a deserialized
@@ -60,12 +60,12 @@ func (d *Deserializer) RegistrationResponse(registrationResponse []byte) (*messa
 	}
 
 	evaluatedMessage := d.conf.OPRF.Group().NewElement()
-	if err := evaluatedMessage.Decode(registrationResponse[:d.conf.OPRFPointLength]); err != nil {
+	if err := evaluatedMessage.Decode(registrationResponse[:d.conf.OPRF.Group().ElementLength()]); err != nil {
 		return nil, errInvalidEvaluatedData
 	}
 
 	pks := d.conf.Group.NewElement()
-	if err := pks.Decode(registrationResponse[d.conf.OPRFPointLength:]); err != nil {
+	if err := pks.Decode(registrationResponse[d.conf.OPRF.Group().ElementLength():]); err != nil {
 		return nil, errInvalidServerPK
 	}
 
@@ -76,7 +76,7 @@ func (d *Deserializer) RegistrationResponse(registrationResponse []byte) (*messa
 }
 
 func (d *Deserializer) recordLength() int {
-	return d.conf.AkePointLength + d.conf.Hash.Size() + d.conf.EnvelopeSize
+	return d.conf.Group.ElementLength() + d.conf.Hash.Size() + d.conf.EnvelopeSize
 }
 
 // RegistrationRecord takes a serialized RegistrationRecord message and returns a deserialized
@@ -86,9 +86,9 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 		return nil, errInvalidMessageLength
 	}
 
-	pk := record[:d.conf.AkePointLength]
-	maskingKey := record[d.conf.AkePointLength : d.conf.AkePointLength+d.conf.Hash.Size()]
-	env := record[d.conf.AkePointLength+d.conf.Hash.Size():]
+	pk := record[:d.conf.Group.ElementLength()]
+	maskingKey := record[d.conf.Group.ElementLength() : d.conf.Group.ElementLength()+d.conf.Hash.Size()]
+	env := record[d.conf.Group.ElementLength()+d.conf.Hash.Size():]
 
 	pku := d.conf.Group.NewElement()
 	if err := pku.Decode(pk); err != nil {
@@ -104,7 +104,7 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 
 func (d *Deserializer) deserializeCredentialRequest(input []byte) (*message.CredentialRequest, error) {
 	blindedMessage := d.conf.OPRF.Group().NewElement()
-	if err := blindedMessage.Decode(input[:d.conf.OPRFPointLength]); err != nil {
+	if err := blindedMessage.Decode(input[:d.conf.OPRF.Group().ElementLength()]); err != nil {
 		return nil, errInvalidBlindedData
 	}
 
@@ -116,17 +116,17 @@ func (d *Deserializer) deserializeCredentialResponse(
 	maxResponseLength int,
 ) (*message.CredentialResponse, error) {
 	data := d.conf.OPRF.Group().NewElement()
-	if err := data.Decode(input[:d.conf.OPRFPointLength]); err != nil {
+	if err := data.Decode(input[:d.conf.OPRF.Group().ElementLength()]); err != nil {
 		return nil, errInvalidEvaluatedData
 	}
 
 	return message.NewCredentialResponse(data,
-		input[d.conf.OPRFPointLength:d.conf.OPRFPointLength+d.conf.NonceLen],
-		input[d.conf.OPRFPointLength+d.conf.NonceLen:maxResponseLength]), nil
+		input[d.conf.OPRF.Group().ElementLength():d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen],
+		input[d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen:maxResponseLength]), nil
 }
 
 func (d *Deserializer) ke1Length() int {
-	return d.conf.OPRFPointLength + d.conf.NonceLen + d.conf.AkePointLength
+	return d.conf.OPRF.Group().ElementLength() + d.conf.NonceLen + d.conf.Group.ElementLength()
 }
 
 // KE1 takes a serialized KE1 message and returns a deserialized KE1 structure.
@@ -140,10 +140,10 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 		return nil, err
 	}
 
-	nonceU := ke1[d.conf.OPRFPointLength : d.conf.OPRFPointLength+d.conf.NonceLen]
+	nonceU := ke1[d.conf.OPRF.Group().ElementLength() : d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen]
 
 	epku := d.conf.Group.NewElement()
-	if err := epku.Decode(ke1[d.conf.OPRFPointLength+d.conf.NonceLen:]); err != nil {
+	if err := epku.Decode(ke1[d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen:]); err != nil {
 		return nil, errInvalidClientEPK
 	}
 
@@ -155,11 +155,11 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 }
 
 func (d *Deserializer) ke2LengthWithoutCreds() int {
-	return d.conf.NonceLen + d.conf.AkePointLength + d.conf.MAC.Size()
+	return d.conf.NonceLen + d.conf.Group.ElementLength() + d.conf.MAC.Size()
 }
 
 func (d *Deserializer) credentialResponseLength() int {
-	return d.conf.OPRFPointLength + d.conf.NonceLen + d.conf.AkePointLength + d.conf.EnvelopeSize
+	return d.conf.OPRF.Group().ElementLength() + d.conf.NonceLen + d.conf.Group.ElementLength() + d.conf.EnvelopeSize
 }
 
 // KE2 takes a serialized KE2 message and returns a deserialized KE2 structure.
@@ -179,8 +179,8 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 
 	nonceS := ke2[maxResponseLength : maxResponseLength+d.conf.NonceLen]
 	offset := maxResponseLength + d.conf.NonceLen
-	epk := ke2[offset : offset+d.conf.AkePointLength]
-	offset += d.conf.AkePointLength
+	epk := ke2[offset : offset+d.conf.Group.ElementLength()]
+	offset += d.conf.Group.ElementLength()
 	mac := ke2[offset:]
 
 	epks := d.conf.Group.NewElement()
