@@ -124,8 +124,8 @@ func FuzzConfiguration(f *testing.F) {
 	// seed corpus
 	loadVectorSeedCorpus(f, "")
 
-	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, o []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, o, _ksf, ake)
+	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, o, ksfID, ake)
 		_ = fuzzServerConfiguration(t, c)
 		_ = fuzzClientConfiguration(t, c)
 	})
@@ -196,14 +196,14 @@ func loadVectorSeedCorpus(f *testing.F, stage string) {
 	)
 }
 
-func inputToConfig(context []byte, kdf, mac, h uint, o []byte, _ksf, ake byte) *opaque.Configuration {
+func inputToConfig(context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) *opaque.Configuration {
 	return &opaque.Configuration{
 		Context: context,
 		KDF:     crypto.Hash(kdf),
 		MAC:     crypto.Hash(mac),
 		Hash:    crypto.Hash(h),
 		OPRF:    oprfToGroup(oprf.Identifier(o)),
-		KSF:     ksf.Identifier(_ksf),
+		KSF:     ksf.Identifier(ksfID),
 		AKE:     opaque.Group(ake),
 	}
 }
@@ -217,8 +217,8 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "RegistrationRequest")
 
-	f.Fuzz(func(t *testing.T, r1, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, r1, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		server, err := c.Server()
 		if err != nil {
 			t.Skip()
@@ -251,8 +251,8 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "RegistrationResponse")
 
-	f.Fuzz(func(t *testing.T, r2, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, r2, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		client, err := c.Client()
 		if err != nil {
 			t.Skip()
@@ -291,8 +291,8 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "RegistrationRecord")
 
-	f.Fuzz(func(t *testing.T, r3, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, r3, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		server, err := c.Server()
 		if err != nil {
 			t.Skip()
@@ -327,8 +327,8 @@ func FuzzDeserializeKE1(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "KE1")
 
-	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		server, err := c.Server()
 		if err != nil {
 			t.Skip()
@@ -393,8 +393,8 @@ func FuzzDeserializeKE2(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "KE2")
 
-	f.Fuzz(func(t *testing.T, ke2, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, ke2, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		client, err := c.Client()
 		if err != nil {
 			t.Skip()
@@ -433,8 +433,8 @@ func FuzzDeserializeKE3(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "KE3")
 
-	f.Fuzz(func(t *testing.T, ke3, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, ke3, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		server, err := c.Server()
 		if err != nil {
 			t.Skip()

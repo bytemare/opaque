@@ -20,6 +20,8 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 )
 
+const testErrValidConf = "unexpected error on valid configuration: %v"
+
 var errInvalidMessageLength = errors.New("invalid message length for the configuration")
 
 /*
@@ -30,7 +32,7 @@ func TestDeserializer(t *testing.T) {
 	// Test valid configurations
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		if _, err := conf.conf.Deserializer(); err != nil {
-			t.Fatalf("unexpected error on valid configuration: %v", err)
+			t.Fatalf(testErrValidConf, err)
 		}
 	})
 
@@ -183,7 +185,7 @@ func TestDecodeAkePrivateKey(t *testing.T) {
 
 		des, err := conf.conf.Deserializer()
 		if err != nil {
-			t.Fatalf("unexpected error on valid configuration: %v", err)
+			t.Fatalf(testErrValidConf, err)
 		}
 
 		if _, err := des.DecodeAkePrivateKey(badKey); err == nil {
@@ -201,7 +203,7 @@ func TestDecodeAkePublicKey(t *testing.T) {
 
 		des, err := conf.conf.Deserializer()
 		if err != nil {
-			t.Fatalf("unexpected error on valid configuration: %v", err)
+			t.Fatalf(testErrValidConf, err)
 		}
 
 		if _, err := des.DecodeAkePublicKey(badKey); err == nil {
