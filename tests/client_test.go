@@ -67,7 +67,7 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 
 		// nil pks
 		expected = "invalid server public key"
-		badr2 = encoding.Concat(r2.Serialize()[:client.GetConf().OPRFPointLength], getBadElement(t, conf))
+		badr2 = encoding.Concat(r2.Serialize()[:client.GetConf().OPRF.Group().ElementLength()], getBadElement(t, conf))
 		if _, err := client.Deserialize.RegistrationResponse(badr2); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid server public key - got %v", err)
@@ -89,12 +89,14 @@ func TestClientFinish_BadEvaluation(t *testing.T) {
 		r2 := encoding.Concat(
 			getBadElement(t, conf),
 			internal.RandomBytes(
-				client.GetConf().NonceLen+client.GetConf().AkePointLength+client.GetConf().EnvelopeSize,
+				client.GetConf().NonceLen+client.GetConf().Group.ElementLength()+client.GetConf().EnvelopeSize,
 			),
 		)
 		badKe2 := encoding.Concat(
 			r2,
-			internal.RandomBytes(client.GetConf().NonceLen+client.GetConf().AkePointLength+client.GetConf().MAC.Size()),
+			internal.RandomBytes(
+				client.GetConf().NonceLen+client.GetConf().Group.ElementLength()+client.GetConf().MAC.Size(),
+			),
 		)
 
 		expected := "invalid OPRF evaluation"
@@ -126,7 +128,7 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 		ke1 := client.LoginInit([]byte("yo"))
 		ke2, _ := server.LoginInit(ke1, nil, sks, pks, oprfSeed, rec)
 
-		goodLength := encoding.PointLength[client.GetConf().Group] + client.GetConf().EnvelopeSize
+		goodLength := client.GetConf().Group.ElementLength() + client.GetConf().EnvelopeSize
 		expected := "invalid masked response length"
 
 		// too short
@@ -218,7 +220,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		// epks := ke2.EpkS
 
 		// tamper epks
-		offset := client.GetConf().AkePointLength + client.GetConf().MAC.Size()
+		offset := client.GetConf().Group.ElementLength() + client.GetConf().MAC.Size()
 		encoded := ke2.Serialize()
 		badKe2 := encoding.Concat3(encoded[:len(encoded)-offset], getBadElement(t, conf), ke2.Mac)
 		expected := "invalid ephemeral server public key"

@@ -13,11 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # pin@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # pin@v3
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@268d8c0ca0432bb2cf416faae41297df9d262d7f # pin@v3
+        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # pin@v3
         with:
           go-version-file: ./go.mod
 
@@ -38,11 +38,11 @@ jobs:
         go: [ '1.19', '1.18' ]
     steps:
       - name: Checkout repo
-        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # pin@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # pin@v3
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@268d8c0ca0432bb2cf416faae41297df9d262d7f # pin@v3
+        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # pin@v3
         with:
           go-version: ${{ matrix.go }}
 
@@ -55,11 +55,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo
-        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # pin@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # pin@v3
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@268d8c0ca0432bb2cf416faae41297df9d262d7f # pin@v3
+        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # pin@v3
         with:
           go-version-file: ./go.mod
 
@@ -75,15 +75,10 @@ jobs:
 
       # Sonar
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@156db6fef3e168e4972abb76de0b32bbce8ec77a # pin@master
+        uses: SonarSource/sonarcloud-github-action@cb201f3b2d7a38231a8c042dfea4539c8bea180b # pin@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.organization=bytemare-github
-            -Dsonar.projectKey=bytemare_opaque
-            -Dsonar.go.coverage.reportPaths=.github/coverage.out
-            -Dsonar.sources=. -Dsonar.test.exclusions=examples_test.go,tests/**
-            -Dsonar.coverage.exclusions=examples_test.go,tests/**
-            -Dsonar.tests=tests/ -Dsonar.verbose=true
+            -Dsonar.organization=bytemare-github -Dsonar.projectKey=bytemare_opaque -Dsonar.go.coverage.reportPaths=.github/coverage.out -Dsonar.sources=. -Dsonar.test.exclusions=examples_test.go,tests/** -Dsonar.coverage.exclusions=examples_test.go,tests/** -Dsonar.tests=tests/ -Dsonar.verbose=true

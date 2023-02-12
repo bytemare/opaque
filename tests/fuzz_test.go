@@ -124,8 +124,8 @@ func FuzzConfiguration(f *testing.F) {
 	// seed corpus
 	loadVectorSeedCorpus(f, "")
 
-	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, o []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, o, _ksf, ake)
+	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, o, ksfID, ake)
 		_ = fuzzServerConfiguration(t, c)
 		_ = fuzzClientConfiguration(t, c)
 	})
@@ -196,14 +196,14 @@ func loadVectorSeedCorpus(f *testing.F, stage string) {
 	)
 }
 
-func inputToConfig(context []byte, kdf, mac, h uint, o []byte, _ksf, ake byte) *opaque.Configuration {
+func inputToConfig(context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) *opaque.Configuration {
 	return &opaque.Configuration{
 		Context: context,
 		KDF:     crypto.Hash(kdf),
 		MAC:     crypto.Hash(mac),
 		Hash:    crypto.Hash(h),
 		OPRF:    oprfToGroup(oprf.Identifier(o)),
-		KSF:     ksf.Identifier(_ksf),
+		KSF:     ksf.Identifier(ksfID),
 		AKE:     opaque.Group(ake),
 	}
 }
@@ -217,8 +217,8 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "RegistrationRequest")
 
-	f.Fuzz(func(t *testing.T, r1, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, r1, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		server, err := c.Server()
 		if err != nil {
 			t.Skip()
@@ -227,12 +227,13 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 		_, err = server.Deserialize.RegistrationRequest(r1)
 		if err != nil {
 			conf := server.GetConf()
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r1) == conf.OPRFPointLength {
+			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
+				len(r1) == conf.OPRF.Group().ElementLength() {
 				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
-				if err := isValidOPRFPoint(conf, r1[:conf.OPRFPointLength], errInvalidBlindedData); err != nil {
+				if err := isValidOPRFPoint(conf, r1[:conf.OPRF.Group().ElementLength()], errInvalidBlindedData); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -250,8 +251,8 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "RegistrationResponse")
 
-	f.Fuzz(func(t *testing.T, r2, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, r2, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		client, err := c.Client()
 		if err != nil {
 			t.Skip()
@@ -260,20 +261,20 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 		_, err = client.Deserialize.RegistrationResponse(r2)
 		if err != nil {
 			conf := client.GetConf()
-			maxResponseLength := conf.OPRFPointLength + conf.AkePointLength
+			maxResponseLength := conf.OPRF.Group().ElementLength() + conf.Group.ElementLength()
 
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r2) == maxResponseLength {
 				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
-				if err := isValidOPRFPoint(conf, r2[:conf.OPRFPointLength], errInvalidEvaluatedData); err != nil {
+				if err := isValidOPRFPoint(conf, r2[:conf.OPRF.Group().ElementLength()], errInvalidEvaluatedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidServerPK.Error()) {
-				if err := isValidAKEPoint(conf, r2[conf.OPRFPointLength:], errInvalidServerPK); err != nil {
+				if err := isValidAKEPoint(conf, r2[conf.OPRF.Group().ElementLength():], errInvalidServerPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -290,8 +291,8 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "RegistrationRecord")
 
-	f.Fuzz(func(t *testing.T, r3, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, r3, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		server, err := c.Server()
 		if err != nil {
 			t.Skip()
@@ -301,14 +302,14 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 
 		_, err = server.Deserialize.RegistrationRecord(r3)
 		if err != nil {
-			maxMessageLength := conf.AkePointLength + conf.Hash.Size() + conf.EnvelopeSize
+			maxMessageLength := conf.Group.ElementLength() + conf.Hash.Size() + conf.EnvelopeSize
 
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r3) == maxMessageLength {
 				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidClientPK.Error()) {
-				if err := isValidAKEPoint(conf, r3[:conf.AkePointLength], errInvalidClientPK); err != nil {
+				if err := isValidAKEPoint(conf, r3[:conf.Group.ElementLength()], errInvalidClientPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -326,8 +327,8 @@ func FuzzDeserializeKE1(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "KE1")
 
-	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		server, err := c.Server()
 		if err != nil {
 			t.Skip()
@@ -337,18 +338,18 @@ func FuzzDeserializeKE1(f *testing.F) {
 		if err != nil {
 			conf := server.GetConf()
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
-				len(ke1) == conf.OPRFPointLength+conf.NonceLen+conf.AkePointLength {
+				len(ke1) == conf.OPRF.Group().ElementLength()+conf.NonceLen+conf.Group.ElementLength() {
 				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
-				if err := isValidOPRFPoint(conf, ke1[:conf.OPRFPointLength], errInvalidBlindedData); err != nil {
+				if err := isValidOPRFPoint(conf, ke1[:conf.OPRF.Group().ElementLength()], errInvalidBlindedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidClientEPK.Error()) {
-				if err := isValidOPRFPoint(conf, ke1[conf.OPRFPointLength+conf.NonceLen:], errInvalidClientEPK); err != nil {
+				if err := isValidOPRFPoint(conf, ke1[conf.OPRF.Group().ElementLength()+conf.NonceLen:], errInvalidClientEPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -392,8 +393,8 @@ func FuzzDeserializeKE2(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "KE2")
 
-	f.Fuzz(func(t *testing.T, ke2, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, ke2, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		client, err := c.Client()
 		if err != nil {
 			t.Skip()
@@ -402,21 +403,23 @@ func FuzzDeserializeKE2(f *testing.F) {
 		_, err = client.Deserialize.KE2(ke2)
 		if err != nil {
 			conf := client.GetConf()
-			maxResponseLength := conf.OPRFPointLength + conf.NonceLen + conf.AkePointLength + conf.EnvelopeSize
+			maxResponseLength := conf.OPRF.Group().
+				ElementLength() +
+				conf.NonceLen + conf.Group.ElementLength() + conf.EnvelopeSize
 
 			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
-				len(ke2) == maxResponseLength+conf.NonceLen+conf.AkePointLength+conf.MAC.Size() {
+				len(ke2) == maxResponseLength+conf.NonceLen+conf.Group.ElementLength()+conf.MAC.Size() {
 				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
-				if err := isValidOPRFPoint(conf, ke2[:conf.OPRFPointLength], errInvalidEvaluatedData); err != nil {
+				if err := isValidOPRFPoint(conf, ke2[:conf.OPRF.Group().ElementLength()], errInvalidEvaluatedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidServerEPK.Error()) {
-				if err := isValidAKEPoint(conf, ke2[conf.OPRFPointLength+conf.NonceLen:], errInvalidServerEPK); err != nil {
+				if err := isValidAKEPoint(conf, ke2[conf.OPRF.Group().ElementLength()+conf.NonceLen:], errInvalidServerEPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -430,8 +433,8 @@ func FuzzDeserializeKE3(f *testing.F) {
 
 	loadVectorSeedCorpus(f, "KE3")
 
-	f.Fuzz(func(t *testing.T, ke3, context []byte, kdf, mac, h uint, oprf []byte, _ksf, ake byte) {
-		c := inputToConfig(context, kdf, mac, h, oprf, _ksf, ake)
+	f.Fuzz(func(t *testing.T, ke3, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
+		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
 		server, err := c.Server()
 		if err != nil {
 			t.Skip()

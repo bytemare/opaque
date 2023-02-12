@@ -162,17 +162,15 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 	o := c.OPRF.OPRF()
 	mac := internal.NewMac(c.MAC)
 	ip := &internal.Configuration{
-		OPRF:            o,
-		OPRFPointLength: encoding.PointLength[o.Group()],
-		KDF:             internal.NewKDF(c.KDF),
-		MAC:             mac,
-		Hash:            internal.NewHash(c.Hash),
-		KSF:             internal.NewKSF(c.KSF),
-		NonceLen:        internal.NonceLength,
-		EnvelopeSize:    internal.NonceLength + mac.Size(),
-		Group:           g,
-		AkePointLength:  encoding.PointLength[g],
-		Context:         c.Context,
+		OPRF:         o,
+		KDF:          internal.NewKDF(c.KDF),
+		MAC:          mac,
+		Hash:         internal.NewHash(c.Hash),
+		KSF:          internal.NewKSF(c.KSF),
+		NonceLen:     internal.NonceLength,
+		EnvelopeSize: internal.NonceLength + mac.Size(),
+		Group:        g,
+		Context:      c.Context,
 	}
 
 	return ip, nil

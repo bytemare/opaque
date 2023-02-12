@@ -21,7 +21,6 @@ import (
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 )
 
@@ -259,16 +258,14 @@ func TestNilConfiguration(t *testing.T) {
 	def := opaque.DefaultConfiguration()
 	g := group.Group(def.AKE)
 	defaultConfiguration := &internal.Configuration{
-		KDF:             internal.NewKDF(def.KDF),
-		MAC:             internal.NewMac(def.MAC),
-		Hash:            internal.NewHash(def.Hash),
-		KSF:             internal.NewKSF(def.KSF),
-		NonceLen:        internal.NonceLength,
-		OPRFPointLength: encoding.PointLength[g],
-		AkePointLength:  encoding.PointLength[g],
-		Group:           g,
-		OPRF:            oprf.IDFromGroup(g),
-		Context:         def.Context,
+		KDF:      internal.NewKDF(def.KDF),
+		MAC:      internal.NewMac(def.MAC),
+		Hash:     internal.NewHash(def.Hash),
+		KSF:      internal.NewKSF(def.KSF),
+		NonceLen: internal.NonceLength,
+		Group:    g,
+		OPRF:     oprf.IDFromGroup(g),
+		Context:  def.Context,
 	}
 
 	s, _ := opaque.NewServer(nil)

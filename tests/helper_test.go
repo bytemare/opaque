@@ -134,7 +134,7 @@ func badScalar(t *testing.T, g group.Group, curve elliptic.Curve) []byte {
 }
 
 func getBadNistElement(t *testing.T, id group.Group) []byte {
-	size := encoding.PointLength[id]
+	size := id.ElementLength()
 	element := internal.RandomBytes(size)
 	// detag compression
 	element[0] = 4
@@ -194,7 +194,7 @@ func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
 	pad := c.KDF.Expand(
 		key,
 		encoding.SuffixString(nonce, tag.CredentialResponsePad),
-		encoding.PointLength[c.Group]+c.EnvelopeSize,
+		c.Group.ElementLength()+c.EnvelopeSize,
 	)
 
 	dst := make([]byte, len(pad))
@@ -210,7 +210,7 @@ func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
 func buildPRK(client *opaque.Client, evaluation *group.Element) ([]byte, error) {
 	conf := client.GetConf()
 	unblinded := client.OPRF.Finalize(evaluation)
-	hardened := conf.KSF.Harden(unblinded, nil, conf.OPRFPointLength)
+	hardened := conf.KSF.Harden(unblinded, nil, conf.OPRF.Group().ElementLength())
 
 	return conf.KDF.Extract(nil, encoding.Concat(unblinded, hardened)), nil
 }
@@ -225,7 +225,7 @@ func getEnvelope(client *opaque.Client, ke2 *message.KE2) (*keyrecovery.Envelope
 
 	maskingKey := conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), conf.KDF.Size())
 	clear := xorResponse(conf, maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
-	e := clear[encoding.PointLength[conf.Group]:]
+	e := clear[conf.Group.ElementLength():]
 
 	env := &keyrecovery.Envelope{
 		Nonce:   e[:conf.NonceLen],

@@ -12,7 +12,6 @@ package oprf
 
 import (
 	"crypto"
-	"fmt"
 
 	group "github.com/bytemare/crypto"
 
@@ -57,13 +56,9 @@ func init() {
 }
 
 func (i Identifier) register(g group.Group, h crypto.Hash) {
-	if g.Available() && h.Available() {
-		suites[g] = i
-		groups[i] = g
-		hashes[i] = h
-	} else {
-		panic(fmt.Sprintf("OPRF dependencies not available - Group: %v, Hash: %v", g.Available(), h.Available()))
-	}
+	suites[g] = i
+	groups[i] = g
+	hashes[i] = h
 }
 
 func (i Identifier) dst(prefix string) []byte {
@@ -92,15 +87,6 @@ func (i Identifier) Available() bool {
 	case Ristretto255Sha512, P256Sha256, P384Sha384, P521Sha512:
 		break
 	default:
-		return false
-	}
-
-	// Check for unregistered groups and hashes
-	if _, ok := groups[i]; !ok {
-		return false
-	}
-
-	if _, ok := hashes[i]; !ok {
 		return false
 	}
 
