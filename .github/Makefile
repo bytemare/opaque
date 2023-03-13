@@ -1,11 +1,14 @@
 .PHONY: update
 update:
-	@cd ../
 	@echo "Updating dependencies..."
-	@go get -u
+	@cd ../ && go get -u
+	@pwd
 	@go mod tidy
 	@echo "Updating Github Actions pins..."
 	@$(foreach file, $(wildcard workflows/*.yml), pin-github-action $(file);)
+
+.PHONY: update-linters
+update-linters:
 	@echo "Updating linters..."
 	@go install mvdan.cc/gofumpt@latest
 	@go install github.com/daixiang0/gci@latest

@@ -25,7 +25,6 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
-	"github.com/bytemare/opaque/message"
 )
 
 type ByteToHex []byte
@@ -82,7 +81,6 @@ type inputs struct {
 	ServerPrivateKey      ByteToHex `json:"server_private_key"`
 	ServerPrivateKeyshare ByteToHex `json:"server_private_keyshare"`
 	ServerPublicKey       ByteToHex `json:"server_public_key"`
-	KE1                   ByteToHex `json:"KE1"`               // Used for fake credentials tests
 	ClientPublicKey       ByteToHex `json:"client_public_key"` // Used for fake credentials tests
 	MaskingKey            ByteToHex `json:"masking_key"`       // Used for fake credentials tests
 }
@@ -121,7 +119,6 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	client, _ := conf.Client()
 
 	g := conf.OPRF.Group()
-	t.Logf("%v // %v", conf.OPRF, g)
 	blind := g.NewScalar()
 	if err := blind.Decode(v.Inputs.BlindRegistration); err != nil {
 		panic(err)
@@ -334,13 +331,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal(err)
 	}
 
-	var ke1 *message.KE1
-	if isFake(v.Config.Fake) {
-		ke1, err = s.Deserialize.KE1(v.Inputs.KE1)
-	} else {
-		ke1, err = s.Deserialize.KE1(v.Outputs.KE1)
-	}
-
+	ke1, err := s.Deserialize.KE1(v.Outputs.KE1)
 	if err != nil {
 		t.Fatal(err)
 	}

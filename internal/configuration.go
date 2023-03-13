@@ -32,16 +32,15 @@ var ErrConfigurationInvalidLength = errors.New("invalid encoded configuration le
 
 // Configuration is the internal representation of the instance runtime parameters.
 type Configuration struct {
-	KDF            *KDF
-	MAC            *Mac
-	Hash           *Hash
-	KSF            *KSF
-	OPRF           oprf.Identifier
-	Context        []byte
-	NonceLen       int
-	EnvelopeSize   int
-	AkePointLength uint
-	Group          group.Group
+	KDF          *KDF
+	MAC          *Mac
+	Hash         *Hash
+	KSF          *KSF
+	OPRF         oprf.Identifier
+	Context      []byte
+	NonceLen     int
+	EnvelopeSize int
+	Group        group.Group
 }
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
