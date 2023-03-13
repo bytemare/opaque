@@ -115,7 +115,7 @@ func TestServerInit_NilSecretKey(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, pk := conf.conf.KeyGen()
-		expected := "invalid server secret key: "
+		expected := "invalid server AKE secret key: "
 
 		if _, err := server.LoginInit(nil, nil, nil, pk, nil, nil); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
