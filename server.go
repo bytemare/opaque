@@ -23,6 +23,9 @@ import (
 )
 
 var (
+	// ErrNoServerKeyMaterial indicates that the server's key material has not been set.
+	ErrNoServerKeyMaterial = errors.New("key material not set: call SetKeyMaterial to set values")
+
 	// ErrAkeInvalidClientMac indicates that the MAC contained in the KE3 message is not valid in the given session.
 	ErrAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")
 
@@ -47,6 +50,14 @@ type Server struct {
 	Deserialize *Deserializer
 	conf        *internal.Configuration
 	Ake         *ake.Server
+	*keyMaterial
+}
+
+type keyMaterial struct {
+	serverIdentity  []byte
+	serverSecretKey *group.Scalar
+	serverPublicKey []byte
+	oprfSeed        []byte
 }
 
 // NewServer returns a Server instantiation given the application Configuration.
@@ -64,6 +75,7 @@ func NewServer(c *Configuration) (*Server, error) {
 		Deserialize: &Deserializer{conf: conf},
 		conf:        conf,
 		Ake:         ake.NewServer(),
+		keyMaterial: nil,
 	}, nil
 }
 
@@ -117,41 +129,6 @@ func (s *Server) credentialResponse(
 	return message.NewCredentialResponse(z, maskingNonce, maskedResponse)
 }
 
-func (s *Server) verifyInitInput(
-	serverSecretKey, serverPublicKey, oprfSeed []byte,
-	record *ClientRecord,
-) (*group.Scalar, error) {
-	sks := s.conf.Group.NewScalar()
-	if err := sks.Decode(serverSecretKey); err != nil {
-		return nil, fmt.Errorf("invalid server AKE secret key: %w", err)
-	}
-
-	if sks.IsZero() {
-		return nil, ErrZeroSKS
-	}
-
-	if len(oprfSeed) != s.conf.Hash.Size() {
-		return nil, ErrInvalidOPRFSeedLength
-	}
-
-	if len(serverPublicKey) != s.conf.Group.ElementLength() {
-		return nil, ErrInvalidPksLength
-	}
-
-	if err := s.conf.Group.NewElement().Decode(serverPublicKey); err != nil {
-		return nil, fmt.Errorf("invalid server public key: %w", err)
-	}
-
-	if len(record.Envelope) != s.conf.EnvelopeSize {
-		return nil, ErrInvalidEnvelopeLength
-	}
-
-	// We've checked that the server's public key and the client's envelope are of correct length,
-	// thus ensuring that the subsequent xor-ing input is the same length as the encryption pad.
-
-	return sks, nil
-}
-
 // ServerLoginInitOptions enables setting optional values for the session, which default to secure random values if not
 // set.
 type ServerLoginInitOptions struct {
@@ -175,30 +152,75 @@ func getServerLoginInitOptions(options []ServerLoginInitOptions) *ake.Options {
 	return &op
 }
 
-// LoginInit responds to a KE1 message with a KE2 message given server credentials and client record.
+// SetKeyMaterial set the server's identity and mandatory key material to be used during LoginInit().
+// All these values must be the same as used during client registration and remain the same across protocol execution
+// for a given registered client.
+//
+// - serverIdentity can be nil, in which case it will be set to serverPublicKey.
+// - serverSecretKey is the server's secret AKE key.
+// - serverPublicKey is the server's public AKE key to the serverSecretKey.
+// - oprfSeed is the long-term OPRF input seed.
+func (s *Server) SetKeyMaterial(serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte) error {
+	sks := s.conf.Group.NewScalar()
+	if err := sks.Decode(serverSecretKey); err != nil {
+		return fmt.Errorf("invalid server AKE secret key: %w", err)
+	}
+
+	if sks.IsZero() {
+		return ErrZeroSKS
+	}
+
+	if len(oprfSeed) != s.conf.Hash.Size() {
+		return ErrInvalidOPRFSeedLength
+	}
+
+	if len(serverPublicKey) != s.conf.Group.ElementLength() {
+		return ErrInvalidPksLength
+	}
+
+	if err := s.conf.Group.NewElement().Decode(serverPublicKey); err != nil {
+		return fmt.Errorf("invalid server public key: %w", err)
+	}
+
+	s.keyMaterial = &keyMaterial{
+		serverIdentity:  serverIdentity,
+		serverSecretKey: sks,
+		serverPublicKey: serverPublicKey,
+		oprfSeed:        oprfSeed,
+	}
+
+	return nil
+}
+
+// LoginInit responds to a KE1 message with a KE2 message a client record.
 func (s *Server) LoginInit(
 	ke1 *message.KE1,
-	serverIdentity, serverSecretKey, serverPublicKey, oprfSeed []byte,
 	record *ClientRecord,
 	options ...ServerLoginInitOptions,
 ) (*message.KE2, error) {
-	sks, err := s.verifyInitInput(serverSecretKey, serverPublicKey, oprfSeed, record)
-	if err != nil {
-		return nil, err
+	if s.keyMaterial == nil {
+		return nil, ErrNoServerKeyMaterial
 	}
+
+	if len(record.Envelope) != s.conf.EnvelopeSize {
+		return nil, ErrInvalidEnvelopeLength
+	}
+
+	// We've checked that the server's public key and the client's envelope are of correct length,
+	// thus ensuring that the subsequent xor-ing input is the same length as the encryption pad.
 
 	op := getServerLoginInitOptions(options)
 
-	response := s.credentialResponse(ke1.CredentialRequest, serverPublicKey,
-		record.RegistrationRecord, record.CredentialIdentifier, oprfSeed, record.TestMaskNonce)
+	response := s.credentialResponse(ke1.CredentialRequest, s.keyMaterial.serverPublicKey,
+		record.RegistrationRecord, record.CredentialIdentifier, s.keyMaterial.oprfSeed, record.TestMaskNonce)
 
 	identities := ake.Identities{
 		ClientIdentity: record.ClientIdentity,
-		ServerIdentity: serverIdentity,
+		ServerIdentity: s.keyMaterial.serverIdentity,
 	}
-	identities.SetIdentities(record.PublicKey, serverPublicKey)
+	identities.SetIdentities(record.PublicKey, s.keyMaterial.serverPublicKey)
 
-	ke2 := s.Ake.Response(s.conf, &identities, sks, record.PublicKey, ke1, response, *op)
+	ke2 := s.Ake.Response(s.conf, &identities, s.keyMaterial.serverSecretKey, record.PublicKey, ke1, response, *op)
 
 	return ke2, nil
 }
@@ -210,6 +232,11 @@ func (s *Server) LoginFinish(ke3 *message.KE3) error {
 	}
 
 	return nil
+}
+
+// Flush sets all the server's session related internal AKE values to nil.
+func (s *Server) Flush() {
+	s.Ake.Flush()
 }
 
 // SessionKey returns the session key if the previous call to LoginInit() was successful.

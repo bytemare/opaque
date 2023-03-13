@@ -9,6 +9,7 @@
 package opaque_test
 
 import (
+	"log"
 	"strings"
 	"testing"
 
@@ -117,16 +118,23 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		server, err := conf.conf.Server()
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		sks, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
+
+		if err := server.SetKeyMaterial(nil, sks, pks, oprfSeed); err != nil {
+			t.Fatal(err)
+		}
+
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.LoginInit([]byte("yo"))
-		ke2, _ := server.LoginInit(ke1, nil, sks, pks, oprfSeed, rec)
+		ke2, _ := server.LoginInit(ke1, rec)
 
 		goodLength := client.GetConf().Group.ElementLength() + client.GetConf().EnvelopeSize
 		expected := "invalid masked response length"
@@ -156,16 +164,23 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		server, err := conf.conf.Server()
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		sks, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
+
+		if err := server.SetKeyMaterial(nil, sks, pks, oprfSeed); err != nil {
+			t.Fatal(err)
+		}
+
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.LoginInit([]byte("yo"))
-		ke2, _ := server.LoginInit(ke1, nil, sks, pks, oprfSeed, rec)
+		ke2, _ := server.LoginInit(ke1, rec)
 
 		env, _, err := getEnvelope(client, ke2)
 		if err != nil {
@@ -207,16 +222,23 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		server, err := conf.conf.Server()
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		sks, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
+
+		if err := server.SetKeyMaterial(nil, sks, pks, oprfSeed); err != nil {
+			t.Fatal(err)
+		}
+
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.LoginInit([]byte("yo"))
-		ke2, _ := server.LoginInit(ke1, nil, sks, pks, oprfSeed, rec)
+		ke2, _ := server.LoginInit(ke1, rec)
 		// epks := ke2.EpkS
 
 		// tamper epks
@@ -283,16 +305,23 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		server, err := conf.conf.Server()
 		if err != nil {
 			t.Fatal(err)
 		}
+
 		sks, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
+
+		if err := server.SetKeyMaterial(nil, sks, pks, oprfSeed); err != nil {
+			log.Fatal(err)
+		}
+
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
 		ke1 := client.LoginInit([]byte("yo"))
-		ke2, _ := server.LoginInit(ke1, nil, sks, pks, oprfSeed, rec)
+		ke2, _ := server.LoginInit(ke1, rec)
 
 		ke2.Mac = internal.RandomBytes(client.GetConf().MAC.Size())
 		expected := "finalizing AKE: invalid server mac"

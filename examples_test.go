@@ -297,6 +297,10 @@ func Example_loginKeyExchange() {
 		log.Fatalln(err)
 	}
 
+	if err := server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretOprfSeed); err != nil {
+		log.Fatalln(err)
+	}
+
 	// These are the 3 login messages that will be exchanged,
 	// and the respective sessions keys for the client and server.
 	var message1, message2, message3 []byte
@@ -315,8 +319,7 @@ func Example_loginKeyExchange() {
 			log.Fatalln(err)
 		}
 
-		ke2, err := server.LoginInit(ke1, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed,
-			exampleClientRecord)
+		ke2, err := server.LoginInit(ke1, exampleClientRecord)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -410,12 +413,16 @@ func Example_fakeResponse() {
 			log.Fatalln(err)
 		}
 
+		if err := server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretOprfSeed); err != nil {
+			log.Fatalln(err)
+		}
+
 		ke1, err := server.Deserialize.KE1(message1)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		ke2, err := server.LoginInit(ke1, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed, fakeRecord)
+		ke2, err := server.LoginInit(ke1, fakeRecord)
 		if err != nil {
 			log.Fatalln(err)
 		}

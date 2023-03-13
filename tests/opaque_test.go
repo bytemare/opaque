@@ -148,12 +148,16 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	var state []byte
 	{
 		server, _ := p.Server()
+		if err := server.SetKeyMaterial(p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed); err != nil {
+			t.Fatal(err)
+		}
+
 		m4, err := server.Deserialize.KE1(m4s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
 
-		ke2, err := server.LoginInit(m4, p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed, record)
+		ke2, err := server.LoginInit(m4, record)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}

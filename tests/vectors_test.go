@@ -336,12 +336,16 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal(err)
 	}
 
-	ke2, err := s.LoginInit(
-		ke1,
+	if err := s.SetKeyMaterial(
 		v.Inputs.ServerIdentity,
 		v.Inputs.ServerPrivateKey,
 		v.Inputs.ServerPublicKey,
-		v.Inputs.OprfSeed,
+		v.Inputs.OprfSeed); err != nil {
+		t.Fatal(err)
+	}
+
+	ke2, err := s.LoginInit(
+		ke1,
 		record,
 		opaque.ServerLoginInitOptions{
 			EphemeralSecretKey: sks,
