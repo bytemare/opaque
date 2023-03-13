@@ -123,7 +123,7 @@ func (s *Server) verifyInitInput(
 ) (*group.Scalar, error) {
 	sks := s.conf.Group.NewScalar()
 	if err := sks.Decode(serverSecretKey); err != nil {
-		return nil, fmt.Errorf("invalid server secret key: %w", err)
+		return nil, fmt.Errorf("invalid server AKE secret key: %w", err)
 	}
 
 	if sks.IsZero() {
