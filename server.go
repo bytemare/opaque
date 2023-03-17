@@ -24,7 +24,7 @@ import (
 
 var (
 	// ErrNoServerKeyMaterial indicates that the server's key material has not been set.
-	ErrNoServerKeyMaterial = errors.New("key material not set: call SetKeyMaterial to set values")
+	ErrNoServerKeyMaterial = errors.New("key material not set: call SetKeyMaterial() to set values")
 
 	// ErrAkeInvalidClientMac indicates that the MAC contained in the KE3 message is not valid in the given session.
 	ErrAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")

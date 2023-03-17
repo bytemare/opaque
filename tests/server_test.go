@@ -143,6 +143,24 @@ func TestServerInit_ZeroSecretKey(t *testing.T) {
 	})
 }
 
+func TestServerInit_NoKeyMaterial(t *testing.T) {
+	/*
+		SetKeyMaterial has not been called or was not successful
+	*/
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, err := conf.conf.Server()
+		if err != nil {
+			t.Fatal(err)
+		}
+		expected := "key material not set: call SetKeyMaterial() to set values"
+
+		if _, err := server.LoginInit(nil, nil); err == nil ||
+			!strings.HasPrefix(err.Error(), expected) {
+			t.Fatalf("expected error not calling SetKeyMaterial - got %s", err)
+		}
+	})
+}
+
 func TestServerInit_InvalidEnvelope(t *testing.T) {
 	/*
 		Record envelope of invalid length
