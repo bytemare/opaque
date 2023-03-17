@@ -149,6 +149,7 @@ func testAuthentication(
 
 	// Server
 	var m5s []byte
+	var state []byte
 	server, _ := p.Server()
 	{
 		if err := server.SetKeyMaterial(p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed); err != nil {
@@ -164,6 +165,8 @@ func testAuthentication(
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
+
+		state = server.SerializeState()
 
 		m5s = ke2.Serialize()
 	}
@@ -194,20 +197,26 @@ func testAuthentication(
 	// Server
 	var serverKey []byte
 	{
-		m6, err := server.Deserialize.KE3(m6s)
+		// here we spawn a new server instance to test setting the state
+		resumedServer, _ := p.Server()
+		if err := resumedServer.SetAKEState(state); err != nil {
+			t.Fatalf(dbgErr, err)
+		}
+
+		m6, err := resumedServer.Deserialize.KE3(m6s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
 
-		if err := server.LoginFinish(m6); err != nil {
+		if err := resumedServer.LoginFinish(m6); err != nil {
 			t.Fatalf(dbgErr, err)
 		}
 
-		serverKey = server.SessionKey()
+		serverKey = resumedServer.SessionKey()
 	}
 
 	if !bytes.Equal(clientKey, serverKey) {
-		t.Fatalf(" session keys differ")
+		t.Fatalf("session keys differ")
 	}
 
 	return client, server, exportKeyLogin
