@@ -234,11 +234,6 @@ func (s *Server) LoginFinish(ke3 *message.KE3) error {
 	return nil
 }
 
-// Flush sets all the server's session related internal AKE values to nil.
-func (s *Server) Flush() {
-	s.Ake.Flush()
-}
-
 // SessionKey returns the session key if the previous call to LoginInit() was successful.
 func (s *Server) SessionKey() []byte {
 	return s.Ake.SessionKey()

@@ -112,9 +112,7 @@ func (s *Server) SetState(clientMac, sessionSecret []byte) error {
 
 // Flush sets all the server's session related internal AKE values to nil.
 func (s *Server) Flush() {
-	s.ephemeralSecretKey.Zero()
-	s.ephemeralSecretKey = nil
-	s.nonce = nil
+	s.values.flush()
 	s.clientMac = nil
 	s.sessionSecret = nil
 }
