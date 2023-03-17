@@ -177,8 +177,6 @@ func (v oprfVector) test(t *testing.T) {
 		t.Fatalf("private key decoding errored with %q\nfor sksm %v\n", err, v.SkSm)
 	}
 
-	t.Logf("suite: %v", v.SuiteID)
-
 	privKey := v.SuiteID.Group().NewScalar()
 	if err := privKey.Decode(s); err != nil {
 		t.Fatal(fmt.Errorf("private key decoding to scalar in suite %v errored with %q", v.SuiteID, err))

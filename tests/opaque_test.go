@@ -55,12 +55,12 @@ func TestFull(t *testing.T) {
 	/*
 		Registration
 	*/
-	record, exportKeyReg := testRegistration(t, test)
+	_, _, record, exportKeyReg := testRegistration(t, test)
 
 	/*
 		Login
 	*/
-	exportKeyLogin := testAuthentication(t, test, record)
+	_, _, exportKeyLogin := testAuthentication(t, test, record)
 
 	// Check values
 	if !bytes.Equal(exportKeyReg, exportKeyLogin) {
@@ -68,7 +68,7 @@ func TestFull(t *testing.T) {
 	}
 }
 
-func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte) {
+func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Server, *opaque.ClientRecord, []byte) {
 	// Client
 	client, _ := p.Client()
 
@@ -125,7 +125,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 			t.Fatalf(dbgErr, err)
 		}
 
-		return &opaque.ClientRecord{
+		return client, server, &opaque.ClientRecord{
 			CredentialIdentifier: credID,
 			ClientIdentity:       p.username,
 			RegistrationRecord:   m3,
@@ -133,7 +133,11 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.ClientRecord, []byte
 	}
 }
 
-func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord) []byte {
+func testAuthentication(
+	t *testing.T,
+	p *testParams,
+	record *opaque.ClientRecord,
+) (*opaque.Client, *opaque.Server, []byte) {
 	// Client
 	client, _ := p.Client()
 
@@ -146,14 +150,18 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	// Server
 	var m5s []byte
 	var state []byte
+	server, _ := p.Server()
 	{
-		server, _ := p.Server()
+		if err := server.SetKeyMaterial(p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed); err != nil {
+			t.Fatal(err)
+		}
+
 		m4, err := server.Deserialize.KE1(m4s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
 
-		ke2, err := server.LoginInit(m4, p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed, record)
+		ke2, err := server.LoginInit(m4, record)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -189,28 +197,29 @@ func testAuthentication(t *testing.T, p *testParams, record *opaque.ClientRecord
 	// Server
 	var serverKey []byte
 	{
-		server, _ := p.Server()
-		m6, err := server.Deserialize.KE3(m6s)
+		// here we spawn a new server instance to test setting the state
+		resumedServer, _ := p.Server()
+		if err := resumedServer.SetAKEState(state); err != nil {
+			t.Fatalf(dbgErr, err)
+		}
+
+		m6, err := resumedServer.Deserialize.KE3(m6s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
 
-		if err := server.SetAKEState(state); err != nil {
+		if err := resumedServer.LoginFinish(m6); err != nil {
 			t.Fatalf(dbgErr, err)
 		}
 
-		if err := server.LoginFinish(m6); err != nil {
-			t.Fatalf(dbgErr, err)
-		}
-
-		serverKey = server.SessionKey()
+		serverKey = resumedServer.SessionKey()
 	}
 
 	if !bytes.Equal(clientKey, serverKey) {
-		t.Fatalf(" session keys differ")
+		t.Fatalf("session keys differ")
 	}
 
-	return exportKeyLogin
+	return client, server, exportKeyLogin
 }
 
 func isSameConf(a, b *opaque.Configuration) bool {
@@ -247,6 +256,68 @@ func TestConfiguration_Deserialization(t *testing.T) {
 
 	if !isSameConf(conf, conf2) {
 		t.Fatalf("Unexpected inequality:\n\t%v\n\t%v", conf, conf2)
+	}
+}
+
+func TestFlush(t *testing.T) {
+	ids := []byte("server")
+	username := []byte("client")
+	password := []byte("password")
+
+	conf := opaque.DefaultConfiguration()
+	conf.Context = []byte("OPAQUETest")
+
+	test := &testParams{
+		Configuration: conf,
+		username:      username,
+		userID:        username,
+		serverID:      ids,
+		password:      password,
+		oprfSeed:      conf.GenerateOPRFSeed(),
+	}
+
+	serverSecretKey, pks := conf.KeyGen()
+	test.serverSecretKey = serverSecretKey
+	test.serverPublicKey = pks
+
+	/*
+		Registration
+	*/
+	_, _, record, _ := testRegistration(t, test)
+
+	/*
+		Login
+	*/
+	client, server, _ := testAuthentication(t, test, record)
+
+	client.Ake.Flush()
+	if client.SessionKey() != nil {
+		t.Fatalf("client flush failed, the session key is non-nil: %v", client.SessionKey())
+	}
+
+	if client.Ake.GetEphemeralSecretKey() != nil {
+		t.Fatalf("client flush failed, the ephemeral session key is non-nil: %v", client.SessionKey())
+	}
+
+	if client.Ake.GetNonce() != nil {
+		t.Fatalf("client flush failed, the nonce is non-nil: %v", client.SessionKey())
+	}
+
+	server.Ake.Flush()
+	if server.SessionKey() != nil {
+		t.Fatalf("server flush failed, the session key is non-nil: %v", client.SessionKey())
+	}
+
+	if server.Ake.GetEphemeralSecretKey() != nil {
+		t.Fatalf("server flush failed, the ephemeral session key is non-nil: %v", client.SessionKey())
+	}
+
+	if server.Ake.GetNonce() != nil {
+		t.Fatalf("server flush failed, the nonce is non-nil: %v", client.SessionKey())
+	}
+
+	if server.ExpectedMAC() != nil {
+		t.Fatalf("server flush failed, the expected client mac is non-nil: %v", client.SessionKey())
 	}
 }
 

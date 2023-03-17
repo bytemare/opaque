@@ -64,13 +64,13 @@ func TestServerInit_InvalidPublicKey(t *testing.T) {
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
 
 		expected := "input server public key's length is invalid"
-		if _, err := server.LoginInit(nil, nil, sk, nil, oprfSeed, nil); err == nil ||
+		if err := server.SetKeyMaterial(nil, sk, nil, oprfSeed); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil pubkey - got %s", err)
 		}
 
 		expected = "invalid server public key: "
-		if _, err := server.LoginInit(nil, nil, sk, getBadElement(t, conf), oprfSeed, nil); err == nil ||
+		if err := server.SetKeyMaterial(nil, sk, getBadElement(t, conf), oprfSeed); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on bad secret key - got %s", err)
 		}
@@ -89,17 +89,17 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 		sk, pk := conf.conf.KeyGen()
 		expected := opaque.ErrInvalidOPRFSeedLength
 
-		if _, err := server.LoginInit(nil, nil, sk, pk, nil, nil); err == nil || !errors.Is(err, expected) {
+		if err := server.SetKeyMaterial(nil, sk, pk, nil); err == nil || !errors.Is(err, expected) {
 			t.Fatalf("expected error on nil seed - got %s", err)
 		}
 
 		seed := internal.RandomBytes(conf.conf.Hash.Size() - 1)
-		if _, err := server.LoginInit(nil, nil, sk, pk, seed, nil); err == nil || !errors.Is(err, expected) {
+		if err := server.SetKeyMaterial(nil, sk, pk, seed); err == nil || !errors.Is(err, expected) {
 			t.Fatalf("expected error on bad seed - got %s", err)
 		}
 
 		seed = internal.RandomBytes(conf.conf.Hash.Size() + 1)
-		if _, err := server.LoginInit(nil, nil, sk, pk, seed, nil); err == nil || !errors.Is(err, expected) {
+		if err := server.SetKeyMaterial(nil, sk, pk, seed); err == nil || !errors.Is(err, expected) {
 			t.Fatalf("expected error on bad seed - got %s", err)
 		}
 	})
@@ -117,7 +117,7 @@ func TestServerInit_NilSecretKey(t *testing.T) {
 		_, pk := conf.conf.KeyGen()
 		expected := "invalid server AKE secret key: "
 
-		if _, err := server.LoginInit(nil, nil, nil, pk, nil, nil); err == nil ||
+		if err := server.SetKeyMaterial(nil, nil, pk, nil); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil secret key - got %s", err)
 		}
@@ -136,9 +136,27 @@ func TestServerInit_ZeroSecretKey(t *testing.T) {
 		sk := [32]byte{}
 		expected := "server private key is zero"
 
-		if _, err := server.LoginInit(nil, nil, sk[:], nil, nil, nil); err == nil ||
+		if err := server.SetKeyMaterial(nil, sk[:], nil, nil); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil secret key - got %s", err)
+		}
+	})
+}
+
+func TestServerInit_NoKeyMaterial(t *testing.T) {
+	/*
+		SetKeyMaterial has not been called or was not successful
+	*/
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		server, err := conf.conf.Server()
+		if err != nil {
+			t.Fatal(err)
+		}
+		expected := "key material not set: call SetKeyMaterial() to set values"
+
+		if _, err := server.LoginInit(nil, nil); err == nil ||
+			!strings.HasPrefix(err.Error(), expected) {
+			t.Fatalf("expected error not calling SetKeyMaterial - got %s", err)
 		}
 	})
 }
@@ -154,6 +172,11 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 		}
 		sk, pk := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
+
+		if err := server.SetKeyMaterial(nil, sk, pk, oprfSeed); err != nil {
+			t.Fatal(err)
+		}
+
 		client, err := conf.conf.Client()
 		if err != nil {
 			t.Fatal(err)
@@ -162,7 +185,7 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 		rec.Envelope = internal.RandomBytes(15)
 
 		expected := "record has invalid envelope length"
-		if _, err := server.LoginInit(nil, nil, sk, pk, oprfSeed, rec); err == nil ||
+		if _, err := server.LoginInit(nil, rec); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil secret key - got %s", err)
 		}
@@ -226,9 +249,12 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	client, _ := conf.Client()
 	server, _ := conf.Server()
 	sk, pk := conf.KeyGen()
+	if err := server.SetKeyMaterial(nil, sk, pk, oprfSeed); err != nil {
+		t.Fatal(err)
+	}
 	rec := buildRecord(credId, oprfSeed, password, pk, client, server)
 	ke1 := client.LoginInit(password)
-	ke2, err := server.LoginInit(ke1, nil, sk, pk, oprfSeed, rec)
+	ke2, err := server.LoginInit(ke1, rec)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +295,8 @@ func TestServerSetAKEState_InvalidInput(t *testing.T) {
 	sk, pk := conf.KeyGen()
 	rec := buildRecord(credId, seed, password, pk, client, server)
 	ke1 := client.LoginInit(password)
-	_, _ = server.LoginInit(ke1, nil, sk, pk, seed, rec)
+	_ = server.SetKeyMaterial(nil, sk, pk, seed)
+	_, _ = server.LoginInit(ke1, rec)
 	state := server.SerializeState()
 	if err := server.SetAKEState(state); err == nil || err.Error() != errStateExists.Error() {
 		t.Fatalf("Expected error for SetAKEState. want %q, got %q", errStateExists, err)

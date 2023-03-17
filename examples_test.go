@@ -91,6 +91,7 @@ func Example_configuration() {
 func Example_serverSetup() {
 	// This a straightforward way to use a secure and efficient configuration.
 	// They have to be run only once in the application's lifecycle, and the output values must be stored appropriately.
+	serverID := []byte("server-identity")
 	conf := opaque.DefaultConfiguration()
 	secretOprfSeed = conf.GenerateOPRFSeed()
 	serverPrivateKey, serverPublicKey = conf.KeyGen()
@@ -99,9 +100,19 @@ func Example_serverSetup() {
 		log.Fatalf("Oh no! Something went wrong setting up the server secrets!")
 	}
 
-	fmt.Println("OPAQUE server values initialized.")
+	// Server setup
+	server, err := conf.Server()
+	if err != nil {
+		log.Fatalln(err)
+	}
 
-	// Output: OPAQUE server values initialized.
+	if err := server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretOprfSeed); err != nil {
+		log.Fatalln(err)
+	}
+
+	fmt.Println("OPAQUE server initialized.")
+
+	// Output: OPAQUE server initialized.
 }
 
 // Example_Deserialization demonstrates a couple of ways to deserialize OPAQUE protocol messages.
@@ -297,6 +308,10 @@ func Example_loginKeyExchange() {
 		log.Fatalln(err)
 	}
 
+	if err := server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretOprfSeed); err != nil {
+		log.Fatalln(err)
+	}
+
 	// These are the 3 login messages that will be exchanged,
 	// and the respective sessions keys for the client and server.
 	var message1, message2, message3 []byte
@@ -315,8 +330,7 @@ func Example_loginKeyExchange() {
 			log.Fatalln(err)
 		}
 
-		ke2, err := server.LoginInit(ke1, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed,
-			exampleClientRecord)
+		ke2, err := server.LoginInit(ke1, exampleClientRecord)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -410,12 +424,16 @@ func Example_fakeResponse() {
 			log.Fatalln(err)
 		}
 
+		if err := server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretOprfSeed); err != nil {
+			log.Fatalln(err)
+		}
+
 		ke1, err := server.Deserialize.KE1(message1)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		ke2, err := server.LoginInit(ke1, serverID, serverPrivateKey, serverPublicKey, secretOprfSeed, fakeRecord)
+		ke2, err := server.LoginInit(ke1, fakeRecord)
 		if err != nil {
 			log.Fatalln(err)
 		}

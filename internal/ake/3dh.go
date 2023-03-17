@@ -83,6 +83,25 @@ type values struct {
 	nonce              []byte
 }
 
+// GetEphemeralSecretKey returns the state's ephemeral secret key.
+func (v *values) GetEphemeralSecretKey() *group.Scalar {
+	return v.ephemeralSecretKey
+}
+
+// GetNonce returns the secret nonce.
+func (v *values) GetNonce() []byte {
+	return v.nonce
+}
+
+func (v *values) flush() {
+	if v.ephemeralSecretKey != nil {
+		v.ephemeralSecretKey.Zero()
+		v.ephemeralSecretKey = nil
+	}
+
+	v.nonce = nil
+}
+
 // setOptions sets optional values.
 // There's no effect if ephemeralSecretKey and nonce have already been set in a previous call.
 func (v *values) setOptions(g group.Group, options Options) *group.Element {

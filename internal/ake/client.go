@@ -81,3 +81,9 @@ func (c *Client) Finalize(
 func (c *Client) SessionKey() []byte {
 	return c.sessionSecret
 }
+
+// Flush sets all the client's session related internal AKE values to nil.
+func (c *Client) Flush() {
+	c.values.flush()
+	c.sessionSecret = nil
+}
