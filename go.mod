@@ -3,7 +3,7 @@ module github.com/bytemare/opaque
 go 1.20
 
 require (
-	github.com/bytemare/crypto v0.4.3
+	github.com/bytemare/crypto v0.4.4
 	github.com/bytemare/hash v0.1.5
 	github.com/bytemare/ksf v0.1.0
 )
