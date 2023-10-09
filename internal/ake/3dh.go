@@ -21,10 +21,10 @@ import (
 
 // KeyGen returns private and public keys in the group.
 func KeyGen(id group.Group) (privateKey, publicKey []byte) {
-	scalar, element := oprf.IDFromGroup(id).
-		DeriveKeyPair(internal.RandomBytes(internal.SeedLength), []byte(tag.DeriveDiffieHellmanKeyPair))
+	scalar := id.NewScalar().Random()
+	point := id.Base().Multiply(scalar)
 
-	return scalar.Encode(), element.Encode()
+	return scalar.Encode(), point.Encode()
 }
 
 func diffieHellman(s *group.Scalar, e *group.Element) *group.Element {

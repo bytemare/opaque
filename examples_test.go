@@ -110,7 +110,7 @@ func Example_serverSetup() {
 		log.Fatalln(err)
 	}
 
-	fmt.Println("OPAQUE server values initialized.")
+	fmt.Println("OPAQUE server initialized.")
 
 	// Output: OPAQUE server initialized.
 }
