@@ -110,7 +110,7 @@ func Example_serverSetup() {
 		log.Fatalln(err)
 	}
 
-	fmt.Println("OPAQUE server initialized.")
+	fmt.Println("OPAQUE server values initialized.")
 
 	// Output: OPAQUE server initialized.
 }
@@ -319,7 +319,7 @@ func Example_loginKeyExchange() {
 
 	// The client initiates the ball and sends the serialized ke1 to the server.
 	{
-		ke1 := client.LoginInit(password)
+		ke1 := client.GenerateKE1(password)
 		message1 = ke1.Serialize()
 	}
 
@@ -330,7 +330,7 @@ func Example_loginKeyExchange() {
 			log.Fatalln(err)
 		}
 
-		ke2, err := server.LoginInit(ke1, exampleClientRecord)
+		ke2, err := server.GenerateKE2(ke1, exampleClientRecord)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -347,7 +347,7 @@ func Example_loginKeyExchange() {
 		}
 
 		// In this example, we don't use the secret export key. The client sends the serialized ke3 to the server.
-		ke3, _, err := client.LoginFinish(ke2, opaque.ClientLoginFinishOptions{
+		ke3, _, err := client.GenerateKE3(ke2, opaque.GenerateKE3Options{
 			ClientIdentity: clientID,
 			ServerIdentity: serverID,
 		})
@@ -391,7 +391,7 @@ func Example_loginKeyExchange() {
 
 // Example_FakeResponse shows how to counter some client enumeration attacks by faking an existing client entry.
 // Precompute the fake client record, and return it when no valid record was found.
-// Use this with the server's LoginInit function whenever a client wants to retrieve an envelope but a client
+// Use this with the server's GenerateKE1 function whenever a client wants to retrieve an envelope but a client
 // entry does not exist. Failing to do so results in an attacker being able to enumerate users.
 func Example_fakeResponse() {
 	// The server must have been set up with its long term values once. So we're calling this, here, for the demo.
@@ -433,7 +433,7 @@ func Example_fakeResponse() {
 			log.Fatalln(err)
 		}
 
-		ke2, err := server.LoginInit(ke1, fakeRecord)
+		ke2, err := server.GenerateKE2(ke1, fakeRecord)
 		if err != nil {
 			log.Fatalln(err)
 		}

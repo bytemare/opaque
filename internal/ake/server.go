@@ -48,19 +48,19 @@ func (s *Server) Response(
 	response *message.CredentialResponse,
 	options Options,
 ) *message.KE2 {
-	epk := s.values.setOptions(conf.Group, options)
+	epks := s.values.setOptions(conf.Group, options)
 
 	ke2 := &message.KE2{
-		CredentialResponse: response,
-		NonceS:             s.nonce,
-		EpkS:               epk,
-		Mac:                nil,
+		CredentialResponse:   response,
+		ServerNonce:          s.nonce,
+		ServerPublicKeyshare: epks,
+		ServerMac:            nil,
 	}
 
 	ikm := k3dh(
-		ke1.EpkU,
+		ke1.ClientPublicKeyshare,
 		s.ephemeralSecretKey,
-		ke1.EpkU,
+		ke1.ClientPublicKeyshare,
 		serverSecretKey,
 		clientPublicKey,
 		s.ephemeralSecretKey,
@@ -68,14 +68,14 @@ func (s *Server) Response(
 	sessionSecret, serverMac, clientMac := core3DH(conf, identities, ikm, ke1.Serialize(), ke2)
 	s.sessionSecret = sessionSecret
 	s.clientMac = clientMac
-	ke2.Mac = serverMac
+	ke2.ServerMac = serverMac
 
 	return ke2
 }
 
 // Finalize verifies the authentication tag contained in ke3.
 func (s *Server) Finalize(conf *internal.Configuration, ke3 *message.KE3) bool {
-	return conf.MAC.Equal(s.clientMac, ke3.Mac)
+	return conf.MAC.Equal(s.clientMac, ke3.ClientMac)
 }
 
 // SessionKey returns the secret shared session key if a previous call to Response() was successful.

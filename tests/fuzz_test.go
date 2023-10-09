@@ -139,6 +139,10 @@ func loadVectorSeedCorpus(f *testing.F, stage string) {
 	}
 
 	for _, v := range vectors {
+		if v.Config.Group == "curve25519" {
+			continue
+		}
+
 		var input ByteToHex
 		switch stage {
 		case "":

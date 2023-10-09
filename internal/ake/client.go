@@ -43,9 +43,9 @@ func (c *Client) Start(cs group.Group, options Options) *message.KE1 {
 	epk := c.values.setOptions(cs, options)
 
 	return &message.KE1{
-		CredentialRequest: nil,
-		NonceU:            c.nonce,
-		EpkU:              epk,
+		CredentialRequest:    nil,
+		ClientNonce:          c.nonce,
+		ClientPublicKeyshare: epk,
 	}
 }
 
@@ -59,22 +59,22 @@ func (c *Client) Finalize(
 	ke2 *message.KE2,
 ) (*message.KE3, error) {
 	ikm := k3dh(
-		ke2.EpkS,
+		ke2.ServerPublicKeyshare,
 		c.ephemeralSecretKey,
 		serverPublicKey,
 		c.ephemeralSecretKey,
-		ke2.EpkS,
+		ke2.ServerPublicKeyshare,
 		clientSecretKey,
 	)
 	sessionSecret, serverMac, clientMac := core3DH(conf, identities, ikm, c.Ke1, ke2)
 
-	if !conf.MAC.Equal(serverMac, ke2.Mac) {
+	if !conf.MAC.Equal(serverMac, ke2.ServerMac) {
 		return nil, errAkeInvalidServerMac
 	}
 
 	c.sessionSecret = sessionSecret
 
-	return &message.KE3{Mac: clientMac}, nil
+	return &message.KE3{ClientMac: clientMac}, nil
 }
 
 // SessionKey returns the secret shared session key if a previous call to Finalize() was successful.

@@ -51,9 +51,9 @@ func Mask(
 // This function assumes that maskedResponse has been checked to be of length pointLength + envelope size.
 func Unmask(
 	conf *internal.Configuration,
-	randomizedPwd, nonce, maskedResponse []byte,
+	randomizedPassword, nonce, maskedResponse []byte,
 ) (serverPublicKey *group.Element, serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
-	maskingKey := conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), conf.Hash.Size())
+	maskingKey := conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), conf.Hash.Size())
 	clear := xorResponse(conf, maskingKey, nonce, maskedResponse)
 	serverPublicKeyBytes = clear[:conf.Group.ElementLength()]
 	env := clear[conf.Group.ElementLength():]
