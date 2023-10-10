@@ -17,7 +17,7 @@ correspond to the [official draft versions](https://datatracker.ietf.org/doc/dra
 
 #### What is OPAQUE?
 
-> OPAQUE is a PKI-free secure aPAKE that is secure against pre-computation attacks. OPAQUE provides forward secrecy with
+> OPAQUE is an aPAKE that is secure against pre-computation attacks. OPAQUE provides forward secrecy with
 > respect to password leakage while also hiding the password from the server, even during password registration. OPAQUE
 > allows applications to increase the difficulty of offline dictionary attacks via iterated hashing or other key
 > stretching schemes. OPAQUE is also extensible, allowing clients to safely store and retrieve arbitrary application data
