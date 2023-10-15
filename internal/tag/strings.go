@@ -36,8 +36,8 @@ const (
 	// MaskingKey is the masking key's creation KDF dst.
 	MaskingKey = "MaskingKey"
 
-	// DerivePrivateKey is the client's private key hash-to-scalar dst.
-	DerivePrivateKey = "OPAQUE-DeriveAuthKeyPair"
+	// DeriveDiffieHellmanKeyPair is the private key hash-to-scalar dst.
+	DeriveDiffieHellmanKeyPair = "OPAQUE-DeriveDiffieHellmanKeyPair"
 
 	// ExpandPrivateKey is the client's private key seed KDF dst.
 	ExpandPrivateKey = "PrivateKey"
@@ -45,7 +45,7 @@ const (
 	// 3DH tags.
 
 	// VersionTag indicates the protocol RFC identifier for the AKE transcript prefix.
-	VersionTag = "RFCXXXX"
+	VersionTag = "OPAQUEv1-"
 
 	// LabelPrefix is the 3DH secret KDF dst prefix.
 	LabelPrefix = "OPAQUE-"

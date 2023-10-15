@@ -12,7 +12,6 @@ import (
 	group "github.com/bytemare/crypto"
 
 	"github.com/bytemare/opaque/internal/encoding"
-	"github.com/bytemare/opaque/internal/oprf"
 )
 
 // CredentialRequest represents credential request message.
@@ -21,7 +20,7 @@ type CredentialRequest struct {
 }
 
 // NewCredentialRequest returns a populated CredentialRequest.
-func NewCredentialRequest(ciphersuite oprf.Identifier, message *group.Element) *CredentialRequest {
+func NewCredentialRequest(message *group.Element) *CredentialRequest {
 	return &CredentialRequest{
 		BlindedMessage: message,
 	}

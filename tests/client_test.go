@@ -86,7 +86,7 @@ func TestClientFinish_BadEvaluation(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_ = client.LoginInit([]byte("yo"))
+		_ = client.GenerateKE1([]byte("yo"))
 		r2 := encoding.Concat(
 			getBadElement(t, conf),
 			internal.RandomBytes(
@@ -133,21 +133,21 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
-		ke1 := client.LoginInit([]byte("yo"))
-		ke2, _ := server.LoginInit(ke1, rec)
+		ke1 := client.GenerateKE1([]byte("yo"))
+		ke2, _ := server.GenerateKE2(ke1, rec)
 
 		goodLength := client.GetConf().Group.ElementLength() + client.GetConf().EnvelopeSize
 		expected := "invalid masked response length"
 
 		// too short
 		ke2.MaskedResponse = internal.RandomBytes(goodLength - 1)
-		if _, _, err := client.LoginFinish(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for short response - got %v", err)
 		}
 
 		// too long
 		ke2.MaskedResponse = internal.RandomBytes(goodLength + 1)
-		if _, _, err := client.LoginFinish(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for long response - got %v", err)
 		}
 	})
@@ -179,8 +179,8 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
-		ke1 := client.LoginInit([]byte("yo"))
-		ke2, _ := server.LoginInit(ke1, rec)
+		ke1 := client.GenerateKE1([]byte("yo"))
+		ke2, _ := server.GenerateKE2(ke1, rec)
 
 		env, _, err := getEnvelope(client, ke2)
 		if err != nil {
@@ -193,7 +193,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
 
 		expected := "key recovery: invalid envelope authentication tag"
-		if _, _, err := client.LoginFinish(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error = %q for invalid envelope mac - got %v", expected, err)
 		}
 	})
@@ -237,22 +237,22 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
-		ke1 := client.LoginInit([]byte("yo"))
-		ke2, _ := server.LoginInit(ke1, rec)
-		// epks := ke2.EpkS
+		ke1 := client.GenerateKE1([]byte("yo"))
+		ke2, _ := server.GenerateKE2(ke1, rec)
+		// epks := ke2.ServerPublicKeyshare
 
 		// tamper epks
 		offset := client.GetConf().Group.ElementLength() + client.GetConf().MAC.Size()
 		encoded := ke2.Serialize()
-		badKe2 := encoding.Concat3(encoded[:len(encoded)-offset], getBadElement(t, conf), ke2.Mac)
+		badKe2 := encoding.Concat3(encoded[:len(encoded)-offset], getBadElement(t, conf), ke2.ServerMac)
 		expected := "invalid ephemeral server public key"
 		if _, err := client.Deserialize.KE2(badKe2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid epks encoding - got %q", err)
 		}
 
 		// tamper PKS
-		// ke2.EpkS = server.Group.NewElement().Mult(server.Group.NewScalar().Random())
-		env, randomizedPwd, err := getEnvelope(client, ke2)
+		// ke2.ServerPublicKeyshare = server.Group.NewElement().Mult(server.Group.NewScalar().Random())
+		env, randomizedPassword, err := getEnvelope(client, ke2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -266,7 +266,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 			nil,
 		)
 		authKey := client.GetConf().KDF.Expand(
-			randomizedPwd,
+			randomizedPassword,
 			encoding.SuffixString(env.Nonce, tag.AuthKey),
 			client.GetConf().KDF.Size(),
 		)
@@ -277,7 +277,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
 
 		expected = "unmasking: invalid server public key in masked response"
-		if _, _, err := client.LoginFinish(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error %q for invalid envelope mac - got %q", expected, err)
 		}
 
@@ -288,7 +288,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
 
 		expected = "key recovery: invalid envelope authentication tag"
-		if _, _, err := client.LoginFinish(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error %q for invalid envelope mac - got %q", expected, err)
 		}
 	})
@@ -320,12 +320,12 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 
 		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
 
-		ke1 := client.LoginInit([]byte("yo"))
-		ke2, _ := server.LoginInit(ke1, rec)
+		ke1 := client.GenerateKE1([]byte("yo"))
+		ke2, _ := server.GenerateKE2(ke1, rec)
 
-		ke2.Mac = internal.RandomBytes(client.GetConf().MAC.Size())
+		ke2.ServerMac = internal.RandomBytes(client.GetConf().MAC.Size())
 		expected := "finalizing AKE: invalid server mac"
-		if _, _, err := client.LoginFinish(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error %q for invalid epks encoding - got %q", expected, err)
 		}
 	})
@@ -335,9 +335,9 @@ func TestClientFinish_MissingKe1(t *testing.T) {
 	expectedError := "missing KE1 in client state"
 	conf := opaque.DefaultConfiguration()
 	client, _ := conf.Client()
-	if _, _, err := client.LoginFinish(nil); err == nil || !strings.EqualFold(err.Error(), expectedError) {
+	if _, _, err := client.GenerateKE3(nil); err == nil || !strings.EqualFold(err.Error(), expectedError) {
 		t.Fatalf(
-			"expected error when calling LoginFinish without pre-existing KE1, want %q, got %q",
+			"expected error when calling GenerateKE3 without pre-existing KE1, want %q, got %q",
 			expectedError,
 			err,
 		)

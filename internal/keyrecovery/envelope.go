@@ -16,6 +16,7 @@ import (
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 )
 
@@ -38,12 +39,12 @@ func (e *Envelope) Serialize() []byte {
 	return encoding.Concat(e.Nonce, e.AuthTag)
 }
 
-func exportKey(conf *internal.Configuration, randomizedPwd, nonce []byte) []byte {
-	return conf.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.ExportKey), conf.KDF.Size())
+func exportKey(conf *internal.Configuration, randomizedPassword, nonce []byte) []byte {
+	return conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExportKey), conf.KDF.Size())
 }
 
-func authTag(conf *internal.Configuration, randomizedPwd, nonce, ctc []byte) []byte {
-	authKey := conf.KDF.Expand(randomizedPwd, encoding.SuffixString(nonce, tag.AuthKey), conf.KDF.Size())
+func authTag(conf *internal.Configuration, randomizedPassword, nonce, ctc []byte) []byte {
+	authKey := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.AuthKey), conf.KDF.Size())
 	return conf.MAC.MAC(authKey, encoding.Concat(nonce, ctc))
 }
 
@@ -64,27 +65,35 @@ func cleartextCredentials(clientPublicKey, serverPublicKey, clientIdentity, serv
 	)
 }
 
+func deriveDiffieHellmanKeyPair(
+	conf *internal.Configuration,
+	randomizedPassword, nonce []byte,
+) (*group.Scalar, *group.Element) {
+	seed := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
+	return oprf.IDFromGroup(conf.Group).DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
+}
+
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
 func Store(
 	conf *internal.Configuration,
-	randomizedPwd []byte, serverPublicKey *group.Element,
-	creds *Credentials,
+	randomizedPassword []byte, serverPublicKey *group.Element,
+	credentials *Credentials,
 ) (env *Envelope, pku *group.Element, export []byte) {
 	// testing: integrated to support testing with set nonce
-	nonce := creds.EnvelopeNonce
+	nonce := credentials.EnvelopeNonce
 	if nonce == nil {
 		nonce = internal.RandomBytes(conf.NonceLen)
 	}
 
-	pku = getPubkey(conf, randomizedPwd, nonce)
+	_, pku = deriveDiffieHellmanKeyPair(conf, randomizedPassword, nonce)
 	ctc := cleartextCredentials(
 		pku.Encode(),
 		serverPublicKey.Encode(),
-		creds.ClientIdentity,
-		creds.ServerIdentity,
+		credentials.ClientIdentity,
+		credentials.ServerIdentity,
 	)
-	auth := authTag(conf, randomizedPwd, nonce, ctc)
-	export = exportKey(conf, randomizedPwd, nonce)
+	auth := authTag(conf, randomizedPassword, nonce, ctc)
+	export = exportKey(conf, randomizedPassword, nonce)
 
 	env = &Envelope{
 		Nonce:   nonce,
@@ -97,10 +106,10 @@ func Store(
 // Recover returns the client's private and public key, as well as the secret export key.
 func Recover(
 	conf *internal.Configuration,
-	randomizedPwd, serverPublicKey, clientIdentity, serverIdentity []byte,
+	randomizedPassword, serverPublicKey, clientIdentity, serverIdentity []byte,
 	envelope *Envelope,
 ) (clientSecretKey *group.Scalar, clientPublicKey *group.Element, export []byte, err error) {
-	clientSecretKey, clientPublicKey = recoverKeys(conf, randomizedPwd, envelope.Nonce)
+	clientSecretKey, clientPublicKey = deriveDiffieHellmanKeyPair(conf, randomizedPassword, envelope.Nonce)
 	ctc := cleartextCredentials(
 		clientPublicKey.Encode(),
 		serverPublicKey,
@@ -108,12 +117,12 @@ func Recover(
 		serverIdentity,
 	)
 
-	expectedTag := authTag(conf, randomizedPwd, envelope.Nonce, ctc)
+	expectedTag := authTag(conf, randomizedPassword, envelope.Nonce, ctc)
 	if !conf.MAC.Equal(expectedTag, envelope.AuthTag) {
 		return nil, nil, nil, errEnvelopeInvalidMac
 	}
 
-	export = exportKey(conf, randomizedPwd, envelope.Nonce)
+	export = exportKey(conf, randomizedPassword, envelope.Nonce)
 
 	return clientSecretKey, clientPublicKey, export, nil
 }

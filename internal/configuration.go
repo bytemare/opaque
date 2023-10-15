@@ -24,7 +24,7 @@ const (
 	NonceLength = 32
 
 	// SeedLength is the default length used for seeds.
-	SeedLength = 32
+	SeedLength = oprf.SeedLength
 )
 
 // ErrConfigurationInvalidLength happens when deserializing a configuration of invalid length.

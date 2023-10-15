@@ -129,22 +129,22 @@ func (s *Server) credentialResponse(
 	return message.NewCredentialResponse(z, maskingNonce, maskedResponse)
 }
 
-// ServerLoginInitOptions enables setting optional values for the session, which default to secure random values if not
+// GenerateKE2Options enables setting optional values for the session, which default to secure random values if not
 // set.
-type ServerLoginInitOptions struct {
-	// EphemeralSecretKey: optional
-	EphemeralSecretKey *group.Scalar
+type GenerateKE2Options struct {
+	// KeyShareSeed: optional
+	KeyShareSeed []byte
 	// Nonce: optional
 	Nonce []byte
 	// NonceLength: optional
 	NonceLength uint
 }
 
-func getServerLoginInitOptions(options []ServerLoginInitOptions) *ake.Options {
+func getGenerateKE2Options(options []GenerateKE2Options) *ake.Options {
 	var op ake.Options
 
 	if len(options) != 0 {
-		op.EphemeralSecretKey = options[0].EphemeralSecretKey
+		op.KeyShareSeed = options[0].KeyShareSeed
 		op.Nonce = options[0].Nonce
 		op.NonceLength = options[0].NonceLength
 	}
@@ -152,7 +152,7 @@ func getServerLoginInitOptions(options []ServerLoginInitOptions) *ake.Options {
 	return &op
 }
 
-// SetKeyMaterial set the server's identity and mandatory key material to be used during LoginInit().
+// SetKeyMaterial set the server's identity and mandatory key material to be used during GenerateKE2().
 // All these values must be the same as used during client registration and remain the same across protocol execution
 // for a given registered client.
 //
@@ -192,11 +192,11 @@ func (s *Server) SetKeyMaterial(serverIdentity, serverSecretKey, serverPublicKey
 	return nil
 }
 
-// LoginInit responds to a KE1 message with a KE2 message a client record.
-func (s *Server) LoginInit(
+// GenerateKE2 responds to a KE1 message with a KE2 message a client record.
+func (s *Server) GenerateKE2(
 	ke1 *message.KE1,
 	record *ClientRecord,
-	options ...ServerLoginInitOptions,
+	options ...GenerateKE2Options,
 ) (*message.KE2, error) {
 	if s.keyMaterial == nil {
 		return nil, ErrNoServerKeyMaterial
@@ -209,7 +209,7 @@ func (s *Server) LoginInit(
 	// We've checked that the server's public key and the client's envelope are of correct length,
 	// thus ensuring that the subsequent xor-ing input is the same length as the encryption pad.
 
-	op := getServerLoginInitOptions(options)
+	op := getGenerateKE2Options(options)
 
 	response := s.credentialResponse(ke1.CredentialRequest, s.keyMaterial.serverPublicKey,
 		record.RegistrationRecord, record.CredentialIdentifier, s.keyMaterial.oprfSeed, record.TestMaskNonce)
@@ -234,12 +234,12 @@ func (s *Server) LoginFinish(ke3 *message.KE3) error {
 	return nil
 }
 
-// SessionKey returns the session key if the previous call to LoginInit() was successful.
+// SessionKey returns the session key if the previous call to GenerateKE2() was successful.
 func (s *Server) SessionKey() []byte {
 	return s.Ake.SessionKey()
 }
 
-// ExpectedMAC returns the expected client MAC if the previous call to LoginInit() was successful.
+// ExpectedMAC returns the expected client MAC if the previous call to GenerateKE2() was successful.
 func (s *Server) ExpectedMAC() []byte {
 	return s.Ake.ExpectedMAC()
 }

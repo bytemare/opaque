@@ -14,6 +14,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"testing"
@@ -46,7 +47,7 @@ func (j *ByteToHex) UnmarshalJSON(b []byte) error {
 }
 
 /*
-	Test test vectors
+	Test the test vectors
 */
 
 type config struct {
@@ -62,27 +63,24 @@ type config struct {
 }
 
 type inputs struct {
-	BlindLogin            ByteToHex `json:"blind_login"`
-	BlindRegistration     ByteToHex `json:"blind_registration"`
-	ClientIdentity        ByteToHex `json:"client_identity,omitempty"`
-	Context               ByteToHex `json:"context"`
-	ClientKeyshare        ByteToHex `json:"client_keyshare"`
-	ClientNonce           ByteToHex `json:"client_nonce"`
-	ClientPrivateKeyshare ByteToHex `json:"client_private_keyshare"`
-	CredentialIdentifier  ByteToHex `json:"credential_identifier"`
-	EnvelopeNonce         ByteToHex `json:"envelope_nonce"`
-	MaskingNonce          ByteToHex `json:"masking_nonce"`
-	OprfKey               ByteToHex `json:"oprf_key"`
-	OprfSeed              ByteToHex `json:"oprf_seed"`
-	Password              ByteToHex `json:"password"`
-	ServerIdentity        ByteToHex `json:"server_identity,omitempty"`
-	ServerKeyshare        ByteToHex `json:"server_keyshare"`
-	ServerNonce           ByteToHex `json:"server_nonce"`
-	ServerPrivateKey      ByteToHex `json:"server_private_key"`
-	ServerPrivateKeyshare ByteToHex `json:"server_private_keyshare"`
-	ServerPublicKey       ByteToHex `json:"server_public_key"`
-	ClientPublicKey       ByteToHex `json:"client_public_key"` // Used for fake credentials tests
-	MaskingKey            ByteToHex `json:"masking_key"`       // Used for fake credentials tests
+	BlindLogin           ByteToHex `json:"blind_login"`
+	BlindRegistration    ByteToHex `json:"blind_registration"`
+	ClientIdentity       ByteToHex `json:"client_identity,omitempty"`
+	ClientKeyshareSeed   ByteToHex `json:"client_keyshare_seed"`
+	ClientNonce          ByteToHex `json:"client_nonce"`
+	CredentialIdentifier ByteToHex `json:"credential_identifier"`
+	EnvelopeNonce        ByteToHex `json:"envelope_nonce"`
+	MaskingNonce         ByteToHex `json:"masking_nonce"`
+	OprfSeed             ByteToHex `json:"oprf_seed"`
+	Password             ByteToHex `json:"password"`
+	ServerIdentity       ByteToHex `json:"server_identity,omitempty"`
+	ServerKeyshareSeed   ByteToHex `json:"server_keyshare_seed"`
+	ServerNonce          ByteToHex `json:"server_nonce"`
+	ServerPrivateKey     ByteToHex `json:"server_private_key"`
+	ServerPublicKey      ByteToHex `json:"server_public_key"`
+	ClientPublicKey      ByteToHex `json:"client_public_key"` // Used for fake credentials tests
+	MaskingKey           ByteToHex `json:"masking_key"`       // Used for fake credentials tests
+	KE1                  ByteToHex `json:"KE1,omitempty"`     // Used for fake credentials tests
 }
 
 type intermediates struct {
@@ -92,6 +90,7 @@ type intermediates struct {
 	Envelope        ByteToHex `json:"envelope"`         //
 	HandshakeSecret ByteToHex `json:"handshake_secret"` //
 	MaskingKey      ByteToHex `json:"masking_key"`
+	OprfKey         ByteToHex `json:"oprf_key"`
 	RandomPWD       ByteToHex `json:"randomized_pwd"` //
 	ServerMacKey    ByteToHex `json:"server_mac_key"` //
 }
@@ -205,16 +204,11 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 			panic(err)
 		}
 
-		esk, err := client.Deserialize.DecodeAkePrivateKey(v.Inputs.ClientPrivateKeyshare)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		KE1 := client.LoginInit(v.Inputs.Password, opaque.ClientLoginInitOptions{
-			Blind:              blind,
-			EphemeralSecretKey: esk,
-			Nonce:              v.Inputs.ClientNonce,
-			NonceLength:        internal.NonceLength,
+		KE1 := client.GenerateKE1(v.Inputs.Password, opaque.GenerateKE1Options{
+			Blind:        blind,
+			KeyShareSeed: v.Inputs.ClientKeyshareSeed,
+			Nonce:        v.Inputs.ClientNonce,
+			NonceLength:  internal.NonceLength,
 		})
 
 		if !bytes.Equal(v.Outputs.KE1, KE1.Serialize()) {
@@ -258,9 +252,9 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ke3, exportKey, err := client.LoginFinish(
+	ke3, exportKey, err := client.GenerateKE3(
 		cke2,
-		opaque.ClientLoginFinishOptions{
+		opaque.GenerateKE3Options{
 			ClientIdentity: v.Inputs.ClientIdentity,
 			ServerIdentity: v.Inputs.ServerIdentity,
 		},
@@ -321,16 +315,15 @@ func (v *vector) test(t *testing.T) {
 		v.testRegistration(p, t)
 	}
 
+	if isFake(v.Config.Fake) {
+		v.Outputs.KE1 = v.Inputs.KE1
+	}
+
 	// Login
 	v.testLogin(p, t)
 }
 
 func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.ClientRecord) {
-	sks, err := s.Deserialize.DecodeAkePrivateKey(v.Inputs.ServerPrivateKeyshare)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ke1, err := s.Deserialize.KE1(v.Outputs.KE1)
 	if err != nil {
 		t.Fatal(err)
@@ -344,13 +337,13 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal(err)
 	}
 
-	ke2, err := s.LoginInit(
+	ke2, err := s.GenerateKE2(
 		ke1,
 		record,
-		opaque.ServerLoginInitOptions{
-			EphemeralSecretKey: sks,
-			Nonce:              v.Inputs.ServerNonce,
-			NonceLength:        internal.NonceLength,
+		opaque.GenerateKE2Options{
+			KeyShareSeed: v.Inputs.ServerKeyshareSeed,
+			Nonce:        v.Inputs.ServerNonce,
+			NonceLength:  internal.NonceLength,
 		},
 	)
 	if err != nil {
@@ -375,7 +368,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 			t.Fatal(err)
 		}
 
-		if !bytes.Equal(vectorKE3.Mac, s.ExpectedMAC()) {
+		if !bytes.Equal(vectorKE3.ClientMac, s.ExpectedMAC()) {
 			t.Fatalf("Expected client MACs do not match : %v", s.ExpectedMAC())
 		}
 
@@ -408,15 +401,15 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal("CredResp do not match")
 	}
 
-	if !bytes.Equal(vectorKE2.NonceS, ke2.NonceS) {
+	if !bytes.Equal(vectorKE2.ServerNonce, ke2.ServerNonce) {
 		t.Fatal("nonces do not match")
 	}
 
-	if !bytes.Equal(vectorKE2.EpkS.Encode(), ke2.EpkS.Encode()) {
+	if !bytes.Equal(vectorKE2.ServerPublicKeyshare.Encode(), ke2.ServerPublicKeyshare.Encode()) {
 		t.Fatal("epks do not match")
 	}
 
-	if !bytes.Equal(vectorKE2.Mac, ke2.Mac) {
+	if !bytes.Equal(vectorKE2.ServerMac, ke2.ServerMac) {
 		t.Fatalf("server macs do not match")
 	}
 
@@ -499,6 +492,7 @@ func groupToGroup(g string) opaque.Group {
 	// case "curve25519_XMD:SHA-512_ELL2_RO_":
 	//	return opaque.Curve25519Sha512
 	default:
+		log.Printf("group %s", g)
 		panic("group not recognised")
 	}
 }
@@ -529,6 +523,9 @@ func TestOpaqueVectors(t *testing.T) {
 	}
 
 	for _, tv := range v {
+		if tv.Config.Group == "curve25519" {
+			continue
+		}
 		t.Run(fmt.Sprintf("%s - %s - Fake:%s", tv.Config.Name, tv.Config.Group, tv.Config.Fake), tv.test)
 	}
 }

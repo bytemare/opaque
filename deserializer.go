@@ -108,7 +108,7 @@ func (d *Deserializer) deserializeCredentialRequest(input []byte) (*message.Cred
 		return nil, errInvalidBlindedData
 	}
 
-	return message.NewCredentialRequest(d.conf.OPRF, blindedMessage), nil
+	return message.NewCredentialRequest(blindedMessage), nil
 }
 
 func (d *Deserializer) deserializeCredentialResponse(
@@ -148,9 +148,9 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 	}
 
 	return &message.KE1{
-		CredentialRequest: request,
-		NonceU:            nonceU,
-		EpkU:              epku,
+		CredentialRequest:    request,
+		ClientNonce:          nonceU,
+		ClientPublicKeyshare: epku,
 	}, nil
 }
 
@@ -189,10 +189,10 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 	}
 
 	return &message.KE2{
-		CredentialResponse: cresp,
-		NonceS:             nonceS,
-		EpkS:               epks,
-		Mac:                mac,
+		CredentialResponse:   cresp,
+		ServerNonce:          nonceS,
+		ServerPublicKeyshare: epks,
+		ServerMac:            mac,
 	}, nil
 }
 
@@ -202,7 +202,7 @@ func (d *Deserializer) KE3(ke3 []byte) (*message.KE3, error) {
 		return nil, errInvalidMessageLength
 	}
 
-	return &message.KE3{Mac: ke3}, nil
+	return &message.KE3{ClientMac: ke3}, nil
 }
 
 // DecodeAkePrivateKey takes a serialized private key (a scalar) and attempts to return it's decoded form.

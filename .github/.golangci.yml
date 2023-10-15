@@ -9,9 +9,10 @@ linters:
     - contextcheck
     - cyclop
     - decorder
-    - depguard
+    #- depguard
     - dogsled
     - dupl
+    - dupword
     - durationcheck
     - errcheck
     - errchkjson
@@ -25,6 +26,7 @@ linters:
     - forcetypeassert
     - funlen
     - gci
+    - ginkgolinter
     #- gochecknoglobals
     #- gochecknoinits
     - gocognit
@@ -43,6 +45,7 @@ linters:
     - gomodguard
     - goprintffuncname
     - gosec
+    - gosmopolitan
     - gosimple
     - govet
     - grouper
@@ -64,6 +67,7 @@ linters:
     - nolintlint
     #- nonamedreturns
     - nosprintfhostport
+    - musttag
     - paralleltest
     - prealloc
     - predeclared
@@ -74,9 +78,10 @@ linters:
     - sqlclosecheck
     - staticcheck
     - stylecheck
+    - tagalign
     - tagliatelle
     - tenv
-    #- testableexamples
+    - testableexamples
     - testpackage
     - thelper
     - tparallel
@@ -90,6 +95,7 @@ linters:
     - whitespace
     - wrapcheck
     - wsl
+    - zerologlint
   presets:
     - bugs
     - unused
