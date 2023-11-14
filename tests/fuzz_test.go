@@ -30,7 +30,7 @@ const (
 	fmtGotValidInput = "got %q but input is valid"
 )
 
-func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) {
+func CheckFuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) {
 	// Errors tested for
 	var (
 		errInvalidKDFid  = errors.New("invalid KDF id")
@@ -81,10 +81,10 @@ func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error
 	t.Fatalf("Unrecognized error: %q", err)
 }
 
-func fuzzClientConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Client {
+func DoFuzzClientConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Client {
 	client, err := c.Client()
 	if err != nil {
-		fuzzTestConfigurationError(t, c, err)
+		CheckFuzzTestConfigurationError(t, c, err)
 	}
 	if client == nil {
 		t.Fatal("server is nil")
@@ -93,10 +93,10 @@ func fuzzClientConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Clie
 	return client
 }
 
-func fuzzServerConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Server {
+func DoFuzzServerConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Server {
 	server, err := c.Server()
 	if err != nil {
-		fuzzTestConfigurationError(t, c, err)
+		CheckFuzzTestConfigurationError(t, c, err)
 	}
 	if server == nil {
 		t.Fatal("server is nil")
@@ -105,7 +105,7 @@ func fuzzServerConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Serv
 	return server
 }
 
-func fuzzLoadVectors(path string) ([]*vector, error) {
+func DoFuzzLoadVectors(path string) ([]*vector, error) {
 	contents, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("no vectors to read: %v", err)
@@ -126,14 +126,14 @@ func FuzzConfiguration(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, o, ksfID, ake)
-		_ = fuzzServerConfiguration(t, c)
-		_ = fuzzClientConfiguration(t, c)
+		_ = DoFuzzServerConfiguration(t, c)
+		_ = DoFuzzClientConfiguration(t, c)
 	})
 }
 
 func loadVectorSeedCorpus(f *testing.F, stage string) {
 	// seed corpus
-	vectors, err := fuzzLoadVectors("vectors.json")
+	vectors, err := DoFuzzLoadVectors("vectors.json")
 	if err != nil {
 		log.Fatal(err)
 	}
