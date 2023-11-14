@@ -17,7 +17,6 @@ jobs:
         with:
           language: go # Change this to the language you are fuzzing.
           sanitizer: ${{ matrix.sanitizer }}
-          parallel-fuzzing: true
       - name: Run Fuzzers (${{ matrix.sanitizer }})
         id: run
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1

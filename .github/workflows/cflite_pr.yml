@@ -28,7 +28,6 @@ jobs:
           storage-repo: https://${{ secrets.FUZZ_STORAGE_REPO_TOKEN }}@github.com/bytemare/fuzzing.git
           storage-repo-branch: main   # Optional. Defaults to "main"
           storage-repo-branch-coverage: gh-pages  # Optional. Defaults to "gh-pages".
-          parallel-fuzzing: true
       - name: Run Fuzzers (${{ matrix.sanitizer }})
         id: run
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
