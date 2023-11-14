@@ -72,7 +72,7 @@ func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error
 		t.Skip()
 	}
 	if strings.Contains(err.Error(), errInvalidAKEid.Error()) {
-		if c.AKE.Group().Available() {
+		if c.AKE.Available() {
 			t.Fatalf("got %q but input is valid: %q", errInvalidAKEid, c.AKE)
 		}
 		t.Skip()
