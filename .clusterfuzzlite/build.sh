@@ -1,9 +1,9 @@
 #!/bin/bash -eu
 
-compile_go_fuzzer github.com/bytemare/opaque test/FuzzConfiguration fuzz_Configuration fuzz
-compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeRegistrationRequest fuzz_DeserializeRegistrationRequest fuzz
-compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeRegistrationResponse fuzz_DeserializeRegistrationResponse fuzz
-compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeRegistrationRecord fuzz_DeserializeRegistrationRecord fuzz
-compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeKE1 fuzz_DeserializeKE1 fuzz
-compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeKE2 fuzz_DeserializeKE2 fuzz
-compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeKE3 fuzz_DeserializeKE3 fuzz
+compile_go_fuzzer github.com/bytemare/opaque test/FuzzConfiguration Fuzz_Configuration fuzz
+compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeRegistrationRequest Fuzz_DeserializeRegistrationRequest fuzz
+compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeRegistrationResponse Fuzz_DeserializeRegistrationResponse fuzz
+compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeRegistrationRecord Fuzz_DeserializeRegistrationRecord fuzz
+compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeKE1 Fuzz_DeserializeKE1 fuzz
+compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeKE2 Fuzz_DeserializeKE2 fuzz
+compile_go_fuzzer github.com/bytemare/opaque test/FuzzDeserializeKE3 Fuzz_DeserializeKE3 fuzz
