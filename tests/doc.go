@@ -1,1 +1,1 @@
-package opaque_test
+package tests
