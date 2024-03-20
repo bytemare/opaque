@@ -25,9 +25,9 @@ jobs:
           # Optional but recommended: used to only run fuzzers that are affected
           # by the PR.
           # See later section on "Git repo for storage".
-          storage-repo: https://${{ secrets.FUZZ_STORAGE_REPO_TOKEN }}@github.com/bytemare/fuzzing.git
-          storage-repo-branch: main   # Optional. Defaults to "main"
-          storage-repo-branch-coverage: gh-pages  # Optional. Defaults to "gh-pages".
+          # storage-repo: https://${{ secrets.FUZZ_STORAGE_REPO_TOKEN }}@github.com/bytemare/fuzzing.git
+          # storage-repo-branch: main   # Optional. Defaults to "main"
+          # storage-repo-branch-coverage: gh-pages  # Optional. Defaults to "gh-pages".
       - name: Run Fuzzers (${{ matrix.sanitizer }})
         id: run
         uses: google/clusterfuzzlite/actions/run_fuzzers@v1
