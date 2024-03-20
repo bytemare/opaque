@@ -1,0 +1,10 @@
+homepage: "https://github.com/bytemare/opaque"
+language: go
+sanitizers:
+  - address
+  - undefined
+  - memory
+architectures:
+  - x86_64
+  - i386
+main_repo: 'https://github.com/bytemare/opaque.git'

@@ -1,0 +1,24 @@
+name: ClusterFuzzLite continuous builds
+on:
+  push:
+    branches:
+      - main  # Use your actual default branch here.
+permissions: read-all
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.sanitizer }}-${{ github.ref }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined, memory]  # Override this with the sanitizers you want.
+    steps:
+      - name: Build Fuzzers (${{ matrix.sanitizer }})
+        id: build
+        uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        with:
+          language: go # Change this to the language you are fuzzing.
+          sanitizer: ${{ matrix.sanitizer }}
+          upload-build: true
