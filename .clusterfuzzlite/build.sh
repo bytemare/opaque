@@ -1,5 +1,7 @@
 #!/bin/bash -eu
 
+set -ex
+
 compile_go_fuzzer github.com/bytemare/opaque/tests FuzzConfiguration Fuzz_Configuration fuzz
 compile_go_fuzzer github.com/bytemare/opaque/tests FuzzDeserializeRegistrationRequest Fuzz_DeserializeRegistrationRequest fuzz
 compile_go_fuzzer github.com/bytemare/opaque/tests FuzzDeserializeRegistrationResponse Fuzz_DeserializeRegistrationResponse fuzz
