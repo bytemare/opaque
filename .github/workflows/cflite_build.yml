@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Build Fuzzers (${{ matrix.sanitizer }})
         id: build
-        uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        uses: google/clusterfuzzlite/actions/build_fuzzers
         with:
           language: go # Change this to the language you are fuzzing.
           sanitizer: ${{ matrix.sanitizer }}
