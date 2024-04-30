@@ -26,21 +26,27 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 )
 
-const (
-	fmtGotValidInput = "got %q but input is valid"
-)
+const fmtGotValidInput = "got %q but input is valid"
+
+type fuzzConfError struct {
+	error       error
+	value       interface{}
+	isAvailable bool
+}
 
 // skipErrorOnCondition skips the test if we find the expected error in err and cond if false.
-func skipErrorOnCondition(t *testing.T, expected, err error, cond bool, val interface{}) {
-	if strings.Contains(expected.Error(), err.Error()) {
-		if cond {
-			t.Fatalf("got %q but input is valid: %q", err, val)
+func skipErrorOnCondition(t *testing.T, expected error, ce *fuzzConfError) error {
+	if strings.Contains(expected.Error(), ce.error.Error()) {
+		if ce.isAvailable {
+			return fmt.Errorf("got %q but input is valid: %q", ce.error, ce.value)
 		}
 		t.Skip()
 	}
+
+	return nil
 }
 
-func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) {
+func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) error {
 	// Errors tested for
 	var (
 		errInvalidKDFid  = errors.New("invalid KDF id")
@@ -51,38 +57,50 @@ func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error
 		errInvalidAKEid  = errors.New("invalid AKE group id")
 	)
 
-	skipErrorOnCondition(t, err, errInvalidKDFid, hash.Hashing(c.KDF).Available(), c.KDF)
-	skipErrorOnCondition(t, err, errInvalidMACid, hash.Hashing(c.MAC).Available(), c.MAC)
-	skipErrorOnCondition(t, err, errInvalidHASHid, hash.Hashing(c.Hash).Available(), c.Hash)
-	skipErrorOnCondition(t, err, errInvalidKSFid, c.KSF.Available(), c.KSF)
-	skipErrorOnCondition(t, err, errInvalidOPRFid, c.OPRF.OPRF().Available(), c.OPRF)
-	skipErrorOnCondition(t, err, errInvalidAKEid, c.AKE.Group().Available(), c.AKE)
+	errorTests := []*fuzzConfError{
+		{errInvalidKDFid, c.KDF, hash.Hashing(c.KDF).Available()},
+		{errInvalidMACid, c.MAC, hash.Hashing(c.MAC).Available()},
+		{errInvalidHASHid, c.Hash, hash.Hashing(c.Hash).Available()},
+		{errInvalidKSFid, c.KSF, c.KSF == 0 && c.KSF.Available()},
+		{errInvalidOPRFid, c.OPRF, c.OPRF.Available() && c.OPRF.OPRF().Available()},
+		{errInvalidAKEid, c.AKE, c.AKE.Available() && c.AKE.Group().Available()},
+	}
 
-	t.Fatalf("Unrecognized error: %q", err)
+	for _, test := range errorTests {
+		if e := skipErrorOnCondition(t, err, test); e != nil {
+			return e
+		}
+	}
+
+	return fmt.Errorf("unrecognized error: %w", err)
 }
 
-func DoFuzzClientConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Client {
+func DoFuzzClientConfiguration(t *testing.T, c *opaque.Configuration) (*opaque.Client, error) {
 	client, err := c.Client()
 	if err != nil {
-		CheckFuzzTestConfigurationError(t, c, err)
+		if err = fuzzTestConfigurationError(t, c, err); err != nil {
+			return nil, err
+		}
 	}
 	if client == nil {
 		t.Fatal("server is nil")
 	}
 
-	return client
+	return client, nil
 }
 
-func DoFuzzServerConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Server {
+func DoFuzzServerConfiguration(t *testing.T, c *opaque.Configuration) (*opaque.Server, error) {
 	server, err := c.Server()
 	if err != nil {
-		CheckFuzzTestConfigurationError(t, c, err)
+		if err = fuzzTestConfigurationError(t, c, err); err != nil {
+			return nil, err
+		}
 	}
 	if server == nil {
 		t.Fatal("server is nil")
 	}
 
-	return server
+	return server, nil
 }
 
 func DoFuzzLoadVectors(path string) ([]*vector, error) {
@@ -106,8 +124,14 @@ func FuzzConfiguration(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, o, ksfID, ake)
-		_ = DoFuzzServerConfiguration(t, c)
-		_ = DoFuzzClientConfiguration(t, c)
+
+		if _, err := DoFuzzServerConfiguration(t, c); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := DoFuzzClientConfiguration(t, c); err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 
