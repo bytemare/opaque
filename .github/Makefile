@@ -39,7 +39,7 @@ lint: fmt license
 .PHONY: test
 test:
 	@echo "Running all tests ..."
-	@go test -v -vet=all ../tests
+	@go test -v -vet=all ../...
 
 .PHONY: vectors
 vectors:
