@@ -276,7 +276,7 @@ func Example_registration() {
 		fmt.Println("OPAQUE registration is easy!")
 	}
 
-	// Output: OPAQUE server values initialized.
+	// Output: OPAQUE server initialized.
 	// OPAQUE registration is easy!
 }
 
@@ -384,7 +384,7 @@ func Example_loginKeyExchange() {
 	}
 
 	fmt.Println("OPAQUE is much awesome!")
-	// Output: OPAQUE server values initialized.
+	// Output: OPAQUE server initialized.
 	// OPAQUE registration is easy!
 	// OPAQUE is much awesome!
 }
@@ -450,6 +450,6 @@ func Example_fakeResponse() {
 		fmt.Println("Thwarting OPAQUE client enumeration is easy!")
 	}
 
-	// Output: OPAQUE server values initialized.
+	// Output: OPAQUE server initialized.
 	// Thwarting OPAQUE client enumeration is easy!
 }

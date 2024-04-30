@@ -10,11 +10,8 @@ package opaque_test
 
 import (
 	"crypto"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"os"
 	"strings"
 	"testing"
 
@@ -26,21 +23,27 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 )
 
-const (
-	fmtGotValidInput = "got %q but input is valid"
-)
+const fmtGotValidInput = "got %q but input is valid"
+
+type fuzzConfError struct {
+	error       error
+	value       interface{}
+	isAvailable bool
+}
 
 // skipErrorOnCondition skips the test if we find the expected error in err and cond if false.
-func skipErrorOnCondition(t *testing.T, expected, err error, cond bool, val interface{}) {
-	if strings.Contains(expected.Error(), err.Error()) {
-		if cond {
-			t.Fatalf("got %q but input is valid: %q", err, val)
+func skipErrorOnCondition(t *testing.T, expected error, ce *fuzzConfError) error {
+	if strings.Contains(expected.Error(), ce.error.Error()) {
+		if ce.isAvailable {
+			return fmt.Errorf("got %q but input is valid: %q", ce.error, ce.value)
 		}
 		t.Skip()
 	}
+
+	return nil
 }
 
-func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) {
+func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) error {
 	// Errors tested for
 	var (
 		errInvalidKDFid  = errors.New("invalid KDF id")
@@ -51,133 +54,162 @@ func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error
 		errInvalidAKEid  = errors.New("invalid AKE group id")
 	)
 
-	skipErrorOnCondition(t, err, errInvalidKDFid, hash.Hashing(c.KDF).Available(), c.KDF)
-	skipErrorOnCondition(t, err, errInvalidMACid, hash.Hashing(c.MAC).Available(), c.MAC)
-	skipErrorOnCondition(t, err, errInvalidHASHid, hash.Hashing(c.Hash).Available(), c.Hash)
-	skipErrorOnCondition(t, err, errInvalidKSFid, c.KSF.Available(), c.KSF)
-	skipErrorOnCondition(t, err, errInvalidOPRFid, c.OPRF.OPRF().Available(), c.OPRF)
-	skipErrorOnCondition(t, err, errInvalidAKEid, c.AKE.Group().Available(), c.AKE)
+	errorTests := []*fuzzConfError{
+		{errInvalidKDFid, c.KDF, hash.Hashing(c.KDF).Available()},
+		{errInvalidMACid, c.MAC, hash.Hashing(c.MAC).Available()},
+		{errInvalidHASHid, c.Hash, hash.Hashing(c.Hash).Available()},
+		{errInvalidKSFid, c.KSF, c.KSF == 0 && c.KSF.Available()},
+		{errInvalidOPRFid, c.OPRF, c.OPRF.Available() && c.OPRF.OPRF().Available()},
+		{errInvalidAKEid, c.AKE, c.AKE.Available() && c.AKE.Group().Available()},
+	}
 
-	t.Fatalf("Unrecognized error: %q", err)
+	for _, test := range errorTests {
+		if e := skipErrorOnCondition(t, err, test); e != nil {
+			return e
+		}
+	}
+
+	return fmt.Errorf("unrecognized error: %w", err)
 }
 
-func fuzzClientConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Client {
+func DoFuzzClientConfiguration(t *testing.T, c *opaque.Configuration) (*opaque.Client, error) {
 	client, err := c.Client()
 	if err != nil {
-		fuzzTestConfigurationError(t, c, err)
+		if err = fuzzTestConfigurationError(t, c, err); err != nil {
+			return nil, err
+		}
 	}
 	if client == nil {
 		t.Fatal("server is nil")
 	}
 
-	return client
+	return client, nil
 }
 
-func fuzzServerConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Server {
+func DoFuzzServerConfiguration(t *testing.T, c *opaque.Configuration) (*opaque.Server, error) {
 	server, err := c.Server()
 	if err != nil {
-		fuzzTestConfigurationError(t, c, err)
+		if err = fuzzTestConfigurationError(t, c, err); err != nil {
+			return nil, err
+		}
 	}
 	if server == nil {
 		t.Fatal("server is nil")
 	}
 
-	return server
+	return server, nil
 }
 
-func fuzzLoadVectors(path string) ([]*vector, error) {
-	contents, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("no vectors to read: %v", err)
-	}
-
-	var v []*vector
-	err = json.Unmarshal(contents, &v)
-	if err != nil {
-		return nil, fmt.Errorf("no vectors to read: %v", err)
-	}
-
-	return v, nil
-}
+//func DoFuzzLoadVectors(path string) ([]*vector, error) {
+//	contents, err := os.ReadFile(path)
+//	if err != nil {
+//		return nil, fmt.Errorf("no vectors to read: %v", err)
+//	}
+//
+//	var v []*vector
+//	err = json.Unmarshal(contents, &v)
+//	if err != nil {
+//		return nil, fmt.Errorf("no vectors to read: %v", err)
+//	}
+//
+//	return v, nil
+//}
 
 func FuzzConfiguration(f *testing.F) {
 	// seed corpus
-	loadVectorSeedCorpus(f, "")
+	// loadVectorSeedCorpus(f, "")
 
 	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, o, ksfID, ake)
-		_ = fuzzServerConfiguration(t, c)
-		_ = fuzzClientConfiguration(t, c)
+
+		if _, err := DoFuzzServerConfiguration(t, c); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := DoFuzzClientConfiguration(t, c); err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 
-func loadVectorSeedCorpus(f *testing.F, stage string) {
-	// seed corpus
-	vectors, err := fuzzLoadVectors("vectors.json")
-	if err != nil {
-		log.Fatal(err)
+//func //loadVectorSeedCorpus(f *testing.F, stage string) {
+//	// seed corpus
+//	vectors, err := DoFuzzLoadVectors("vectors.json")
+//	if err != nil {
+//		log.Fatal(err)
+//	}
+//
+//	for _, v := range vectors {
+//		if v.Config.Group == "curve25519" {
+//			continue
+//		}
+//
+//		var input ByteToHex
+//		switch stage {
+//		case "":
+//			input = nil
+//		case "RegistrationRequest":
+//			input = v.Outputs.RegistrationRequest
+//		case "RegistrationResponse":
+//			input = v.Outputs.RegistrationResponse
+//		case "RegistrationRecord":
+//			input = v.Outputs.RegistrationRecord
+//		case "KE1":
+//			input = v.Outputs.KE1
+//		case "KE2":
+//			input = v.Outputs.KE2
+//		case "KE3":
+//			input = v.Outputs.KE3
+//		default:
+//			panic(nil)
+//		}
+//
+//		f.Add([]byte(input),
+//			[]byte(v.Config.Context),
+//			uint(kdfToHash(v.Config.KDF)),
+//			uint(macToHash(v.Config.MAC)),
+//			uint(hashToHash(v.Config.Hash)),
+//			[]byte(v.Config.OPRF),
+//			byte(ksfToKSF(v.Config.KSF)),
+//			byte(groupToGroup(v.Config.Group)),
+//		)
+//	}
+//
+//	// previous crashers
+//	f.Add([]byte("0"), []byte(""), uint(7), uint(37), uint(7), []byte{'\x05'}, byte('\x02'), byte('\x05'))
+//	f.Add([]byte("0"), []byte("0"), uint(13), uint(5), uint(5), []byte{'\x03'}, byte('\r'), byte('\x03'))
+//	f.Add([]byte("0"), []byte("0"), uint(13), uint(5), uint(5), []byte{'\a'}, byte('\x04'), byte('\x03'))
+//	f.Add(
+//		[]byte("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+//		[]byte("0"),
+//		uint(7),
+//		uint(7),
+//		uint(7),
+//		[]byte{'\x01'},
+//		byte('\x03'),
+//		byte('\x01'),
+//	)
+//	f.Add(
+//		[]byte("00000000000000000000000000000000"),
+//		[]byte("0"),
+//		uint(7),
+//		uint(7),
+//		uint(7),
+//		[]byte{'\x01'},
+//		byte('\x03'),
+//		byte('\x06'),
+//	)
+//}
+
+func oprfToGroup(oprf oprf.Identifier) opaque.Group {
+	switch oprf {
+	case "ristretto255-SHA512":
+		return opaque.RistrettoSha512
+	case "P256-SHA256":
+		return opaque.P256Sha256
+	default:
+		return 0
 	}
-
-	for _, v := range vectors {
-		if v.Config.Group == "curve25519" {
-			continue
-		}
-
-		var input ByteToHex
-		switch stage {
-		case "":
-			input = nil
-		case "RegistrationRequest":
-			input = v.Outputs.RegistrationRequest
-		case "RegistrationResponse":
-			input = v.Outputs.RegistrationResponse
-		case "RegistrationRecord":
-			input = v.Outputs.RegistrationRecord
-		case "KE1":
-			input = v.Outputs.KE1
-		case "KE2":
-			input = v.Outputs.KE2
-		case "KE3":
-			input = v.Outputs.KE3
-		default:
-			panic(nil)
-		}
-
-		f.Add([]byte(input),
-			[]byte(v.Config.Context),
-			uint(kdfToHash(v.Config.KDF)),
-			uint(macToHash(v.Config.MAC)),
-			uint(hashToHash(v.Config.Hash)),
-			[]byte(v.Config.OPRF),
-			byte(ksfToKSF(v.Config.KSF)),
-			byte(groupToGroup(v.Config.Group)),
-		)
-	}
-
-	// previous crashers
-	f.Add([]byte("0"), []byte(""), uint(7), uint(37), uint(7), []byte{'\x05'}, byte('\x02'), byte('\x05'))
-	f.Add([]byte("0"), []byte("0"), uint(13), uint(5), uint(5), []byte{'\x03'}, byte('\r'), byte('\x03'))
-	f.Add([]byte("0"), []byte("0"), uint(13), uint(5), uint(5), []byte{'\a'}, byte('\x04'), byte('\x03'))
-	f.Add(
-		[]byte("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-		[]byte("0"),
-		uint(7),
-		uint(7),
-		uint(7),
-		[]byte{'\x01'},
-		byte('\x03'),
-		byte('\x01'),
-	)
-	f.Add(
-		[]byte("00000000000000000000000000000000"),
-		[]byte("0"),
-		uint(7),
-		uint(7),
-		uint(7),
-		[]byte{'\x01'},
-		byte('\x03'),
-		byte('\x06'),
-	)
 }
 
 func inputToConfig(context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) *opaque.Configuration {
@@ -199,7 +231,7 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 		errInvalidBlindedData   = errors.New("blinded data is an invalid point")
 	)
 
-	loadVectorSeedCorpus(f, "RegistrationRequest")
+	// loadVectorSeedCorpus(f, "RegistrationRequest")
 
 	f.Fuzz(func(t *testing.T, r1, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -233,7 +265,7 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 		errInvalidServerPK      = errors.New("invalid server public key")
 	)
 
-	loadVectorSeedCorpus(f, "RegistrationResponse")
+	// loadVectorSeedCorpus(f, "RegistrationResponse")
 
 	f.Fuzz(func(t *testing.T, r2, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -273,7 +305,7 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 		errInvalidClientPK      = errors.New("invalid client public key")
 	)
 
-	loadVectorSeedCorpus(f, "RegistrationRecord")
+	// loadVectorSeedCorpus(f, "RegistrationRecord")
 
 	f.Fuzz(func(t *testing.T, r3, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -309,7 +341,7 @@ func FuzzDeserializeKE1(f *testing.F) {
 		errInvalidClientEPK     = errors.New("invalid ephemeral client public key")
 	)
 
-	loadVectorSeedCorpus(f, "KE1")
+	// loadVectorSeedCorpus(f, "KE1")
 
 	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -375,7 +407,7 @@ func FuzzDeserializeKE2(f *testing.F) {
 		errInvalidServerEPK     = errors.New("invalid ephemeral server public key")
 	)
 
-	loadVectorSeedCorpus(f, "KE2")
+	// loadVectorSeedCorpus(f, "KE2")
 
 	f.Fuzz(func(t *testing.T, ke2, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -415,7 +447,7 @@ func FuzzDeserializeKE3(f *testing.F) {
 	// Error tested for
 	errInvalidMessageLength := errors.New("invalid message length for the configuration")
 
-	loadVectorSeedCorpus(f, "KE3")
+	// loadVectorSeedCorpus(f, "KE3")
 
 	f.Fuzz(func(t *testing.T, ke3, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -434,4 +466,26 @@ func FuzzDeserializeKE3(f *testing.F) {
 			}
 		}
 	})
+}
+
+func FuzzKE3(data []byte) int {
+	// Error tested for
+	errInvalidMessageLength := errors.New("invalid message length for the configuration")
+
+	server, err := opaque.NewServer(nil)
+	if err != nil {
+		fmt.Println(err)
+		return 0
+	}
+
+	_, err = server.Deserialize.KE3(data)
+	if err != nil {
+		conf := server.GetConf()
+		maxMessageLength := conf.MAC.Size()
+
+		if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(data) == maxMessageLength {
+			fmt.Printf(fmtGotValidInput+"\n", errInvalidMessageLength)
+			return 0
+		}
+	}
 }
