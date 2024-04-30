@@ -1,4 +1,4 @@
-name: Hash
+name: Opaque
 on:
   pull_request:
     branches:
