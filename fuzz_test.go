@@ -117,7 +117,7 @@ func DoFuzzServerConfiguration(t *testing.T, c *opaque.Configuration) (*opaque.S
 
 func FuzzConfiguration(f *testing.F) {
 	// seed corpus
-	//loadVectorSeedCorpus(f, "")
+	// loadVectorSeedCorpus(f, "")
 
 	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, o, ksfID, ake)
@@ -231,7 +231,7 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 		errInvalidBlindedData   = errors.New("blinded data is an invalid point")
 	)
 
-	//loadVectorSeedCorpus(f, "RegistrationRequest")
+	// loadVectorSeedCorpus(f, "RegistrationRequest")
 
 	f.Fuzz(func(t *testing.T, r1, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -265,7 +265,7 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 		errInvalidServerPK      = errors.New("invalid server public key")
 	)
 
-	//loadVectorSeedCorpus(f, "RegistrationResponse")
+	// loadVectorSeedCorpus(f, "RegistrationResponse")
 
 	f.Fuzz(func(t *testing.T, r2, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -305,7 +305,7 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 		errInvalidClientPK      = errors.New("invalid client public key")
 	)
 
-	//loadVectorSeedCorpus(f, "RegistrationRecord")
+	// loadVectorSeedCorpus(f, "RegistrationRecord")
 
 	f.Fuzz(func(t *testing.T, r3, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -341,7 +341,7 @@ func FuzzDeserializeKE1(f *testing.F) {
 		errInvalidClientEPK     = errors.New("invalid ephemeral client public key")
 	)
 
-	//loadVectorSeedCorpus(f, "KE1")
+	// loadVectorSeedCorpus(f, "KE1")
 
 	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -407,7 +407,7 @@ func FuzzDeserializeKE2(f *testing.F) {
 		errInvalidServerEPK     = errors.New("invalid ephemeral server public key")
 	)
 
-	//loadVectorSeedCorpus(f, "KE2")
+	// loadVectorSeedCorpus(f, "KE2")
 
 	f.Fuzz(func(t *testing.T, ke2, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -447,7 +447,7 @@ func FuzzDeserializeKE3(f *testing.F) {
 	// Error tested for
 	errInvalidMessageLength := errors.New("invalid message length for the configuration")
 
-	//loadVectorSeedCorpus(f, "KE3")
+	// loadVectorSeedCorpus(f, "KE3")
 
 	f.Fuzz(func(t *testing.T, ke3, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
@@ -466,4 +466,26 @@ func FuzzDeserializeKE3(f *testing.F) {
 			}
 		}
 	})
+}
+
+func FuzzKE3(data []byte) int {
+	// Error tested for
+	errInvalidMessageLength := errors.New("invalid message length for the configuration")
+
+	server, err := opaque.NewServer(nil)
+	if err != nil {
+		fmt.Println(err)
+		return 0
+	}
+
+	_, err = server.Deserialize.KE3(data)
+	if err != nil {
+		conf := server.GetConf()
+		maxMessageLength := conf.MAC.Size()
+
+		if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(data) == maxMessageLength {
+			fmt.Printf(fmtGotValidInput+"\n", errInvalidMessageLength)
+			return 0
+		}
+	}
 }
