@@ -14,15 +14,15 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 )
 
-// CredentialRequest represents credential request message.
+// CredentialRequest represents a credential request message.
 type CredentialRequest struct {
 	BlindedMessage *group.Element `json:"blindedMessage"`
 }
 
 // NewCredentialRequest returns a populated CredentialRequest.
-func NewCredentialRequest(message *group.Element) *CredentialRequest {
+func NewCredentialRequest(blindedMessage *group.Element) *CredentialRequest {
 	return &CredentialRequest{
-		BlindedMessage: message,
+		BlindedMessage: blindedMessage,
 	}
 }
 
@@ -31,7 +31,7 @@ func (c *CredentialRequest) Serialize() []byte {
 	return c.BlindedMessage.Encode()
 }
 
-// CredentialResponse represents credential response message.
+// CredentialResponse represents a credential response message.
 type CredentialResponse struct {
 	EvaluatedMessage *group.Element `json:"evaluatedMessage"`
 	MaskingNonce     []byte         `json:"maskingNonce"`
@@ -39,10 +39,7 @@ type CredentialResponse struct {
 }
 
 // NewCredentialResponse returns a populated CredentialResponse.
-func NewCredentialResponse(
-	message *group.Element,
-	nonce, response []byte,
-) *CredentialResponse {
+func NewCredentialResponse(message *group.Element, nonce, response []byte) *CredentialResponse {
 	return &CredentialResponse{
 		EvaluatedMessage: message,
 		MaskingNonce:     nonce,

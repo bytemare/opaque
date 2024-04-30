@@ -30,7 +30,7 @@ func KeyGen(id group.Group) (privateKey, publicKey []byte) {
 func diffieHellman(s *group.Scalar, e *group.Element) *group.Element {
 	/*
 		if id == group.Ristretto255Sha512 || id == group.P256Sha256 {
-			b.Multiply(k)
+			e.Copy().Multiply(s)
 		}
 
 		if id == group.Cruve25519 {
@@ -70,15 +70,6 @@ type Options struct {
 }
 
 func (o *Options) init() {
-	/* This is currently unreachable as the callers correctly call this function with non-nil options
-	if options == nil {
-		options = &Options{
-			EphemeralSecretKey: nil,
-			Nonce:              nil,
-			NonceLength:        0,
-		}
-	}
-	*/
 	if o.KeyShareSeed == nil {
 		o.KeyShareSeed = internal.RandomBytes(internal.SeedLength)
 	}

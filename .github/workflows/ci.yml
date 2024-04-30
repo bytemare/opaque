@@ -85,6 +85,7 @@ jobs:
             -Dsonar.projectKey=bytemare_opaque
             -Dsonar.go.coverage.reportPaths=.github/coverage.out
             -Dsonar.sources=.
+            -Dsonar.exclusions=examples_test.go
             -Dsonar.test.exclusions=examples_test.go,tests/**
             -Dsonar.coverage.exclusions=examples_test.go,tests/**
             -Dsonar.tests=tests/
