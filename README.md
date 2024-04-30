@@ -34,7 +34,7 @@ You can find the documentation and usage examples in [the package doc](https://p
 
 ## Versioning
 
-[SemVer](http://semver.org) is used for versioning. For the versions available, see the [tags on the repository](https://github.com/bytemare/opaque/tags).
+[SemVer](https://semver.org) is used for versioning. For the versions available, see the [tags on the repository](https://github.com/bytemare/opaque/tags).
 
 Minor v0.x versions match the corresponding CFRG draft version, the master branch implements the latest changes of [the draft development](https://github.com/cfrg/draft-irtf-cfrg-opaque).
 

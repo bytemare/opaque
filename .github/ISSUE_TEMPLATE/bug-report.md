@@ -16,7 +16,7 @@ A clear and concise description of what the bug is.
 
 ### Your setup
 
-**What version/commit of opaque are you using?**
+**What version/commit of the project are you using?**
 
 **What version of go are you using?**
 <pre>
@@ -30,7 +30,7 @@ $ go env
 
 </pre></details>
 
-**If relevant, what opaque.Parameters are you using?**
+**If relevant, what parameters or arguments are you using?**
 
 ### Reproducing
 
