@@ -1,7 +1,7 @@
 .PHONY: update
 update:
 	@echo "Updating dependencies..."
-	@cd ../ && go get -u
+	@cd ../ && go get -u ../...
 	@pwd
 	@go mod tidy
 	@echo "Updating Github Actions pins..."
@@ -39,7 +39,7 @@ lint: fmt license
 .PHONY: test
 test:
 	@echo "Running all tests ..."
-	@go test -v -vet=all ../tests
+	@go test -v -vet=all ../...
 
 .PHONY: vectors
 vectors:

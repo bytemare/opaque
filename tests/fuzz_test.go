@@ -26,63 +26,72 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 )
 
-const (
-	fmtGotValidInput = "got %q but input is valid"
-)
+const fmtGotValidInput = "got %q but input is valid"
+
+type fuzzConfError struct {
+	error       error
+	value       interface{}
+	isAvailable bool
+}
 
 // skipErrorOnCondition skips the test if we find the expected error in err and cond if false.
-func skipErrorOnCondition(t *testing.T, expected, err error, cond bool, val interface{}) {
-	if strings.Contains(expected.Error(), err.Error()) {
-		if cond {
-			t.Fatalf("got %q but input is valid: %q", err, val)
+func skipErrorOnCondition(t *testing.T, expected error, ce *fuzzConfError) error {
+	if strings.Contains(expected.Error(), ce.error.Error()) {
+		if ce.isAvailable {
+			return fmt.Errorf("got %q but input is valid: %q", ce.error, ce.value)
 		}
 		t.Skip()
 	}
+
+	return nil
 }
 
-func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) {
+func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) error {
 	// Errors tested for
-	var (
-		errInvalidKDFid  = errors.New("invalid KDF id")
-		errInvalidMACid  = errors.New("invalid MAC id")
-		errInvalidHASHid = errors.New("invalid Hash id")
-		errInvalidKSFid  = errors.New("invalid KSF id")
-		errInvalidOPRFid = errors.New("invalid OPRF group id")
-		errInvalidAKEid  = errors.New("invalid AKE group id")
-	)
+	errorTests := []*fuzzConfError{
+		{errors.New("invalid KDF id"), c.KDF, hash.Hashing(c.KDF).Available()},
+		{errors.New("invalid MAC id"), c.MAC, hash.Hashing(c.MAC).Available()},
+		{errors.New("invalid Hash id"), c.Hash, hash.Hashing(c.Hash).Available()},
+		{errors.New("invalid KSF id"), c.KSF, c.KSF == 0 && c.KSF.Available()},
+		{errors.New("invalid OPRF group id"), c.OPRF, c.OPRF.Available() && c.OPRF.OPRF().Available()},
+		{errors.New("invalid AKE group id"), c.AKE, c.AKE.Available() && c.AKE.Group().Available()},
+	}
 
-	skipErrorOnCondition(t, err, errInvalidKDFid, hash.Hashing(c.KDF).Available(), c.KDF)
-	skipErrorOnCondition(t, err, errInvalidMACid, hash.Hashing(c.MAC).Available(), c.MAC)
-	skipErrorOnCondition(t, err, errInvalidHASHid, hash.Hashing(c.Hash).Available(), c.Hash)
-	skipErrorOnCondition(t, err, errInvalidKSFid, c.KSF.Available(), c.KSF)
-	skipErrorOnCondition(t, err, errInvalidOPRFid, c.OPRF.OPRF().Available(), c.OPRF)
-	skipErrorOnCondition(t, err, errInvalidAKEid, c.AKE.Group().Available(), c.AKE)
+	for _, test := range errorTests {
+		if e := skipErrorOnCondition(t, err, test); e != nil {
+			return e
+		}
+	}
 
-	t.Fatalf("Unrecognized error: %q", err)
+	return fmt.Errorf("unrecognized error: %w", err)
 }
 
-func fuzzClientConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Client {
+func fuzzClientConfiguration(t *testing.T, c *opaque.Configuration) (*opaque.Client, error) {
 	client, err := c.Client()
 	if err != nil {
-		fuzzTestConfigurationError(t, c, err)
+		if err = fuzzTestConfigurationError(t, c, err); err != nil {
+			return nil, err
+		}
 	}
 	if client == nil {
-		t.Fatal("server is nil")
+		t.Fatal("client is nil")
 	}
 
-	return client
+	return client, nil
 }
 
-func fuzzServerConfiguration(t *testing.T, c *opaque.Configuration) *opaque.Server {
+func fuzzServerConfiguration(t *testing.T, c *opaque.Configuration) (*opaque.Server, error) {
 	server, err := c.Server()
 	if err != nil {
-		fuzzTestConfigurationError(t, c, err)
+		if err = fuzzTestConfigurationError(t, c, err); err != nil {
+			return nil, err
+		}
 	}
 	if server == nil {
 		t.Fatal("server is nil")
 	}
 
-	return server
+	return server, nil
 }
 
 func fuzzLoadVectors(path string) ([]*vector, error) {
@@ -106,8 +115,14 @@ func FuzzConfiguration(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, o, ksfID, ake)
-		_ = fuzzServerConfiguration(t, c)
-		_ = fuzzClientConfiguration(t, c)
+
+		if _, err := fuzzServerConfiguration(t, c); err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := fuzzServerConfiguration(t, c); err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 
@@ -327,13 +342,15 @@ func FuzzDeserializeKE1(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
-				if err := isValidOPRFPoint(conf, ke1[:conf.OPRF.Group().ElementLength()], errInvalidBlindedData); err != nil {
+				input := ke1[:conf.OPRF.Group().ElementLength()]
+				if err := isValidOPRFPoint(conf, input, errInvalidBlindedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidClientEPK.Error()) {
-				if err := isValidOPRFPoint(conf, ke1[conf.OPRF.Group().ElementLength()+conf.NonceLen:], errInvalidClientEPK); err != nil {
+				input := ke1[conf.OPRF.Group().ElementLength()+conf.NonceLen:]
+				if err := isValidOPRFPoint(conf, input, errInvalidClientEPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -343,7 +360,7 @@ func FuzzDeserializeKE1(f *testing.F) {
 
 func isValidAKEPoint(conf *internal.Configuration, input []byte, err error) error {
 	e := conf.Group.NewElement()
-	if _err := e.Decode(input); _err == nil {
+	if err2 := e.Decode(input); err2 == nil {
 		if e.IsIdentity() {
 			return errors.New("point is identity/infinity")
 		}
@@ -356,7 +373,7 @@ func isValidAKEPoint(conf *internal.Configuration, input []byte, err error) erro
 
 func isValidOPRFPoint(conf *internal.Configuration, input []byte, err error) error {
 	e := conf.OPRF.Group().NewElement()
-	if _err := e.Decode(input); _err == nil {
+	if err2 := e.Decode(input); err2 == nil {
 		if e.IsIdentity() {
 			return errors.New("point is identity/infinity")
 		}
@@ -397,13 +414,15 @@ func FuzzDeserializeKE2(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
-				if err := isValidOPRFPoint(conf, ke2[:conf.OPRF.Group().ElementLength()], errInvalidEvaluatedData); err != nil {
+				input := ke2[:conf.OPRF.Group().ElementLength()]
+				if err := isValidOPRFPoint(conf, input, errInvalidEvaluatedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidServerEPK.Error()) {
-				if err := isValidAKEPoint(conf, ke2[conf.OPRF.Group().ElementLength()+conf.NonceLen:], errInvalidServerEPK); err != nil {
+				input := ke2[conf.OPRF.Group().ElementLength()+conf.NonceLen:]
+				if err := isValidAKEPoint(conf, input, errInvalidServerEPK); err != nil {
 					t.Fatal(err)
 				}
 			}
