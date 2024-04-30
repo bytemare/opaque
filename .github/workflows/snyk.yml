@@ -1,7 +1,10 @@
 name: Snyk
 
 on:
+  push:
+    branches: [ main ]
   pull_request:
+    # The branches below must be a subset of the branches above
     branches: [ main ]
   schedule:
     - cron: '31 10 * * 0'
@@ -14,9 +17,18 @@ jobs:
     name: Snyk
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@61b9e3751b92087fd0b06925ba6dd6314e06f089 # pin@master
+      - uses: step-security/harden-runner@6c3b1c91e8873ae0c705b0709f957c7a6a5eaf10
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.snyk.io:443
+            github.com:443
+            proxy.golang.org:443
+
+      - uses: actions/checkout@8459bc0c7e3759cdf591f513d9f141a95fef0a8f
       - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/golang@39091e69b560da335383b404e50d65b408f4f812 # pin@master
+        uses: snyk/actions/golang@8349f9043a8b7f0f3ee8885bf28f0b388d2446e8
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:

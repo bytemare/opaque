@@ -23,17 +23,24 @@ jobs:
       fail-fast: false
 
     steps:
+      - uses: step-security/harden-runner@6c3b1c91e8873ae0c705b0709f957c7a6a5eaf10
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443 github.com:443 objects.githubusercontent.com:443 proxy.golang.org:443 storage.googleapis.com:443 sum.golang.org:443 uploads.github.com:443
+
       - name: Checkout repository
-        uses: actions/checkout@27135e314dd1818f797af1db9dae03a9f045786b # pin@master
+        uses: actions/checkout@8459bc0c7e3759cdf591f513d9f141a95fef0a8f
 
       # Initializes the CodeQL tools for scanning.
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@231aa2c8a89117b126725a0e11897209b7118144 # pin@master
+        uses: github/codeql-action/init@4ebadbc7468649cf79b138f45e20d999351f6ed0
         with:
           languages: go
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@231aa2c8a89117b126725a0e11897209b7118144 # pin@master
+        uses: github/codeql-action/autobuild@4ebadbc7468649cf79b138f45e20d999351f6ed0
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@231aa2c8a89117b126725a0e11897209b7118144 # pin@master
+        uses: github/codeql-action/analyze@4ebadbc7468649cf79b138f45e20d999351f6ed0

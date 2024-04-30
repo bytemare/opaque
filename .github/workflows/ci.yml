@@ -1,4 +1,4 @@
-name: OPAQUE
+name: Hash
 on:
   pull_request:
     branches:
@@ -12,18 +12,29 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
+      - uses: step-security/harden-runner@6c3b1c91e8873ae0c705b0709f957c7a6a5eaf10
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            proxy.golang.org:443
+            raw.githubusercontent.com:443
+
       - name: Checkout repo
-        uses: actions/checkout@27135e314dd1818f797af1db9dae03a9f045786b # pin@master
+        uses: actions/checkout@8459bc0c7e3759cdf591f513d9f141a95fef0a8f
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@c51a7207680f1bee06f4a751214aab70667f9e25 # pin@master
+        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7
         with:
           go-version-file: ./go.mod
 
       # Linting
       - name: Linting
-        uses: golangci/golangci-lint-action@9cb5ef734c83c4a375008f65983ab82f8d416598 # pin@master
+        uses: golangci/golangci-lint-action@692c9c9dba385536b59da68da5aef1775a6f94ea
         with:
           version: latest
           args: --config=./.github/.golangci.yml ./...
@@ -35,14 +46,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [ '1.21', '1.20' ]
+        go: [ '1.22', '1.21' ]
     steps:
+      - uses: step-security/harden-runner@6c3b1c91e8873ae0c705b0709f957c7a6a5eaf10
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            proxy.golang.org:443
+            storage.googleapis.com:443
+            sum.golang.org:443
+
       - name: Checkout repo
-        uses: actions/checkout@27135e314dd1818f797af1db9dae03a9f045786b # pin@master
+        uses: actions/checkout@8459bc0c7e3759cdf591f513d9f141a95fef0a8f
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@c51a7207680f1bee06f4a751214aab70667f9e25 # pin@master
+        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7
         with:
           go-version: ${{ matrix.go }}
 
@@ -54,12 +75,28 @@ jobs:
     name: Analyze
     runs-on: ubuntu-latest
     steps:
+      - uses: step-security/harden-runner@6c3b1c91e8873ae0c705b0709f957c7a6a5eaf10
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.codecov.io:443
+            api.github.com:443
+            cli.codecov.io:443
+            ea6ne4j2sb.execute-api.eu-central-1.amazonaws.com:443
+            github.com:443
+            objects.githubusercontent.com:443
+            proxy.golang.org:443
+            scanner.sonarcloud.io:443
+            sonarcloud.io:443
+            storage.googleapis.com:443
+
       - name: Checkout repo
-        uses: actions/checkout@27135e314dd1818f797af1db9dae03a9f045786b # pin@master
+        uses: actions/checkout@8459bc0c7e3759cdf591f513d9f141a95fef0a8f
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@c51a7207680f1bee06f4a751214aab70667f9e25 # pin@master
+        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7
         with:
           go-version-file: ./go.mod
 
@@ -69,13 +106,15 @@ jobs:
 
       # Codecov
       - name: Codecov
-        uses: codecov/codecov-action@ef2b0df87fbbd2569a553208e78409b1bc2fb469 # pin@master
+        uses: codecov/codecov-action@1290bddc8851afa46a03b9a73dd9979a415d4c4f
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
           file: .github/coverage.out
 
       # Sonar
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@5ee47de3c96f0c1c51b09d2ff1fec0cfeefcf67c # pin@master
+        uses: SonarSource/sonarcloud-github-action@6bbd64e0cb2194e04addb429d669a9ee873eeeef
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
