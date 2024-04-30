@@ -154,7 +154,7 @@ func TestServerInit_NoKeyMaterial(t *testing.T) {
 		}
 		expected := "key material not set: call SetKeyMaterial() to set values"
 
-		if _, err := server.LoginInit(nil, nil); err == nil ||
+		if _, err := server.GenerateKE2(nil, nil); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error not calling SetKeyMaterial - got %s", err)
 		}
@@ -185,7 +185,7 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 		rec.Envelope = internal.RandomBytes(15)
 
 		expected := "record has invalid envelope length"
-		if _, err := server.LoginInit(nil, rec); err == nil ||
+		if _, err := server.GenerateKE2(nil, rec); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error on nil secret key - got %s", err)
 		}
@@ -226,7 +226,7 @@ func TestServerInit_InvalidEPKU(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		ke1 := client.LoginInit([]byte("yo")).Serialize()
+		ke1 := client.GenerateKE1([]byte("yo")).Serialize()
 		badke1 := encoding.Concat(
 			ke1[:server.GetConf().OPRF.Group().ElementLength()+server.GetConf().NonceLen],
 			getBadElement(t, conf),
@@ -253,16 +253,16 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := buildRecord(credId, oprfSeed, password, pk, client, server)
-	ke1 := client.LoginInit(password)
-	ke2, err := server.LoginInit(ke1, rec)
+	ke1 := client.GenerateKE1(password)
+	ke2, err := server.GenerateKE2(ke1, rec)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ke3, _, err := client.LoginFinish(ke2)
+	ke3, _, err := client.GenerateKE3(ke2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ke3.Mac[0] = ^ke3.Mac[0]
+	ke3.ClientMac[0] = ^ke3.ClientMac[0]
 
 	expected := opaque.ErrAkeInvalidClientMac
 	if err := server.LoginFinish(ke3); err == nil || err.Error() != expected.Error() {
@@ -294,9 +294,9 @@ func TestServerSetAKEState_InvalidInput(t *testing.T) {
 	server, _ = conf.Server()
 	sk, pk := conf.KeyGen()
 	rec := buildRecord(credId, seed, password, pk, client, server)
-	ke1 := client.LoginInit(password)
+	ke1 := client.GenerateKE1(password)
 	_ = server.SetKeyMaterial(nil, sk, pk, seed)
-	_, _ = server.LoginInit(ke1, rec)
+	_, _ = server.GenerateKE2(ke1, rec)
 	state := server.SerializeState()
 	if err := server.SetAKEState(state); err == nil || err.Error() != errStateExists.Error() {
 		t.Fatalf("Expected error for SetAKEState. want %q, got %q", errStateExists, err)

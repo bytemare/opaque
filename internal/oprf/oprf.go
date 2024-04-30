@@ -19,6 +19,9 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 )
 
+// SeedLength is the default length used for seeds.
+const SeedLength = 32
+
 // Identifier of the OPRF compatible cipher suite to be used.
 type Identifier string
 
@@ -103,7 +106,7 @@ func (i Identifier) Group() group.Group {
 	return groups[i]
 }
 
-// DeriveKey returns a scalar mapped from the input.
+// DeriveKey returns a scalar deterministically generated from the input.
 func (i Identifier) DeriveKey(seed, info []byte) *group.Scalar {
 	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), i.contextString())
 	deriveInput := encoding.Concat(seed, encoding.EncodeVector(info))
@@ -121,6 +124,12 @@ func (i Identifier) DeriveKey(seed, info []byte) *group.Scalar {
 	}
 
 	return s
+}
+
+// DeriveKeyPair returns a valid keypair deterministically generated from the input.
+func (i Identifier) DeriveKeyPair(seed, info []byte) (*group.Scalar, *group.Element) {
+	sk := i.DeriveKey(seed, info)
+	return sk, i.Group().Base().Multiply(sk)
 }
 
 // Client returns an OPRF client.

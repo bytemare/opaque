@@ -143,7 +143,7 @@ func testAuthentication(
 
 	var m4s []byte
 	{
-		ke1 := client.LoginInit(p.password)
+		ke1 := client.GenerateKE1(p.password)
 		m4s = ke1.Serialize()
 	}
 
@@ -161,7 +161,7 @@ func testAuthentication(
 			t.Fatalf(dbgErr, err)
 		}
 
-		ke2, err := server.LoginInit(m4, record)
+		ke2, err := server.GenerateKE2(m4, record)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -181,7 +181,7 @@ func testAuthentication(
 			t.Fatalf(dbgErr, err)
 		}
 
-		ke3, key, err := client.LoginFinish(m5, opaque.ClientLoginFinishOptions{
+		ke3, key, err := client.GenerateKE3(m5, opaque.GenerateKE3Options{
 			ClientIdentity: p.username,
 			ServerIdentity: p.serverID,
 		})

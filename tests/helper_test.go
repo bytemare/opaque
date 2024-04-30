@@ -218,12 +218,12 @@ func buildPRK(client *opaque.Client, evaluation *group.Element) ([]byte, error) 
 func getEnvelope(client *opaque.Client, ke2 *message.KE2) (*keyrecovery.Envelope, []byte, error) {
 	conf := client.GetConf()
 
-	randomizedPwd, err := buildPRK(client, ke2.EvaluatedMessage)
+	randomizedPassword, err := buildPRK(client, ke2.EvaluatedMessage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	maskingKey := conf.KDF.Expand(randomizedPwd, []byte(tag.MaskingKey), conf.KDF.Size())
+	maskingKey := conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), conf.KDF.Size())
 	clear := xorResponse(conf, maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
 	e := clear[conf.Group.ElementLength():]
 
@@ -232,5 +232,5 @@ func getEnvelope(client *opaque.Client, ke2 *message.KE2) (*keyrecovery.Envelope
 		AuthTag: e[conf.NonceLen:],
 	}
 
-	return env, randomizedPwd, nil
+	return env, randomizedPassword, nil
 }
