@@ -1,0 +1,9 @@
+go test fuzz v1
+[]byte("")
+[]byte("0")
+uint(89)
+uint(5)
+uint(3)
+[]byte("P256-SHA2\x016")
+byte('\x00')
+byte('\x03')

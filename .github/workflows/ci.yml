@@ -23,7 +23,7 @@ jobs:
 
       # Linting
       - name: Linting
-        uses: golangci/golangci-lint-action@92ba55cf0d79a9feb999e9bcef95c952bbbe545a # pin@master
+        uses: golangci/golangci-lint-action@9cb5ef734c83c4a375008f65983ab82f8d416598 # pin@master
         with:
           version: latest
           args: --config=./.github/.golangci.yml ./...
@@ -35,7 +35,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [ '1.20', '1.19' ]
+        go: [ '1.21', '1.20' ]
     steps:
       - name: Checkout repo
         uses: actions/checkout@27135e314dd1818f797af1db9dae03a9f045786b # pin@master
@@ -69,13 +69,13 @@ jobs:
 
       # Codecov
       - name: Codecov
-        uses: codecov/codecov-action@29386c70ef20e286228c72b668a06fd0e8399192 # pin@master
+        uses: codecov/codecov-action@ef2b0df87fbbd2569a553208e78409b1bc2fb469 # pin@master
         with:
           file: .github/coverage.out
 
       # Sonar
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@db501078e936e4b4c8773d1bb949ba9ddb7b6b6a # pin@master
+        uses: SonarSource/sonarcloud-github-action@5ee47de3c96f0c1c51b09d2ff1fec0cfeefcf67c # pin@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -85,6 +85,7 @@ jobs:
             -Dsonar.projectKey=bytemare_opaque
             -Dsonar.go.coverage.reportPaths=.github/coverage.out
             -Dsonar.sources=.
+            -Dsonar.exclusions=examples_test.go
             -Dsonar.test.exclusions=examples_test.go,tests/**
             -Dsonar.coverage.exclusions=examples_test.go,tests/**
             -Dsonar.tests=tests/

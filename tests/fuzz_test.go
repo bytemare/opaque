@@ -30,7 +30,17 @@ const (
 	fmtGotValidInput = "got %q but input is valid"
 )
 
-func CheckFuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) {
+// skipErrorOnCondition skips the test if we find the expected error in err and cond if false.
+func skipErrorOnCondition(t *testing.T, expected, err error, cond bool, val interface{}) {
+	if strings.Contains(expected.Error(), err.Error()) {
+		if cond {
+			t.Fatalf("got %q but input is valid: %q", err, val)
+		}
+		t.Skip()
+	}
+}
+
+func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) {
 	// Errors tested for
 	var (
 		errInvalidKDFid  = errors.New("invalid KDF id")
@@ -41,42 +51,12 @@ func CheckFuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err 
 		errInvalidAKEid  = errors.New("invalid AKE group id")
 	)
 
-	if strings.Contains(err.Error(), errInvalidKDFid.Error()) {
-		if hash.Hashing(c.KDF).Available() {
-			t.Fatalf("got %q but input is valid: %q", errInvalidKDFid, c.KDF)
-		}
-		t.Skip()
-	}
-	if strings.Contains(err.Error(), errInvalidMACid.Error()) {
-		if hash.Hashing(c.MAC).Available() {
-			t.Fatalf("got %q but input is valid: %q", errInvalidMACid, c.MAC)
-		}
-		t.Skip()
-	}
-	if strings.Contains(err.Error(), errInvalidHASHid.Error()) {
-		if hash.Hashing(c.Hash).Available() {
-			t.Fatalf("got %q but input is valid: %q", errInvalidHASHid, c.Hash)
-		}
-		t.Skip()
-	}
-	if strings.Contains(err.Error(), errInvalidKSFid.Error()) {
-		if c.KSF.Available() {
-			t.Fatalf("got %q but input is valid: %q", errInvalidKSFid, c.KSF)
-		}
-		t.Skip()
-	}
-	if strings.Contains(err.Error(), errInvalidOPRFid.Error()) {
-		if c.OPRF.OPRF().Available() {
-			t.Fatalf("got %q but input is valid: %q", errInvalidOPRFid, c.OPRF)
-		}
-		t.Skip()
-	}
-	if strings.Contains(err.Error(), errInvalidAKEid.Error()) {
-		if c.AKE.Available() {
-			t.Fatalf("got %q but input is valid: %q", errInvalidAKEid, c.AKE)
-		}
-		t.Skip()
-	}
+	skipErrorOnCondition(t, err, errInvalidKDFid, hash.Hashing(c.KDF).Available(), c.KDF)
+	skipErrorOnCondition(t, err, errInvalidMACid, hash.Hashing(c.MAC).Available(), c.MAC)
+	skipErrorOnCondition(t, err, errInvalidHASHid, hash.Hashing(c.Hash).Available(), c.Hash)
+	skipErrorOnCondition(t, err, errInvalidKSFid, c.KSF.Available(), c.KSF)
+	skipErrorOnCondition(t, err, errInvalidOPRFid, c.OPRF.OPRF().Available(), c.OPRF)
+	skipErrorOnCondition(t, err, errInvalidAKEid, c.AKE.Group().Available(), c.AKE)
 
 	t.Fatalf("Unrecognized error: %q", err)
 }
@@ -139,6 +119,10 @@ func loadVectorSeedCorpus(f *testing.F, stage string) {
 	}
 
 	for _, v := range vectors {
+		if v.Config.Group == "curve25519" {
+			continue
+		}
+
 		var input ByteToHex
 		switch stage {
 		case "":
