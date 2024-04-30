@@ -18,12 +18,12 @@ import (
 
 // NewKDF returns a newly instantiated KDF.
 func NewKDF(id crypto.Hash) *KDF {
-	return &KDF{h: hash.FromCrypto(id).Get()}
+	return &KDF{h: hash.FromCrypto(id).GetHashFunction()}
 }
 
 // KDF wraps a hash function and exposes KDF methods.
 type KDF struct {
-	h *hash.Hash
+	h *hash.Fixed
 }
 
 // Extract exposes an Extract only KDF method.
@@ -38,17 +38,17 @@ func (k *KDF) Expand(key, info []byte, length int) []byte {
 
 // Size returns the output size of the Extract method.
 func (k *KDF) Size() int {
-	return k.h.OutputSize()
+	return k.h.Size()
 }
 
 // NewMac returns a newly instantiated Mac.
 func NewMac(id crypto.Hash) *Mac {
-	return &Mac{h: hash.FromCrypto(id).Get()}
+	return &Mac{h: hash.FromCrypto(id).GetHashFunction()}
 }
 
 // Mac wraps a hash function and exposes Message Authentication Code methods.
 type Mac struct {
-	h *hash.Hash
+	h *hash.Fixed
 }
 
 // Equal returns a constant-time comparison of the input.
@@ -63,22 +63,22 @@ func (m *Mac) MAC(key, message []byte) []byte {
 
 // Size returns the MAC's output length.
 func (m *Mac) Size() int {
-	return m.h.OutputSize()
+	return m.h.Size()
 }
 
 // NewHash returns a newly instantiated Hash.
 func NewHash(id crypto.Hash) *Hash {
-	return &Hash{h: hash.FromCrypto(id).Get()}
+	return &Hash{h: hash.FromCrypto(id).GetHashFunction()}
 }
 
 // Hash wraps a hash function and exposes only necessary hashing methods.
 type Hash struct {
-	h *hash.Hash
+	h *hash.Fixed
 }
 
 // Size returns the output size of the hashing function.
 func (h *Hash) Size() int {
-	return h.h.OutputSize()
+	return h.h.Size()
 }
 
 // Sum returns the current hash of the running state.

@@ -184,7 +184,7 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 }
 
 func getFakeEnvelope(c *opaque.Configuration) []byte {
-	if !hash.Hashing(c.MAC).Available() {
+	if !hash.Hash(c.MAC).Available() {
 		panic(nil)
 	}
 
