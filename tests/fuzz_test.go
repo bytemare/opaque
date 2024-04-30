@@ -49,9 +49,9 @@ func skipErrorOnCondition(t *testing.T, expected error, ce *fuzzConfError) error
 func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) error {
 	// Errors tested for
 	errorTests := []*fuzzConfError{
-		{errors.New("invalid KDF id"), c.KDF, hash.Hashing(c.KDF).Available()},
-		{errors.New("invalid MAC id"), c.MAC, hash.Hashing(c.MAC).Available()},
-		{errors.New("invalid Hash id"), c.Hash, hash.Hashing(c.Hash).Available()},
+		{errors.New("invalid KDF id"), c.KDF, hash.Hash(c.KDF).Available()},
+		{errors.New("invalid MAC id"), c.MAC, hash.Hash(c.MAC).Available()},
+		{errors.New("invalid Hash id"), c.Hash, hash.Hash(c.Hash).Available()},
 		{errors.New("invalid KSF id"), c.KSF, c.KSF == 0 && c.KSF.Available()},
 		{errors.New("invalid OPRF group id"), c.OPRF, c.OPRF.Available() && c.OPRF.OPRF().Available()},
 		{errors.New("invalid AKE group id"), c.AKE, c.AKE.Available() && c.AKE.Group().Available()},

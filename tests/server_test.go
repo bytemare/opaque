@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 
+	group "github.com/bytemare/crypto"
+
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -134,7 +136,15 @@ func TestServerInit_ZeroSecretKey(t *testing.T) {
 			t.Fatal(err)
 		}
 		sk := [32]byte{}
-		expected := "server private key is zero"
+
+		var expected string
+
+		switch conf.conf.AKE.Group() {
+		case group.Ristretto255Sha512, group.P256Sha256:
+			expected = "server private key is zero"
+		default:
+			expected = "invalid server AKE secret key: scalar Decode: invalid scalar length"
+		}
 
 		if err := server.SetKeyMaterial(nil, sk[:], nil, nil); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {

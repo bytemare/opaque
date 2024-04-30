@@ -133,15 +133,15 @@ func (c *Configuration) verify() error {
 		return errInvalidAKEid
 	}
 
-	if !hash.Hashing(c.KDF).Available() {
+	if !hash.Hash(c.KDF).Available() {
 		return errInvalidKDFid
 	}
 
-	if !hash.Hashing(c.MAC).Available() {
+	if !hash.Hash(c.MAC).Available() {
 		return errInvalidMACid
 	}
 
-	if !hash.Hashing(c.Hash).Available() {
+	if !hash.Hash(c.Hash).Available() {
 		return errInvalidHASHid
 	}
 
