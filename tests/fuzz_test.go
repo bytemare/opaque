@@ -327,13 +327,15 @@ func FuzzDeserializeKE1(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
-				if err := isValidOPRFPoint(conf, ke1[:conf.OPRF.Group().ElementLength()], errInvalidBlindedData); err != nil {
+				input := ke1[:conf.OPRF.Group().ElementLength()]
+				if err := isValidOPRFPoint(conf, input, errInvalidBlindedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidClientEPK.Error()) {
-				if err := isValidOPRFPoint(conf, ke1[conf.OPRF.Group().ElementLength()+conf.NonceLen:], errInvalidClientEPK); err != nil {
+				input := ke1[conf.OPRF.Group().ElementLength()+conf.NonceLen:]
+				if err := isValidOPRFPoint(conf, input, errInvalidClientEPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -343,7 +345,7 @@ func FuzzDeserializeKE1(f *testing.F) {
 
 func isValidAKEPoint(conf *internal.Configuration, input []byte, err error) error {
 	e := conf.Group.NewElement()
-	if _err := e.Decode(input); _err == nil {
+	if err2 := e.Decode(input); err2 == nil {
 		if e.IsIdentity() {
 			return errors.New("point is identity/infinity")
 		}
@@ -356,7 +358,7 @@ func isValidAKEPoint(conf *internal.Configuration, input []byte, err error) erro
 
 func isValidOPRFPoint(conf *internal.Configuration, input []byte, err error) error {
 	e := conf.OPRF.Group().NewElement()
-	if _err := e.Decode(input); _err == nil {
+	if err2 := e.Decode(input); err2 == nil {
 		if e.IsIdentity() {
 			return errors.New("point is identity/infinity")
 		}
@@ -397,13 +399,15 @@ func FuzzDeserializeKE2(f *testing.F) {
 			}
 
 			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
-				if err := isValidOPRFPoint(conf, ke2[:conf.OPRF.Group().ElementLength()], errInvalidEvaluatedData); err != nil {
+				input := ke2[:conf.OPRF.Group().ElementLength()]
+				if err := isValidOPRFPoint(conf, input, errInvalidEvaluatedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
 			if strings.Contains(err.Error(), errInvalidServerEPK.Error()) {
-				if err := isValidAKEPoint(conf, ke2[conf.OPRF.Group().ElementLength()+conf.NonceLen:], errInvalidServerEPK); err != nil {
+				input := ke2[conf.OPRF.Group().ElementLength()+conf.NonceLen:]
+				if err := isValidAKEPoint(conf, input, errInvalidServerEPK); err != nil {
 					t.Fatal(err)
 				}
 			}
