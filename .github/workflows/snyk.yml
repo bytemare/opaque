@@ -17,7 +17,7 @@ jobs:
     name: Snyk
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@6c3b1c91e8873ae0c705b0709f957c7a6a5eaf10
+      - uses: step-security/harden-runner@9ff9d14760a73102d9fa2f47131624137f50ead8
         with:
           disable-sudo: true
           egress-policy: block
@@ -26,7 +26,7 @@ jobs:
             github.com:443
             proxy.golang.org:443
 
-      - uses: actions/checkout@8459bc0c7e3759cdf591f513d9f141a95fef0a8f
+      - uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/golang@8349f9043a8b7f0f3ee8885bf28f0b388d2446e8
         env:
