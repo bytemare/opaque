@@ -4,7 +4,7 @@ go 1.22.2
 
 require (
 	github.com/bytemare/crypto v0.6.0
-	github.com/bytemare/hash v0.3.0
+	github.com/bytemare/hash v0.4.0
 	github.com/bytemare/ksf v0.1.0
 )
 
@@ -14,6 +14,6 @@ require (
 	github.com/bytemare/hash2curve v0.3.0 // indirect
 	github.com/bytemare/secp256k1 v0.1.2 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
-	golang.org/x/crypto v0.22.0 // indirect
-	golang.org/x/sys v0.19.0 // indirect
+	golang.org/x/crypto v0.28.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
 )
