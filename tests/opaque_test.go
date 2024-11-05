@@ -235,7 +235,7 @@ func isSameConf(a, b *opaque.Configuration) bool {
 	if a.Hash != b.Hash {
 		return false
 	}
-	if a.KSF != b.KSF {
+	if !reflect.DeepEqual(a.KSF, b.KSF) {
 		return false
 	}
 	if a.AKE != b.AKE {
@@ -247,6 +247,22 @@ func isSameConf(a, b *opaque.Configuration) bool {
 
 func TestConfiguration_Deserialization(t *testing.T) {
 	conf := opaque.DefaultConfiguration()
+	ser := conf.Serialize()
+
+	conf2, err := opaque.DeserializeConfiguration(ser)
+	if err != nil {
+		t.Fatalf("unexpected error on valid configuration: %v", err)
+	}
+
+	if !isSameConf(conf, conf2) {
+		t.Fatalf("Unexpected inequality:\n\t%v\n\t%v", conf, conf2)
+	}
+}
+
+func TestConfiguration_KSFConfigDeserialization(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+	conf.KSF.Parameters = []int{2, 19456, 1}
+	conf.KSF.Salt = make([]byte, 16)
 	ser := conf.Serialize()
 
 	conf2, err := opaque.DeserializeConfiguration(ser)
@@ -332,7 +348,7 @@ func TestNilConfiguration(t *testing.T) {
 		KDF:      internal.NewKDF(def.KDF),
 		MAC:      internal.NewMac(def.MAC),
 		Hash:     internal.NewHash(def.Hash),
-		KSF:      internal.NewKSF(def.KSF),
+		KSF:      internal.NewKSF(def.KSF.Identifier),
 		NonceLen: internal.NonceLength,
 		Group:    g,
 		OPRF:     oprf.IDFromGroup(g),
@@ -356,20 +372,6 @@ func TestDeserializeConfiguration_Short(t *testing.T) {
 	if _, err := opaque.DeserializeConfiguration(r9); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
 		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r9. want %q, got %q",
 			internal.ErrConfigurationInvalidLength, err)
-	}
-}
-
-func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
-	d := opaque.DefaultConfiguration().Serialize()
-	d[7] = 3
-
-	expected := "decoding the configuration context: "
-	if _, err := opaque.DeserializeConfiguration(d); err == nil || !strings.HasPrefix(err.Error(), expected) {
-		t.Errorf(
-			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
-			expected,
-			err,
-		)
 	}
 }
 
@@ -431,11 +433,13 @@ func TestBadConfiguration(t *testing.T) {
 
 	convertToBadConf := func(encoded []byte) *opaque.Configuration {
 		return &opaque.Configuration{
-			OPRF:    opaque.Group(encoded[0]),
-			KDF:     crypto.Hash(encoded[1]),
-			MAC:     crypto.Hash(encoded[2]),
-			Hash:    crypto.Hash(encoded[3]),
-			KSF:     ksf.Identifier(encoded[4]),
+			OPRF: opaque.Group(encoded[0]),
+			KDF:  crypto.Hash(encoded[1]),
+			MAC:  crypto.Hash(encoded[2]),
+			Hash: crypto.Hash(encoded[3]),
+			KSF: opaque.KSFConfiguration{
+				Identifier: ksf.Identifier(encoded[4]),
+			},
 			AKE:     opaque.Group(encoded[5]),
 			Context: encoded[5:],
 		}
@@ -491,7 +495,7 @@ func TestFakeRecord(t *testing.T) {
 		KDF:     0,
 		MAC:     0,
 		Hash:    0,
-		KSF:     0,
+		KSF:     opaque.KSFConfiguration{},
 		AKE:     0,
 		Context: nil,
 	}

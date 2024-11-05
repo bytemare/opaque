@@ -38,11 +38,13 @@ func TestDeserializer(t *testing.T) {
 
 	// Test for an invalid configuration.
 	conf := &opaque.Configuration{
-		OPRF:    0,
-		KDF:     0,
-		MAC:     0,
-		Hash:    0,
-		KSF:     0,
+		OPRF: 0,
+		KDF:  0,
+		MAC:  0,
+		Hash: 0,
+		KSF: opaque.KSFConfiguration{
+			Identifier: 0,
+		},
 		AKE:     0,
 		Context: nil,
 	}

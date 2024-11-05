@@ -36,6 +36,7 @@ type Configuration struct {
 	MAC          *Mac
 	Hash         *Hash
 	KSF          *KSF
+	KSFSalt      []byte
 	OPRF         oprf.Identifier
 	Context      []byte
 	NonceLen     int

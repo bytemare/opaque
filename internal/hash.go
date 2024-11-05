@@ -108,6 +108,7 @@ type KSF struct {
 type ksfInterface interface {
 	// Harden uses default parameters for the key derivation function over the input password and salt.
 	Harden(password, salt []byte, length int) []byte
+	Parameterize(parameters ...int)
 }
 
 // IdentityKSF represents a KSF with no operations.
@@ -117,3 +118,5 @@ type IdentityKSF struct{}
 func (i IdentityKSF) Harden(password, _ []byte, _ int) []byte {
 	return password
 }
+
+func (i IdentityKSF) Parameterize(parameters ...int) {}
