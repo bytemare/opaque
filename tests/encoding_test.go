@@ -50,7 +50,7 @@ func TestDecodeVector(t *testing.T) {
 type i2ospTest struct {
 	encoded []byte
 	value   int
-	size    int
+	size    uint16
 }
 
 var I2OSPVectors = []i2ospTest{
@@ -68,12 +68,6 @@ var I2OSPVectors = []i2ospTest{
 	},
 	{
 		[]byte{0xff, 0xff}, 65535, 2,
-	},
-	{
-		[]byte{0xff, 0xe3, 0xd0}, 16770000, 3,
-	},
-	{
-		[]byte{0xff, 0xff, 0xe3, 0x80}, 4294960000, 4,
 	},
 }
 
@@ -98,21 +92,14 @@ func TestI2OSP(t *testing.T) {
 		})
 	}
 
-	length := -1
-	if hasPanic, err := expectPanic(nil, func() {
-		_ = encoding.I2OSP(1, length)
-	}); !hasPanic {
-		t.Fatalf("expected panic with with negative length: %v", err)
-	}
-
-	length = 0
+	var length uint16 = 0
 	if hasPanic, err := expectPanic(nil, func() {
 		_ = encoding.I2OSP(1, length)
 	}); !hasPanic {
 		t.Fatalf("expected panic with with 0 length: %v", err)
 	}
 
-	length = 5
+	length = 3
 	if hasPanic, err := expectPanic(nil, func() {
 		_ = encoding.I2OSP(1, length)
 	}); !hasPanic {
@@ -134,17 +121,15 @@ func TestI2OSP(t *testing.T) {
 		t.Fatalf("expected panic with exceeding value for the length: %v", err)
 	}
 
-	lengths := map[int]int{
-		100:           1,
-		1 << 8:        2,
-		1 << 16:       3,
-		(1 << 32) - 1: 4,
+	lengths := map[int]uint16{
+		100:    1,
+		1 << 8: 2,
 	}
 
 	for k, v := range lengths {
 		r := encoding.I2OSP(k, v)
 
-		if len(r) != v {
+		if uint16(len(r)) != v {
 			t.Fatalf("invalid length for %d. Expected '%d', got '%d' (%v)", k, v, len(r), r)
 		}
 	}

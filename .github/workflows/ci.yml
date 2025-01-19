@@ -120,8 +120,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.organization=bytemare-github
-            -Dsonar.projectKey=bytemare_opaque
+            -Dsonar.organization=bytemare
+            -Dsonar.projectKey=opaque
             -Dsonar.go.coverage.reportPaths=.github/coverage.out
             -Dsonar.sources=.
             -Dsonar.exclusions=examples_test.go

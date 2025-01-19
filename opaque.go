@@ -133,15 +133,15 @@ func (c *Configuration) verify() error {
 		return errInvalidAKEid
 	}
 
-	if !hash.Hash(c.KDF).Available() {
+	if c.KDF >= 25 || !hash.Hash(c.KDF).Available() {
 		return errInvalidKDFid
 	}
 
-	if !hash.Hash(c.MAC).Available() {
+	if c.MAC >= 25 || !hash.Hash(c.MAC).Available() {
 		return errInvalidMACid
 	}
 
-	if !hash.Hash(c.Hash).Available() {
+	if c.Hash >= 25 || !hash.Hash(c.Hash).Available() {
 		return errInvalidHASHid
 	}
 
@@ -247,7 +247,7 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		Context: ctx,
 	}
 
-	if err := c.verify(); err != nil {
+	if err = c.verify(); err != nil {
 		return nil, err
 	}
 

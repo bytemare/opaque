@@ -12,17 +12,12 @@ package encoding
 import "errors"
 
 var (
-	errI2OSPLength  = errors.New("requested size is too big")
 	errHeaderLength = errors.New("insufficient header length for decoding")
 	errTotalLength  = errors.New("insufficient total length for decoding")
 )
 
 // EncodeVectorLen returns the input prepended with a byte encoding of its length.
-func EncodeVectorLen(input []byte, length int) []byte {
-	if length != 1 && length != 2 {
-		panic(errI2OSPLength)
-	}
-
+func EncodeVectorLen(input []byte, length uint16) []byte {
 	return append(I2OSP(len(input), length), input...)
 }
 
