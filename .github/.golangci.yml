@@ -63,7 +63,7 @@ linters:
     - makezero
     - mirror
     - misspell
-    #- mnd
+    - mnd
     - musttag
     - nakedret
     - nestif
@@ -72,7 +72,7 @@ linters:
     - nlreturn
     - noctx
     - nolintlint
-    #- nonamedreturns
+    - nonamedreturns
     - nosprintfhostport
     - paralleltest
     - perfsprint
@@ -169,25 +169,13 @@ linters-settings:
       - operation
       - return
       - assign
-    ignored-functions:
-      - 'EncodeVectorLen'
-      - 'decodeVectorLen'
-      - 'encoding.I2OSP'
-      - 'encoding.OS2IP'
-      - 'make'
   gosec:
     excludes:
       - G115
-    config:
-      G602:
-        frost:
-          - encodedLength
   gosimple:
     checks: [ "all" ]
   govet:
-    settings:
-      shadow:
-        strict: true
+    shadow: true
     disable-all: true
     enable:
       - asmdecl
@@ -249,6 +237,8 @@ linters-settings:
   prealloc:
     simple: false
     for-loops: true
+  unused:
+    check-exported: false
   whitespace:
     multi-if: false
     multi-func: false
@@ -274,13 +264,13 @@ issues:
   #- "do not define dynamic errors, use wrapped static errors instead"
   #- "missing cases in switch of type Group: maxID"
 
-  exclude-rules:
-    - path: internal/hash.go
-      linters:
-        - errcheck
-    - path: internal/tag/strings.go
-      linters:
-        - gosec
+  #exclude-rules:
+  #  - path: internal/hash.go
+  #    linters:
+  #      - errcheck
+  #  - path: internal/tag/strings.go
+  #    linters:
+  #      - gosec
 
   max-issues-per-linter: 0
   max-same-issues: 0
@@ -295,5 +285,10 @@ run:
   tests: false
 
 output:
- formats:
-  - format: colored-line-number
+  formats:
+    - format: colored-line-number
+      path: stdout
+  sort-results: true
+  sort-order:
+    - file
+  show-stats: true
