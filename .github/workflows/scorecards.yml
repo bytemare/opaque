@@ -1,74 +1,39 @@
-name: Scorecard analysis workflow
+name: Scorecard Analysis Workflow
+
 on:
-  # Only the default branch is supported.
-  branch_protection_rule:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   schedule:
     # Weekly on Saturdays.
     - cron: '30 1 * * 6'
-  push:
-    branches: [ main ]
 
-# Declare default permissions as read only.
-permissions: read-all
+permissions: {}
 
 jobs:
   analysis:
-    name: Scorecard analysis
-    runs-on: ubuntu-latest
     permissions:
       # Needed if using Code scanning alerts
       security-events: write
       # Needed for GitHub OIDC token if publish_results is true
       id-token: write
+      # Needed for nested workflow
+      actions: read
+      attestations: read
+      checks: read
+      contents: read
+      deployments: read
+      issues: read
+      discussions: read
+      packages: read
+      pages: read
+      pull-requests: read
+      repository-projects: read
+      statuses: read
 
-    steps:
-      - uses: step-security/harden-runner@18f6947f131da60743dc12d2a22ff28c2b4ea87f
-        with:
-          disable-sudo: true
-          egress-policy: block
-          allowed-endpoints: >
-            api.github.com:443
-            api.osv.dev:443
-            api.securityscorecards.dev:443
-            fulcio.sigstore.dev:443
-            github.com:443
-            oss-fuzz-build-logs.storage.googleapis.com:443
-            rekor.sigstore.dev:443
-            tuf-repo-cdn.sigstore.dev:443
-            www.bestpractices.dev:443
-
-      - name: "Checkout code"
-        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
-        with:
-          persist-credentials: false
-
-      - name: "Run analysis"
-        uses: ossf/scorecard-action@e48dbb732fab761267783321dfa71e2a5c6e263d
-        with:
-          results_file: results.sarif
-          results_format: sarif
-          # (Optional) fine-grained personal access token. Uncomment the `repo_token` line below if:
-          # - you want to enable the Branch-Protection check on a *public* repository, or
-          # To create the PAT, follow the steps in https://github.com/ossf/scorecard-action#authentication-with-fine-grained-pat-optional.
-          repo_token: ${{ secrets.SCORECARD_TOKEN }}
-
-          # Publish the results for public repositories to enable scorecard badges. For more details, see
-          # https://github.com/ossf/scorecard-action#publishing-results.
-          # For private repositories, `publish_results` will automatically be set to `false`, regardless
-          # of the value entered here.
-          publish_results: true
-
-      # Upload the results as artifacts (optional). Commenting out will disable uploads of run results in SARIF
-      # format to the repository Actions tab.
-      - name: "Upload artifact"
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
-        with:
-          name: SARIF file
-          path: results.sarif
-          retention-days: 5
-
-      # required for Code scanning alerts
-      - name: "Upload SARIF results to code scanning"
-        uses: github/codeql-action/upload-sarif@0f1559aeaf806072ddd427d1b11e1c956e4851a0
-        with:
-          sarif_file: results.sarif
+    uses: bytemare/workflows/.github/workflows/scorecard.yml@d4e3826d684cd074ad761f762be084d1af5706a1
+    secrets:
+      token: ${{ secrets.SCORECARD_TOKEN }}
