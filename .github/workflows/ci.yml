@@ -12,7 +12,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@9ff9d14760a73102d9fa2f47131624137f50ead8
+      - uses: step-security/harden-runner@18f6947f131da60743dc12d2a22ff28c2b4ea87f
         with:
           disable-sudo: true
           egress-policy: block
@@ -24,17 +24,17 @@ jobs:
             raw.githubusercontent.com:443
 
       - name: Checkout repo
-        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7
+        uses: actions/setup-go@3d10edb4c2d9ac9923e94a5ec73fa063078e9234
         with:
           go-version-file: ./go.mod
 
       # Linting
       - name: Linting
-        uses: golangci/golangci-lint-action@9d1e0624a798bb64f6c3cea93db47765312263dc
+        uses: golangci/golangci-lint-action@a7b658d2951c9acd466331cdf290b5dbac3bcce6
         with:
           version: latest
           args: --config=./.github/.golangci.yml ./...
@@ -48,7 +48,7 @@ jobs:
       matrix:
         go: [ '1.22', '1.21' ]
     steps:
-      - uses: step-security/harden-runner@9ff9d14760a73102d9fa2f47131624137f50ead8
+      - uses: step-security/harden-runner@18f6947f131da60743dc12d2a22ff28c2b4ea87f
         with:
           disable-sudo: true
           egress-policy: block
@@ -59,11 +59,11 @@ jobs:
             sum.golang.org:443
 
       - name: Checkout repo
-        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7
+        uses: actions/setup-go@3d10edb4c2d9ac9923e94a5ec73fa063078e9234
         with:
           go-version: ${{ matrix.go }}
 
@@ -75,7 +75,7 @@ jobs:
     name: Analyze
     runs-on: ubuntu-latest
     steps:
-      - uses: step-security/harden-runner@9ff9d14760a73102d9fa2f47131624137f50ead8
+      - uses: step-security/harden-runner@18f6947f131da60743dc12d2a22ff28c2b4ea87f
         with:
           disable-sudo: true
           egress-policy: block
@@ -92,11 +92,11 @@ jobs:
             storage.googleapis.com:443
 
       - name: Checkout repo
-        uses: actions/checkout@44c2b7a8a4ea60a981eaca3cf939b5f4305c123b
+        uses: actions/checkout@85e6279cec87321a52edac9c87bce653a07cf6c2
         with:
           fetch-depth: 0
       - name: Setup Go
-        uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7
+        uses: actions/setup-go@3d10edb4c2d9ac9923e94a5ec73fa063078e9234
         with:
           go-version-file: ./go.mod
 
@@ -106,7 +106,7 @@ jobs:
 
       # Codecov
       - name: Codecov
-        uses: codecov/codecov-action@dad251dcaf4fdaa10dfaa1c32aab58f9cb23a448
+        uses: codecov/codecov-action@25fe46e17d692bac1908f2f457f98d2c936d894d
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         with:
@@ -114,14 +114,14 @@ jobs:
 
       # Sonar
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@6bbd64e0cb2194e04addb429d669a9ee873eeeef
+        uses: SonarSource/sonarcloud-github-action@02ef91109b2d589e757aefcfb2854c2783fd7b19
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
-            -Dsonar.organization=bytemare-github
-            -Dsonar.projectKey=bytemare_opaque
+            -Dsonar.organization=bytemare
+            -Dsonar.projectKey=opaque
             -Dsonar.go.coverage.reportPaths=.github/coverage.out
             -Dsonar.sources=.
             -Dsonar.exclusions=examples_test.go

@@ -23,18 +23,17 @@ var (
 	errInputTooLarge = errors.New("input too large for integer")
 )
 
-// I2OSP 32-bit Integer to Octet Stream Primitive on maximum 4 bytes.
-func I2OSP(value, length int) []byte {
+// I2OSP 32-bit Integer to Octet Stream Primitive on maximum 2 bytes.
+func I2OSP(value int, length uint16) []byte {
 	if length <= 0 {
 		panic(errLengthNegative)
 	}
 
-	i2ospMax := 4
-	if length > i2ospMax {
+	if length > 2 {
 		panic(errLengthTooBig)
 	}
 
-	out := make([]byte, i2ospMax)
+	out := make([]byte, 2)
 
 	switch v := value; {
 	case v < 0:
@@ -44,14 +43,8 @@ func I2OSP(value, length int) []byte {
 	case length == 1:
 		binary.BigEndian.PutUint16(out, uint16(v))
 		return out[1:2]
-	case length == 2:
+	default: // length == 2
 		binary.BigEndian.PutUint16(out, uint16(v))
-		return out[:2]
-	case length == 3:
-		binary.BigEndian.PutUint32(out, uint32(v))
-		return out[1:]
-	default: // length == 4
-		binary.BigEndian.PutUint32(out, uint32(v))
 		return out
 	}
 }

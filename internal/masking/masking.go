@@ -41,8 +41,8 @@ func Mask(
 		nonce = internal.RandomBytes(conf.NonceLen)
 	}
 
-	clear := encoding.Concat(serverPublicKey, envelope)
-	maskedResponse = xorResponse(conf, maskingKey, nonce, clear)
+	clearText := encoding.Concat(serverPublicKey, envelope)
+	maskedResponse = xorResponse(conf, maskingKey, nonce, clearText)
 
 	return nonce, maskedResponse
 }
@@ -54,9 +54,9 @@ func Unmask(
 	randomizedPassword, nonce, maskedResponse []byte,
 ) (serverPublicKey *group.Element, serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
 	maskingKey := conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), conf.Hash.Size())
-	clear := xorResponse(conf, maskingKey, nonce, maskedResponse)
-	serverPublicKeyBytes = clear[:conf.Group.ElementLength()]
-	env := clear[conf.Group.ElementLength():]
+	clearText := xorResponse(conf, maskingKey, nonce, maskedResponse)
+	serverPublicKeyBytes = clearText[:conf.Group.ElementLength()]
+	env := clearText[conf.Group.ElementLength():]
 	envelope = &keyrecovery.Envelope{
 		Nonce:   env[:conf.NonceLen],
 		AuthTag: env[conf.NonceLen:],

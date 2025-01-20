@@ -143,7 +143,7 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 	nonceU := ke1[d.conf.OPRF.Group().ElementLength() : d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen]
 
 	epku := d.conf.Group.NewElement()
-	if err := epku.Decode(ke1[d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen:]); err != nil {
+	if err = epku.Decode(ke1[d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen:]); err != nil {
 		return nil, errInvalidClientEPK
 	}
 
@@ -184,7 +184,7 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 	mac := ke2[offset:]
 
 	epks := d.conf.Group.NewElement()
-	if err := epks.Decode(epk); err != nil {
+	if err = epks.Decode(epk); err != nil {
 		return nil, errInvalidServerEPK
 	}
 

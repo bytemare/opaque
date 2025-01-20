@@ -5,8 +5,10 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    - canonicalheader
     - containedctx
     - contextcheck
+    - copyloopvar
     - cyclop
     - decorder
     #- depguard
@@ -14,50 +16,55 @@ linters:
     - dupl
     - dupword
     - durationcheck
+    - err113
     - errcheck
     - errchkjson
     - errname
     - errorlint
-    - execinquery
     - exhaustive
     - exhaustruct
-    - exportloopref
+    - fatcontext
     - forbidigo
     - forcetypeassert
     - funlen
     - gci
     - ginkgolinter
+    - gocheckcompilerdirectives
     #- gochecknoglobals
     #- gochecknoinits
+    - gochecksumtype
     - gocognit
     - goconst
     - gocritic
     - gocyclo
     - godot
     - godox
-    - goerr113
     - gofmt
     - gofumpt
     - goheader
     - goimports
-    #- gomnd
     - gomoddirectives
     - gomodguard
     - goprintffuncname
     - gosec
-    - gosmopolitan
     - gosimple
+    - gosmopolitan
     - govet
     - grouper
     - importas
+    - inamedparam
     - ineffassign
     - interfacebloat
+    - intrange
     - ireturn
     - lll
-    - logrlint
+    - loggercheck
     - maintidx
     - makezero
+    - mirror
     - misspell
+    #- mnd
+    - musttag
     - nakedret
     - nestif
     - nilerr
@@ -67,14 +74,17 @@ linters:
     - nolintlint
     #- nonamedreturns
     - nosprintfhostport
-    - musttag
     - paralleltest
+    - perfsprint
     - prealloc
     - predeclared
     - promlinter
+    - protogetter
     - reassign
     - revive
     - rowserrcheck
+    - sloglint
+    - spancheck
     - sqlclosecheck
     - staticcheck
     - stylecheck
@@ -82,6 +92,7 @@ linters:
     - tagliatelle
     - tenv
     - testableexamples
+    - testifylint
     - testpackage
     - thelper
     - tparallel
@@ -96,12 +107,11 @@ linters:
     - wrapcheck
     - wsl
     - zerologlint
-  presets:
-    - bugs
-    - unused
-  fast: false
 
 linters-settings:
+  cyclop:
+    max-complexity: 15
+    skip-tests: true
   dupl:
     threshold: 100
   errcheck:
@@ -136,6 +146,8 @@ linters-settings:
       - opinionated
       - performance
       - style
+    disabled-checks:
+      - sloppyReassign
   gocyclo:
     min-complexity: 15
   godox:
@@ -163,10 +175,19 @@ linters-settings:
       - 'encoding.I2OSP'
       - 'encoding.OS2IP'
       - 'make'
+  gosec:
+    excludes:
+      - G115
+    config:
+      G602:
+        frost:
+          - encodedLength
   gosimple:
     checks: [ "all" ]
   govet:
-    check-shadowing: true
+    settings:
+      shadow:
+        strict: true
     disable-all: true
     enable:
       - asmdecl
@@ -211,13 +232,23 @@ linters-settings:
     tab-width: 4
   misspell:
     locale: US
+  mnd:
+    checks:
+      - argument
+      - case
+      - condition
+      - operation
+      - return
+      - assign
+    #ignored-functions:
+    #  - 'nist.setMapping'
+    #  - 'big.NewInt'
+    #  - 'hash2curve.HashToFieldXMD'
   nlreturn:
     block-size: 2
   prealloc:
     simple: false
     for-loops: true
-  unused:
-    check-exported: false
   whitespace:
     multi-if: false
     multi-func: false
@@ -238,8 +269,10 @@ issues:
   # But independently from this option we use default exclude patterns,
   # it can be disabled by `exclude-use-default: false`. To list all
   # excluded by default patterns execute `golangci-lint run --help`
-  exclude:
-    - "should have a package comment, unless it's in another file for this package"
+  #exclude:
+  #- "should have a package comment, unless it's in another file for this package"
+  #- "do not define dynamic errors, use wrapped static errors instead"
+  #- "missing cases in switch of type Group: maxID"
 
   exclude-rules:
     - path: internal/hash.go
@@ -262,4 +295,5 @@ run:
   tests: false
 
 output:
- format: github-actions
+ formats:
+  - format: colored-line-number
