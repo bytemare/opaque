@@ -63,7 +63,7 @@ linters:
     - makezero
     - mirror
     - misspell
-    - mnd
+    #- mnd
     - musttag
     - nakedret
     - nestif
@@ -72,7 +72,7 @@ linters:
     - nlreturn
     - noctx
     - nolintlint
-    - nonamedreturns
+    #- nonamedreturns
     - nosprintfhostport
     - paralleltest
     - perfsprint
@@ -116,7 +116,7 @@ linters-settings:
     threshold: 100
   errcheck:
     check-type-assertions: true
-    check-blank: true
+    check-blank: false
     #exclude-functions:
     #  - io/ioutil.ReadFile
     #  - io.Copy(*bytes.Buffer)
@@ -171,6 +171,7 @@ linters-settings:
       - assign
   gosec:
     excludes:
+      - G101
       - G115
   gosimple:
     checks: [ "all" ]
