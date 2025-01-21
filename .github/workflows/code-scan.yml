@@ -1,4 +1,4 @@
-name: Code Scan
+name: Analysis
 
 on:
   push:
@@ -8,8 +8,8 @@ on:
     branches:
       - main
   schedule:
-    # random HH:MM to avoid a load spike on GitHub Actions at 00:00
-    - cron: '4 1 * * *'
+    # Every 3 days at 7 a.m.
+    - cron: '0 7 */3 * *'
 
 permissions: {}
 
@@ -22,7 +22,16 @@ jobs:
       config-path: ./.github/.golangci.yml
       scope: ./...
 
-  Analyze:
+  CodeQL:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: bytemare/workflows/.github/workflows/codeql.yml@d4e3826d684cd074ad761f762be084d1af5706a1
+    with:
+      language: go
+
+  CodeScans:
     permissions:
       contents: read
     uses: bytemare/workflows/.github/workflows/scan-go.yml@d4e3826d684cd074ad761f762be084d1af5706a1
@@ -34,3 +43,27 @@ jobs:
       sonar: ${{ secrets.SONAR_TOKEN }}
       codecov: ${{ secrets.CODECOV_TOKEN }}
       semgrep: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  Scorecard:
+    permissions:
+      # Needed if using Code scanning alerts
+      security-events: write
+      # Needed for GitHub OIDC token if publish_results is true
+      id-token: write
+      # Needed for nested workflow
+      actions: read
+      attestations: read
+      checks: read
+      contents: read
+      deployments: read
+      issues: read
+      discussions: read
+      packages: read
+      pages: read
+      pull-requests: read
+      repository-projects: read
+      statuses: read
+
+    uses: bytemare/workflows/.github/workflows/scorecard.yml@d4e3826d684cd074ad761f762be084d1af5706a1
+    secrets:
+      token: ${{ secrets.SCORECARD_TOKEN }}
