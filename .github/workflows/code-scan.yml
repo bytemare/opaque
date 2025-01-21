@@ -17,7 +17,7 @@ jobs:
   Lint:
     permissions:
       contents: read
-    uses: bytemare/workflows/.github/workflows/golangci-lint.yml@d4e3826d684cd074ad761f762be084d1af5706a1
+    uses: bytemare/workflows/.github/workflows/golangci-lint.yml@6a1ecd61e6af01d166be3eaa6d38fcecf7754c08
     with:
       config-path: ./.github/.golangci.yml
       scope: ./...
@@ -27,14 +27,14 @@ jobs:
       actions: read
       contents: read
       security-events: write
-    uses: bytemare/workflows/.github/workflows/codeql.yml@d4e3826d684cd074ad761f762be084d1af5706a1
+    uses: bytemare/workflows/.github/workflows/codeql.yml@6a1ecd61e6af01d166be3eaa6d38fcecf7754c08
     with:
       language: go
 
   CodeScans:
     permissions:
       contents: read
-    uses: bytemare/workflows/.github/workflows/scan-go.yml@d4e3826d684cd074ad761f762be084d1af5706a1
+    uses: bytemare/workflows/.github/workflows/scan-go.yml@6a1ecd61e6af01d166be3eaa6d38fcecf7754c08
     with:
       sonar-configuration: .github/sonar-project.properties
       coverage-output-file: coverage.out
@@ -64,6 +64,6 @@ jobs:
       repository-projects: read
       statuses: read
 
-    uses: bytemare/workflows/.github/workflows/scorecard.yml@d4e3826d684cd074ad761f762be084d1af5706a1
+    uses: bytemare/workflows/.github/workflows/scorecard.yml@6a1ecd61e6af01d166be3eaa6d38fcecf7754c08
     secrets:
       token: ${{ secrets.SCORECARD_TOKEN }}
