@@ -10,6 +10,8 @@ github.com/bytemare/hash2curve v0.3.0 h1:41Npcbc+u/E252A5aCMtxDcz7JPkkX1QzShneTF
 github.com/bytemare/hash2curve v0.3.0/go.mod h1:itj45U8uqvCtWC0eCswIHVHswXcEHkpFui7gfJdPSfQ=
 github.com/bytemare/ksf v0.1.0 h1:t0VobAtBVSb1SyX1RltuZ+c4gVVHLKQnUN5oYd3o3qc=
 github.com/bytemare/ksf v0.1.0/go.mod h1:wKBp7KmpY482R8lOfcGFh01MsJEU0vZHw8qFEMzNoRU=
+github.com/bytemare/ksf v0.2.0 h1:Nud9UHL1DOJ8V3gVr9NdwyQJs2392jpyWm+4vwwxfew=
+github.com/bytemare/ksf v0.2.0/go.mod h1:TVtEe/x7HURgme5XRkKq60KvRr6Xe2g79lQviKbnhEA=
 github.com/bytemare/secp256k1 v0.1.2 h1:aM+p/+0y1h0SZWqS/yzjGPzffVFubJvwLjUgodFEWOo=
 github.com/bytemare/secp256k1 v0.1.2/go.mod h1:Pxb9miDs8PTt5mOktvvXiRflvLxI1wdxbXrc6IYsaho=
 github.com/gtank/ristretto255 v0.1.2 h1:JEqUCPA1NvLq5DwYtuzigd7ss8fwbYay9fi4/5uMzcc=
