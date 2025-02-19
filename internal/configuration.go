@@ -14,7 +14,7 @@ import (
 	"errors"
 	"fmt"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/oprf"
 )
@@ -40,7 +40,7 @@ type Configuration struct {
 	Context      []byte
 	NonceLen     int
 	EnvelopeSize int
-	Group        group.Group
+	Group        ecc.Group
 }
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).

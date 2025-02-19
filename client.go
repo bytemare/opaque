@@ -12,7 +12,7 @@ import (
 	"errors"
 	"fmt"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
@@ -65,7 +65,7 @@ func (c *Client) GetConf() *internal.Configuration {
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation *group.Element) []byte {
+func (c *Client) buildPRK(evaluation *ecc.Element) []byte {
 	output := c.OPRF.Finalize(evaluation)
 	stretched := c.conf.KSF.Harden(output, nil, c.conf.OPRF.Group().ElementLength())
 
@@ -75,10 +75,10 @@ func (c *Client) buildPRK(evaluation *group.Element) []byte {
 // ClientRegistrationInitOptions enables setting internal client values for the client registration.
 type ClientRegistrationInitOptions struct {
 	// OPRFBlind: optional
-	OPRFBlind *group.Scalar
+	OPRFBlind *ecc.Scalar
 }
 
-func getClientRegistrationInitBlind(options []ClientRegistrationInitOptions) *group.Scalar {
+func getClientRegistrationInitBlind(options []ClientRegistrationInitOptions) *ecc.Scalar {
 	if len(options) == 0 {
 		return nil
 	}
@@ -145,7 +145,7 @@ func (c *Client) RegistrationFinalize(
 // set.
 type GenerateKE1Options struct {
 	// Blind: optional
-	Blind *group.Scalar
+	Blind *ecc.Scalar
 	// KeyShareSeed: optional
 	KeyShareSeed []byte
 	// Nonce: optional
@@ -154,7 +154,7 @@ type GenerateKE1Options struct {
 	NonceLength uint
 }
 
-func (c GenerateKE1Options) get() (*group.Scalar, ake.Options) {
+func (c GenerateKE1Options) get() (*ecc.Scalar, ake.Options) {
 	return c.Blind, ake.Options{
 		KeyShareSeed: c.KeyShareSeed,
 		Nonce:        c.Nonce,
@@ -162,7 +162,7 @@ func (c GenerateKE1Options) get() (*group.Scalar, ake.Options) {
 	}
 }
 
-func getGenerateKE1Options(options []GenerateKE1Options) (*group.Scalar, ake.Options) {
+func getGenerateKE1Options(options []GenerateKE1Options) (*ecc.Scalar, ake.Options) {
 	if len(options) != 0 {
 		return options[0].get()
 	}

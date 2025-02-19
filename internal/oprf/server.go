@@ -9,10 +9,10 @@
 package oprf
 
 import (
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 )
 
 // Evaluate evaluates the blinded input with the given key.
-func (i Identifier) Evaluate(privateKey *group.Scalar, blindedElement *group.Element) *group.Element {
+func (i Identifier) Evaluate(privateKey *ecc.Scalar, blindedElement *ecc.Element) *ecc.Element {
 	return blindedElement.Copy().Multiply(privateKey)
 }

@@ -11,7 +11,7 @@ package ake
 import (
 	"errors"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
@@ -39,7 +39,7 @@ func NewClient() *Client {
 }
 
 // Start initiates the 3DH protocol, and returns a KE1 message with clientInfo.
-func (c *Client) Start(cs group.Group, options Options) *message.KE1 {
+func (c *Client) Start(cs ecc.Group, options Options) *message.KE1 {
 	epk := c.values.setOptions(cs, options)
 
 	return &message.KE1{
@@ -54,8 +54,8 @@ func (c *Client) Start(cs group.Group, options Options) *message.KE1 {
 func (c *Client) Finalize(
 	conf *internal.Configuration,
 	identities *Identities,
-	clientSecretKey *group.Scalar,
-	serverPublicKey *group.Element,
+	clientSecretKey *ecc.Scalar,
+	serverPublicKey *ecc.Element,
 	ke2 *message.KE2,
 ) (*message.KE3, error) {
 	ikm := k3dh(

@@ -12,7 +12,7 @@ import (
 	"errors"
 	"fmt"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
@@ -55,7 +55,7 @@ type Server struct {
 
 type keyMaterial struct {
 	serverIdentity  []byte
-	serverSecretKey *group.Scalar
+	serverSecretKey *ecc.Scalar
 	serverPublicKey []byte
 	oprfSeed        []byte
 }
@@ -84,7 +84,7 @@ func (s *Server) GetConf() *internal.Configuration {
 	return s.conf
 }
 
-func (s *Server) oprfResponse(element *group.Element, oprfSeed, credentialIdentifier []byte) *group.Element {
+func (s *Server) oprfResponse(element *ecc.Element, oprfSeed, credentialIdentifier []byte) *ecc.Element {
 	seed := s.conf.KDF.Expand(
 		oprfSeed,
 		encoding.SuffixString(credentialIdentifier, tag.ExpandOPRF),
@@ -99,7 +99,7 @@ func (s *Server) oprfResponse(element *group.Element, oprfSeed, credentialIdenti
 // identifiers.
 func (s *Server) RegistrationResponse(
 	req *message.RegistrationRequest,
-	serverPublicKey *group.Element,
+	serverPublicKey *ecc.Element,
 	credentialIdentifier, oprfSeed []byte,
 ) *message.RegistrationResponse {
 	z := s.oprfResponse(req.BlindedMessage, oprfSeed, credentialIdentifier)

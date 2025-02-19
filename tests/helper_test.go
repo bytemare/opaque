@@ -17,7 +17,7 @@ import (
 	"math/big"
 	"testing"
 
-	group "github.com/bytemare/crypto"
+	group "github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque"

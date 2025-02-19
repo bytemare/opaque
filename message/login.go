@@ -10,7 +10,7 @@
 package message
 
 import (
-	group "github.com/bytemare/crypto"
+	group "github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/encoding"
 )
