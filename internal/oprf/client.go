@@ -11,7 +11,7 @@ package oprf
 import (
 	"errors"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
@@ -21,13 +21,13 @@ var errInvalidInput = errors.New("invalid input - OPRF input deterministically m
 
 // Client implements the OPRF client and holds its state.
 type Client struct {
-	blind *group.Scalar
+	blind *ecc.Scalar
 	Identifier
 	input []byte
 }
 
 // Blind masks the input.
-func (c *Client) Blind(input []byte, blind *group.Scalar) *group.Element {
+func (c *Client) Blind(input []byte, blind *ecc.Scalar) *ecc.Element {
 	if blind != nil {
 		c.blind = blind.Copy()
 	} else {
@@ -53,7 +53,7 @@ func (c *Client) hashTranscript(input, unblinded []byte) []byte {
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
-func (c *Client) Finalize(evaluation *group.Element) []byte {
+func (c *Client) Finalize(evaluation *ecc.Element) []byte {
 	invert := c.blind.Copy().Invert()
 	u := evaluation.Copy().Multiply(invert).Encode()
 

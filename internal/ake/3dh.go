@@ -10,7 +10,7 @@
 package ake
 
 import (
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -19,21 +19,21 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
-// KeyGen returns private and public keys in the group.
-func KeyGen(id group.Group) (privateKey, publicKey []byte) {
+// KeyGen returns private and public keys in the ecc.
+func KeyGen(id ecc.Group) (privateKey, publicKey []byte) {
 	scalar := id.NewScalar().Random()
 	point := id.Base().Multiply(scalar)
 
 	return scalar.Encode(), point.Encode()
 }
 
-func diffieHellman(s *group.Scalar, e *group.Element) *group.Element {
+func diffieHellman(s *ecc.Scalar, e *ecc.Element) *ecc.Element {
 	/*
-		if id == group.Ristretto255Sha512 || id == group.P256Sha256 {
+		if id == ecc.Ristretto255Sha512 || id == ecc.P256Sha256 {
 			e.Copy().Multiply(s)
 		}
 
-		if id == group.Cruve25519 {
+		if id == ecc.Cruve25519 {
 			// TODO
 		}
 	*/
@@ -47,7 +47,7 @@ type Identities struct {
 }
 
 // SetIdentities sets the client and server identities to their respective public key if not set.
-func (id *Identities) SetIdentities(clientPublicKey *group.Element, serverPublicKey []byte) *Identities {
+func (id *Identities) SetIdentities(clientPublicKey *ecc.Element, serverPublicKey []byte) *Identities {
 	if id.ClientIdentity == nil {
 		id.ClientIdentity = clientPublicKey.Encode()
 	}
@@ -84,12 +84,12 @@ func (o *Options) init() {
 }
 
 type values struct {
-	ephemeralSecretKey *group.Scalar
+	ephemeralSecretKey *ecc.Scalar
 	nonce              []byte
 }
 
 // GetEphemeralSecretKey returns the state's ephemeral secret key.
-func (v *values) GetEphemeralSecretKey() *group.Scalar {
+func (v *values) GetEphemeralSecretKey() *ecc.Scalar {
 	return v.ephemeralSecretKey
 }
 
@@ -109,7 +109,7 @@ func (v *values) flush() {
 
 // setOptions sets optional values.
 // There's no effect if ephemeralSecretKey and nonce have already been set in a previous call.
-func (v *values) setOptions(g group.Group, options Options) *group.Element {
+func (v *values) setOptions(g ecc.Group, options Options) *ecc.Element {
 	options.init()
 
 	if v.ephemeralSecretKey == nil {
@@ -125,12 +125,12 @@ func (v *values) setOptions(g group.Group, options Options) *group.Element {
 }
 
 func k3dh(
-	p1 *group.Element,
-	s1 *group.Scalar,
-	p2 *group.Element,
-	s2 *group.Scalar,
-	p3 *group.Element,
-	s3 *group.Scalar,
+	p1 *ecc.Element,
+	s1 *ecc.Scalar,
+	p2 *ecc.Element,
+	s2 *ecc.Scalar,
+	p3 *ecc.Element,
+	s3 *ecc.Scalar,
 ) []byte {
 	e1 := diffieHellman(s1, p1).Encode()
 	e2 := diffieHellman(s2, p2).Encode()

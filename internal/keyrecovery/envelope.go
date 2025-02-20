@@ -12,7 +12,7 @@ package keyrecovery
 import (
 	"errors"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -68,7 +68,7 @@ func cleartextCredentials(clientPublicKey, serverPublicKey, clientIdentity, serv
 func deriveDiffieHellmanKeyPair(
 	conf *internal.Configuration,
 	randomizedPassword, nonce []byte,
-) (*group.Scalar, *group.Element) {
+) (*ecc.Scalar, *ecc.Element) {
 	seed := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
 	return oprf.IDFromGroup(conf.Group).DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
 }
@@ -76,9 +76,9 @@ func deriveDiffieHellmanKeyPair(
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
 func Store(
 	conf *internal.Configuration,
-	randomizedPassword []byte, serverPublicKey *group.Element,
+	randomizedPassword []byte, serverPublicKey *ecc.Element,
 	credentials *Credentials,
-) (env *Envelope, pku *group.Element, export []byte) {
+) (env *Envelope, pku *ecc.Element, export []byte) {
 	// testing: integrated to support testing with set nonce
 	nonce := credentials.EnvelopeNonce
 	if nonce == nil {
@@ -108,7 +108,7 @@ func Recover(
 	conf *internal.Configuration,
 	randomizedPassword, serverPublicKey, clientIdentity, serverIdentity []byte,
 	envelope *Envelope,
-) (clientSecretKey *group.Scalar, clientPublicKey *group.Element, export []byte, err error) {
+) (clientSecretKey *ecc.Scalar, clientPublicKey *ecc.Element, export []byte, err error) {
 	clientSecretKey, clientPublicKey = deriveDiffieHellmanKeyPair(conf, randomizedPassword, envelope.Nonce)
 	ctc := cleartextCredentials(
 		clientPublicKey.Encode(),

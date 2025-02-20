@@ -13,7 +13,7 @@ package oprf
 import (
 	"crypto"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
@@ -46,19 +46,19 @@ const (
 )
 
 var (
-	suites = make(map[group.Group]Identifier, nbIDs)
-	groups = make(map[Identifier]group.Group, nbIDs)
+	suites = make(map[ecc.Group]Identifier, nbIDs)
+	groups = make(map[Identifier]ecc.Group, nbIDs)
 	hashes = make(map[Identifier]crypto.Hash, nbIDs)
 )
 
 func init() {
-	Ristretto255Sha512.register(group.Ristretto255Sha512, crypto.SHA512)
-	P256Sha256.register(group.P256Sha256, crypto.SHA256)
-	P384Sha384.register(group.P384Sha384, crypto.SHA384)
-	P521Sha512.register(group.P521Sha512, crypto.SHA512)
+	Ristretto255Sha512.register(ecc.Ristretto255Sha512, crypto.SHA512)
+	P256Sha256.register(ecc.P256Sha256, crypto.SHA256)
+	P384Sha384.register(ecc.P384Sha384, crypto.SHA384)
+	P521Sha512.register(ecc.P521Sha512, crypto.SHA512)
 }
 
-func (i Identifier) register(g group.Group, h crypto.Hash) {
+func (i Identifier) register(g ecc.Group, h crypto.Hash) {
 	suites[g] = i
 	groups[i] = g
 	hashes[i] = h
@@ -96,23 +96,23 @@ func (i Identifier) Available() bool {
 	return true
 }
 
-// IDFromGroup returns the OPRF identifier corresponding to the input group.
-func IDFromGroup(g group.Group) Identifier {
+// IDFromGroup returns the OPRF identifier corresponding to the input ecc.
+func IDFromGroup(g ecc.Group) Identifier {
 	return suites[g]
 }
 
 // Group returns the Group identifier for the cipher suite.
-func (i Identifier) Group() group.Group {
+func (i Identifier) Group() ecc.Group {
 	return groups[i]
 }
 
 // DeriveKey returns a scalar deterministically generated from the input.
-func (i Identifier) DeriveKey(seed, info []byte) *group.Scalar {
+func (i Identifier) DeriveKey(seed, info []byte) *ecc.Scalar {
 	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), i.contextString())
 	deriveInput := encoding.Concat(seed, encoding.EncodeVector(info))
 
 	var counter uint8
-	var s *group.Scalar
+	var s *ecc.Scalar
 
 	for s == nil || s.IsZero() {
 		if counter > maxDeriveKeyPairTries {
@@ -127,7 +127,7 @@ func (i Identifier) DeriveKey(seed, info []byte) *group.Scalar {
 }
 
 // DeriveKeyPair returns a valid keypair deterministically generated from the input.
-func (i Identifier) DeriveKeyPair(seed, info []byte) (*group.Scalar, *group.Element) {
+func (i Identifier) DeriveKeyPair(seed, info []byte) (*ecc.Scalar, *ecc.Element) {
 	sk := i.DeriveKey(seed, info)
 	return sk, i.Group().Base().Multiply(sk)
 }

@@ -11,7 +11,7 @@ package ake
 import (
 	"errors"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
@@ -42,8 +42,8 @@ func NewServer() *Server {
 func (s *Server) Response(
 	conf *internal.Configuration,
 	identities *Identities,
-	serverSecretKey *group.Scalar,
-	clientPublicKey *group.Element,
+	serverSecretKey *ecc.Scalar,
+	clientPublicKey *ecc.Element,
 	ke1 *message.KE1,
 	response *message.CredentialResponse,
 	options Options,

@@ -17,7 +17,7 @@ import (
 	"errors"
 	"fmt"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 	"github.com/bytemare/hash"
 	"github.com/bytemare/ksf"
 
@@ -33,23 +33,23 @@ type Group byte
 
 const (
 	// RistrettoSha512 identifies the Ristretto255 group and SHA-512.
-	RistrettoSha512 = Group(group.Ristretto255Sha512)
+	RistrettoSha512 = Group(ecc.Ristretto255Sha512)
 
 	// decaf448Shake256 identifies the Decaf448 group and Shake-256.
 	// decaf448Shake256 = 2.
 
 	// P256Sha256 identifies the NIST P-256 group and SHA-256.
-	P256Sha256 = Group(group.P256Sha256)
+	P256Sha256 = Group(ecc.P256Sha256)
 
 	// P384Sha512 identifies the NIST P-384 group and SHA-384.
-	P384Sha512 = Group(group.P384Sha384)
+	P384Sha512 = Group(ecc.P384Sha384)
 
 	// P521Sha512 identifies the NIST P-512 group and SHA-512.
-	P521Sha512 = Group(group.P521Sha512)
+	P521Sha512 = Group(ecc.P521Sha512)
 )
 
 // Available returns whether the Group byte is recognized in this implementation. This allows to fail early when
-// working with multiple versions not using the same configuration and Group.
+// working with multiple versions not using the same configuration and ecc.
 func (g Group) Available() bool {
 	return g == RistrettoSha512 ||
 		g == P256Sha256 ||
@@ -63,8 +63,8 @@ func (g Group) OPRF() oprf.Identifier {
 }
 
 // Group returns the EC Group used in the Ciphersuite.
-func (g Group) Group() group.Group {
-	return group.Group(g)
+func (g Group) Group() ecc.Group {
+	return ecc.Group(g)
 }
 
 const confLength = 6
@@ -118,9 +118,9 @@ func (c *Configuration) GenerateOPRFSeed() []byte {
 	return RandomBytes(c.Hash.Size())
 }
 
-// KeyGen returns a key pair in the AKE group.
+// KeyGen returns a key pair in the AKE ecc.
 func (c *Configuration) KeyGen() (secretKey, publicKey []byte) {
-	return ake.KeyGen(group.Group(c.AKE))
+	return ake.KeyGen(ecc.Group(c.AKE))
 }
 
 // verify returns an error on the first non-compliant parameter, nil otherwise.

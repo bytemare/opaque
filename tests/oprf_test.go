@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	group "github.com/bytemare/crypto"
+	group "github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"

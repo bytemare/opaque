@@ -12,7 +12,7 @@ import (
 	"errors"
 	"fmt"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
@@ -206,7 +206,7 @@ func (d *Deserializer) KE3(ke3 []byte) (*message.KE3, error) {
 }
 
 // DecodeAkePrivateKey takes a serialized private key (a scalar) and attempts to return it's decoded form.
-func (d *Deserializer) DecodeAkePrivateKey(encoded []byte) (*group.Scalar, error) {
+func (d *Deserializer) DecodeAkePrivateKey(encoded []byte) (*ecc.Scalar, error) {
 	sk := d.conf.Group.NewScalar()
 	if err := sk.Decode(encoded); err != nil {
 		return nil, fmt.Errorf("invalid private key: %w", err)
@@ -216,7 +216,7 @@ func (d *Deserializer) DecodeAkePrivateKey(encoded []byte) (*group.Scalar, error
 }
 
 // DecodeAkePublicKey takes a serialized public key (a point) and attempts to return it's decoded form.
-func (d *Deserializer) DecodeAkePublicKey(encoded []byte) (*group.Element, error) {
+func (d *Deserializer) DecodeAkePublicKey(encoded []byte) (*ecc.Element, error) {
 	pk := d.conf.Group.NewElement()
 	if err := pk.Decode(encoded); err != nil {
 		return nil, fmt.Errorf("invalid public key: %w", err)

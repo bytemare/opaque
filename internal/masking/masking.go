@@ -12,7 +12,7 @@ package masking
 import (
 	"errors"
 
-	group "github.com/bytemare/crypto"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -25,8 +25,8 @@ var errUnmaskInvalidPKS = errors.New("invalid server public key in masked respon
 
 // Keys contains all the output keys from the masking mechanism.
 type Keys struct {
-	ClientSecretKey                  *group.Scalar
-	ClientPublicKey, ServerPublicKey *group.Element
+	ClientSecretKey                  *ecc.Scalar
+	ClientPublicKey, ServerPublicKey *ecc.Element
 	ExportKey, ServerPublicKeyBytes  []byte
 }
 
@@ -52,7 +52,7 @@ func Mask(
 func Unmask(
 	conf *internal.Configuration,
 	randomizedPassword, nonce, maskedResponse []byte,
-) (serverPublicKey *group.Element, serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
+) (serverPublicKey *ecc.Element, serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
 	maskingKey := conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), conf.Hash.Size())
 	clearText := xorResponse(conf, maskingKey, nonce, maskedResponse)
 	serverPublicKeyBytes = clearText[:conf.Group.ElementLength()]
