@@ -67,7 +67,7 @@ func (c *Client) GetConf() *internal.Configuration {
 // buildPRK derives the randomized password from the OPRF output.
 func (c *Client) buildPRK(evaluation *ecc.Element) []byte {
 	output := c.OPRF.Finalize(evaluation)
-	stretched := c.conf.KSF.Harden(output, nil, c.conf.OPRF.Group().ElementLength())
+	stretched := c.conf.KSF.Harden(output, c.conf.KSFSalt, c.conf.Hash.Size())
 
 	return c.conf.KDF.Extract(nil, encoding.Concat(output, stretched))
 }

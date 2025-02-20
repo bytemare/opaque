@@ -31,7 +31,7 @@ func isSameConf(a, b *opaque.Configuration) bool {
 		a.KDF != b.KDF ||
 		a.MAC != b.MAC ||
 		a.Hash != b.Hash ||
-		a.KSF != b.KSF ||
+		!reflect.DeepEqual(a.KSF, b.KSF) ||
 		a.AKE != b.AKE {
 		return false
 	}
@@ -48,11 +48,13 @@ func Example_configuration() {
 	defaultConf := opaque.DefaultConfiguration()
 
 	customConf := &opaque.Configuration{
-		OPRF:    opaque.RistrettoSha512,
-		KDF:     crypto.SHA512,
-		MAC:     crypto.SHA512,
-		Hash:    crypto.SHA512,
-		KSF:     ksf.Argon2id,
+		OPRF: opaque.RistrettoSha512,
+		KDF:  crypto.SHA512,
+		MAC:  crypto.SHA512,
+		Hash: crypto.SHA512,
+		KSF: opaque.KSFConfiguration{
+			Identifier: ksf.Argon2id,
+		},
 		AKE:     opaque.RistrettoSha512,
 		Context: nil,
 	}
@@ -79,7 +81,7 @@ func Example_configuration() {
 
 	fmt.Println("OPAQUE configuration is easy!")
 
-	// Output: Encoded Configuration: 0107070701010000
+	// Output: Encoded Configuration: 010707070101000000000000
 	// OPAQUE configuration is easy!
 }
 
