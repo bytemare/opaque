@@ -67,7 +67,7 @@ func (g Group) Group() ecc.Group {
 	return ecc.Group(g)
 }
 
-const confLength = 6
+const confIdsLength = 6
 
 var (
 	errInvalidOPRFid = errors.New("invalid OPRF group id")
@@ -78,26 +78,34 @@ var (
 	errInvalidAKEid  = errors.New("invalid AKE group id")
 )
 
+type KSFConfiguration struct {
+	Identifier ksf.Identifier `json:"identifier"`
+	Parameters []int          `json:"parameters"`
+	Salt       []byte         `json:"salt"`
+}
+
 // Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
 // as well as KDF, MAC, Hash should be the same.
 type Configuration struct {
 	Context []byte
-	KDF     crypto.Hash    `json:"kdf"`
-	MAC     crypto.Hash    `json:"mac"`
-	Hash    crypto.Hash    `json:"hash"`
-	OPRF    Group          `json:"oprf"`
-	KSF     ksf.Identifier `json:"ksf"`
-	AKE     Group          `json:"group"`
+	KDF     crypto.Hash      `json:"kdf"`
+	MAC     crypto.Hash      `json:"mac"`
+	Hash    crypto.Hash      `json:"hash"`
+	OPRF    Group            `json:"oprf"`
+	KSF     KSFConfiguration `json:"ksf"`
+	AKE     Group            `json:"group"`
 }
 
 // DefaultConfiguration returns a default configuration with strong parameters.
 func DefaultConfiguration() *Configuration {
 	return &Configuration{
-		OPRF:    RistrettoSha512,
-		KDF:     crypto.SHA512,
-		MAC:     crypto.SHA512,
-		Hash:    crypto.SHA512,
-		KSF:     ksf.Argon2id,
+		OPRF: RistrettoSha512,
+		KDF:  crypto.SHA512,
+		MAC:  crypto.SHA512,
+		Hash: crypto.SHA512,
+		KSF: KSFConfiguration{
+			Identifier: ksf.Argon2id,
+		},
 		AKE:     RistrettoSha512,
 		Context: nil,
 	}
@@ -145,7 +153,7 @@ func (c *Configuration) verify() error {
 		return errInvalidHASHid
 	}
 
-	if c.KSF != 0 && !c.KSF.Available() {
+	if c.KSF.Identifier != 0 && !c.KSF.Identifier.Available() {
 		return errInvalidKSFid
 	}
 
@@ -166,11 +174,16 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 		KDF:          internal.NewKDF(c.KDF),
 		MAC:          mac,
 		Hash:         internal.NewHash(c.Hash),
-		KSF:          internal.NewKSF(c.KSF),
+		KSF:          internal.NewKSF(c.KSF.Identifier),
+		KSFSalt:      c.KSF.Salt,
 		NonceLen:     internal.NonceLength,
 		EnvelopeSize: internal.NonceLength + mac.Size(),
 		Group:        g,
 		Context:      c.Context,
+	}
+
+	if c.KSF.Parameters != nil {
+		ip.KSF.Parameterize(c.KSF.Parameters...)
 	}
 
 	return ip, nil
@@ -189,16 +202,23 @@ func (c *Configuration) Deserializer() (*Deserializer, error) {
 
 // Serialize returns the byte encoding of the Configuration structure.
 func (c *Configuration) Serialize() []byte {
-	b := []byte{
+	ids := []byte{
 		byte(c.OPRF),
 		byte(c.KDF),
 		byte(c.MAC),
 		byte(c.Hash),
-		byte(c.KSF),
+		byte(c.KSF.Identifier),
 		byte(c.AKE),
 	}
 
-	return encoding.Concat(b, encoding.EncodeVector(c.Context))
+	var ksfEncodedParams []byte
+	for _, param := range c.KSF.Parameters {
+		ksfEncodedParams = append(ksfEncodedParams, encoding.I2OSP(param, 4)...)
+	}
+	ksfEncodedParams = encoding.EncodeVector(ksfEncodedParams)
+	ksfEncodedSalt := encoding.EncodeVector(c.KSF.Salt)
+
+	return encoding.Concatenate(ids, encoding.EncodeVector(c.Context), ksfEncodedParams, ksfEncodedSalt)
 }
 
 // GetFakeRecord creates a fake Client record to be used when no existing client record exists,
@@ -228,21 +248,50 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 
 // DeserializeConfiguration decodes the input and returns a Parameter structure.
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
-	if len(encoded) < confLength+2 { // corresponds to the configuration length + 2-byte encoding of empty context
+	if len(encoded) < confIdsLength+2 { // corresponds to the configuration length + 2-byte encoding of empty context
 		return nil, internal.ErrConfigurationInvalidLength
 	}
 
-	ctx, _, err := encoding.DecodeVector(encoded[confLength:])
+	ctx, _, err := encoding.DecodeVector(encoded[confIdsLength:])
 	if err != nil {
 		return nil, fmt.Errorf("decoding the configuration context: %w", err)
 	}
 
+	var ksfParams []int
+	ksfParamOffset := confIdsLength + 2 + len(ctx)
+
+	if len(encoded) >= ksfParamOffset+2 {
+		ksfEncodedParams, _, err := encoding.DecodeVector(encoded[ksfParamOffset:])
+		if err != nil {
+			return nil, fmt.Errorf("decoding the ksf configuration parameters: %w", err)
+		}
+		for i := 0; i < len(ksfEncodedParams); i += 4 {
+			ksfParams = append(ksfParams, encoding.OS2IP(ksfEncodedParams[i:i+4]))
+		}
+	}
+
+	var ksfSalt []byte
+	ksfSaltOffset := ksfParamOffset + 2 + (len(ksfParams) * 4)
+	if len(encoded) >= ksfSaltOffset+2 {
+		ksfSalt, _, err = encoding.DecodeVector(encoded[ksfSaltOffset:])
+		if err != nil {
+			return nil, fmt.Errorf("decoding the ksf salt: %w", err)
+		}
+		if len(ksfSalt) == 0 {
+			ksfSalt = nil
+		}
+	}
+
 	c := &Configuration{
-		OPRF:    Group(encoded[0]),
-		KDF:     crypto.Hash(encoded[1]),
-		MAC:     crypto.Hash(encoded[2]),
-		Hash:    crypto.Hash(encoded[3]),
-		KSF:     ksf.Identifier(encoded[4]),
+		OPRF: Group(encoded[0]),
+		KDF:  crypto.Hash(encoded[1]),
+		MAC:  crypto.Hash(encoded[2]),
+		Hash: crypto.Hash(encoded[3]),
+		KSF: KSFConfiguration{
+			Identifier: ksf.Identifier(encoded[4]),
+			Parameters: ksfParams,
+			Salt:       ksfSalt,
+		},
 		AKE:     Group(encoded[5]),
 		Context: ctx,
 	}
