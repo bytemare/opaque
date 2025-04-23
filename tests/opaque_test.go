@@ -275,6 +275,20 @@ func TestConfiguration_KSFConfigDeserialization(t *testing.T) {
 	}
 }
 
+func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
+	d := opaque.DefaultConfiguration().Serialize()
+	d[7] = 3
+
+	expected := "decoding the configuration context: "
+	if _, err := opaque.DeserializeConfiguration(d); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		t.Errorf(
+			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
+			expected,
+			err,
+		)
+	}
+}
+
 func TestFlush(t *testing.T) {
 	ids := []byte("server")
 	username := []byte("client")

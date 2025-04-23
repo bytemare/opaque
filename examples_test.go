@@ -53,7 +53,7 @@ func Example_configuration() {
 		MAC:  crypto.SHA512,
 		Hash: crypto.SHA512,
 		KSF: opaque.KSFConfiguration{
-			Identifier: ksf.Argon2id,
+			Identifier: []int{int(ksf.Argon2id)},
 		},
 		AKE:     opaque.RistrettoSha512,
 		Context: nil,
