@@ -79,9 +79,9 @@ var (
 )
 
 type KSFConfiguration struct {
-	Identifier []int  `json:"identifier"`
-	Parameters []int  `json:"parameters"`
-	Salt       []byte `json:"salt"`
+	Parameters []int          `json:"parameters"`
+	Salt       []byte         `json:"salt"`
+	Identifier ksf.Identifier `json:"identifier"`
 }
 
 // Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
@@ -104,7 +104,7 @@ func DefaultConfiguration() *Configuration {
 		MAC:  crypto.SHA512,
 		Hash: crypto.SHA512,
 		KSF: KSFConfiguration{
-			Identifier: []int{int(ksf.Argon2id)},
+			Identifier: ksf.Argon2id,
 		},
 		AKE:     RistrettoSha512,
 		Context: nil,
@@ -153,7 +153,7 @@ func (c *Configuration) verify() error {
 		return errInvalidHASHid
 	}
 
-	if c.KSF.Identifier[0] != 0 && !(ksf.Identifier(c.KSF.Identifier[0])).Available() {
+	if c.KSF.Identifier != 0 && !c.KSF.Identifier.Available() {
 		return errInvalidKSFid
 	}
 
@@ -174,7 +174,7 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 		KDF:          internal.NewKDF(c.KDF),
 		MAC:          mac,
 		Hash:         internal.NewHash(c.Hash),
-		KSF:          internal.NewKSF(ksf.Identifier(c.KSF.Identifier[0])),
+		KSF:          internal.NewKSF(c.KSF.Identifier),
 		KSFSalt:      c.KSF.Salt,
 		NonceLen:     internal.NonceLength,
 		EnvelopeSize: internal.NonceLength + mac.Size(),
@@ -207,7 +207,7 @@ func (c *Configuration) Serialize() []byte {
 		byte(c.KDF),
 		byte(c.MAC),
 		byte(c.Hash),
-		byte(c.KSF.Identifier[0]),
+		byte(c.KSF.Identifier),
 		byte(c.AKE),
 	}
 
@@ -285,7 +285,7 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		MAC:  crypto.Hash(encoded[2]),
 		Hash: crypto.Hash(encoded[3]),
 		KSF: KSFConfiguration{
-			Identifier: []int{int(encoded[4])},
+			Identifier: ksf.Identifier(encoded[4]),
 			Parameters: ksfParams,
 			Salt:       ksfSalt,
 		},
