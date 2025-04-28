@@ -277,7 +277,7 @@ func TestConfiguration_KSFConfigDeserialization(t *testing.T) {
 
 func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
 	d := opaque.DefaultConfiguration().Serialize()
-	d[7] = 3
+	d[7] = 20
 
 	expected := "decoding the configuration context: "
 	if _, err := opaque.DeserializeConfiguration(d); err == nil || !strings.HasPrefix(err.Error(), expected) {
