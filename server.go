@@ -211,16 +211,16 @@ func (s *Server) GenerateKE2(
 
 	op := getGenerateKE2Options(options)
 
-	response := s.credentialResponse(ke1.CredentialRequest, s.keyMaterial.serverPublicKey,
-		record.RegistrationRecord, record.CredentialIdentifier, s.keyMaterial.oprfSeed, record.TestMaskNonce)
+	response := s.credentialResponse(ke1.CredentialRequest, s.serverPublicKey,
+		record.RegistrationRecord, record.CredentialIdentifier, s.oprfSeed, record.TestMaskNonce)
 
 	identities := ake.Identities{
 		ClientIdentity: record.ClientIdentity,
-		ServerIdentity: s.keyMaterial.serverIdentity,
+		ServerIdentity: s.serverIdentity,
 	}
-	identities.SetIdentities(record.PublicKey, s.keyMaterial.serverPublicKey)
+	identities.SetIdentities(record.PublicKey, s.serverPublicKey)
 
-	ke2 := s.Ake.Response(s.conf, &identities, s.keyMaterial.serverSecretKey, record.PublicKey, ke1, response, *op)
+	ke2 := s.Ake.Response(s.conf, &identities, s.serverSecretKey, record.PublicKey, ke1, response, *op)
 
 	return ke2, nil
 }

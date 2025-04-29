@@ -48,7 +48,7 @@ func (s *Server) Response(
 	response *message.CredentialResponse,
 	options Options,
 ) *message.KE2 {
-	epks := s.values.setOptions(conf.Group, options)
+	epks := s.setOptions(conf.Group, options)
 
 	ke2 := &message.KE2{
 		CredentialResponse:   response,
@@ -112,7 +112,7 @@ func (s *Server) SetState(clientMac, sessionSecret []byte) error {
 
 // Flush sets all the server's session related internal AKE values to nil.
 func (s *Server) Flush() {
-	s.values.flush()
+	s.flush()
 	s.clientMac = nil
 	s.sessionSecret = nil
 }

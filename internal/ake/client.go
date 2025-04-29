@@ -40,7 +40,7 @@ func NewClient() *Client {
 
 // Start initiates the 3DH protocol, and returns a KE1 message with clientInfo.
 func (c *Client) Start(cs ecc.Group, options Options) *message.KE1 {
-	epk := c.values.setOptions(cs, options)
+	epk := c.setOptions(cs, options)
 
 	return &message.KE1{
 		CredentialRequest:    nil,
@@ -84,6 +84,6 @@ func (c *Client) SessionKey() []byte {
 
 // Flush sets all the client's session related internal AKE values to nil.
 func (c *Client) Flush() {
-	c.values.flush()
+	c.flush()
 	c.sessionSecret = nil
 }

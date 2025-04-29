@@ -10,7 +10,7 @@
 package message
 
 import (
-	group "github.com/bytemare/ecc"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/encoding"
 )
@@ -18,8 +18,8 @@ import (
 // KE1 is the first message of the login flow, created by the client and sent to the server.
 type KE1 struct {
 	*CredentialRequest
-	ClientPublicKeyshare *group.Element `json:"clientPublicKeyshare"`
-	ClientNonce          []byte         `json:"clientNonce"`
+	ClientPublicKeyshare *ecc.Element `json:"clientPublicKeyshare"`
+	ClientNonce          []byte       `json:"clientNonce"`
 }
 
 // Serialize returns the byte encoding of KE1.
@@ -30,9 +30,9 @@ func (m *KE1) Serialize() []byte {
 // KE2 is the second message of the login flow, created by the server and sent to the client.
 type KE2 struct {
 	*CredentialResponse
-	ServerPublicKeyshare *group.Element `json:"serverPublicKeyshare"`
-	ServerNonce          []byte         `json:"serverNonce"`
-	ServerMac            []byte         `json:"serverMac"`
+	ServerPublicKeyshare *ecc.Element `json:"serverPublicKeyshare"`
+	ServerNonce          []byte       `json:"serverNonce"`
+	ServerMac            []byte       `json:"serverMac"`
 }
 
 // Serialize returns the byte encoding of KE2.
