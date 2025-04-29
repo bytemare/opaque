@@ -25,7 +25,7 @@ func TestEncodeVectorLenPanic(t *testing.T) {
 		recover()
 	}()
 
-	encoding.EncodeVectorLen(nil, 3)
+	encoding.EncodeVectorLen(nil, 5)
 	t.Fatal("no panic with exceeding encoding length")
 }
 
@@ -99,7 +99,7 @@ func TestI2OSP(t *testing.T) {
 		t.Fatalf("expected panic with with 0 length: %v", err)
 	}
 
-	length = 3
+	length = 5
 	if hasPanic, err := expectPanic(nil, func() {
 		_ = encoding.I2OSP(1, length)
 	}); !hasPanic {
