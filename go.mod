@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/bytemare/ecc v0.8.3
 	github.com/bytemare/hash v0.5.0
-	github.com/bytemare/ksf v0.2.0
+	github.com/bytemare/ksf v0.3.0
 )
 
 require (
