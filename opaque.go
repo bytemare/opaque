@@ -79,9 +79,9 @@ var (
 )
 
 type KSFConfiguration struct {
-	Identifier ksf.Identifier `json:"identifier"`
 	Parameters []int          `json:"parameters"`
 	Salt       []byte         `json:"salt"`
+	Identifier ksf.Identifier `json:"identifier"`
 }
 
 // Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
@@ -248,38 +248,35 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 
 // DeserializeConfiguration decodes the input and returns a Parameter structure.
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
-	if len(encoded) < confIdsLength+2 { // corresponds to the configuration length + 2-byte encoding of empty context
+	if len(encoded) < confIdsLength+6 { // corresponds to the configuration length + 3*2-byte encoding of empty context and KSF parameters
 		return nil, internal.ErrConfigurationInvalidLength
 	}
 
-	ctx, _, err := encoding.DecodeVector(encoded[confIdsLength:])
+	ctx, offset, err := encoding.DecodeVector(encoded[confIdsLength:])
 	if err != nil {
 		return nil, fmt.Errorf("decoding the configuration context: %w", err)
 	}
 
-	var ksfParams []int
-	ksfParamOffset := confIdsLength + 2 + len(ctx)
+	offset += confIdsLength
 
-	if len(encoded) >= ksfParamOffset+2 {
-		ksfEncodedParams, _, err := encoding.DecodeVector(encoded[ksfParamOffset:])
-		if err != nil {
-			return nil, fmt.Errorf("decoding the ksf configuration parameters: %w", err)
-		}
-		for i := 0; i < len(ksfEncodedParams); i += 4 {
-			ksfParams = append(ksfParams, encoding.OS2IP(ksfEncodedParams[i:i+4]))
-		}
+	ksfEncodedParams, offsetKSF, err := encoding.DecodeVector(encoded[offset:])
+	if err != nil {
+		return nil, fmt.Errorf("decoding the ksf configuration parameters: %w", err)
+	}
+	offset += offsetKSF
+
+	var ksfParams []int
+	for i := 0; i < len(ksfEncodedParams); i += 4 {
+		ksfParams = append(ksfParams, encoding.OS2IP(ksfEncodedParams[i:i+4]))
 	}
 
-	var ksfSalt []byte
-	ksfSaltOffset := ksfParamOffset + 2 + (len(ksfParams) * 4)
-	if len(encoded) >= ksfSaltOffset+2 {
-		ksfSalt, _, err = encoding.DecodeVector(encoded[ksfSaltOffset:])
-		if err != nil {
-			return nil, fmt.Errorf("decoding the ksf salt: %w", err)
-		}
-		if len(ksfSalt) == 0 {
-			ksfSalt = nil
-		}
+	ksfSalt, _, err := encoding.DecodeVector(encoded[offset:])
+	if err != nil {
+		return nil, fmt.Errorf("decoding the ksf salt: %w", err)
+	}
+
+	if len(ksfSalt) == 0 {
+		ksfSalt = nil
 	}
 
 	c := &Configuration{
