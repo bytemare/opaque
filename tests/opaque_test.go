@@ -275,20 +275,6 @@ func TestConfiguration_KSFConfigDeserialization(t *testing.T) {
 	}
 }
 
-func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
-	d := opaque.DefaultConfiguration().Serialize()
-	d[7] = 20
-
-	expected := "decoding the configuration context: "
-	if _, err := opaque.DeserializeConfiguration(d); err == nil || !strings.HasPrefix(err.Error(), expected) {
-		t.Errorf(
-			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
-			expected,
-			err,
-		)
-	}
-}
-
 func TestFlush(t *testing.T) {
 	ids := []byte("server")
 	username := []byte("client")
@@ -355,6 +341,20 @@ func TestFlush(t *testing.T) {
 	The following tests look for failing conditions.
 */
 
+func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
+	d := opaque.DefaultConfiguration().Serialize()
+	d[7] = 20
+
+	expected := "decoding the configuration context: "
+	if _, err := opaque.DeserializeConfiguration(d); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		t.Errorf(
+			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
+			expected,
+			err,
+		)
+	}
+}
+
 func TestNilConfiguration(t *testing.T) {
 	def := opaque.DefaultConfiguration()
 	g := group.Group(def.AKE)
@@ -402,11 +402,11 @@ func TestBadConfiguration(t *testing.T) {
 		error   string
 	}{
 		{
-			name: "Bad OPRF",
+			name: "Bad KSF",
 			makeBad: func() []byte {
-				return setBadValue(0, 0)
+				return setBadValue(0, 10)
 			},
-			error: "invalid OPRF group id",
+			error: "invalid KSF id",
 		},
 		{
 			name: "Bad KDF",
@@ -430,11 +430,11 @@ func TestBadConfiguration(t *testing.T) {
 			error: "invalid Hash id",
 		},
 		{
-			name: "Bad KSF",
+			name: "Bad OPRF",
 			makeBad: func() []byte {
-				return setBadValue(4, 10)
+				return setBadValue(4, 0)
 			},
-			error: "invalid KSF id",
+			error: "invalid OPRF group id",
 		},
 		{
 			name: "Bad AKE",
@@ -447,13 +447,13 @@ func TestBadConfiguration(t *testing.T) {
 
 	convertToBadConf := func(encoded []byte) *opaque.Configuration {
 		return &opaque.Configuration{
-			OPRF: opaque.Group(encoded[0]),
-			KDF:  crypto.Hash(encoded[1]),
-			MAC:  crypto.Hash(encoded[2]),
-			Hash: crypto.Hash(encoded[3]),
 			KSF: opaque.KSFConfiguration{
-				Identifier: ksf.Identifier(encoded[4]),
+				Identifier: ksf.Identifier(encoded[0]),
 			},
+			KDF:     crypto.Hash(encoded[1]),
+			MAC:     crypto.Hash(encoded[2]),
+			Hash:    crypto.Hash(encoded[3]),
+			OPRF:    opaque.Group(encoded[4]),
 			AKE:     opaque.Group(encoded[5]),
 			Context: encoded[5:],
 		}
