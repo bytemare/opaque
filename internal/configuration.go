@@ -10,7 +10,7 @@
 package internal
 
 import (
-	cryptorand "crypto/rand"
+	"crypto/rand"
 	"errors"
 	"fmt"
 
@@ -46,7 +46,7 @@ type Configuration struct {
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
 func RandomBytes(length int) []byte {
 	r := make([]byte, length)
-	if _, err := cryptorand.Read(r); err != nil {
+	if _, err := rand.Read(r); err != nil {
 		// We can as well not panic and try again in a loop and a counter to stop.
 		panic(fmt.Errorf("unexpected error in generating random bytes : %w", err))
 	}

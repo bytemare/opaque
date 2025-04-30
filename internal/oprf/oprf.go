@@ -45,25 +45,6 @@ const (
 	maxDeriveKeyPairTries = 255
 )
 
-var (
-	suites = make(map[ecc.Group]Identifier, nbIDs)
-	groups = make(map[Identifier]ecc.Group, nbIDs)
-	hashes = make(map[Identifier]crypto.Hash, nbIDs)
-)
-
-func init() {
-	Ristretto255Sha512.register(ecc.Ristretto255Sha512, crypto.SHA512)
-	P256Sha256.register(ecc.P256Sha256, crypto.SHA256)
-	P384Sha384.register(ecc.P384Sha384, crypto.SHA384)
-	P521Sha512.register(ecc.P521Sha512, crypto.SHA512)
-}
-
-func (i Identifier) register(g ecc.Group, h crypto.Hash) {
-	suites[g] = i
-	groups[i] = g
-	hashes[i] = h
-}
-
 func (i Identifier) dst(prefix string) []byte {
 	return encoding.Concat([]byte(prefix), i.contextString())
 }
@@ -73,7 +54,12 @@ func (i Identifier) contextString() []byte {
 }
 
 func (i Identifier) hash(input ...[]byte) []byte {
-	h := hashes[i].New()
+	h := map[Identifier]crypto.Hash{
+		Ristretto255Sha512: crypto.SHA512,
+		P256Sha256:         crypto.SHA256,
+		P384Sha384:         crypto.SHA384,
+		P521Sha512:         crypto.SHA512,
+	}[i].New()
 	h.Reset()
 
 	for _, i := range input {
@@ -98,12 +84,22 @@ func (i Identifier) Available() bool {
 
 // IDFromGroup returns the OPRF identifier corresponding to the input ecc.
 func IDFromGroup(g ecc.Group) Identifier {
-	return suites[g]
+	return map[ecc.Group]Identifier{
+		ecc.Ristretto255Sha512: Ristretto255Sha512,
+		ecc.P256Sha256:         P256Sha256,
+		ecc.P384Sha384:         P384Sha384,
+		ecc.P521Sha512:         P521Sha512,
+	}[g]
 }
 
 // Group returns the Group identifier for the cipher suite.
 func (i Identifier) Group() ecc.Group {
-	return groups[i]
+	return map[Identifier]ecc.Group{
+		Ristretto255Sha512: ecc.Ristretto255Sha512,
+		P256Sha256:         ecc.P256Sha256,
+		P384Sha384:         ecc.P384Sha384,
+		P521Sha512:         ecc.P521Sha512,
+	}[i]
 }
 
 // DeriveKey returns a scalar deterministically generated from the input.
@@ -111,8 +107,10 @@ func (i Identifier) DeriveKey(seed, info []byte) *ecc.Scalar {
 	dst := encoding.Concat([]byte(tag.DeriveKeyPairInternal), i.contextString())
 	deriveInput := encoding.Concat(seed, encoding.EncodeVector(info))
 
-	var counter uint8
-	var s *ecc.Scalar
+	var (
+		counter uint8
+		s       *ecc.Scalar
+	)
 
 	for s == nil || s.IsZero() {
 		if counter > maxDeriveKeyPairTries {

@@ -9,18 +9,18 @@
 package message
 
 import (
-	group "github.com/bytemare/ecc"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/encoding"
 )
 
 // CredentialRequest represents a credential request message.
 type CredentialRequest struct {
-	BlindedMessage *group.Element `json:"blindedMessage"`
+	BlindedMessage *ecc.Element `json:"blindedMessage"`
 }
 
 // NewCredentialRequest returns a populated CredentialRequest.
-func NewCredentialRequest(blindedMessage *group.Element) *CredentialRequest {
+func NewCredentialRequest(blindedMessage *ecc.Element) *CredentialRequest {
 	return &CredentialRequest{
 		BlindedMessage: blindedMessage,
 	}
@@ -33,13 +33,13 @@ func (c *CredentialRequest) Serialize() []byte {
 
 // CredentialResponse represents a credential response message.
 type CredentialResponse struct {
-	EvaluatedMessage *group.Element `json:"evaluatedMessage"`
-	MaskingNonce     []byte         `json:"maskingNonce"`
-	MaskedResponse   []byte         `json:"maskedResponse"`
+	EvaluatedMessage *ecc.Element `json:"evaluatedMessage"`
+	MaskingNonce     []byte       `json:"maskingNonce"`
+	MaskedResponse   []byte       `json:"maskedResponse"`
 }
 
 // NewCredentialResponse returns a populated CredentialResponse.
-func NewCredentialResponse(message *group.Element, nonce, response []byte) *CredentialResponse {
+func NewCredentialResponse(message *ecc.Element, nonce, response []byte) *CredentialResponse {
 	return &CredentialResponse{
 		EvaluatedMessage: message,
 		MaskingNonce:     nonce,
