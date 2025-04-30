@@ -88,11 +88,11 @@ type KSFConfiguration struct {
 // as well as KDF, MAC, Hash should be the same.
 type Configuration struct {
 	Context []byte
+	KSF     KSFConfiguration `json:"ksf"`
 	KDF     crypto.Hash      `json:"kdf"`
 	MAC     crypto.Hash      `json:"mac"`
 	Hash    crypto.Hash      `json:"hash"`
 	OPRF    Group            `json:"oprf"`
-	KSF     KSFConfiguration `json:"ksf"`
 	AKE     Group            `json:"group"`
 }
 
@@ -203,11 +203,11 @@ func (c *Configuration) Deserializer() (*Deserializer, error) {
 // Serialize returns the byte encoding of the Configuration structure.
 func (c *Configuration) Serialize() []byte {
 	ids := []byte{
-		byte(c.OPRF),
+		byte(c.KSF.Identifier),
 		byte(c.KDF),
 		byte(c.MAC),
 		byte(c.Hash),
-		byte(c.KSF.Identifier),
+		byte(c.OPRF),
 		byte(c.AKE),
 	}
 
@@ -215,10 +215,68 @@ func (c *Configuration) Serialize() []byte {
 	for _, param := range c.KSF.Parameters {
 		ksfEncodedParams = append(ksfEncodedParams, encoding.I2OSP(param, 4)...)
 	}
-	ksfEncodedParams = encoding.EncodeVector(ksfEncodedParams)
-	ksfEncodedSalt := encoding.EncodeVector(c.KSF.Salt)
 
-	return encoding.Concatenate(ids, encoding.EncodeVector(c.Context), ksfEncodedParams, ksfEncodedSalt)
+	return encoding.Concatenate(ids,
+		encoding.EncodeVector(c.Context),
+		encoding.EncodeVector(ksfEncodedParams),
+		encoding.EncodeVector(c.KSF.Salt),
+	)
+}
+
+// DeserializeConfiguration decodes the input and returns a Parameter structure.
+func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
+	// corresponds to the configuration length + 3*2-byte encoding of empty context and KSF parameters
+	if len(encoded) < confIdsLength+6 {
+		return nil, internal.ErrConfigurationInvalidLength
+	}
+
+	ctx, offset, err := encoding.DecodeVector(encoded[confIdsLength:])
+	if err != nil {
+		return nil, fmt.Errorf("decoding the configuration context: %w", err)
+	}
+
+	offset += confIdsLength
+
+	ksfEncodedParams, offsetKSF, err := encoding.DecodeVector(encoded[offset:])
+	if err != nil {
+		return nil, fmt.Errorf("decoding the ksf configuration parameters: %w", err)
+	}
+
+	offset += offsetKSF
+
+	var ksfParams []int
+	for i := 0; i < len(ksfEncodedParams); i += 4 {
+		ksfParams = append(ksfParams, encoding.OS2IP(ksfEncodedParams[i:i+4]))
+	}
+
+	ksfSalt, _, err := encoding.DecodeVector(encoded[offset:])
+	if err != nil {
+		return nil, fmt.Errorf("decoding the ksf salt: %w", err)
+	}
+
+	if len(ksfSalt) == 0 {
+		ksfSalt = nil
+	}
+
+	c := &Configuration{
+		Context: ctx,
+		KSF: KSFConfiguration{
+			Identifier: ksf.Identifier(encoded[0]),
+			Parameters: ksfParams,
+			Salt:       ksfSalt,
+		},
+		KDF:  crypto.Hash(encoded[1]),
+		MAC:  crypto.Hash(encoded[2]),
+		Hash: crypto.Hash(encoded[3]),
+		OPRF: Group(encoded[4]),
+		AKE:  Group(encoded[5]),
+	}
+
+	if err = c.verify(); err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
 // GetFakeRecord creates a fake Client record to be used when no existing client record exists,
@@ -244,60 +302,6 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 		RegistrationRecord:   regRecord,
 		TestMaskNonce:        nil,
 	}, nil
-}
-
-// DeserializeConfiguration decodes the input and returns a Parameter structure.
-func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
-	if len(encoded) < confIdsLength+6 { // corresponds to the configuration length + 3*2-byte encoding of empty context and KSF parameters
-		return nil, internal.ErrConfigurationInvalidLength
-	}
-
-	ctx, offset, err := encoding.DecodeVector(encoded[confIdsLength:])
-	if err != nil {
-		return nil, fmt.Errorf("decoding the configuration context: %w", err)
-	}
-
-	offset += confIdsLength
-
-	ksfEncodedParams, offsetKSF, err := encoding.DecodeVector(encoded[offset:])
-	if err != nil {
-		return nil, fmt.Errorf("decoding the ksf configuration parameters: %w", err)
-	}
-	offset += offsetKSF
-
-	var ksfParams []int
-	for i := 0; i < len(ksfEncodedParams); i += 4 {
-		ksfParams = append(ksfParams, encoding.OS2IP(ksfEncodedParams[i:i+4]))
-	}
-
-	ksfSalt, _, err := encoding.DecodeVector(encoded[offset:])
-	if err != nil {
-		return nil, fmt.Errorf("decoding the ksf salt: %w", err)
-	}
-
-	if len(ksfSalt) == 0 {
-		ksfSalt = nil
-	}
-
-	c := &Configuration{
-		OPRF: Group(encoded[0]),
-		KDF:  crypto.Hash(encoded[1]),
-		MAC:  crypto.Hash(encoded[2]),
-		Hash: crypto.Hash(encoded[3]),
-		KSF: KSFConfiguration{
-			Identifier: ksf.Identifier(encoded[4]),
-			Parameters: ksfParams,
-			Salt:       ksfSalt,
-		},
-		AKE:     Group(encoded[5]),
-		Context: ctx,
-	}
-
-	if err = c.verify(); err != nil {
-		return nil, err
-	}
-
-	return c, nil
 }
 
 // ClientRecord is a server-side structure enabling the storage of user relevant information.
