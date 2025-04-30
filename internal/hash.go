@@ -119,4 +119,4 @@ func (i IdentityKSF) Harden(password, _ []byte, _ int) []byte {
 	return password
 }
 
-func (i IdentityKSF) Parameterize(parameters ...int) {}
+func (i IdentityKSF) Parameterize(_ ...int) {}

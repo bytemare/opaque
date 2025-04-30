@@ -69,6 +69,18 @@ var I2OSPVectors = []i2ospTest{
 	{
 		[]byte{0xff, 0xff}, 65535, 2,
 	},
+	{
+		[]byte{0x01, 0x00, 0x00}, 65536, 3,
+	},
+	{
+		[]byte{0xff, 0xff, 0xff}, 16777215, 3,
+	},
+	{
+		[]byte{0x01, 0x00, 0x00, 0x00}, 16777216, 4,
+	},
+	{
+		[]byte{0xff, 0xff, 0xff, 0xff}, 4294967295, 4,
+	},
 }
 
 func TestI2OSP(t *testing.T) {
@@ -122,8 +134,10 @@ func TestI2OSP(t *testing.T) {
 	}
 
 	lengths := map[int]uint16{
-		100:    1,
-		1 << 8: 2,
+		100:           1,
+		1 << 8:        2,
+		1 << 16:       3,
+		(1 << 32) - 1: 4,
 	}
 
 	for k, v := range lengths {
