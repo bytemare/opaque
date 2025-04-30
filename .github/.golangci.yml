@@ -1,295 +1,85 @@
+version: "2"
 linters:
-  disable-all: true
-  enable:
-    - asasalint
-    - asciicheck
-    - bidichk
-    - bodyclose
-    - canonicalheader
-    - containedctx
-    - contextcheck
-    - copyloopvar
-    - cyclop
-    - decorder
-    #- depguard
-    - dogsled
-    - dupl
-    - dupword
-    - durationcheck
-    - err113
-    - errcheck
-    - errchkjson
-    - errname
-    - errorlint
-    - exhaustive
-    - exhaustruct
-    - fatcontext
-    - forbidigo
-    - forcetypeassert
-    - funlen
-    - gci
-    - ginkgolinter
-    - gocheckcompilerdirectives
-    #- gochecknoglobals
-    #- gochecknoinits
-    - gochecksumtype
-    - gocognit
-    - goconst
-    - gocritic
-    - gocyclo
-    - godot
-    - godox
-    - gofmt
-    - gofumpt
-    - goheader
-    - goimports
-    - gomoddirectives
-    - gomodguard
-    - goprintffuncname
-    - gosec
-    - gosimple
-    - gosmopolitan
-    - govet
-    - grouper
-    - importas
-    - inamedparam
-    - ineffassign
-    - interfacebloat
-    - intrange
-    - ireturn
-    - lll
-    - loggercheck
-    - maintidx
-    - makezero
-    - mirror
-    - misspell
-    #- mnd
-    - musttag
-    - nakedret
-    - nestif
-    - nilerr
-    - nilnil
-    - nlreturn
-    - noctx
-    - nolintlint
-    #- nonamedreturns
-    - nosprintfhostport
-    - paralleltest
-    - perfsprint
-    - prealloc
-    - predeclared
-    - promlinter
-    - protogetter
-    - reassign
-    - revive
-    - rowserrcheck
-    - sloglint
-    - spancheck
-    - sqlclosecheck
-    - staticcheck
-    - stylecheck
-    - tagalign
-    - tagliatelle
-    - testableexamples
-    - testifylint
-    - testpackage
-    - thelper
-    - tparallel
-    - typecheck
-    - unconvert
-    - unparam
-    - unused
-    - usestdlibvars
-    - usetesting
-    #- varnamelen
-    - wastedassign
-    - whitespace
-    - wrapcheck
-    - wsl
-    - zerologlint
+  default: all
+  disable:
+    - funcorder
+    - nonamedreturns
+    - varnamelen
+  settings:
+    cyclop:
+      max-complexity: 13
+    depguard:
+      rules:
+        main:
+          list-mode: lax
+          allow:
+            - golang.org/x/crypto/*
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    gocritic:
+      enable-all: true
+    govet:
+      enable-all: true
+      settings:
+        shadow:
+          strict: true
+    interfacebloat:
+      max: 11
+    mnd:
+      checks:
+        - argument
+        - case
+        - condition
+        - operation
+        - return
+        - assign
+      ignored-numbers:
+        - '2'
+        - '3'
+        - '4'
+        - '8'
+    nlreturn:
+      block-size: 2
+    prealloc:
+      simple: false
+      for-loops: true
 
-linters-settings:
-  cyclop:
-    max-complexity: 15
-    skip-tests: true
-  dupl:
-    threshold: 100
-  errcheck:
-    check-type-assertions: true
-    check-blank: false
-    #exclude-functions:
-    #  - io/ioutil.ReadFile
-    #  - io.Copy(*bytes.Buffer)
-    #  - io.Copy(os.Stdout)
-  funlen:
-    lines: 100
-    statements: 50
-  gci:
-    sections:
-      - standard # Standard section: captures all standard packages.
-      - default # Default section: contains all imports that could not be matched to another section type.
-      - prefix(github.com/bytemare/opaque) # Custom section: groups all imports with the specified Prefix.
-    skip-generated: true
-    # Enable custom order of sections.
-    # If `true`, make the section order the same as the order of `sections`.
-    # Default: false
-    custom-order: true
-  gocognit:
-    min-complexity: 15
-  goconst:
-    min-len: 2
-    min-occurrences: 2
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - sloppyReassign
-  gocyclo:
-    min-complexity: 15
-  godox:
-    keywords:
-      - NOTE
-      - OPTIMIZE
-      - HACK
-      - TODO
-      - todo
-  gofmt:
-    simplify: true
-  goimports:
-    local-prefixes: github.com/bytemare/opaque
-  gomnd:
-    checks:
-      - argument
-      - case
-      - condition
-      - operation
-      - return
-      - assign
-  gosec:
-    excludes:
-      - G101
-      - G115
-  gosimple:
-    checks: [ "all" ]
-  govet:
-    shadow: true
-    disable-all: true
-    enable:
-      - asmdecl
-      - assign
-      - atomic
-      - atomicalign
-      - bools
-      - buildtag
-      - cgocall
-      - composites
-      - copylocks
-      - deepequalerrors
-      - errorsas
-      - fieldalignment
-      - findcall
-      - framepointer
-      - httpresponse
-      - ifaceassert
-      - loopclosure
-      - lostcancel
-      - nilfunc
-      - nilness
-      - printf
-      - reflectvaluecompare
-      - shadow
-      - shift
-      - sigchanyzer
-      - sortslice
-      - stdmethods
-      - stringintconv
-      - structtag
-      - testinggoroutine
-      - tests
-      - unmarshal
-      - unreachable
-      - unsafeptr
-      - unusedresult
-      - unusedwrite
-  lll:
-    line-length: 120
-    # tab width ('\t') in spaces. Default to 1.
-    tab-width: 4
-  misspell:
-    locale: US
-  mnd:
-    checks:
-      - argument
-      - case
-      - condition
-      - operation
-      - return
-      - assign
-    #ignored-functions:
-    #  - 'nist.setMapping'
-    #  - 'big.NewInt'
-    #  - 'hash2curve.HashToFieldXMD'
-  nlreturn:
-    block-size: 2
-  prealloc:
-    simple: false
-    for-loops: true
-  unused:
-    check-exported: false
-  whitespace:
-    multi-if: false
-    multi-func: false
-  wsl:
-    # Allow declarations (var) to be cuddled.
-    allow-cuddle-declarations: true
-    # Allow trailing comments in ending of blocks
-    allow-trailing-comment: false
-    # Force newlines in end of case at this limit (0 = never).
-    force-case-trailing-whitespace: 0
-    # Force cuddling of err checks with err var assignment
-    force-err-cuddling: true
-    # Allow leading comments to be separated with empty liens
-    allow-separated-leading-comment: false
-
+  exclusions:
+    rules:
+      - path: internal/hash.go
+        text: "Error return value of `h.h.Write` is not checked"
+      - path: internal/tag/strings.go
+        text: "G101: Potential hardcoded credentials"
 issues:
-  # List of regexps of issue texts to exclude, empty list by default.
-  # But independently from this option we use default exclude patterns,
-  # it can be disabled by `exclude-use-default: false`. To list all
-  # excluded by default patterns execute `golangci-lint run --help`
-  #exclude:
-  #- "should have a package comment, unless it's in another file for this package"
-  #- "do not define dynamic errors, use wrapped static errors instead"
-  #- "missing cases in switch of type Group: maxID"
-
-  #exclude-rules:
-  #  - path: internal/hash.go
-  #    linters:
-  #      - errcheck
-  #  - path: internal/tag/strings.go
-  #    linters:
-  #      - gosec
-
   max-issues-per-linter: 0
   max-same-issues: 0
-
-  # Independently of option `exclude` we use default exclude patterns,
-  # it can be disabled by this option. To list all
-  # excluded by default patterns execute `golangci-lint run --help`.
-  # Default value for this option is true.
-  exclude-use-default: false
-
-run:
-  tests: false
-
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/bytemare/opaque)
+        - blank
+        - dot
+        - alias
+      no-inline-comments: true
+      no-prefix-comments: true
+      custom-order: true
+    goimports:
+      local-prefixes:
+        - github.com/bytemare/opaque
+    golines:
+      max-len: 200
 output:
-  formats:
-    - format: colored-line-number
-      path: stdout
-  sort-results: true
   sort-order:
     - file
-  show-stats: true
+run:
+  tests: false

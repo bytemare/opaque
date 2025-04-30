@@ -49,7 +49,7 @@ func (c *Client) hashTranscript(input, unblinded []byte) []byte {
 	encElement := encoding.EncodeVector(unblinded)
 	encDST := []byte(tag.OPRFFinalize)
 
-	return c.Identifier.hash(encInput, encElement, encDST)
+	return c.hash(encInput, encElement, encDST)
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.

@@ -10,6 +10,8 @@
 package ake
 
 import (
+	"math"
+
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
@@ -33,7 +35,7 @@ func diffieHellman(s *ecc.Scalar, e *ecc.Element) *ecc.Element {
 			e.Copy().Multiply(s)
 		}
 
-		if id == ecc.Cruve25519 {
+		if id == ecc.Curve25519 {
 			// TODO
 		}
 	*/
@@ -78,8 +80,12 @@ func (o *Options) init() {
 		o.NonceLength = internal.NonceLength
 	}
 
+	if o.NonceLength > math.MaxInt {
+		panic("invalid nonce length")
+	}
+
 	if len(o.Nonce) == 0 {
-		o.Nonce = internal.RandomBytes(int(o.NonceLength))
+		o.Nonce = internal.RandomBytes(int(o.NonceLength)) //nolint:gosec // overflow is checked beforehand.
 	}
 }
 

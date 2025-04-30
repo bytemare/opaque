@@ -141,15 +141,15 @@ func (c *Configuration) verify() error {
 		return errInvalidAKEid
 	}
 
-	if c.KDF >= 25 || !hash.Hash(c.KDF).Available() {
+	if c.KDF >= 25 || !hash.Hash(c.KDF).Available() { //nolint:gosec // overflow is checked beforehand.
 		return errInvalidKDFid
 	}
 
-	if c.MAC >= 25 || !hash.Hash(c.MAC).Available() {
+	if c.MAC >= 25 || !hash.Hash(c.MAC).Available() { //nolint:gosec // overflow is checked beforehand.
 		return errInvalidMACid
 	}
 
-	if c.Hash >= 25 || !hash.Hash(c.Hash).Available() {
+	if c.Hash >= 25 || !hash.Hash(c.Hash).Available() { //nolint:gosec // overflow is checked beforehand.
 		return errInvalidHASHid
 	}
 

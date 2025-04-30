@@ -41,7 +41,7 @@ func I2OSP(value int, length uint16) []byte {
 	case v >= 1<<(8*length):
 		panic(errInputLarge)
 	case length == 1:
-		binary.BigEndian.PutUint16(out, uint16(v))
+		binary.BigEndian.PutUint16(out, uint16(v)) //nolint:gosec // overflow is checked beforehand.
 		return out[1:2]
 	case length == 2:
 		binary.BigEndian.PutUint16(out, uint16(v))
@@ -57,18 +57,18 @@ func I2OSP(value int, length uint16) []byte {
 
 // OS2IP Octet Stream to Integer Primitive on maximum 4 bytes / 32 bits.
 func OS2IP(input []byte) int {
-	switch length := len(input); {
-	case length == 0:
+	switch len(input) {
+	case 0:
 		panic(errInputEmpty)
-	case length == 1:
+	case 1:
 		b := []byte{0, input[0]}
 		return int(binary.BigEndian.Uint16(b))
-	case length == 2:
+	case 2:
 		return int(binary.BigEndian.Uint16(input))
-	case length == 3:
+	case 3:
 		b := append([]byte{0}, input...)
 		return int(binary.BigEndian.Uint32(b))
-	case length == 4:
+	case 4:
 		return int(binary.BigEndian.Uint32(input))
 	default:
 		panic(errInputTooLarge)
