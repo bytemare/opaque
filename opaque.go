@@ -67,7 +67,7 @@ func (g Group) Group() ecc.Group {
 	return ecc.Group(g)
 }
 
-const confIdsLength = 6
+const confIDsLength = 6
 
 var (
 	errInvalidOPRFid = errors.New("invalid OPRF group id")
@@ -78,6 +78,8 @@ var (
 	errInvalidAKEid  = errors.New("invalid AKE group id")
 )
 
+// KSFConfiguration defines the configuration for a Key Stretching Function (KSF),
+// including optional parameters, a salt value, and a unique identifier specifying the KSF type.
 type KSFConfiguration struct {
 	Parameters []int          `json:"parameters"`
 	Salt       []byte         `json:"salt"`
@@ -226,16 +228,16 @@ func (c *Configuration) Serialize() []byte {
 // DeserializeConfiguration decodes the input and returns a Parameter structure.
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	// corresponds to the configuration length + 3*2-byte encoding of empty context and KSF parameters
-	if len(encoded) < confIdsLength+6 {
+	if len(encoded) < confIDsLength+6 {
 		return nil, internal.ErrConfigurationInvalidLength
 	}
 
-	ctx, offset, err := encoding.DecodeVector(encoded[confIdsLength:])
+	ctx, offset, err := encoding.DecodeVector(encoded[confIDsLength:])
 	if err != nil {
 		return nil, fmt.Errorf("decoding the configuration context: %w", err)
 	}
 
-	offset += confIdsLength
+	offset += confIDsLength
 
 	ksfEncodedParams, offsetKSF, err := encoding.DecodeVector(encoded[offset:])
 	if err != nil {
@@ -244,6 +246,7 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 
 	offset += offsetKSF
 
+	//nolint:prealloc // slice size depends on decoded input and kept for clarity
 	var ksfParams []int
 	for i := 0; i < len(ksfEncodedParams); i += 4 {
 		ksfParams = append(ksfParams, encoding.OS2IP(ksfEncodedParams[i:i+4]))
@@ -272,7 +275,7 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		AKE:  Group(encoded[5]),
 	}
 
-	if err = c.verify(); err != nil {
+	if err := c.verify(); err != nil {
 		return nil, err
 	}
 

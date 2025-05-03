@@ -44,13 +44,13 @@ func I2OSP(value int, length uint16) []byte {
 		binary.BigEndian.PutUint16(out, uint16(v)) //nolint:gosec // overflow is checked beforehand.
 		return out[1:2]
 	case length == 2:
-		binary.BigEndian.PutUint16(out, uint16(v))
+		binary.BigEndian.PutUint16(out, uint16(v)) //nolint:gosec // overflow is checked beforehand.
 		return out[:2]
 	case length == 3:
-		binary.BigEndian.PutUint32(out, uint32(v))
+		binary.BigEndian.PutUint32(out, uint32(v)) //nolint:gosec // overflow is checked beforehand.
 		return out[1:]
 	default: // length == 4
-		binary.BigEndian.PutUint32(out, uint32(v))
+		binary.BigEndian.PutUint32(out, uint32(v)) //nolint:gosec // overflow is checked beforehand.
 		return out
 	}
 }

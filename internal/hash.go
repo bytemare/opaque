@@ -119,4 +119,5 @@ func (i IdentityKSF) Harden(password, _ []byte, _ int) []byte {
 	return password
 }
 
+// Parameterize applies KSF parameters if defined.
 func (i IdentityKSF) Parameterize(_ ...int) {}
