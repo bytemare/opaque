@@ -301,11 +301,13 @@ func oprfToGroup(oprf oprf.Identifier) opaque.Group {
 
 func (v *vector) test(t *testing.T) {
 	p := &opaque.Configuration{
-		OPRF:    oprfToGroup(v.Config.OPRF),
-		Hash:    hashToHash(v.Config.Hash),
-		KDF:     kdfToHash(v.Config.KDF),
-		MAC:     macToHash(v.Config.MAC),
-		KSF:     ksfToKSF(v.Config.KSF),
+		OPRF: oprfToGroup(v.Config.OPRF),
+		Hash: hashToHash(v.Config.Hash),
+		KDF:  kdfToHash(v.Config.KDF),
+		MAC:  macToHash(v.Config.MAC),
+		KSF: opaque.KSFConfiguration{
+			Identifier: ksfToKSF(v.Config.KSF),
+		},
 		AKE:     groupToGroup(v.Config.Group),
 		Context: []byte(v.Config.Context),
 	}

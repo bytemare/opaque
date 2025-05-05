@@ -72,14 +72,10 @@ func (i Identifier) hash(input ...[]byte) []byte {
 // Available returns whether the Identifier has been registered of not.
 func (i Identifier) Available() bool {
 	// Check for invalid identifiers
-	switch i {
-	case Ristretto255Sha512, P256Sha256, P384Sha384, P521Sha512:
-		break
-	default:
-		return false
-	}
-
-	return true
+	return i == Ristretto255Sha512 ||
+		i == P256Sha256 ||
+		i == P384Sha384 ||
+		i == P521Sha512
 }
 
 // IDFromGroup returns the OPRF identifier corresponding to the input ecc.

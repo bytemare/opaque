@@ -25,7 +25,7 @@ func TestEncodeVectorLenPanic(t *testing.T) {
 		recover()
 	}()
 
-	encoding.EncodeVectorLen(nil, 3)
+	encoding.EncodeVectorLen(nil, 5)
 	t.Fatal("no panic with exceeding encoding length")
 }
 
@@ -69,6 +69,18 @@ var I2OSPVectors = []i2ospTest{
 	{
 		[]byte{0xff, 0xff}, 65535, 2,
 	},
+	{
+		[]byte{0x01, 0x00, 0x00}, 65536, 3,
+	},
+	{
+		[]byte{0xff, 0xff, 0xff}, 16777215, 3,
+	},
+	{
+		[]byte{0x01, 0x00, 0x00, 0x00}, 16777216, 4,
+	},
+	{
+		[]byte{0xff, 0xff, 0xff, 0xff}, 4294967295, 4,
+	},
 }
 
 func TestI2OSP(t *testing.T) {
@@ -99,7 +111,7 @@ func TestI2OSP(t *testing.T) {
 		t.Fatalf("expected panic with with 0 length: %v", err)
 	}
 
-	length = 3
+	length = 5
 	if hasPanic, err := expectPanic(nil, func() {
 		_ = encoding.I2OSP(1, length)
 	}); !hasPanic {
@@ -122,8 +134,10 @@ func TestI2OSP(t *testing.T) {
 	}
 
 	lengths := map[int]uint16{
-		100:    1,
-		1 << 8: 2,
+		100:           1,
+		1 << 8:        2,
+		1 << 16:       3,
+		(1 << 32) - 1: 4,
 	}
 
 	for k, v := range lengths {

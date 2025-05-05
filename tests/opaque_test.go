@@ -235,7 +235,7 @@ func isSameConf(a, b *opaque.Configuration) bool {
 	if a.Hash != b.Hash {
 		return false
 	}
-	if a.KSF != b.KSF {
+	if !reflect.DeepEqual(a.KSF, b.KSF) {
 		return false
 	}
 	if a.AKE != b.AKE {
@@ -256,6 +256,35 @@ func TestConfiguration_Deserialization(t *testing.T) {
 
 	if !isSameConf(conf, conf2) {
 		t.Fatalf("Unexpected inequality:\n\t%v\n\t%v", conf, conf2)
+	}
+}
+
+func TestConfiguration_KSFConfigDeserialization(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+	conf.KSF.Parameters = []int{2, 19456, 1}
+	conf.KSF.Salt = []byte("salt")
+	ser := conf.Serialize()
+
+	conf2, err := opaque.DeserializeConfiguration(ser)
+	if err != nil {
+		t.Fatalf("unexpected error on valid configuration: %v", err)
+	}
+
+	if !isSameConf(conf, conf2) {
+		t.Fatalf("Unexpected inequality:\n\t%v\n\t%v", conf, conf2)
+	}
+}
+
+func TestConfiguration_ToInternal_KSFParameterization(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+
+	// Set explicit KSF parameters
+	conf.KSF.Parameters = []int{42, 99, 7}
+	conf.KSF.Salt = []byte("salt")
+
+	_, err := conf.Deserializer()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -325,6 +354,20 @@ func TestFlush(t *testing.T) {
 	The following tests look for failing conditions.
 */
 
+func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
+	d := opaque.DefaultConfiguration().Serialize()
+	d[7] = 20
+
+	expected := "decoding the configuration context: "
+	if _, err := opaque.DeserializeConfiguration(d); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		t.Errorf(
+			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
+			expected,
+			err,
+		)
+	}
+}
+
 func TestNilConfiguration(t *testing.T) {
 	def := opaque.DefaultConfiguration()
 	g := group.Group(def.AKE)
@@ -332,7 +375,7 @@ func TestNilConfiguration(t *testing.T) {
 		KDF:      internal.NewKDF(def.KDF),
 		MAC:      internal.NewMac(def.MAC),
 		Hash:     internal.NewHash(def.Hash),
-		KSF:      internal.NewKSF(def.KSF),
+		KSF:      internal.NewKSF(def.KSF.Identifier),
 		NonceLen: internal.NonceLength,
 		Group:    g,
 		OPRF:     oprf.IDFromGroup(g),
@@ -359,17 +402,46 @@ func TestDeserializeConfiguration_Short(t *testing.T) {
 	}
 }
 
-func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
-	d := opaque.DefaultConfiguration().Serialize()
-	d[7] = 3
-
-	expected := "decoding the configuration context: "
-	if _, err := opaque.DeserializeConfiguration(d); err == nil || !strings.HasPrefix(err.Error(), expected) {
-		t.Errorf(
+func TestConfiguration_Bad_KSFConfigDeserialization(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+	conf.KSF.Parameters = []int{2, 19456, 1}
+	conf.KSF.Salt = []byte("salt")
+	ser := conf.Serialize()
+	// Bad header, not multiple of 4
+	ser[9] = 7
+	expected := "decoding the KSF configuration: invalid ksf configuration encoding header"
+	if _, err := opaque.DeserializeConfiguration(ser); err == nil || err.Error() != expected {
+		t.Fatalf(
 			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
 			expected,
 			err,
 		)
+	}
+	// KSF params too short
+	ser[9] = 12
+	expected = "decoding the KSF configuration: decoding the ksf configuration parameters: insufficient total length for decoding"
+	if _, err := opaque.DeserializeConfiguration(ser[:12+(len(conf.KSF.Parameters)-1)*4]); err == nil ||
+		err.Error() != expected {
+		t.Fatalf(
+			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
+			expected,
+			err,
+		)
+	}
+	// Bad Salt header: too short
+	expected = "decoding the KSF configuration: decoding the ksf salt: insufficient header length for decoding"
+	if _, err := opaque.DeserializeConfiguration(ser[:len(ser)-len(conf.KSF.Salt)-1]); err == nil ||
+		err.Error() != expected {
+		t.Fatalf(
+			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
+			expected,
+			err,
+		)
+	}
+	// Bad Salt: too short
+	expected = "decoding the KSF configuration: decoding the ksf salt: insufficient total length for decoding"
+	if _, err := opaque.DeserializeConfiguration(ser[:len(ser)-1]); err == nil || err.Error() != expected {
+		t.Fatalf("expected error on invalid configuration: %v", err)
 	}
 }
 
@@ -386,11 +458,11 @@ func TestBadConfiguration(t *testing.T) {
 		error   string
 	}{
 		{
-			name: "Bad OPRF",
+			name: "Bad KSF",
 			makeBad: func() []byte {
-				return setBadValue(0, 0)
+				return setBadValue(0, 10)
 			},
-			error: "invalid OPRF group id",
+			error: "invalid KSF id",
 		},
 		{
 			name: "Bad KDF",
@@ -414,11 +486,11 @@ func TestBadConfiguration(t *testing.T) {
 			error: "invalid Hash id",
 		},
 		{
-			name: "Bad KSF",
+			name: "Bad OPRF",
 			makeBad: func() []byte {
-				return setBadValue(4, 10)
+				return setBadValue(4, 0)
 			},
-			error: "invalid KSF id",
+			error: "invalid OPRF group id",
 		},
 		{
 			name: "Bad AKE",
@@ -431,11 +503,13 @@ func TestBadConfiguration(t *testing.T) {
 
 	convertToBadConf := func(encoded []byte) *opaque.Configuration {
 		return &opaque.Configuration{
-			OPRF:    opaque.Group(encoded[0]),
+			KSF: opaque.KSFConfiguration{
+				Identifier: ksf.Identifier(encoded[0]),
+			},
 			KDF:     crypto.Hash(encoded[1]),
 			MAC:     crypto.Hash(encoded[2]),
+			OPRF:    opaque.Group(encoded[4]),
 			Hash:    crypto.Hash(encoded[3]),
-			KSF:     ksf.Identifier(encoded[4]),
 			AKE:     opaque.Group(encoded[5]),
 			Context: encoded[5:],
 		}
@@ -491,7 +565,7 @@ func TestFakeRecord(t *testing.T) {
 		KDF:     0,
 		MAC:     0,
 		Hash:    0,
-		KSF:     0,
+		KSF:     opaque.KSFConfiguration{},
 		AKE:     0,
 		Context: nil,
 	}
