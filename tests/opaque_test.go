@@ -262,7 +262,7 @@ func TestConfiguration_Deserialization(t *testing.T) {
 func TestConfiguration_KSFConfigDeserialization(t *testing.T) {
 	conf := opaque.DefaultConfiguration()
 	conf.KSF.Parameters = []int{2, 19456, 1}
-	conf.KSF.Salt = make([]byte, 16)
+	conf.KSF.Salt = []byte("salt")
 	ser := conf.Serialize()
 
 	conf2, err := opaque.DeserializeConfiguration(ser)
@@ -386,6 +386,49 @@ func TestDeserializeConfiguration_Short(t *testing.T) {
 	if _, err := opaque.DeserializeConfiguration(r9); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
 		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r9. want %q, got %q",
 			internal.ErrConfigurationInvalidLength, err)
+	}
+}
+
+func TestConfiguration_Bad_KSFConfigDeserialization(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+	conf.KSF.Parameters = []int{2, 19456, 1}
+	conf.KSF.Salt = []byte("salt")
+	ser := conf.Serialize()
+	// Bad header, not multiple of 4
+	ser[9] = 7
+	expected := "decoding the KSF configuration: invalid ksf configuration encoding header"
+	if _, err := opaque.DeserializeConfiguration(ser); err == nil || err.Error() != expected {
+		t.Fatalf(
+			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
+			expected,
+			err,
+		)
+	}
+	// KSF params too short
+	ser[9] = 12
+	expected = "decoding the KSF configuration: decoding the ksf configuration parameters: insufficient total length for decoding"
+	if _, err := opaque.DeserializeConfiguration(ser[:12+(len(conf.KSF.Parameters)-1)*4]); err == nil ||
+		err.Error() != expected {
+		t.Fatalf(
+			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
+			expected,
+			err,
+		)
+	}
+	// Bad Salt header: too short
+	expected = "decoding the KSF configuration: decoding the ksf salt: insufficient header length for decoding"
+	if _, err := opaque.DeserializeConfiguration(ser[:len(ser)-len(conf.KSF.Salt)-1]); err == nil ||
+		err.Error() != expected {
+		t.Fatalf(
+			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
+			expected,
+			err,
+		)
+	}
+	// Bad Salt: too short
+	expected = "decoding the KSF configuration: decoding the ksf salt: insufficient total length for decoding"
+	if _, err := opaque.DeserializeConfiguration(ser[:len(ser)-1]); err == nil || err.Error() != expected {
+		t.Fatalf("expected error on invalid configuration: %v", err)
 	}
 }
 

@@ -70,12 +70,13 @@ func (g Group) Group() ecc.Group {
 const confIDsLength = 6
 
 var (
-	errInvalidOPRFid = errors.New("invalid OPRF group id")
-	errInvalidKDFid  = errors.New("invalid KDF id")
-	errInvalidMACid  = errors.New("invalid MAC id")
-	errInvalidHASHid = errors.New("invalid Hash id")
-	errInvalidKSFid  = errors.New("invalid KSF id")
-	errInvalidAKEid  = errors.New("invalid AKE group id")
+	errInvalidOPRFid    = errors.New("invalid OPRF group id")
+	errInvalidKDFid     = errors.New("invalid KDF id")
+	errInvalidMACid     = errors.New("invalid MAC id")
+	errInvalidHASHid    = errors.New("invalid Hash id")
+	errInvalidKSFid     = errors.New("invalid KSF id")
+	errInvalidAKEid     = errors.New("invalid AKE group id")
+	errInvalidKSFHeader = errors.New("invalid ksf configuration encoding header")
 )
 
 // KSFConfiguration defines the configuration for a Key Stretching Function (KSF),
@@ -107,6 +108,8 @@ func DefaultConfiguration() *Configuration {
 		Hash: crypto.SHA512,
 		KSF: KSFConfiguration{
 			Identifier: ksf.Argon2id,
+			Salt:       nil,
+			Parameters: nil,
 		},
 		AKE:     RistrettoSha512,
 		Context: nil,
@@ -225,33 +228,33 @@ func (c *Configuration) Serialize() []byte {
 	)
 }
 
-// DeserializeConfiguration decodes the input and returns a Parameter structure.
-func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
-	// corresponds to the configuration length + 3*2-byte encoding of empty context and KSF parameters
-	if len(encoded) < confIDsLength+6 {
-		return nil, internal.ErrConfigurationInvalidLength
+func deserializeKSFParameters(encoded []byte) (*KSFConfiguration, error) {
+	// Header must be a multiple of 4, since we're encoding each parameter on 4 bytes.
+	// Multiples of 4 have their last two digits set to 0.
+	// So we're AND-ing with 3, since either both or one bit will be set if not a multiple of 4.
+	n := encoding.OS2IP(encoded[:2]) // we avoid out-of-bounds due to previous length check by caller
+	if (n & 3) != 0 {
+		return nil, errInvalidKSFHeader
 	}
 
-	ctx, offset, err := encoding.DecodeVector(encoded[confIDsLength:])
-	if err != nil {
-		return nil, fmt.Errorf("decoding the configuration context: %w", err)
-	}
-
-	offset += confIDsLength
-
-	ksfEncodedParams, offsetKSF, err := encoding.DecodeVector(encoded[offset:])
-	if err != nil {
-		return nil, fmt.Errorf("decoding the ksf configuration parameters: %w", err)
-	}
-
-	offset += offsetKSF
-
-	//nolint:prealloc // slice size depends on decoded input and kept for clarity
 	var ksfParams []int
-	for i := 0; i < len(ksfEncodedParams); i += 4 {
-		ksfParams = append(ksfParams, encoding.OS2IP(ksfEncodedParams[i:i+4]))
-	}
 
+	offset := 2
+	// Parameters
+	if n != 0 {
+		ksfEncodedParams, offsetKSF, err := encoding.DecodeVector(encoded)
+		if err != nil {
+			return nil, fmt.Errorf("decoding the ksf configuration parameters: %w", err)
+		}
+
+		ksfParams = make([]int, 0, n/4)
+		for i := 0; i < len(ksfEncodedParams); i += 4 {
+			ksfParams = append(ksfParams, encoding.OS2IP(ksfEncodedParams[i:i+4]))
+		}
+
+		offset = offsetKSF
+	}
+	// Salt
 	ksfSalt, _, err := encoding.DecodeVector(encoded[offset:])
 	if err != nil {
 		return nil, fmt.Errorf("decoding the ksf salt: %w", err)
@@ -261,22 +264,43 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		ksfSalt = nil
 	}
 
-	c := &Configuration{
-		Context: ctx,
-		KSF: KSFConfiguration{
-			Identifier: ksf.Identifier(encoded[0]),
-			Parameters: ksfParams,
-			Salt:       ksfSalt,
-		},
-		KDF:  crypto.Hash(encoded[1]),
-		MAC:  crypto.Hash(encoded[2]),
-		Hash: crypto.Hash(encoded[3]),
-		OPRF: Group(encoded[4]),
-		AKE:  Group(encoded[5]),
+	return &KSFConfiguration{
+		Identifier: 0,
+		Parameters: ksfParams,
+		Salt:       ksfSalt,
+	}, nil
+}
+
+// DeserializeConfiguration decodes the input and returns a Parameter structure.
+func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
+	// corresponds to the configuration length + 3*2-byte encoding of empty context, and KSF salt and parameters
+	if len(encoded) < confIDsLength+6 {
+		return nil, internal.ErrConfigurationInvalidLength
 	}
 
-	if err := c.verify(); err != nil {
-		return nil, err
+	ctx, offset, err := encoding.DecodeVector(encoded[confIDsLength:])
+	if err != nil {
+		return nil, fmt.Errorf("decoding the configuration context: %w", err)
+	}
+
+	ksfConf, err := deserializeKSFParameters(encoded[offset+confIDsLength:])
+	if err != nil {
+		return nil, fmt.Errorf("decoding the KSF configuration: %w", err)
+	}
+
+	ksfConf.Identifier = ksf.Identifier(encoded[0]) // we avoid out-of-bounds due to previous length check
+	c := &Configuration{
+		Context: ctx,
+		KSF:     *ksfConf,
+		KDF:     crypto.Hash(encoded[1]),
+		MAC:     crypto.Hash(encoded[2]),
+		Hash:    crypto.Hash(encoded[3]),
+		OPRF:    Group(encoded[4]),
+		AKE:     Group(encoded[5]),
+	}
+
+	if err2 := c.verify(); err2 != nil {
+		return nil, err2
 	}
 
 	return c, nil
