@@ -11,7 +11,9 @@ package opaque
 import (
 	"errors"
 	"fmt"
+
 	"github.com/bytemare/ecc"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -134,10 +136,10 @@ type GenerateKE2Options struct {
 	KeyShareSeed []byte
 	// AKENonce: optional.
 	AKENonce []byte
-	// AKENonceLength: optional, overrides the default length of the nonce to be created if no nonce is provided.
-	AKENonceLength uint
 	// MaskingNonce: optional.
 	MaskingNonce []byte
+	// AKENonceLength: optional, overrides the default length of the nonce to be created if no nonce is provided.
+	AKENonceLength uint
 }
 
 func getGenerateKE2Options(options []GenerateKE2Options) (*ake.Options, []byte) {

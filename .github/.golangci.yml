@@ -19,6 +19,8 @@ linters:
       check-blank: true
     gocritic:
       enable-all: true
+      disable-checks:
+        - unnamedResult
     govet:
       enable-all: true
       settings:
@@ -51,6 +53,8 @@ linters:
         text: "Error return value of `h.h.Write` is not checked"
       - path: internal/tag/strings.go
         text: "G101: Potential hardcoded credentials"
+      - path: server.go
+        text: "unnamedResult: consider giving a name to these results"
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
