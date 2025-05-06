@@ -10,8 +10,6 @@
 package ake
 
 import (
-	"math"
-
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
@@ -68,7 +66,7 @@ type Options struct {
 	// Nonce: optional.
 	Nonce []byte
 	// NonceLength: optional, overrides the default length of the nonce to be created if no nonce is provided.
-	NonceLength uint
+	NonceLength uint32
 }
 
 func (o *Options) init() {
@@ -80,12 +78,8 @@ func (o *Options) init() {
 		o.NonceLength = internal.NonceLength
 	}
 
-	if o.NonceLength > math.MaxInt {
-		panic("invalid nonce length")
-	}
-
 	if len(o.Nonce) == 0 {
-		o.Nonce = internal.RandomBytes(int(o.NonceLength)) //nolint:gosec // overflow is checked beforehand.
+		o.Nonce = internal.RandomBytes(int(o.NonceLength))
 	}
 }
 

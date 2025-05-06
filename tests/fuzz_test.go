@@ -52,7 +52,7 @@ func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error
 		{errors.New("invalid KDF id"), c.KDF, hash.Hash(c.KDF).Available()},
 		{errors.New("invalid MAC id"), c.MAC, hash.Hash(c.MAC).Available()},
 		{errors.New("invalid Hash id"), c.Hash, hash.Hash(c.Hash).Available()},
-		{errors.New("invalid KSF id"), c.KSF.Identifier, c.KSF.Identifier == 0 && c.KSF.Identifier.Available()},
+		{errors.New("invalid KSF id"), c.KSF, c.KSF == 0 && c.KSF.Available()},
 		{errors.New("invalid OPRF group id"), c.OPRF, c.OPRF.Available() && c.OPRF.OPRF().Available()},
 		{errors.New("invalid AKE group id"), c.AKE, c.AKE.Available() && c.AKE.Group().Available()},
 	}
@@ -202,10 +202,8 @@ func inputToConfig(context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) 
 		MAC:     crypto.Hash(mac),
 		Hash:    crypto.Hash(h),
 		OPRF:    oprfToGroup(oprf.Identifier(o)),
-		KSF: opaque.KSFConfiguration{
-			Identifier: ksf.Identifier(ksfID),
-		},
-		AKE: opaque.Group(ake),
+		KSF:     ksf.Identifier(ksfID),
+		AKE:     opaque.Group(ake),
 	}
 }
 

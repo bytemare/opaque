@@ -139,7 +139,7 @@ type GenerateKE2Options struct {
 	// MaskingNonce: optional.
 	MaskingNonce []byte
 	// AKENonceLength: optional, overrides the default length of the nonce to be created if no nonce is provided.
-	AKENonceLength uint
+	AKENonceLength uint32
 }
 
 func getGenerateKE2Options(options []GenerateKE2Options) (*ake.Options, []byte) {

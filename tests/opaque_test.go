@@ -28,7 +28,9 @@ const dbgErr = "%v"
 
 type testParams struct {
 	*opaque.Configuration
-	username, userID, serverID, password, serverSecretKey, serverPublicKey, oprfSeed []byte
+	username, userID, serverID, password, serverSecretKey, serverPublicKey, oprfSeed, ksfSalt, kdfSalt []byte
+	ksfParameters                                                                                      []int
+	ksfLength, nonceLength                                                                             uint32
 }
 
 func TestFull(t *testing.T) {
@@ -38,29 +40,34 @@ func TestFull(t *testing.T) {
 
 	conf := opaque.DefaultConfiguration()
 	conf.Context = []byte("OPAQUETest")
+	conf.KSF = ksf.Argon2id
 
-	test := &testParams{
+	tester := &testParams{
 		Configuration: conf,
 		username:      username,
 		userID:        username,
 		serverID:      ids,
 		password:      password,
 		oprfSeed:      conf.GenerateOPRFSeed(),
+		ksfParameters: []int{3, 65536, 4},
+		ksfSalt:       []byte("ksfSalt"),
+		kdfSalt:       []byte("kdfSalt"),
+		nonceLength:   internal.NonceLength,
 	}
 
 	serverSecretKey, pks := conf.KeyGen()
-	test.serverSecretKey = serverSecretKey
-	test.serverPublicKey = pks
+	tester.serverSecretKey = serverSecretKey
+	tester.serverPublicKey = pks
 
 	/*
 		Registration
 	*/
-	_, _, record, exportKeyReg := testRegistration(t, test)
+	_, _, record, exportKeyReg := testRegistration(t, tester)
 
 	/*
 		Login
 	*/
-	_, _, exportKeyLogin := testAuthentication(t, test, record)
+	_, _, exportKeyLogin := testAuthentication(t, tester, record)
 
 	// Check values
 	if !bytes.Equal(exportKeyReg, exportKeyLogin) {
@@ -111,6 +118,10 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 		upload, key := client.RegistrationFinalize(m2, opaque.ClientRegistrationFinalizeOptions{
 			ClientIdentity: p.username,
 			ServerIdentity: p.serverID,
+			KDFSalt:        p.kdfSalt,
+			KSFSalt:        p.ksfSalt,
+			KSFParameters:  p.ksfParameters,
+			KSFLength:      p.ksfLength,
 		})
 		exportKeyReg = key
 
@@ -184,6 +195,10 @@ func testAuthentication(
 		ke3, key, err := client.GenerateKE3(m5, opaque.GenerateKE3Options{
 			ClientIdentity: p.username,
 			ServerIdentity: p.serverID,
+			KDFSalt:        p.kdfSalt,
+			KSFSalt:        p.ksfSalt,
+			KSFParameters:  p.ksfParameters,
+			KSFLength:      p.ksfLength,
 		})
 		if err != nil {
 			t.Fatalf(dbgErr, err)
@@ -247,22 +262,6 @@ func isSameConf(a, b *opaque.Configuration) bool {
 
 func TestConfiguration_Deserialization(t *testing.T) {
 	conf := opaque.DefaultConfiguration()
-	ser := conf.Serialize()
-
-	conf2, err := opaque.DeserializeConfiguration(ser)
-	if err != nil {
-		t.Fatalf("unexpected error on valid configuration: %v", err)
-	}
-
-	if !isSameConf(conf, conf2) {
-		t.Fatalf("Unexpected inequality:\n\t%v\n\t%v", conf, conf2)
-	}
-}
-
-func TestConfiguration_KSFConfigDeserialization(t *testing.T) {
-	conf := opaque.DefaultConfiguration()
-	conf.KSF.Parameters = []int{2, 19456, 1}
-	conf.KSF.Salt = []byte("salt")
 	ser := conf.Serialize()
 
 	conf2, err := opaque.DeserializeConfiguration(ser)
@@ -359,13 +358,13 @@ func TestNilConfiguration(t *testing.T) {
 	def := opaque.DefaultConfiguration()
 	g := group.Group(def.AKE)
 	defaultConfiguration := &internal.Configuration{
+		OPRF:     oprf.IDFromGroup(g),
+		Group:    g,
+		KSF:      internal.NewKSF(def.KSF),
 		KDF:      internal.NewKDF(def.KDF),
 		MAC:      internal.NewMac(def.MAC),
 		Hash:     internal.NewHash(def.Hash),
-		KSF:      internal.NewKSF(def.KSF.Identifier),
 		NonceLen: internal.NonceLength,
-		Group:    g,
-		OPRF:     oprf.IDFromGroup(g),
 		Context:  def.Context,
 	}
 
@@ -387,49 +386,6 @@ func TestDeserializeConfiguration_Short(t *testing.T) {
 	}
 }
 
-func TestConfiguration_Bad_KSFConfigDeserialization(t *testing.T) {
-	conf := opaque.DefaultConfiguration()
-	conf.KSF.Parameters = []int{2, 19456, 1}
-	conf.KSF.Salt = []byte("salt")
-	ser := conf.Serialize()
-	// Bad header, not multiple of 4
-	ser[9] = 7
-	expected := "decoding the KSF configuration: invalid ksf configuration encoding header"
-	if _, err := opaque.DeserializeConfiguration(ser); err == nil || err.Error() != expected {
-		t.Fatalf(
-			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
-			expected,
-			err,
-		)
-	}
-	// KSF params too short
-	ser[9] = 12
-	expected = "decoding the KSF configuration: decoding the ksf configuration parameters: insufficient total length for decoding"
-	if _, err := opaque.DeserializeConfiguration(ser[:12+(len(conf.KSF.Parameters)-1)*4]); err == nil ||
-		err.Error() != expected {
-		t.Fatalf(
-			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
-			expected,
-			err,
-		)
-	}
-	// Bad Salt header: too short
-	expected = "decoding the KSF configuration: decoding the ksf salt: insufficient header length for decoding"
-	if _, err := opaque.DeserializeConfiguration(ser[:len(ser)-len(conf.KSF.Salt)-1]); err == nil ||
-		err.Error() != expected {
-		t.Fatalf(
-			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
-			expected,
-			err,
-		)
-	}
-	// Bad Salt: too short
-	expected = "decoding the KSF configuration: decoding the ksf salt: insufficient total length for decoding"
-	if _, err := opaque.DeserializeConfiguration(ser[:len(ser)-1]); err == nil || err.Error() != expected {
-		t.Fatalf("expected error on invalid configuration: %v", err)
-	}
-}
-
 func TestBadConfiguration(t *testing.T) {
 	setBadValue := func(pos, val int) []byte {
 		b := opaque.DefaultConfiguration().Serialize()
@@ -443,60 +399,58 @@ func TestBadConfiguration(t *testing.T) {
 		error   string
 	}{
 		{
-			name: "Bad KSF",
-			makeBad: func() []byte {
-				return setBadValue(0, 10)
-			},
-			error: "invalid KSF id",
-		},
-		{
-			name: "Bad KDF",
-			makeBad: func() []byte {
-				return setBadValue(1, 0)
-			},
-			error: "invalid KDF id",
-		},
-		{
-			name: "Bad MAC",
-			makeBad: func() []byte {
-				return setBadValue(2, 0)
-			},
-			error: "invalid MAC id",
-		},
-		{
-			name: "Bad Hash",
-			makeBad: func() []byte {
-				return setBadValue(3, 0)
-			},
-			error: "invalid Hash id",
-		},
-		{
 			name: "Bad OPRF",
 			makeBad: func() []byte {
-				return setBadValue(4, 0)
+				return setBadValue(0, 0)
 			},
 			error: "invalid OPRF group id",
 		},
 		{
 			name: "Bad AKE",
 			makeBad: func() []byte {
-				return setBadValue(5, 0)
+				return setBadValue(1, 0)
 			},
 			error: "invalid AKE group id",
+		},
+		{
+			name: "Bad KSF",
+			makeBad: func() []byte {
+				return setBadValue(2, 10)
+			},
+			error: "invalid KSF id",
+		},
+		{
+			name: "Bad KDF",
+			makeBad: func() []byte {
+				return setBadValue(3, 0)
+			},
+			error: "invalid KDF id",
+		},
+		{
+			name: "Bad MAC",
+			makeBad: func() []byte {
+				return setBadValue(4, 0)
+			},
+			error: "invalid MAC id",
+		},
+		{
+			name: "Bad Hash",
+			makeBad: func() []byte {
+				return setBadValue(5, 0)
+			},
+			error: "invalid Hash id",
 		},
 	}
 
 	convertToBadConf := func(encoded []byte) *opaque.Configuration {
 		return &opaque.Configuration{
-			KSF: opaque.KSFConfiguration{
-				Identifier: ksf.Identifier(encoded[0]),
-			},
-			KDF:     crypto.Hash(encoded[1]),
-			MAC:     crypto.Hash(encoded[2]),
-			OPRF:    opaque.Group(encoded[4]),
-			Hash:    crypto.Hash(encoded[3]),
-			AKE:     opaque.Group(encoded[5]),
-			Context: encoded[5:],
+			OPRF:    opaque.Group(encoded[0]),
+			AKE:     opaque.Group(encoded[1]),
+			KSF:     ksf.Identifier(encoded[2]),
+			KDF:     crypto.Hash(encoded[3]),
+			MAC:     crypto.Hash(encoded[4]),
+			Hash:    crypto.Hash(encoded[5]),
+			Context: encoded[6:],
 		}
 	}
 
@@ -534,6 +488,42 @@ func TestBadConfiguration(t *testing.T) {
 	}
 }
 
+func TestBadNonceLength(t *testing.T) {
+	ids := []byte("server")
+	username := []byte("client")
+	password := []byte("password")
+
+	conf := opaque.DefaultConfiguration()
+	conf.Context = []byte("OPAQUETest")
+
+	tester := &testParams{
+		Configuration: conf,
+		username:      username,
+		userID:        username,
+		serverID:      ids,
+		password:      password,
+		oprfSeed:      conf.GenerateOPRFSeed(),
+	}
+
+	serverSecretKey, pks := conf.KeyGen()
+	tester.serverSecretKey = serverSecretKey
+	tester.serverPublicKey = pks
+
+	/*
+		Registration
+	*/
+	_, _, record, _ := testRegistration(t, tester)
+
+	/*
+		Login
+	*/
+	if hasPanic, _ := expectPanic(errors.New("invalid nonce length"), func() {
+		_, _, _ = testAuthentication(t, tester, record)
+	}); !hasPanic {
+		t.Fatal("expected panic with big input")
+	}
+}
+
 func TestFakeRecord(t *testing.T) {
 	// Test valid configurations
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -545,11 +535,11 @@ func TestFakeRecord(t *testing.T) {
 	// Test for an invalid configuration.
 	conf := &opaque.Configuration{
 		OPRF:    0,
+		AKE:     0,
+		KSF:     0,
 		KDF:     0,
 		MAC:     0,
 		Hash:    0,
-		KSF:     opaque.KSFConfiguration{},
-		AKE:     0,
 		Context: nil,
 	}
 
