@@ -183,6 +183,24 @@ func TestDeserializeKE3(t *testing.T) {
 
 func TestDecodeAkePrivateKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
+		key := conf.conf.AKE.Group().NewScalar().Random()
+
+		des, err := conf.conf.Deserializer()
+		if err != nil {
+			t.Fatalf(testErrValidConf, err)
+		}
+
+		if _, err = des.DecodeAkePrivateKey(key.Encode()); err != nil {
+			t.Fatalf("unexpect error on valid private key. Group %v, key %v",
+				conf.conf.AKE,
+				key.Hex(),
+			)
+		}
+	})
+}
+
+func TestDecodeBadAkePrivateKey(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
 		badKey := getBadScalar(t, conf)
 
 		des, err := conf.conf.Deserializer()

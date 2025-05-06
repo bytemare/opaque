@@ -9,9 +9,12 @@
 package opaque_test
 
 import (
+	"encoding/hex"
 	"log"
 	"strings"
 	"testing"
+
+	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
@@ -341,5 +344,66 @@ func TestClientFinish_MissingKe1(t *testing.T) {
 			expectedError,
 			err,
 		)
+	}
+}
+
+func TestClientKSF(t *testing.T) {
+	tests := []struct {
+		name   string
+		Input  string
+		Output string
+		KSF    opaque.KSFConfiguration
+	}{
+		{
+			name: "Argon2id",
+			KSF: opaque.KSFConfiguration{
+				Identifier: ksf.Argon2id,
+				Salt:       []byte("salt"),
+				Parameters: []int{3, 65536, 4},
+			},
+			Input:  "password",
+			Output: "ca51a24bb2c50588ab0614dc957140a2d37cea4337cc356412aa5e7035fe9508",
+		},
+		{
+			name: "Scrypt",
+			KSF: opaque.KSFConfiguration{
+				Identifier: ksf.Scrypt,
+				Salt:       []byte("salt"),
+				Parameters: []int{32768, 8, 1},
+			},
+			Input:  "password",
+			Output: "4bc0fd507e93a600768021341ec726c57c00cb55a4702a1650131365500cf471",
+		},
+		{
+			name: "PBKDF2",
+			KSF: opaque.KSFConfiguration{
+				Identifier: ksf.PBKDF2Sha512,
+				Salt:       []byte("salt"),
+				Parameters: []int{10000},
+			},
+			Input:  "password",
+			Output: "72629a41b076e588fba8c71ca37fadc9acdc8e7321b9cb4ea55fd0bf9fe8ed72",
+		},
+		{
+			name: "Identity",
+			KSF: opaque.KSFConfiguration{
+				Identifier: 0,
+				Salt:       []byte("salt"),
+				Parameters: []int{1, 2},
+			},
+			Input:  "password",
+			Output: "70617373776f7264",
+		},
+	}
+
+	for _, ksfTest := range tests {
+		t.Run(ksfTest.name, func(t *testing.T) {
+			f := internal.NewKSF(ksfTest.KSF.Identifier)
+			f.Parameterize(ksfTest.KSF.Parameters...)
+
+			if ksfTest.Output != hex.EncodeToString(f.Harden([]byte(ksfTest.Input), ksfTest.KSF.Salt, 32)) {
+				t.Fatal("unexpected KSF output")
+			}
+		})
 	}
 }
