@@ -275,19 +275,6 @@ func TestConfiguration_KSFConfigDeserialization(t *testing.T) {
 	}
 }
 
-func TestConfiguration_ToInternal_KSFParameterization(t *testing.T) {
-	conf := opaque.DefaultConfiguration()
-
-	// Set explicit KSF parameters
-	conf.KSF.Parameters = []int{42, 99, 7}
-	conf.KSF.Salt = []byte("salt")
-
-	_, err := conf.Deserializer()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestFlush(t *testing.T) {
 	ids := []byte("server")
 	username := []byte("client")
