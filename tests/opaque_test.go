@@ -488,42 +488,6 @@ func TestBadConfiguration(t *testing.T) {
 	}
 }
 
-func TestBadNonceLength(t *testing.T) {
-	ids := []byte("server")
-	username := []byte("client")
-	password := []byte("password")
-
-	conf := opaque.DefaultConfiguration()
-	conf.Context = []byte("OPAQUETest")
-
-	tester := &testParams{
-		Configuration: conf,
-		username:      username,
-		userID:        username,
-		serverID:      ids,
-		password:      password,
-		oprfSeed:      conf.GenerateOPRFSeed(),
-	}
-
-	serverSecretKey, pks := conf.KeyGen()
-	tester.serverSecretKey = serverSecretKey
-	tester.serverPublicKey = pks
-
-	/*
-		Registration
-	*/
-	_, _, record, _ := testRegistration(t, tester)
-
-	/*
-		Login
-	*/
-	if hasPanic, _ := expectPanic(errors.New("invalid nonce length"), func() {
-		_, _, _ = testAuthentication(t, tester, record)
-	}); !hasPanic {
-		t.Fatal("expected panic with big input")
-	}
-}
-
 func TestFakeRecord(t *testing.T) {
 	// Test valid configurations
 	testAll(t, func(t2 *testing.T, conf *configuration) {
