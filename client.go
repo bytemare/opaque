@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright (C) 2020-2022 Daniel Bourdrez. All Rights Reserved.
+// Copyright (C) 2020-2025 Daniel Bourdrez. All Rights Reserved.
 //
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree or at
@@ -74,7 +74,7 @@ func (c *Client) buildPRK(evaluation *ecc.Element) []byte {
 
 // ClientRegistrationInitOptions enables setting internal client values for the client registration.
 type ClientRegistrationInitOptions struct {
-	// OPRFBlind: optional
+	// OPRFBlind: optional.
 	OPRFBlind *ecc.Scalar
 }
 
@@ -100,11 +100,11 @@ func (c *Client) RegistrationInit(
 
 // ClientRegistrationFinalizeOptions enables setting optional client values for the client registration.
 type ClientRegistrationFinalizeOptions struct {
-	// ClientIdentity: optional
+	// ClientIdentity: optional.
 	ClientIdentity []byte
-	// ServerIdentity: optional
+	// ServerIdentity: optional.
 	ServerIdentity []byte
-	// EnvelopeNonce : optional
+	// EnvelopeNonce : optional.
 	EnvelopeNonce []byte
 }
 
@@ -141,24 +141,24 @@ func (c *Client) RegistrationFinalize(
 	}, exportKey
 }
 
-// GenerateKE1Options enables setting optional values for the session, which default to secure random values if not
+// GenerateKE1Options enable setting optional values for the session, which default to secure random values if not
 // set.
 type GenerateKE1Options struct {
-	// Blind: optional
-	Blind *ecc.Scalar
-	// KeyShareSeed: optional
+	// OPRFBlind: optional.
+	OPRFBlind *ecc.Scalar
+	// KeyShareSeed: optional.
 	KeyShareSeed []byte
-	// Nonce: optional
-	Nonce []byte
-	// NonceLength: optional
-	NonceLength uint
+	// AKENonce: optional.
+	AKENonce []byte
+	// AKENonceLength: optional, overrides the default length of the nonce to be created if no nonce is provided.
+	AKENonceLength uint
 }
 
 func (c GenerateKE1Options) get() (*ecc.Scalar, ake.Options) {
-	return c.Blind, ake.Options{
+	return c.OPRFBlind, ake.Options{
 		KeyShareSeed: c.KeyShareSeed,
-		Nonce:        c.Nonce,
-		NonceLength:  c.NonceLength,
+		Nonce:        c.AKENonce,
+		NonceLength:  c.AKENonceLength,
 	}
 }
 
@@ -185,11 +185,11 @@ func (c *Client) GenerateKE1(password []byte, options ...GenerateKE1Options) *me
 	return ke1
 }
 
-// GenerateKE3Options enables setting optional client values for the client registration.
+// GenerateKE3Options enable setting optional client values for the client registration.
 type GenerateKE3Options struct {
-	// ClientIdentity: optional
+	// ClientIdentity: optional.
 	ClientIdentity []byte
-	// ServerIdentity: optional
+	// ServerIdentity: optional.
 	ServerIdentity []byte
 }
 

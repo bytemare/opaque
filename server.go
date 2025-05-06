@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright (C) 2020-2022 Daniel Bourdrez. All Rights Reserved.
+// Copyright (C) 2020-2025 Daniel Bourdrez. All Rights Reserved.
 //
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree or at
@@ -11,9 +11,7 @@ package opaque
 import (
 	"errors"
 	"fmt"
-
 	"github.com/bytemare/ecc"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -129,27 +127,33 @@ func (s *Server) credentialResponse(
 	return message.NewCredentialResponse(z, maskingNonce, maskedResponse)
 }
 
-// GenerateKE2Options enables setting optional values for the session, which default to secure random values if not
+// GenerateKE2Options enable setting optional values for the session, which default to secure random values if not
 // set.
 type GenerateKE2Options struct {
-	// KeyShareSeed: optional
+	// KeyShareSeed: optional.
 	KeyShareSeed []byte
-	// Nonce: optional
-	Nonce []byte
-	// NonceLength: optional
-	NonceLength uint
+	// AKENonce: optional.
+	AKENonce []byte
+	// AKENonceLength: optional, overrides the default length of the nonce to be created if no nonce is provided.
+	AKENonceLength uint
+	// MaskingNonce: optional.
+	MaskingNonce []byte
 }
 
-func getGenerateKE2Options(options []GenerateKE2Options) *ake.Options {
-	var op ake.Options
+func getGenerateKE2Options(options []GenerateKE2Options) (*ake.Options, []byte) {
+	var (
+		op           ake.Options
+		maskingNonce []byte
+	)
 
 	if len(options) != 0 {
 		op.KeyShareSeed = options[0].KeyShareSeed
-		op.Nonce = options[0].Nonce
-		op.NonceLength = options[0].NonceLength
+		op.Nonce = options[0].AKENonce
+		op.NonceLength = options[0].AKENonceLength
+		maskingNonce = options[0].MaskingNonce
 	}
 
-	return &op
+	return &op, maskingNonce
 }
 
 // SetKeyMaterial set the server's identity and mandatory key material to be used during GenerateKE2().
@@ -209,10 +213,10 @@ func (s *Server) GenerateKE2(
 	// We've checked that the server's public key and the client's envelope are of correct length,
 	// thus ensuring that the subsequent xor-ing input is the same length as the encryption pad.
 
-	op := getGenerateKE2Options(options)
+	op, maskingNonce := getGenerateKE2Options(options)
 
 	response := s.credentialResponse(ke1.CredentialRequest, s.serverPublicKey,
-		record.RegistrationRecord, record.CredentialIdentifier, s.oprfSeed, record.TestMaskNonce)
+		record.RegistrationRecord, record.CredentialIdentifier, s.oprfSeed, maskingNonce)
 
 	identities := ake.Identities{
 		ClientIdentity: record.ClientIdentity,

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright (C) 2020-2022 Daniel Bourdrez. All Rights Reserved.
+// Copyright (C) 2020-2025 Daniel Bourdrez. All Rights Reserved.
 //
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree or at
@@ -327,18 +327,14 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 		CredentialIdentifier: credentialIdentifier,
 		ClientIdentity:       nil,
 		RegistrationRecord:   regRecord,
-		TestMaskNonce:        nil,
 	}, nil
 }
 
 // ClientRecord is a server-side structure enabling the storage of user relevant information.
 type ClientRecord struct {
+	*message.RegistrationRecord
 	CredentialIdentifier []byte
 	ClientIdentity       []byte
-	*message.RegistrationRecord
-
-	// testing
-	TestMaskNonce []byte
 }
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
