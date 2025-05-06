@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright (C) 2020-2022 Daniel Bourdrez. All Rights Reserved.
+// Copyright (C) 2020-2025 Daniel Bourdrez. All Rights Reserved.
 //
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree or at
@@ -369,13 +369,11 @@ func TestNilConfiguration(t *testing.T) {
 		Context:  def.Context,
 	}
 
-	s, _ := opaque.NewServer(nil)
-	if reflect.DeepEqual(s.GetConf(), defaultConfiguration) {
+	if s, _ := opaque.NewServer(nil); reflect.DeepEqual(s.GetConf(), defaultConfiguration) {
 		t.Errorf("server did not default to correct configuration")
 	}
 
-	c, _ := opaque.NewClient(nil)
-	if reflect.DeepEqual(c.GetConf(), defaultConfiguration) {
+	if c, _ := opaque.NewClient(nil); reflect.DeepEqual(c.GetConf(), defaultConfiguration) {
 		t.Errorf("client did not default to correct configuration")
 	}
 }
@@ -506,8 +504,9 @@ func TestBadConfiguration(t *testing.T) {
 		t.Run(badConf.name, func(t *testing.T) {
 			// Test Deserialization for bad conf
 			badEncoded := badConf.makeBad()
-			_, err := opaque.DeserializeConfiguration(badEncoded)
-			if err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+
+			if _, err := opaque.DeserializeConfiguration(badEncoded); err == nil ||
+				!strings.EqualFold(err.Error(), badConf.error) {
 				t.Fatalf(
 					"Expected error for %s. Want %q, got %q.\n\tEncoded: %v",
 					badConf.name,
@@ -520,18 +519,15 @@ func TestBadConfiguration(t *testing.T) {
 			// Test bad configuration for client, server, and deserializer setup
 			bad := convertToBadConf(badEncoded)
 
-			_, err = bad.Client()
-			if err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+			if _, err := bad.Client(); err == nil || !strings.EqualFold(err.Error(), badConf.error) {
 				t.Fatalf("Expected error for %s / client. Want %q, got %q", badConf.name, badConf.error, err)
 			}
 
-			_, err = bad.Server()
-			if err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+			if _, err := bad.Server(); err == nil || !strings.EqualFold(err.Error(), badConf.error) {
 				t.Fatalf("Expected error for %s / server. Want %q, got %q", badConf.name, badConf.error, err)
 			}
 
-			_, err = bad.Deserializer()
-			if err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+			if _, err := bad.Deserializer(); err == nil || !strings.EqualFold(err.Error(), badConf.error) {
 				t.Fatalf("Expected error for %s / deserializer. Want %q, got %q", badConf.name, badConf.error, err)
 			}
 		})

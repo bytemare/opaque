@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright (C) 2020-2022 Daniel Bourdrez. All Rights Reserved.
+// Copyright (C) 2020-2025 Daniel Bourdrez. All Rights Reserved.
 //
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree or at
@@ -61,13 +61,13 @@ func (id *Identities) SetIdentities(clientPublicKey *ecc.Element, serverPublicKe
 	return id
 }
 
-// Options enables setting optional ephemeral values, which default to secure random values if not set.
+// Options enable setting optional ephemeral values, which default to secure random values if not set.
 type Options struct {
-	// KeyShareSeed: optional
+	// KeyShareSeed: optional.
 	KeyShareSeed []byte
-	// Nonce: optional
+	// Nonce: optional.
 	Nonce []byte
-	// NonceLength: optional
+	// NonceLength: optional, overrides the default length of the nonce to be created if no nonce is provided.
 	NonceLength uint
 }
 

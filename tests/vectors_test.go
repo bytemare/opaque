@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 //
-// Copyright (C) 2020-2022 Daniel Bourdrez. All Rights Reserved.
+// Copyright (C) 2020-2025 Daniel Bourdrez. All Rights Reserved.
 //
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree or at
@@ -205,10 +205,10 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 		}
 
 		KE1 := client.GenerateKE1(v.Inputs.Password, opaque.GenerateKE1Options{
-			Blind:        blind,
-			KeyShareSeed: v.Inputs.ClientKeyshareSeed,
-			Nonce:        v.Inputs.ClientNonce,
-			NonceLength:  internal.NonceLength,
+			OPRFBlind:      blind,
+			KeyShareSeed:   v.Inputs.ClientKeyshareSeed,
+			AKENonce:       v.Inputs.ClientNonce,
+			AKENonceLength: internal.NonceLength,
 		})
 
 		if !bytes.Equal(v.Outputs.KE1, KE1.Serialize()) {
@@ -238,7 +238,6 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 
 	record.CredentialIdentifier = v.Inputs.CredentialIdentifier
 	record.ClientIdentity = v.Inputs.ClientIdentity
-	record.TestMaskNonce = v.Inputs.MaskingNonce
 
 	v.loginResponse(t, server, record)
 
@@ -343,9 +342,10 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		ke1,
 		record,
 		opaque.GenerateKE2Options{
-			KeyShareSeed: v.Inputs.ServerKeyshareSeed,
-			Nonce:        v.Inputs.ServerNonce,
-			NonceLength:  internal.NonceLength,
+			KeyShareSeed:   v.Inputs.ServerKeyshareSeed,
+			AKENonce:       v.Inputs.ServerNonce,
+			AKENonceLength: internal.NonceLength,
+			MaskingNonce:   v.Inputs.MaskingNonce,
 		},
 	)
 	if err != nil {
