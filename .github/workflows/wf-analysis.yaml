@@ -17,7 +17,7 @@ jobs:
   Lint:
     permissions:
       contents: read
-    uses: bytemare/workflows/.github/workflows/golangci-lint.yaml@10acaec9311457cf71789a956e110ac175297fb1
+    uses: bytemare/workflows/.github/workflows/golangci-lint.yaml@696fab4908e73675d0c90d77637ecaed7e93e978
     with:
       config-path: ./.github/.golangci.yml
       scope: ./...
@@ -27,7 +27,7 @@ jobs:
       actions: read
       contents: read
       security-events: write
-    uses: bytemare/workflows/.github/workflows/codeql.yaml@10acaec9311457cf71789a956e110ac175297fb1
+    uses: bytemare/workflows/.github/workflows/codeql.yaml@696fab4908e73675d0c90d77637ecaed7e93e978
     with:
       language: go
 
@@ -36,7 +36,7 @@ jobs:
       contents: read
       # Needed to upload the results to code-scanning dashboard.
       security-events: write
-    uses: bytemare/workflows/.github/workflows/scan-go.yaml@10acaec9311457cf71789a956e110ac175297fb1
+    uses: bytemare/workflows/.github/workflows/scan-go.yaml@696fab4908e73675d0c90d77637ecaed7e93e978
     with:
       sonar-configuration: .github/sonar-project.properties
     secrets:
@@ -67,6 +67,6 @@ jobs:
       statuses: read
       models: read
 
-    uses: bytemare/workflows/.github/workflows/scorecard.yaml@10acaec9311457cf71789a956e110ac175297fb1
+    uses: bytemare/workflows/.github/workflows/scorecard.yaml@696fab4908e73675d0c90d77637ecaed7e93e978
     secrets:
       token: ${{ secrets.SCORECARD_TOKEN }}
