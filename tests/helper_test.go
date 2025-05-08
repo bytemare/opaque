@@ -54,10 +54,8 @@ var configurationTable = []configuration{
 			KDF:  crypto.SHA256,
 			MAC:  crypto.SHA256,
 			Hash: crypto.SHA256,
-			KSF: opaque.KSFConfiguration{
-				Identifier: ksf.Scrypt,
-			},
-			AKE: opaque.P256Sha256,
+			KSF:  ksf.Argon2id,
+			AKE:  opaque.P256Sha256,
 		},
 		curve: elliptic.P256(),
 	},
@@ -68,10 +66,8 @@ var configurationTable = []configuration{
 			KDF:  crypto.SHA512,
 			MAC:  crypto.SHA512,
 			Hash: crypto.SHA512,
-			KSF: opaque.KSFConfiguration{
-				Identifier: ksf.Scrypt,
-			},
-			AKE: opaque.P384Sha512,
+			KSF:  ksf.Argon2id,
+			AKE:  opaque.P384Sha512,
 		},
 		curve: elliptic.P384(),
 	},
@@ -82,10 +78,8 @@ var configurationTable = []configuration{
 			KDF:  crypto.SHA512,
 			MAC:  crypto.SHA512,
 			Hash: crypto.SHA512,
-			KSF: opaque.KSFConfiguration{
-				Identifier: ksf.Scrypt,
-			},
-			AKE: opaque.P521Sha512,
+			KSF:  ksf.Argon2id,
+			AKE:  opaque.P521Sha512,
 		},
 		curve: elliptic.P521(),
 	},
@@ -229,8 +223,8 @@ func getEnvelope(client *opaque.Client, ke2 *message.KE2) (*keyrecovery.Envelope
 	}
 
 	maskingKey := conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), conf.KDF.Size())
-	clear := xorResponse(conf, maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
-	e := clear[conf.Group.ElementLength():]
+	clearText := xorResponse(conf, maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
+	e := clearText[conf.Group.ElementLength():]
 
 	env := &keyrecovery.Envelope{
 		Nonce:   e[:conf.NonceLen],

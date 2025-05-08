@@ -65,11 +65,11 @@ func (c *Client) GetConf() *internal.Configuration {
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation *ecc.Element) []byte {
+func (c *Client) buildPRK(evaluation *ecc.Element, ksfSalt, kdfSalt []byte, ksfLength int) []byte {
 	output := c.OPRF.Finalize(evaluation)
-	stretched := c.conf.KSF.Harden(output, c.conf.KSFSalt, c.conf.Hash.Size())
+	stretched := c.conf.KSF.Harden(output, ksfSalt, ksfLength)
 
-	return c.conf.KDF.Extract(nil, encoding.Concat(output, stretched))
+	return c.conf.KDF.Extract(kdfSalt, encoding.Concat(output, stretched))
 }
 
 // ClientRegistrationInitOptions enables setting internal client values for the client registration.
@@ -106,22 +106,41 @@ type ClientRegistrationFinalizeOptions struct {
 	ServerIdentity []byte
 	// EnvelopeNonce : optional.
 	EnvelopeNonce []byte
+	// KDFSalt: optional.
+	KDFSalt []byte
+	// KSFSalt: optional.
+	KSFSalt []byte
+	// KSFParameters: optional.
+	KSFParameters []int
+	// KSFLength: optional.
+	KSFLength uint32
 }
 
-func initClientRegistrationFinalizeOptions(options []ClientRegistrationFinalizeOptions) *keyrecovery.Credentials {
+func (c *Client) initClientRegistrationFinalizeOptions(
+	options []ClientRegistrationFinalizeOptions,
+) (*keyrecovery.Credentials, []byte, []byte, int) {
 	if len(options) == 0 {
 		return &keyrecovery.Credentials{
 			ClientIdentity: nil,
 			ServerIdentity: nil,
 			EnvelopeNonce:  nil,
-		}
+		}, nil, nil, c.conf.Group.ElementLength()
+	}
+
+	if len(options[0].KSFParameters) != 0 {
+		c.conf.KSF.Parameterize(options[0].KSFParameters...)
+	}
+
+	ksfLength := int(options[0].KSFLength)
+	if ksfLength == 0 {
+		ksfLength = c.conf.Group.ElementLength()
 	}
 
 	return &keyrecovery.Credentials{
 		ClientIdentity: options[0].ClientIdentity,
 		ServerIdentity: options[0].ServerIdentity,
 		EnvelopeNonce:  options[0].EnvelopeNonce,
-	}
+	}, options[0].KSFSalt, options[0].KDFSalt, ksfLength
 }
 
 // RegistrationFinalize returns a RegistrationRecord message given the identities and the server's RegistrationResponse.
@@ -129,8 +148,8 @@ func (c *Client) RegistrationFinalize(
 	resp *message.RegistrationResponse,
 	options ...ClientRegistrationFinalizeOptions,
 ) (record *message.RegistrationRecord, exportKey []byte) {
-	credentials := initClientRegistrationFinalizeOptions(options)
-	randomizedPassword := c.buildPRK(resp.EvaluatedMessage)
+	credentials, ksfSalt, kdfSalt, ksfLength := c.initClientRegistrationFinalizeOptions(options)
+	randomizedPassword := c.buildPRK(resp.EvaluatedMessage, ksfSalt, kdfSalt, ksfLength)
 	maskingKey := c.conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), c.conf.KDF.Size())
 	envelope, clientPublicKey, exportKey := keyrecovery.Store(c.conf, randomizedPassword, resp.Pks, credentials)
 
@@ -151,20 +170,16 @@ type GenerateKE1Options struct {
 	// AKENonce: optional.
 	AKENonce []byte
 	// AKENonceLength: optional, overrides the default length of the nonce to be created if no nonce is provided.
-	AKENonceLength uint
-}
-
-func (c GenerateKE1Options) get() (*ecc.Scalar, ake.Options) {
-	return c.OPRFBlind, ake.Options{
-		KeyShareSeed: c.KeyShareSeed,
-		Nonce:        c.AKENonce,
-		NonceLength:  c.AKENonceLength,
-	}
+	AKENonceLength uint32
 }
 
 func getGenerateKE1Options(options []GenerateKE1Options) (*ecc.Scalar, ake.Options) {
 	if len(options) != 0 {
-		return options[0].get()
+		return options[0].OPRFBlind, ake.Options{
+			KeyShareSeed: options[0].KeyShareSeed,
+			Nonce:        options[0].AKENonce,
+			NonceLength:  options[0].AKENonceLength,
+		}
 	}
 
 	return nil, ake.Options{
@@ -191,20 +206,37 @@ type GenerateKE3Options struct {
 	ClientIdentity []byte
 	// ServerIdentity: optional.
 	ServerIdentity []byte
+	// KDFSalt: optional.
+	KDFSalt []byte
+	// KSFSalt: optional.
+	KSFSalt []byte
+	// KSFParameters: optional.
+	KSFParameters []int
+	// KSFLength: optional.
+	KSFLength uint32
 }
 
-func initGenerateKE3Options(options []GenerateKE3Options) *ake.Identities {
+func (c *Client) initGenerateKE3Options(options []GenerateKE3Options) (*ake.Identities, []byte, []byte, int) {
 	if len(options) == 0 {
 		return &ake.Identities{
 			ClientIdentity: nil,
 			ServerIdentity: nil,
-		}
+		}, nil, nil, c.conf.Group.ElementLength()
+	}
+
+	if len(options[0].KSFParameters) != 0 {
+		c.conf.KSF.Parameterize(options[0].KSFParameters...)
+	}
+
+	ksfLength := int(options[0].KSFLength)
+	if ksfLength == 0 {
+		ksfLength = c.conf.Group.ElementLength()
 	}
 
 	return &ake.Identities{
 		ClientIdentity: options[0].ClientIdentity,
 		ServerIdentity: options[0].ServerIdentity,
-	}
+	}, options[0].KSFSalt, options[0].KDFSalt, ksfLength
 }
 
 // GenerateKE3 returns a KE3 message given the server's KE2 response message and the identities. If the idc
@@ -221,10 +253,10 @@ func (c *Client) GenerateKE3(
 		return nil, nil, errInvalidMaskedLength
 	}
 
-	identities := initGenerateKE3Options(options)
+	identities, ksfSalt, kdfSalt, ksfLength := c.initGenerateKE3Options(options)
 
 	// Finalize the OPRF.
-	randomizedPassword := c.buildPRK(ke2.EvaluatedMessage)
+	randomizedPassword := c.buildPRK(ke2.EvaluatedMessage, ksfSalt, kdfSalt, ksfLength)
 
 	// Decrypt the masked response.
 	serverPublicKey, serverPublicKeyBytes,

@@ -48,14 +48,12 @@ func Example_configuration() {
 	defaultConf := opaque.DefaultConfiguration()
 
 	customConf := &opaque.Configuration{
-		OPRF: opaque.RistrettoSha512,
-		KDF:  crypto.SHA512,
-		MAC:  crypto.SHA512,
-		Hash: crypto.SHA512,
-		KSF: opaque.KSFConfiguration{
-			Identifier: ksf.Argon2id,
-		},
+		OPRF:    opaque.RistrettoSha512,
 		AKE:     opaque.RistrettoSha512,
+		KSF:     ksf.Argon2id,
+		KDF:     crypto.SHA512,
+		MAC:     crypto.SHA512,
+		Hash:    crypto.SHA512,
 		Context: nil,
 	}
 
@@ -81,7 +79,7 @@ func Example_configuration() {
 
 	fmt.Println("OPAQUE configuration is easy!")
 
-	// Output: Encoded Configuration: 010707070101000000000000
+	// Output: Encoded Configuration: 0101010707070000
 	// OPAQUE configuration is easy!
 }
 

@@ -9,6 +9,7 @@
 package opaque_test
 
 import (
+	"crypto"
 	"encoding/hex"
 	"log"
 	"strings"
@@ -48,7 +49,7 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 		r1 := client.RegistrationInit([]byte("yo"))
 
 		pk := server.GetConf().Group.NewElement()
-		if err := pk.Decode(pks); err != nil {
+		if err = pk.Decode(pks); err != nil {
 			panic(err)
 		}
 		r2 := server.RegistrationResponse(r1, pk, credID, oprfSeed)
@@ -56,7 +57,7 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 		// message length
 		badr2 := internal.RandomBytes(15)
 		expected := "invalid message length"
-		if _, err := client.Deserialize.RegistrationResponse(badr2); err == nil ||
+		if _, err = client.Deserialize.RegistrationResponse(badr2); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for empty server public key - got %v", err)
 		}
@@ -64,7 +65,7 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 		// invalid data
 		badr2 = encoding.Concat(getBadElement(t, conf), pks)
 		expected = "invalid OPRF evaluation"
-		if _, err := client.Deserialize.RegistrationResponse(badr2); err == nil ||
+		if _, err = client.Deserialize.RegistrationResponse(badr2); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for empty server public key - got %v", err)
 		}
@@ -72,7 +73,7 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 		// nil pks
 		expected = "invalid server public key"
 		badr2 = encoding.Concat(r2.Serialize()[:client.GetConf().OPRF.Group().ElementLength()], getBadElement(t, conf))
-		if _, err := client.Deserialize.RegistrationResponse(badr2); err == nil ||
+		if _, err = client.Deserialize.RegistrationResponse(badr2); err == nil ||
 			!strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid server public key - got %v", err)
 		}
@@ -104,7 +105,7 @@ func TestClientFinish_BadEvaluation(t *testing.T) {
 		)
 
 		expected := "invalid OPRF evaluation"
-		if _, err := client.Deserialize.KE2(badKe2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, err = client.Deserialize.KE2(badKe2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for invalid evaluated element - got %v", err)
 		}
 	})
@@ -130,7 +131,7 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 		sks, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
 
-		if err := server.SetKeyMaterial(nil, sks, pks, oprfSeed); err != nil {
+		if err = server.SetKeyMaterial(nil, sks, pks, oprfSeed); err != nil {
 			t.Fatal(err)
 		}
 
@@ -144,13 +145,13 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 
 		// too short
 		ke2.MaskedResponse = internal.RandomBytes(goodLength - 1)
-		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, err = client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for short response - got %v", err)
 		}
 
 		// too long
 		ke2.MaskedResponse = internal.RandomBytes(goodLength + 1)
-		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, err = client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
 			t.Fatalf("expected error for long response - got %v", err)
 		}
 	})
@@ -176,7 +177,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		sks, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
 
-		if err := server.SetKeyMaterial(nil, sks, pks, oprfSeed); err != nil {
+		if err = server.SetKeyMaterial(nil, sks, pks, oprfSeed); err != nil {
 			t.Fatal(err)
 		}
 
@@ -192,8 +193,8 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 
 		// tamper the envelope
 		env.AuthTag = internal.RandomBytes(client.GetConf().MAC.Size())
-		clear := encoding.Concat(pks, env.Serialize())
-		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
+		clearText := encoding.Concat(pks, env.Serialize())
+		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clearText)
 
 		expected := "key recovery: invalid envelope authentication tag"
 		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
@@ -276,8 +277,8 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		authTag := client.GetConf().MAC.MAC(authKey, encoding.Concat(env.Nonce, ctc))
 		env.AuthTag = authTag
 
-		clear := encoding.Concat(badpks, env.Serialize())
-		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
+		clearText := encoding.Concat(badpks, env.Serialize())
+		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clearText)
 
 		expected = "unmasking: invalid server public key in masked response"
 		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
@@ -287,8 +288,8 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		// replace PKS
 		group := server.GetConf().Group
 		fakepks := group.Base().Multiply(group.NewScalar().Random()).Encode()
-		clear = encoding.Concat(fakepks, env.Serialize())
-		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clear)
+		clearText = encoding.Concat(fakepks, env.Serialize())
+		ke2.MaskedResponse = xorResponse(server.GetConf(), rec.MaskingKey, ke2.MaskingNonce, clearText)
 
 		expected = "key recovery: invalid envelope authentication tag"
 		if _, _, err := client.GenerateKE3(ke2); err == nil || !strings.HasPrefix(err.Error(), expected) {
@@ -347,62 +348,78 @@ func TestClientFinish_MissingKe1(t *testing.T) {
 	}
 }
 
-func TestClientKSF(t *testing.T) {
-	tests := []struct {
-		name   string
-		Input  string
-		Output string
-		KSF    opaque.KSFConfiguration
-	}{
+func TestClientPRK(t *testing.T) {
+	type prkTest struct {
+		name          string
+		input         string
+		ksfSalt       string
+		kdfSalt       string
+		output        string
+		ksfParameters []int
+		ksfLength     int
+		kdf           crypto.Hash
+		ksf           ksf.Identifier
+	}
+
+	tests := []prkTest{
 		{
-			name: "Argon2id",
-			KSF: opaque.KSFConfiguration{
-				Identifier: ksf.Argon2id,
-				Salt:       []byte("salt"),
-				Parameters: []int{3, 65536, 4},
-			},
-			Input:  "password",
-			Output: "ca51a24bb2c50588ab0614dc957140a2d37cea4337cc356412aa5e7035fe9508",
+			name:          "Argon2id",
+			ksf:           ksf.Argon2id,
+			ksfSalt:       "ksfSalt",
+			ksfLength:     32,
+			ksfParameters: []int{3, 65536, 4},
+			kdf:           crypto.SHA512,
+			kdfSalt:       "kdfSalt",
+			input:         "password",
+			output:        "3e858a95d7fe77be3a6278dafa572f8a3a1d49a7154e3a0710d9a5a46358fd0993d958d0963cd88c0a907d105fadcb8c0702b02f8305f8f3c77204b63a93e469",
 		},
 		{
-			name: "Scrypt",
-			KSF: opaque.KSFConfiguration{
-				Identifier: ksf.Scrypt,
-				Salt:       []byte("salt"),
-				Parameters: []int{32768, 8, 1},
-			},
-			Input:  "password",
-			Output: "4bc0fd507e93a600768021341ec726c57c00cb55a4702a1650131365500cf471",
+			name:          "Scrypt",
+			ksf:           ksf.Scrypt,
+			ksfSalt:       "ksfSalt",
+			ksfLength:     32,
+			ksfParameters: []int{32768, 8, 1},
+			kdf:           crypto.SHA512,
+			kdfSalt:       "kdfSalt",
+			input:         "password",
+			output:        "a0d28223edab936f13d778636f1801c0368c2b8d990c5be3cf93d7d1f5ade9d7634a2b20b2f09ac2f1508be6741fcd2f4279ecf33d4b672991b107463016c37f",
 		},
 		{
-			name: "PBKDF2",
-			KSF: opaque.KSFConfiguration{
-				Identifier: ksf.PBKDF2Sha512,
-				Salt:       []byte("salt"),
-				Parameters: []int{10000},
-			},
-			Input:  "password",
-			Output: "72629a41b076e588fba8c71ca37fadc9acdc8e7321b9cb4ea55fd0bf9fe8ed72",
+			name:          "PBKDF2",
+			ksf:           ksf.PBKDF2Sha512,
+			ksfSalt:       "ksfSalt",
+			ksfLength:     32,
+			ksfParameters: []int{10000},
+			kdf:           crypto.SHA512,
+			kdfSalt:       "kdfSalt",
+			input:         "password",
+			output:        "35bd30915a0564dbd160402bec5163441cc3c8c3c9ee4cf2d87f0f2e228b514cf1c18a41ce9e84b3306286cd06032b296a4a2ff487945e59fcecbab7f06b3098",
 		},
 		{
-			name: "Identity",
-			KSF: opaque.KSFConfiguration{
-				Identifier: 0,
-				Salt:       []byte("salt"),
-				Parameters: []int{1, 2},
-			},
-			Input:  "password",
-			Output: "70617373776f7264",
+			name:          "Identity",
+			ksf:           0,
+			ksfSalt:       "ksfSalt",
+			ksfLength:     32,
+			ksfParameters: []int{1, 2},
+			kdf:           crypto.SHA512,
+			kdfSalt:       "kdfSalt",
+			input:         "password",
+			output:        "deba3102d5ddf4b833ff43d3d2f3fb77b9514652bb6ce7b985a091478a6c8ecaedb0354d72284202c3de9f358cba8885326403b9738835ae86b6a49fec25ab38",
 		},
 	}
 
 	for _, ksfTest := range tests {
 		t.Run(ksfTest.name, func(t *testing.T) {
-			f := internal.NewKSF(ksfTest.KSF.Identifier)
-			f.Parameterize(ksfTest.KSF.Parameters...)
+			input := []byte(ksfTest.input)
+			stretcher := internal.NewKSF(ksfTest.ksf)
+			stretcher.Parameterize(ksfTest.ksfParameters...)
+			stretched := stretcher.Harden(input, []byte(ksfTest.ksfSalt), ksfTest.ksfLength)
 
-			if ksfTest.Output != hex.EncodeToString(f.Harden([]byte(ksfTest.Input), ksfTest.KSF.Salt, 32)) {
-				t.Fatal("unexpected KSF output")
+			extract := internal.NewKDF(ksfTest.kdf)
+			output := hex.EncodeToString(extract.Extract([]byte(ksfTest.kdfSalt), encoding.Concat(input, stretched)))
+
+			if output != ksfTest.output {
+				t.Errorf("got %q, want %q", output, ksfTest.output)
 			}
 		})
 	}
