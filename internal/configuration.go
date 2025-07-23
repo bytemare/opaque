@@ -13,9 +13,11 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"math"
 
 	"github.com/bytemare/ecc"
 
+	"github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
 )
 
@@ -24,7 +26,7 @@ const (
 	NonceLength = 32
 
 	// SeedLength is the default length used for seeds.
-	SeedLength = oprf.SeedLength
+	SeedLength = 32
 )
 
 // ErrConfigurationInvalidLength happens when deserializing a configuration of invalid length.
@@ -35,7 +37,7 @@ type Configuration struct {
 	KDF          *KDF
 	MAC          *Mac
 	Hash         *Hash
-	KSF          *KSF
+	KSF          *ksf.KSF
 	OPRF         oprf.Identifier
 	Context      []byte
 	NonceLen     int
@@ -52,4 +54,41 @@ func RandomBytes(length int) []byte {
 	}
 
 	return r
+}
+
+var (
+	// ErrSliceDifferentLength indicates the provided slice is of different length than the configured value.
+	ErrSliceDifferentLength = fmt.Errorf("provided slice is different length than the configured value")
+
+	// ErrSliceShorterLength indicates the provided slice is shorter than the configured value.
+	ErrSliceShorterLength = fmt.Errorf("provided slice is shorter than the configured value")
+)
+
+// ValidateOptionsLength returns an error if the input slice does not match the provided length or is shorter than
+// the reference length.
+func ValidateOptionsLength(input []byte, length int, referenceLength uint32) error {
+	if input == nil {
+		return nil
+	}
+
+	// If a length is provided, the input slice must match it.
+	if length != 0 {
+		if length < 0 {
+			return fmt.Errorf("the provided length %d is negative", length)
+		}
+
+		if length > math.MaxUint32 {
+			return fmt.Errorf("the provided length %d exceeds maximum uint32 value", length)
+		}
+
+		if length != len(input) {
+			return fmt.Errorf("%w: want %d, got %d", ErrSliceDifferentLength, length, len(input))
+		}
+	} else {
+		if len(input) < int(referenceLength) {
+			return fmt.Errorf("%w: want %d, got %d", ErrSliceShorterLength, referenceLength, len(input))
+		}
+	}
+
+	return nil
 }

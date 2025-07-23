@@ -12,15 +12,14 @@ package oprf
 
 import (
 	"crypto"
+	"errors"
+	"fmt"
 
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
 )
-
-// SeedLength is the default length used for seeds.
-const SeedLength = 32
 
 // Identifier of the OPRF compatible cipher suite to be used.
 type Identifier string
@@ -43,6 +42,14 @@ const (
 
 	nbIDs                 = 4
 	maxDeriveKeyPairTries = 255
+)
+
+var (
+	// ErrBlindGroup indicates the OPRF blind's group does not match the OPRF configuration.
+	ErrBlindGroup = errors.New("OPRF blind is from a different group than the configuration")
+
+	// ErrBlindZero indicates the OPRF blind is zero.
+	ErrBlindZero = fmt.Errorf("OPRF blind is zero")
 )
 
 func (i Identifier) dst(prefix string) []byte {
@@ -133,4 +140,22 @@ func (i Identifier) Client() *Client {
 		input:      nil,
 		blind:      nil,
 	}
+}
+
+// ValidateBlind checks whether the blind is of the same group and different from 0.
+func (i Identifier) ValidateBlind(blind *ecc.Scalar) error {
+	if blind.Group() != i.Group() {
+		return fmt.Errorf(
+			"%w: expected %s, got %s",
+			ErrBlindGroup,
+			i.Group(),
+			blind.Group(),
+		)
+	}
+
+	if blind.IsZero() {
+		return ErrBlindZero
+	}
+
+	return nil
 }

@@ -21,30 +21,28 @@ var errAkeInvalidServerMac = errors.New("invalid server mac")
 
 // Client exposes the client's AKE functions and holds its state.
 type Client struct {
-	values
-	Ke1           []byte
-	sessionSecret []byte
+	EphemeralSecretKey *ecc.Scalar
+	Ke1                []byte
+	sessionSecret      []byte
 }
 
 // NewClient returns a new, empty, 3DH client.
 func NewClient() *Client {
 	return &Client{
-		values: values{
-			ephemeralSecretKey: nil,
-			nonce:              nil,
-		},
-		Ke1:           nil,
-		sessionSecret: nil,
+		EphemeralSecretKey: nil,
+		Ke1:                nil,
+		sessionSecret:      nil,
 	}
 }
 
 // Start initiates the 3DH protocol, and returns a KE1 message with clientInfo.
-func (c *Client) Start(cs ecc.Group, options Options) *message.KE1 {
-	epk := c.setOptions(cs, options)
+func (c *Client) Start(g ecc.Group, options *Options) *message.KE1 {
+	esk, epk := MakeKeyShare(g, options.EphemeralKeyShareSeed, options.EphemeralSecretKeyShare)
+	c.EphemeralSecretKey = esk
 
 	return &message.KE1{
 		CredentialRequest:    nil,
-		ClientNonce:          c.nonce,
+		ClientNonce:          options.Nonce,
 		ClientPublicKeyshare: epk,
 	}
 }
@@ -53,20 +51,18 @@ func (c *Client) Start(cs ecc.Group, options Options) *message.KE1 {
 // returns a KE3 message.
 func (c *Client) Finalize(
 	conf *internal.Configuration,
-	identities *Identities,
-	clientSecretKey *ecc.Scalar,
-	serverPublicKey *ecc.Element,
 	ke2 *message.KE2,
+	clientKM, serverKM *KeyMaterial,
 ) (*message.KE3, error) {
 	ikm := k3dh(
-		ke2.ServerPublicKeyshare,
-		c.ephemeralSecretKey,
-		serverPublicKey,
-		c.ephemeralSecretKey,
-		ke2.ServerPublicKeyshare,
-		clientSecretKey,
+		serverKM.PublicKeyShare,
+		clientKM.EphemeralSecretKey,
+		serverKM.PublicKey,
+		clientKM.EphemeralSecretKey,
+		serverKM.PublicKeyShare,
+		clientKM.SecretKey,
 	)
-	sessionSecret, serverMac, clientMac := core3DH(conf, identities, ikm, c.Ke1, ke2)
+	sessionSecret, serverMac, clientMac := core3DH(conf, clientKM.Identity, serverKM.Identity, ikm, c.Ke1, ke2)
 
 	if !conf.MAC.Equal(serverMac, ke2.ServerMac) {
 		return nil, errAkeInvalidServerMac
@@ -82,8 +78,20 @@ func (c *Client) SessionKey() []byte {
 	return c.sessionSecret
 }
 
+func (c *Client) GetEphemeralSecretKey() *ecc.Scalar {
+	if c.EphemeralSecretKey == nil {
+		return nil
+	}
+	return c.EphemeralSecretKey.Copy()
+}
+
 // Flush sets all the client's session related internal AKE values to nil.
 func (c *Client) Flush() {
-	c.flush()
+	if c.EphemeralSecretKey != nil {
+		c.EphemeralSecretKey.Zero()
+		c.EphemeralSecretKey = nil
+	}
+
+	c.Ke1 = nil
 	c.sessionSecret = nil
 }

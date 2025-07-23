@@ -167,26 +167,30 @@ func getBadScalar(t *testing.T, c *configuration) []byte {
 }
 
 func buildRecord(
-	credID, oprfSeed, password, pks []byte,
+	credID, password []byte,
 	client *opaque.Client,
 	server *opaque.Server,
-) *opaque.ClientRecord {
-	conf := server.GetConf()
-	r1 := client.RegistrationInit(password)
-
-	pk := conf.Group.NewElement()
-	if err := pk.Decode(pks); err != nil {
-		panic(err)
+) (*opaque.ClientRecord, error) {
+	r1, err := client.RegistrationInit(password)
+	if err != nil {
+		return nil, err
 	}
 
-	r2 := server.RegistrationResponse(r1, pk, credID, oprfSeed)
-	r3, _ := client.RegistrationFinalize(r2)
+	r2, err := server.RegistrationResponse(r1, credID, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	r3, _, err := client.RegistrationFinalize(r2)
+	if err != nil {
+		return nil, err
+	}
 
 	return &opaque.ClientRecord{
 		CredentialIdentifier: credID,
 		ClientIdentity:       nil,
 		RegistrationRecord:   r3,
-	}
+	}, nil
 }
 
 func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {

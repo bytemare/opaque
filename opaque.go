@@ -24,6 +24,7 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
+	internalKSF "github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
 )
@@ -164,7 +165,7 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 	ip := &internal.Configuration{
 		OPRF:         o,
 		Group:        g,
-		KSF:          internal.NewKSF(c.KSF),
+		KSF:          internalKSF.NewKSF(c.KSF),
 		KDF:          internal.NewKDF(c.KDF),
 		MAC:          mac,
 		Hash:         internal.NewHash(c.Hash),
@@ -242,9 +243,9 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 	publicKey := i.Group.Base().Multiply(scalar)
 
 	regRecord := &message.RegistrationRecord{
-		PublicKey:  publicKey,
-		MaskingKey: RandomBytes(i.KDF.Size()),
-		Envelope:   make([]byte, internal.NonceLength+i.MAC.Size()),
+		ClientPublicKey: publicKey,
+		MaskingKey:      RandomBytes(i.KDF.Size()),
+		Envelope:        make([]byte, internal.NonceLength+i.MAC.Size()),
 	}
 
 	return &ClientRecord{

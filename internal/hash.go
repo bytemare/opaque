@@ -13,7 +13,6 @@ import (
 	"crypto/hmac"
 
 	"github.com/bytemare/hash"
-	"github.com/bytemare/ksf"
 )
 
 // NewKDF returns a newly instantiated KDF.
@@ -89,40 +88,4 @@ func (h *Hash) Sum() []byte {
 // Write adds input to the running state.
 func (h *Hash) Write(p []byte) {
 	_, _ = h.h.Write(p)
-}
-
-// NewKSF returns a newly instantiated KSF.
-func NewKSF(id ksf.Identifier) *KSF {
-	if id == 0 {
-		return &KSF{&IdentityKSF{}}
-	}
-
-	return &KSF{id.Get()}
-}
-
-// KSF wraps a key stretching function and exposes its functions.
-type KSF struct {
-	ksfInterface
-}
-
-type ksfInterface interface {
-	// Harden uses default parameters for the key derivation function over the input password and salt.
-	Harden(password, salt []byte, length int) []byte
-
-	// Parameterize replaces the functions parameters with the new ones.
-	// Must match the amount of parameters for the KSF.
-	Parameterize(parameters ...int)
-}
-
-// IdentityKSF represents a KSF with no operations.
-type IdentityKSF struct{}
-
-// Harden returns the password as is.
-func (i IdentityKSF) Harden(password, _ []byte, _ int) []byte {
-	return password
-}
-
-// Parameterize applies KSF parameters if defined.
-func (i IdentityKSF) Parameterize(_ ...int) {
-	// no-op
 }

@@ -35,7 +35,6 @@ func Mask(
 	conf *internal.Configuration,
 	nonceIn, maskingKey, serverPublicKey, envelope []byte,
 ) (nonce, maskedResponse []byte) {
-	// testing: integrated to support testing, to force values.
 	nonce = nonceIn
 	if len(nonce) == 0 {
 		nonce = internal.RandomBytes(conf.NonceLen)

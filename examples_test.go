@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	exampleClientRecord                               *opaque.ClientRecord
-	secretOprfSeed, serverPrivateKey, serverPublicKey []byte
+	exampleClientRecord                                     *opaque.ClientRecord
+	secretGlobalOprfSeed, serverPrivateKey, serverPublicKey []byte
 )
 
 func isSameConf(a, b *opaque.Configuration) bool {
@@ -93,10 +93,10 @@ func Example_serverSetup() {
 	// They have to be run only once in the application's lifecycle, and the output values must be stored appropriately.
 	serverID := []byte("server-identity")
 	conf := opaque.DefaultConfiguration()
-	secretOprfSeed = conf.GenerateOPRFSeed()
+	secretGlobalOprfSeed = conf.GenerateOPRFSeed()
 	serverPrivateKey, serverPublicKey = conf.KeyGen()
 
-	if serverPrivateKey == nil || serverPublicKey == nil || secretOprfSeed == nil {
+	if serverPrivateKey == nil || serverPublicKey == nil || secretGlobalOprfSeed == nil {
 		log.Fatalf("Oh no! Something went wrong setting up the server secrets!")
 	}
 
@@ -106,7 +106,7 @@ func Example_serverSetup() {
 		log.Fatalln(err)
 	}
 
-	if err := server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretOprfSeed); err != nil {
+	if err = server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretGlobalOprfSeed); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -186,11 +186,6 @@ func Example_deserialization() {
 // client (e.g. database entry ID), and that must absolutely stay the same for the whole client existence and
 // never be reused.
 func Example_registration() {
-	// The server must have been set up with its long term values once. So we're calling this, here, for the demo.
-	{
-		Example_serverSetup()
-	}
-
 	// Secret client information.
 	password := []byte("password")
 
@@ -199,13 +194,21 @@ func Example_registration() {
 	clientID := []byte("username")
 	conf := opaque.DefaultConfiguration()
 
-	// Runtime instantiation for the client and server.
-	client, err := conf.Client()
+	// Runtime instantiation of the server.
+	server, err := conf.Server()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	server, err := conf.Server()
+	secretGlobalOprfSeed = conf.GenerateOPRFSeed()
+	serverPrivateKey, serverPublicKey = conf.KeyGen()
+
+	if err = server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretGlobalOprfSeed); err != nil {
+		log.Fatalln(err)
+	}
+
+	// Runtime instantiation of the client.
+	client, err := conf.Client()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -218,7 +221,11 @@ func Example_registration() {
 
 	// The client starts, serializes the message, and sends it to the server.
 	{
-		c1 := client.RegistrationInit(password)
+		c1, err := client.RegistrationInit(password)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
 		message1 = c1.Serialize()
 	}
 
@@ -232,13 +239,12 @@ func Example_registration() {
 		// The server creates a database entry for the client and creates a credential identifier that must absolutely
 		// be unique among all clients.
 		credID = opaque.RandomBytes(64)
-		pks, err := server.Deserialize.DecodeAkePublicKey(serverPublicKey)
+
+		// The server uses its public key and secret OPRF seed created at the setup.
+		response, err := server.RegistrationResponse(request, credID, nil)
 		if err != nil {
 			log.Fatalln(err)
 		}
-
-		// The server uses its public key and secret OPRF seed created at the setup.
-		response := server.RegistrationResponse(request, pks, credID, secretOprfSeed)
 
 		// The server responds with its serialized response.
 		message2 = response.Serialize()
@@ -253,10 +259,14 @@ func Example_registration() {
 
 		// The client produces its record and a client-only-known secret export_key, that the client can use for other purposes (e.g. encrypt
 		// information to store on the server, and that the server can't decrypt). We don't use in the example here.
-		record, _ := client.RegistrationFinalize(response, opaque.ClientRegistrationFinalizeOptions{
+		record, _, err := client.RegistrationFinalize(response, opaque.ClientOptions{
 			ClientIdentity: clientID,
 			ServerIdentity: serverID,
 		})
+		if err != nil {
+			log.Fatalln(err)
+		}
+
 		message3 = record.Serialize()
 	}
 
@@ -276,8 +286,7 @@ func Example_registration() {
 		fmt.Println("OPAQUE registration is easy!")
 	}
 
-	// Output: OPAQUE server initialized.
-	// OPAQUE registration is easy!
+	// Output: OPAQUE registration is easy!
 }
 
 // Example_LoginKeyExchange demonstrates in a single function the interactions between a client and a server for the
@@ -297,18 +306,19 @@ func Example_loginKeyExchange() {
 	clientID := []byte("username")
 	conf := opaque.DefaultConfiguration()
 
-	// Runtime instantiation for the client and server.
-	client, err := conf.Client()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
+	// Runtime instantiation of the server.
 	server, err := conf.Server()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	if err := server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretOprfSeed); err != nil {
+	if err = server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretGlobalOprfSeed); err != nil {
+		log.Fatalln(err)
+	}
+
+	// Runtime instantiation of the client.
+	client, err := conf.Client()
+	if err != nil {
 		log.Fatalln(err)
 	}
 
@@ -319,7 +329,11 @@ func Example_loginKeyExchange() {
 
 	// The client initiates the ball and sends the serialized ke1 to the server.
 	{
-		ke1 := client.GenerateKE1(password)
+		ke1, err := client.GenerateKE1(password)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
 		message1 = ke1.Serialize()
 	}
 
@@ -347,7 +361,7 @@ func Example_loginKeyExchange() {
 		}
 
 		// In this example, we don't use the secret export key. The client sends the serialized ke3 to the server.
-		ke3, _, err := client.GenerateKE3(ke2, opaque.GenerateKE3Options{
+		ke3, _, err := client.GenerateKE3(ke2, opaque.ClientOptions{
 			ClientIdentity: clientID,
 			ServerIdentity: serverID,
 		})
@@ -378,14 +392,13 @@ func Example_loginKeyExchange() {
 		serverSessionKey = server.SessionKey()
 	}
 
-	// The following test does not exist in the real world and simply proves the point that the keys match.
+	// The following test does not exist in the real world and simply proves the point that the keys match for the demo.
 	if !bytes.Equal(clientSessionKey, serverSessionKey) {
 		log.Fatalln("Oh no! Abort! The shared session keys don't match!")
 	}
 
 	fmt.Println("OPAQUE is much awesome!")
-	// Output: OPAQUE server initialized.
-	// OPAQUE registration is easy!
+	// Output: OPAQUE registration is easy!
 	// OPAQUE is much awesome!
 }
 
@@ -424,7 +437,7 @@ func Example_fakeResponse() {
 			log.Fatalln(err)
 		}
 
-		if err := server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretOprfSeed); err != nil {
+		if err := server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretGlobalOprfSeed); err != nil {
 			log.Fatalln(err)
 		}
 

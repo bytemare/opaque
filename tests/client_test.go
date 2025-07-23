@@ -20,6 +20,7 @@ import (
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+	ksf2 "github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/tag"
 )
 
@@ -27,7 +28,7 @@ import (
 	The following tests look for failing conditions.
 */
 
-func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
+func TestClient_Deserialize_RegistrationResponse(t *testing.T) {
 	/*
 		Invalid data sent to the client
 	*/
@@ -44,15 +45,24 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_, pks := conf.conf.KeyGen()
 		oprfSeed := internal.RandomBytes(conf.conf.Hash.Size())
-		r1 := client.RegistrationInit([]byte("yo"))
+		_, pks := conf.conf.KeyGen()
 
-		pk := server.GetConf().Group.NewElement()
-		if err = pk.Decode(pks); err != nil {
-			panic(err)
+		if err = server.SetKeyMaterial(nil, nil, pks, oprfSeed); err != nil {
+			t.Fatal(err)
 		}
-		r2 := server.RegistrationResponse(r1, pk, credID, oprfSeed)
+
+		// Start the registration flow.
+
+		r1, err := client.RegistrationInit([]byte("yo"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		r2, err := server.RegistrationResponse(r1, credID, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		// message length
 		badr2 := internal.RandomBytes(15)
@@ -70,7 +80,7 @@ func TestClientRegistrationFinalize_InvalidPks(t *testing.T) {
 			t.Fatalf("expected error for empty server public key - got %v", err)
 		}
 
-		// nil pks
+		// invalid pks
 		expected = "invalid server public key"
 		badr2 = encoding.Concat(r2.Serialize()[:client.GetConf().OPRF.Group().ElementLength()], getBadElement(t, conf))
 		if _, err = client.Deserialize.RegistrationResponse(badr2); err == nil ||
@@ -90,7 +100,11 @@ func TestClientFinish_BadEvaluation(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		_ = client.GenerateKE1([]byte("yo"))
+		_, err = client.GenerateKE1([]byte("yo"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		r2 := encoding.Concat(
 			getBadElement(t, conf),
 			internal.RandomBytes(
@@ -135,10 +149,20 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
+		rec, err := buildRecord(credID, []byte("yo"), client, server)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		ke1 := client.GenerateKE1([]byte("yo"))
-		ke2, _ := server.GenerateKE2(ke1, rec)
+		ke1, err := client.GenerateKE1([]byte("yo"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ke2, err := server.GenerateKE2(ke1, rec)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		goodLength := client.GetConf().Group.ElementLength() + client.GetConf().EnvelopeSize
 		expected := "invalid masked response length"
@@ -181,9 +205,16 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
+		rec, err := buildRecord(credID, []byte("yo"), client, server)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		ke1 := client.GenerateKE1([]byte("yo"))
+		ke1, err := client.GenerateKE1([]byte("yo"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		ke2, _ := server.GenerateKE2(ke1, rec)
 
 		env, _, err := getEnvelope(client, ke2)
@@ -239,10 +270,21 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
+		rec, err := buildRecord(credID, []byte("yo"), client, server)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		ke1 := client.GenerateKE1([]byte("yo"))
-		ke2, _ := server.GenerateKE2(ke1, rec)
+		ke1, err := client.GenerateKE1([]byte("yo"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ke2, err := server.GenerateKE2(ke1, rec)
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		// epks := ke2.ServerPublicKeyshare
 
 		// tamper epks
@@ -264,7 +306,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		badpks := getBadElement(t, conf)
 
 		ctc := cleartextCredentials(
-			rec.RegistrationRecord.PublicKey.Encode(),
+			rec.RegistrationRecord.ClientPublicKey.Encode(),
 			badpks,
 			nil,
 			nil,
@@ -322,10 +364,20 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 			log.Fatal(err)
 		}
 
-		rec := buildRecord(credID, oprfSeed, []byte("yo"), pks, client, server)
+		rec, err := buildRecord(credID, []byte("yo"), client, server)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		ke1 := client.GenerateKE1([]byte("yo"))
-		ke2, _ := server.GenerateKE2(ke1, rec)
+		ke1, err := client.GenerateKE1([]byte("yo"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ke2, err := server.GenerateKE2(ke1, rec)
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		ke2.ServerMac = internal.RandomBytes(client.GetConf().MAC.Size())
 		expected := "finalizing AKE: invalid server mac"
@@ -336,7 +388,7 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 }
 
 func TestClientFinish_MissingKe1(t *testing.T) {
-	expectedError := "missing KE1 in client state"
+	expectedError := "client state: missing KE1 message - call GenerateKE1 first"
 	conf := opaque.DefaultConfiguration()
 	client, _ := conf.Client()
 	if _, _, err := client.GenerateKE3(nil); err == nil || !strings.EqualFold(err.Error(), expectedError) {
@@ -411,7 +463,7 @@ func TestClientPRK(t *testing.T) {
 	for _, ksfTest := range tests {
 		t.Run(ksfTest.name, func(t *testing.T) {
 			input := []byte(ksfTest.input)
-			stretcher := internal.NewKSF(ksfTest.ksf)
+			stretcher := ksf2.NewKSF(ksfTest.ksf)
 			stretcher.Parameterize(ksfTest.ksfParameters...)
 			stretched := stretcher.Harden(input, []byte(ksfTest.ksfSalt), ksfTest.ksfLength)
 

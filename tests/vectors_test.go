@@ -123,7 +123,10 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 		panic(err)
 	}
 
-	regReq := client.RegistrationInit(v.Inputs.Password, opaque.ClientRegistrationInitOptions{OPRFBlind: blind})
+	regReq, err := client.RegistrationInit(v.Inputs.Password, opaque.ClientOptions{OPRFBlind: blind})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !bytes.Equal(v.Outputs.RegistrationRequest, regReq.Serialize()) {
 		t.Fatalf(
@@ -135,12 +138,15 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 
 	// Server
 	server, _ := conf.Server()
-	pks, err := server.Deserialize.DecodeAkePublicKey(v.Inputs.ServerPublicKey)
-	if err != nil {
-		panic(err)
+
+	if err := server.SetKeyMaterial(nil, nil, v.Inputs.ServerPublicKey, v.Inputs.OprfSeed); err != nil {
+		t.Fatal(err)
 	}
 
-	regResp := server.RegistrationResponse(regReq, pks, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
+	regResp, err := server.RegistrationResponse(regReq, v.Inputs.CredentialIdentifier, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	vRegResp, err := client.Deserialize.RegistrationResponse(v.Outputs.RegistrationResponse)
 	if err != nil {
@@ -152,7 +158,7 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 		t.Fatal("registration response data do not match")
 	}
 
-	if !bytes.Equal(vRegResp.Pks.Encode(), regResp.Pks.Encode()) {
+	if !bytes.Equal(vRegResp.ServerPublicKey, regResp.ServerPublicKey) {
 		t.Fatal("registration response serverPublicKey do not match")
 	}
 
@@ -161,14 +167,17 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	}
 
 	// Client
-	upload, exportKey := client.RegistrationFinalize(
+	upload, exportKey, err := client.RegistrationFinalize(
 		regResp,
-		opaque.ClientRegistrationFinalizeOptions{
+		opaque.ClientOptions{
 			ClientIdentity: v.Inputs.ClientIdentity,
 			ServerIdentity: v.Inputs.ServerIdentity,
 			EnvelopeNonce:  v.Inputs.EnvelopeNonce,
 		},
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !bytes.Equal(v.Outputs.ExportKey, exportKey) {
 		t.Fatalf("exportKey do not match\nexpected %v,\ngot %v", v.Outputs.ExportKey, exportKey)
@@ -204,15 +213,30 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 			panic(err)
 		}
 
-		KE1 := client.GenerateKE1(v.Inputs.Password, opaque.GenerateKE1Options{
-			OPRFBlind:      blind,
-			KeyShareSeed:   v.Inputs.ClientKeyshareSeed,
-			AKENonce:       v.Inputs.ClientNonce,
-			AKENonceLength: internal.NonceLength,
+		KE1, err := client.GenerateKE1(v.Inputs.Password, opaque.ClientOptions{
+			OPRFBlind: blind,
+			AKE: opaque.AKEOptions{
+				EphemeralSecretKey: nil,
+				KeyShareSeed:       v.Inputs.ClientKeyshareSeed,
+				Nonce:              v.Inputs.ClientNonce,
+				KeyShareSeedLength: 0,
+				NonceLength:        internal.NonceLength,
+			},
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if !bytes.Equal(v.Outputs.KE1, KE1.Serialize()) {
-			t.Fatalf("KE1 do not match")
+			log.Println(hex.EncodeToString(v.Inputs.ClientNonce))
+			log.Println(hex.EncodeToString(v.Inputs.ClientKeyshareSeed))
+			log.Println(KE1.ClientPublicKeyshare.Hex())
+			log.Println(hex.EncodeToString(KE1.ClientNonce))
+			t.Fatalf(
+				"KE1 do not match:\nwant %v,\ngot  %v",
+				hex.EncodeToString(v.Outputs.KE1),
+				hex.EncodeToString(KE1.Serialize()),
+			)
 		}
 	}
 
@@ -253,7 +277,7 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 
 	ke3, exportKey, err := client.GenerateKE3(
 		cke2,
-		opaque.GenerateKE3Options{
+		opaque.ClientOptions{
 			ClientIdentity: v.Inputs.ClientIdentity,
 			ServerIdentity: v.Inputs.ServerIdentity,
 		},
@@ -339,7 +363,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 	ke2, err := s.GenerateKE2(
 		ke1,
 		record,
-		opaque.GenerateKE2Options{
+		opaque.ServerOptions{
 			KeyShareSeed:   v.Inputs.ServerKeyshareSeed,
 			AKENonce:       v.Inputs.ServerNonce,
 			AKENonceLength: internal.NonceLength,

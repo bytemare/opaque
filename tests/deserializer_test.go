@@ -189,7 +189,7 @@ func TestDecodeAkePrivateKey(t *testing.T) {
 		}
 
 		if _, err = des.DecodeAkePrivateKey(key.Encode()); err != nil {
-			t.Fatalf("unexpect error on valid private key. Group %v, key %v",
+			t.Fatalf("unexpected error on valid private key. Group %v, key %v",
 				conf.conf.AKE,
 				key.Hex(),
 			)

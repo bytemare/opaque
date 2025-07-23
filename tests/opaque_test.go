@@ -21,6 +21,7 @@ import (
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
+	ksf2 "github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
 )
 
@@ -30,7 +31,7 @@ type testParams struct {
 	*opaque.Configuration
 	username, userID, serverID, password, serverSecretKey, serverPublicKey, oprfSeed, ksfSalt, kdfSalt []byte
 	ksfParameters                                                                                      []int
-	ksfLength, nonceLength                                                                             uint32
+	ksfLength, nonceLength                                                                             int
 }
 
 func TestFull(t *testing.T) {
@@ -81,7 +82,11 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 
 	var m1s []byte
 	{
-		reqReg := client.RegistrationInit(p.password)
+		reqReg, err := client.RegistrationInit(p.password)
+		if err != nil {
+			t.Fatalf(dbgErr, err)
+		}
+
 		m1s = reqReg.Serialize()
 	}
 
@@ -96,12 +101,15 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 		}
 
 		credID = internal.RandomBytes(32)
-		pks, err := server.Deserialize.DecodeAkePublicKey(p.serverPublicKey)
-		if err != nil {
+
+		if err = server.SetKeyMaterial(nil, nil, p.serverPublicKey, p.oprfSeed); err != nil {
 			t.Fatalf(dbgErr, err)
 		}
 
-		respReg := server.RegistrationResponse(m1, pks, credID, p.oprfSeed)
+		respReg, err := server.RegistrationResponse(m1, credID, nil)
+		if err != nil {
+			t.Fatalf(dbgErr, err)
+		}
 
 		m2s = respReg.Serialize()
 	}
@@ -115,7 +123,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 			t.Fatalf(dbgErr, err)
 		}
 
-		upload, key := client.RegistrationFinalize(m2, opaque.ClientRegistrationFinalizeOptions{
+		upload, key, err := client.RegistrationFinalize(m2, opaque.ClientOptions{
 			ClientIdentity: p.username,
 			ServerIdentity: p.serverID,
 			KDFSalt:        p.kdfSalt,
@@ -123,6 +131,10 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 			KSFParameters:  p.ksfParameters,
 			KSFLength:      p.ksfLength,
 		})
+		if err != nil {
+			t.Fatalf(dbgErr, err)
+		}
+
 		exportKeyReg = key
 
 		m3s = upload.Serialize()
@@ -154,7 +166,11 @@ func testAuthentication(
 
 	var m4s []byte
 	{
-		ke1 := client.GenerateKE1(p.password)
+		ke1, err := client.GenerateKE1(p.password)
+		if err != nil {
+			t.Fatalf(dbgErr, err)
+		}
+
 		m4s = ke1.Serialize()
 	}
 
@@ -192,7 +208,7 @@ func testAuthentication(
 			t.Fatalf(dbgErr, err)
 		}
 
-		ke3, key, err := client.GenerateKE3(m5, opaque.GenerateKE3Options{
+		ke3, key, err := client.GenerateKE3(m5, opaque.ClientOptions{
 			ClientIdentity: p.username,
 			ServerIdentity: p.serverID,
 			KDFSalt:        p.kdfSalt,
@@ -311,28 +327,20 @@ func TestFlush(t *testing.T) {
 	}
 
 	if client.Ake.GetEphemeralSecretKey() != nil {
-		t.Fatalf("client flush failed, the ephemeral session key is non-nil: %v", client.SessionKey())
+		t.Fatalf("client flush failed, the ephemeral session key is non-nil: %v", client.Ake.GetEphemeralSecretKey())
 	}
 
-	if client.Ake.GetNonce() != nil {
-		t.Fatalf("client flush failed, the nonce is non-nil: %v", client.SessionKey())
-	}
-
-	server.Ake.Flush()
+	server.Flush()
 	if server.SessionKey() != nil {
-		t.Fatalf("server flush failed, the session key is non-nil: %v", client.SessionKey())
+		t.Fatalf("server flush failed, the session key is non-nil: %v", server.SessionKey())
 	}
 
-	if server.Ake.GetEphemeralSecretKey() != nil {
-		t.Fatalf("server flush failed, the ephemeral session key is non-nil: %v", client.SessionKey())
-	}
-
-	if server.Ake.GetNonce() != nil {
-		t.Fatalf("server flush failed, the nonce is non-nil: %v", client.SessionKey())
+	if server.GetEphemeralSecretKey() != nil {
+		t.Fatalf("server flush failed, the ephemeral session key is non-nil: %v", server.GetEphemeralSecretKey())
 	}
 
 	if server.ExpectedMAC() != nil {
-		t.Fatalf("server flush failed, the expected client mac is non-nil: %v", client.SessionKey())
+		t.Fatalf("server flush failed, the expected client mac is non-nil: %v", server.ExpectedMAC())
 	}
 }
 
@@ -360,7 +368,7 @@ func TestNilConfiguration(t *testing.T) {
 	defaultConfiguration := &internal.Configuration{
 		OPRF:     oprf.IDFromGroup(g),
 		Group:    g,
-		KSF:      internal.NewKSF(def.KSF),
+		KSF:      ksf2.NewKSF(def.KSF),
 		KDF:      internal.NewKDF(def.KDF),
 		MAC:      internal.NewMac(def.MAC),
 		Hash:     internal.NewHash(def.Hash),

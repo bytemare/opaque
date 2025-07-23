@@ -11,6 +11,7 @@ package keyrecovery
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/bytemare/ecc"
 
@@ -25,7 +26,6 @@ var errEnvelopeInvalidMac = errors.New("invalid envelope authentication tag")
 // Credentials structure is currently used for testing purposes.
 type Credentials struct {
 	ClientIdentity, ServerIdentity []byte
-	EnvelopeNonce                  []byte // testing: integrated to support testing
 }
 
 // Envelope represents the OPAQUE envelope.
@@ -76,21 +76,16 @@ func deriveDiffieHellmanKeyPair(
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
 func Store(
 	conf *internal.Configuration,
-	randomizedPassword []byte, serverPublicKey *ecc.Element,
-	credentials *Credentials,
+	randomizedPassword, serverPublicKey,
+	clientIdentity, serverIdentity,
+	nonce []byte,
 ) (env *Envelope, pku *ecc.Element, export []byte) {
-	// testing: integrated to support testing with set nonce
-	nonce := credentials.EnvelopeNonce
-	if nonce == nil {
-		nonce = internal.RandomBytes(conf.NonceLen)
-	}
-
 	_, pku = deriveDiffieHellmanKeyPair(conf, randomizedPassword, nonce)
 	ctc := cleartextCredentials(
 		pku.Encode(),
-		serverPublicKey.Encode(),
-		credentials.ClientIdentity,
-		credentials.ServerIdentity,
+		serverPublicKey,
+		clientIdentity,
+		serverIdentity,
 	)
 	auth := authTag(conf, randomizedPassword, nonce, ctc)
 	export = exportKey(conf, randomizedPassword, nonce)
@@ -125,4 +120,29 @@ func Recover(
 	export = exportKey(conf, randomizedPassword, envelope.Nonce)
 
 	return clientSecretKey, clientPublicKey, export, nil
+}
+
+type Options struct {
+	Nonce       []byte
+	NonceLength uint32
+}
+
+func NewOptions() *Options {
+	return &Options{
+		Nonce:       nil,
+		NonceLength: internal.NonceLength,
+	}
+}
+
+func (o *Options) Set(nonce []byte, length int) error {
+	if err := internal.ValidateOptionsLength(nonce, length, internal.NonceLength); err != nil {
+		return fmt.Errorf("envelope nonce: %w", err)
+	}
+
+	o.Nonce = nonce
+	if length != 0 {
+		o.NonceLength = uint32(length)
+	}
+
+	return nil
 }

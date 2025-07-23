@@ -10,6 +10,7 @@
 package ake
 
 import (
+	"fmt"
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
@@ -17,6 +18,14 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
+)
+
+var (
+	// ErrOptionsSeed indicates the AKE key share seed is invalid.
+	ErrOptionsSeed = fmt.Errorf("invalid AKE key share seed")
+
+	// ErrOptionsNonce indicates the AKE nonce is not valid.
+	ErrOptionsNonce = fmt.Errorf("invalid AKE nonce")
 )
 
 // KeyGen returns private and public keys in the ecc.
@@ -61,67 +70,62 @@ func (id *Identities) SetIdentities(clientPublicKey *ecc.Element, serverPublicKe
 
 // Options enable setting optional ephemeral values, which default to secure random values if not set.
 type Options struct {
-	// KeyShareSeed: optional.
-	KeyShareSeed []byte
-	// Nonce: optional.
-	Nonce []byte
-	// NonceLength: optional, overrides the default length of the nonce to be created if no nonce is provided.
-	NonceLength uint32
+	EphemeralSecretKeyShare     *ecc.Scalar
+	EphemeralKeyShareSeed       []byte
+	Nonce                       []byte
+	EphemeralKeyShareSeedLength uint32
+	NonceLength                 uint32
 }
 
-func (o *Options) init() {
-	if o.KeyShareSeed == nil {
-		o.KeyShareSeed = internal.RandomBytes(internal.SeedLength)
-	}
-
-	if o.NonceLength == 0 {
-		o.NonceLength = internal.NonceLength
-	}
-
-	if len(o.Nonce) == 0 {
-		o.Nonce = internal.RandomBytes(int(o.NonceLength))
+// NewOptions returns a new Options structure with default values.
+func NewOptions() *Options {
+	return &Options{
+		EphemeralKeyShareSeed:       nil,
+		Nonce:                       nil,
+		EphemeralKeyShareSeedLength: internal.SeedLength,
+		NonceLength:                 internal.NonceLength,
 	}
 }
 
-type values struct {
-	ephemeralSecretKey *ecc.Scalar
-	nonce              []byte
-}
-
-// GetEphemeralSecretKey returns the state's ephemeral secret key.
-func (v *values) GetEphemeralSecretKey() *ecc.Scalar {
-	return v.ephemeralSecretKey
-}
-
-// GetNonce returns the secret nonce.
-func (v *values) GetNonce() []byte {
-	return v.nonce
-}
-
-func (v *values) flush() {
-	if v.ephemeralSecretKey != nil {
-		v.ephemeralSecretKey.Zero()
-		v.ephemeralSecretKey = nil
+func (o *Options) Set(seed []byte, seedLength int, nonce []byte, nonceLength int) error {
+	if err := setOptions(&o.EphemeralKeyShareSeed, &o.EphemeralKeyShareSeedLength,
+		seed, seedLength, internal.SeedLength, ErrOptionsSeed); err != nil {
+		return err
 	}
 
-	v.nonce = nil
+	if err := setOptions(&o.Nonce, &o.NonceLength,
+		nonce, nonceLength, internal.NonceLength, ErrOptionsNonce); err != nil {
+		return err
+	}
+
+	return nil
 }
 
-// setOptions sets optional values.
-// There's no effect if ephemeralSecretKey and nonce have already been set in a previous call.
-func (v *values) setOptions(g ecc.Group, options Options) *ecc.Element {
-	options.init()
-
-	if v.ephemeralSecretKey == nil {
-		v.ephemeralSecretKey = oprf.IDFromGroup(g).
-			DeriveKey(options.KeyShareSeed, []byte(tag.DeriveDiffieHellmanKeyPair))
+func setOptions(s *[]byte, l *uint32, input []byte, length int, referenceLength uint32, refErr error) error {
+	if err := internal.ValidateOptionsLength(input, length, referenceLength); err != nil {
+		return fmt.Errorf("%w: %w", refErr, err)
 	}
 
-	if v.nonce == nil {
-		v.nonce = options.Nonce
+	if length != 0 {
+		*l = uint32(length)
 	}
 
-	return g.Base().Multiply(v.ephemeralSecretKey)
+	if len(input) == 0 {
+		*s = internal.RandomBytes(int(*l))
+	} else {
+		*s = input
+	}
+
+	return nil
+}
+
+func MakeKeyShare(g ecc.Group, seed []byte, ephemeralSecretKey *ecc.Scalar) (*ecc.Scalar, *ecc.Element) {
+	if ephemeralSecretKey == nil {
+		ephemeralSecretKey = oprf.IDFromGroup(g).
+			DeriveKey(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
+	}
+
+	return ephemeralSecretKey, g.Base().Multiply(ephemeralSecretKey)
 }
 
 func k3dh(
@@ -140,9 +144,9 @@ func k3dh(
 }
 
 func core3DH(
-	conf *internal.Configuration, identities *Identities, ikm, ke1 []byte, ke2 *message.KE2,
+	conf *internal.Configuration, idC, idS, ikm, ke1 []byte, ke2 *message.KE2,
 ) (sessionSecret, macS, macC []byte) {
-	initTranscript(conf, identities, ke1, ke2)
+	initTranscript(conf, idC, idS, ke1, ke2)
 
 	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, conf.Hash.Sum()) // preamble
 	serverMac := conf.MAC.MAC(serverMacKey, conf.Hash.Sum())                                // transcript2
@@ -173,9 +177,9 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func initTranscript(conf *internal.Configuration, identities *Identities, ke1 []byte, ke2 *message.KE2) {
-	encodedClientID := encoding.EncodeVector(identities.ClientIdentity)
-	encodedServerID := encoding.EncodeVector(identities.ServerIdentity)
+func initTranscript(conf *internal.Configuration, idC, idS, ke1 []byte, ke2 *message.KE2) {
+	encodedClientID := encoding.EncodeVector(idC)
+	encodedServerID := encoding.EncodeVector(idS)
 	conf.Hash.Write(encoding.Concatenate([]byte(tag.VersionTag), encoding.EncodeVector(conf.Context),
 		encodedClientID, ke1,
 		encodedServerID, ke2.CredentialResponse.Serialize(), ke2.ServerNonce, ke2.ServerPublicKeyshare.Encode()))

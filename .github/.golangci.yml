@@ -1,8 +1,10 @@
 version: "2"
 linters:
-  default: all
+  default: none
   disable:
+    - embeddedstructfieldcheck
     - funcorder
+    - noinlineerr
     - nonamedreturns
     - varnamelen
   enable:
@@ -108,7 +110,7 @@ linters:
     - wastedassign
     - whitespace
     - wrapcheck
-    - wsl
+    - wsl_v5
     - zerologlint
   settings:
     cyclop:
@@ -126,6 +128,7 @@ linters:
       enable-all: true
       disabled-checks:
         - unnamedResult
+        - sloppyReassign
     govet:
       enable-all: true
       settings:

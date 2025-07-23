@@ -64,14 +64,16 @@ func (d *Deserializer) RegistrationResponse(registrationResponse []byte) (*messa
 		return nil, errInvalidEvaluatedData
 	}
 
+	pksBytes := registrationResponse[d.conf.OPRF.Group().ElementLength():]
+
 	pks := d.conf.Group.NewElement()
-	if err := pks.Decode(registrationResponse[d.conf.OPRF.Group().ElementLength():]); err != nil {
+	if err := pks.Decode(pksBytes); err != nil {
 		return nil, errInvalidServerPK
 	}
 
 	return &message.RegistrationResponse{
 		EvaluatedMessage: evaluatedMessage,
-		Pks:              pks,
+		ServerPublicKey:  pksBytes,
 	}, nil
 }
 
@@ -96,9 +98,9 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 	}
 
 	return &message.RegistrationRecord{
-		PublicKey:  pku,
-		MaskingKey: maskingKey,
-		Envelope:   env,
+		ClientPublicKey: pku,
+		MaskingKey:      maskingKey,
+		Envelope:        env,
 	}, nil
 }
 
