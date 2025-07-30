@@ -14,11 +14,9 @@ package opaque
 
 import (
 	"crypto"
-	"errors"
 	"fmt"
 
 	"github.com/bytemare/ecc"
-	"github.com/bytemare/hash"
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque/internal"
@@ -70,15 +68,6 @@ func (g Group) Group() ecc.Group {
 
 const confIDsLength = 6
 
-var (
-	errInvalidOPRFid = errors.New("invalid OPRF group id")
-	errInvalidKDFid  = errors.New("invalid KDF id")
-	errInvalidMACid  = errors.New("invalid MAC id")
-	errInvalidHASHid = errors.New("invalid Hash id")
-	errInvalidKSFid  = errors.New("invalid KSF id")
-	errInvalidAKEid  = errors.New("invalid AKE group id")
-)
-
 // Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
 // as well as KDF, MAC, Hash should be the same.
 type Configuration struct {
@@ -120,34 +109,34 @@ func (c *Configuration) GenerateOPRFSeed() []byte {
 }
 
 // KeyGen returns a key pair in the AKE ecc.
-func (c *Configuration) KeyGen() (secretKey, publicKey []byte) {
+func (c *Configuration) KeyGen() (secretKey *ecc.Scalar, publicKey *ecc.Element) {
 	return ake.KeyGen(ecc.Group(c.AKE))
 }
 
 // verify returns an error on the first non-compliant parameter, nil otherwise.
 func (c *Configuration) verify() error {
 	if !c.OPRF.Available() || !c.OPRF.OPRF().Available() {
-		return errInvalidOPRFid
+		return ErrInvalidOPRFid
 	}
 
 	if !c.AKE.Available() || !c.AKE.Group().Available() {
-		return errInvalidAKEid
+		return ErrInvalidAKEid
 	}
 
-	if c.KDF >= 25 || !hash.Hash(c.KDF).Available() { //nolint:gosec // overflow is checked beforehand.
-		return errInvalidKDFid
+	if !internal.IsHashFunctionValid(c.KDF) {
+		return ErrInvalidKDFid
 	}
 
-	if c.MAC >= 25 || !hash.Hash(c.MAC).Available() { //nolint:gosec // overflow is checked beforehand.
-		return errInvalidMACid
+	if !internal.IsHashFunctionValid(c.MAC) {
+		return ErrInvalidMACid
 	}
 
-	if c.Hash >= 25 || !hash.Hash(c.Hash).Available() { //nolint:gosec // overflow is checked beforehand.
-		return errInvalidHASHid
+	if !internal.IsHashFunctionValid(c.Hash) {
+		return ErrInvalidHASHid
 	}
 
 	if c.KSF != 0 && !c.KSF.Available() {
-		return errInvalidKSFid
+		return ErrInvalidKSFid
 	}
 
 	return nil
@@ -265,4 +254,84 @@ type ClientRecord struct {
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
 func RandomBytes(length int) []byte {
 	return internal.RandomBytes(length)
+}
+
+// IsValidScalar checks if the provided scalar is valid for the given group.
+func IsValidScalar(g ecc.Group, s *ecc.Scalar) error {
+	if s == nil {
+		return ErrScalarNil
+	}
+
+	if s.Group() != g {
+		return ErrScalarGroupMismatch
+	}
+
+	// Check if the scalar is zero.
+	if s.IsZero() {
+		return ErrScalarZero
+	}
+
+	return nil
+}
+
+// IsValidElement checks if the provided element is valid for the given group.
+func IsValidElement(g ecc.Group, e *ecc.Element) error {
+	if e == nil {
+		return ErrElementNil
+	}
+
+	if e.Group() != g {
+		return ErrElementGroupMismatch
+	}
+
+	// Check if the element is the identity element (point at infinity).
+	if e.IsIdentity() {
+		return ErrElementIdentity
+	}
+
+	return nil
+}
+
+// AKEOptions override the secure default values or internally generated values. It is recommended to use NewAKEOptions
+// to instantiate, or the lengths will be set to zero, which is not secure. Only use this if you know what you're
+// doing. Reusing seeds and nonces across sessions is a security risk, and breaks forward secrecy.
+type AKEOptions struct {
+	EphemeralSecretKeyShare  *ecc.Scalar
+	SecretKeyShareSeed       []byte
+	Nonce                    []byte
+	SecretKeyShareSeedLength int
+	NonceLength              int
+}
+
+// NewAKEOptions returns a new AKEOptions structure with secure default values. Use this to ensure that secure lengths
+// are set by default.
+func NewAKEOptions() *AKEOptions {
+	return &AKEOptions{
+		EphemeralSecretKeyShare:  nil,
+		SecretKeyShareSeed:       nil,
+		Nonce:                    nil,
+		SecretKeyShareSeedLength: internal.SeedLength,
+		NonceLength:              internal.NonceLength,
+	}
+}
+
+func processAkeOptions(g ecc.Group, out *ake.Options, o *AKEOptions) error {
+	if o == nil {
+		o = NewAKEOptions()
+	}
+
+	// The ephemeral key share seed is created regardless of whether it's provided. TODO: maybe change that.
+	if err := out.Set(o.SecretKeyShareSeed, o.SecretKeyShareSeedLength, o.Nonce, o.NonceLength); err != nil {
+		return fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+	}
+
+	if o.EphemeralSecretKeyShare != nil {
+		if err := IsValidScalar(g, o.EphemeralSecretKeyShare); err != nil {
+			return fmt.Errorf("%w: ephemeral secret key, %w", errClientOptionsPrefix, err)
+		}
+
+		out.EphemeralSecretKeyShare = o.EphemeralSecretKeyShare
+	}
+
+	return nil
 }

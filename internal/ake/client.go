@@ -9,89 +9,46 @@
 package ake
 
 import (
-	"errors"
-
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
 
-var errAkeInvalidServerMac = errors.New("invalid server mac")
-
-// Client exposes the client's AKE functions and holds its state.
-type Client struct {
-	EphemeralSecretKey *ecc.Scalar
-	Ke1                []byte
-	sessionSecret      []byte
-}
-
-// NewClient returns a new, empty, 3DH client.
-func NewClient() *Client {
-	return &Client{
-		EphemeralSecretKey: nil,
-		Ke1:                nil,
-		sessionSecret:      nil,
-	}
-}
-
 // Start initiates the 3DH protocol, and returns a KE1 message with clientInfo.
-func (c *Client) Start(g ecc.Group, options *Options) *message.KE1 {
-	esk, epk := MakeKeyShare(g, options.EphemeralKeyShareSeed, options.EphemeralSecretKeyShare)
-	c.EphemeralSecretKey = esk
+func Start(g ecc.Group, options *Options) (*message.KE1, *ecc.Scalar) {
+	esk, epk := options.GetEphemeralKeyShare(g)
 
 	return &message.KE1{
 		CredentialRequest:    nil,
 		ClientNonce:          options.Nonce,
 		ClientPublicKeyshare: epk,
-	}
+	}, esk
 }
 
 // Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions
 // returns a KE3 message.
-func (c *Client) Finalize(
+func Finalize(
 	conf *internal.Configuration,
+	clientKM *KeyMaterial,
+	identities *Identities,
+	serverPublicKey *ecc.Element,
 	ke2 *message.KE2,
-	clientKM, serverKM *KeyMaterial,
-) (*message.KE3, error) {
+	ke1 []byte,
+) (*message.KE3, []byte, bool) {
 	ikm := k3dh(
-		serverKM.PublicKeyShare,
+		ke2.ServerPublicKeyshare,
 		clientKM.EphemeralSecretKey,
-		serverKM.PublicKey,
+		serverPublicKey,
 		clientKM.EphemeralSecretKey,
-		serverKM.PublicKeyShare,
+		ke2.ServerPublicKeyshare,
 		clientKM.SecretKey,
 	)
-	sessionSecret, serverMac, clientMac := core3DH(conf, clientKM.Identity, serverKM.Identity, ikm, c.Ke1, ke2)
+	sessionSecret, serverMac, clientMac := core3DH(conf, identities, ikm, ke1, ke2)
 
 	if !conf.MAC.Equal(serverMac, ke2.ServerMac) {
-		return nil, errAkeInvalidServerMac
+		return nil, nil, false
 	}
 
-	c.sessionSecret = sessionSecret
-
-	return &message.KE3{ClientMac: clientMac}, nil
-}
-
-// SessionKey returns the secret shared session key if a previous call to Finalize() was successful.
-func (c *Client) SessionKey() []byte {
-	return c.sessionSecret
-}
-
-func (c *Client) GetEphemeralSecretKey() *ecc.Scalar {
-	if c.EphemeralSecretKey == nil {
-		return nil
-	}
-	return c.EphemeralSecretKey.Copy()
-}
-
-// Flush sets all the client's session related internal AKE values to nil.
-func (c *Client) Flush() {
-	if c.EphemeralSecretKey != nil {
-		c.EphemeralSecretKey.Zero()
-		c.EphemeralSecretKey = nil
-	}
-
-	c.Ke1 = nil
-	c.sessionSecret = nil
+	return &message.KE3{ClientMac: clientMac}, sessionSecret, true
 }

@@ -11,6 +11,7 @@ package ake
 
 import (
 	"fmt"
+
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
@@ -20,33 +21,41 @@ import (
 	"github.com/bytemare/opaque/message"
 )
 
-var (
-	// ErrOptionsSeed indicates the AKE key share seed is invalid.
-	ErrOptionsSeed = fmt.Errorf("invalid AKE key share seed")
-
-	// ErrOptionsNonce indicates the AKE nonce is not valid.
-	ErrOptionsNonce = fmt.Errorf("invalid AKE nonce")
-)
-
 // KeyGen returns private and public keys in the ecc.
-func KeyGen(id ecc.Group) (privateKey, publicKey []byte) {
-	scalar := id.NewScalar().Random()
-	point := id.Base().Multiply(scalar)
+func KeyGen(g ecc.Group, seed ...[]byte) (*ecc.Scalar, *ecc.Element) {
+	var s []byte
+	if len(seed) != 0 && len(seed[0]) > 0 {
+		s = seed[0]
+	} else {
+		s = internal.RandomBytes(internal.SeedLength)
+	}
 
-	return scalar.Encode(), point.Encode()
+	sk := oprf.IDFromGroup(g).DeriveKey(s, []byte(tag.DeriveDiffieHellmanKeyPair))
+
+	return sk, g.Base().Multiply(sk)
 }
 
 func diffieHellman(s *ecc.Scalar, e *ecc.Element) *ecc.Element {
 	/*
-		if id == ecc.Ristretto255Sha512 || id == ecc.P256Sha256 {
-			e.Copy().Multiply(s)
-		}
-
 		if id == ecc.Curve25519 {
 			// TODO
 		}
 	*/
 	return e.Copy().Multiply(s)
+}
+
+// KeyMaterial holds the ephemeral and secret keys used in the 3DH protocol.
+type KeyMaterial struct {
+	EphemeralSecretKey *ecc.Scalar
+	SecretKey          *ecc.Scalar
+}
+
+// Flush attempts to zero out the ephemeral and secret keys, and sets them to nil.
+func (m *KeyMaterial) Flush() {
+	m.EphemeralSecretKey.Zero()
+	m.EphemeralSecretKey = nil
+	m.SecretKey.Zero()
+	m.SecretKey = nil
 }
 
 // Identities holds the client and server identities.
@@ -80,6 +89,7 @@ type Options struct {
 // NewOptions returns a new Options structure with default values.
 func NewOptions() *Options {
 	return &Options{
+		EphemeralSecretKeyShare:     nil,
 		EphemeralKeyShareSeed:       nil,
 		Nonce:                       nil,
 		EphemeralKeyShareSeedLength: internal.SeedLength,
@@ -87,23 +97,36 @@ func NewOptions() *Options {
 	}
 }
 
+// Set sets the ephemeral key share seed and nonce given the provided values, or generates secure random values
+// if not provided.
 func (o *Options) Set(seed []byte, seedLength int, nonce []byte, nonceLength int) error {
 	if err := setOptions(&o.EphemeralKeyShareSeed, &o.EphemeralKeyShareSeedLength,
-		seed, seedLength, internal.SeedLength, ErrOptionsSeed); err != nil {
-		return err
+		seed, seedLength, internal.SeedLength); err != nil {
+		return fmt.Errorf("invalid AKE key share seed: %w", err)
 	}
 
 	if err := setOptions(&o.Nonce, &o.NonceLength,
-		nonce, nonceLength, internal.NonceLength, ErrOptionsNonce); err != nil {
-		return err
+		nonce, nonceLength, internal.NonceLength); err != nil {
+		return fmt.Errorf("invalid AKE nonce: %w", err)
 	}
 
 	return nil
 }
 
-func setOptions(s *[]byte, l *uint32, input []byte, length int, referenceLength uint32, refErr error) error {
+// GetEphemeralKeyShare returns the ephemeral secret key share and its corresponding public key share.
+func (o *Options) GetEphemeralKeyShare(g ecc.Group) (*ecc.Scalar, *ecc.Element) {
+	esk := o.EphemeralSecretKeyShare
+	if esk == nil {
+		esk = oprf.IDFromGroup(g).
+			DeriveKey(o.EphemeralKeyShareSeed, []byte(tag.DeriveDiffieHellmanKeyPair))
+	}
+
+	return esk, g.Base().Multiply(esk)
+}
+
+func setOptions(s *[]byte, l *uint32, input []byte, length int, referenceLength uint32) error {
 	if err := internal.ValidateOptionsLength(input, length, referenceLength); err != nil {
-		return fmt.Errorf("%w: %w", refErr, err)
+		return err
 	}
 
 	if length != 0 {
@@ -119,15 +142,6 @@ func setOptions(s *[]byte, l *uint32, input []byte, length int, referenceLength 
 	return nil
 }
 
-func MakeKeyShare(g ecc.Group, seed []byte, ephemeralSecretKey *ecc.Scalar) (*ecc.Scalar, *ecc.Element) {
-	if ephemeralSecretKey == nil {
-		ephemeralSecretKey = oprf.IDFromGroup(g).
-			DeriveKey(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
-	}
-
-	return ephemeralSecretKey, g.Base().Multiply(ephemeralSecretKey)
-}
-
 func k3dh(
 	p1 *ecc.Element,
 	s1 *ecc.Scalar,
@@ -136,6 +150,8 @@ func k3dh(
 	p3 *ecc.Element,
 	s3 *ecc.Scalar,
 ) []byte {
+	// slog.Info("3DH", "p1", p1.Hex(), "s1", s1.Hex(), "p2", p2.Hex(), "s2", s2.Hex(), "p3", p3.Hex(), "s3", s3.Hex())
+
 	e1 := diffieHellman(s1, p1).Encode()
 	e2 := diffieHellman(s2, p2).Encode()
 	e3 := diffieHellman(s3, p3).Encode()
@@ -144,9 +160,9 @@ func k3dh(
 }
 
 func core3DH(
-	conf *internal.Configuration, idC, idS, ikm, ke1 []byte, ke2 *message.KE2,
+	conf *internal.Configuration, identities *Identities, ikm, ke1 []byte, ke2 *message.KE2,
 ) (sessionSecret, macS, macC []byte) {
-	initTranscript(conf, idC, idS, ke1, ke2)
+	initTranscript(conf, identities, ke1, ke2)
 
 	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, conf.Hash.Sum()) // preamble
 	serverMac := conf.MAC.MAC(serverMacKey, conf.Hash.Sum())                                // transcript2
@@ -177,12 +193,22 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func initTranscript(conf *internal.Configuration, idC, idS, ke1 []byte, ke2 *message.KE2) {
-	encodedClientID := encoding.EncodeVector(idC)
-	encodedServerID := encoding.EncodeVector(idS)
-	conf.Hash.Write(encoding.Concatenate([]byte(tag.VersionTag), encoding.EncodeVector(conf.Context),
-		encodedClientID, ke1,
-		encodedServerID, ke2.CredentialResponse.Serialize(), ke2.ServerNonce, ke2.ServerPublicKeyshare.Encode()))
+func initTranscript(conf *internal.Configuration, identities *Identities, ke1 []byte, ke2 *message.KE2) {
+	addToHash(conf, []byte(tag.VersionTag),
+		encoding.EncodeVector(conf.Context),
+		encoding.EncodeVector(identities.ClientIdentity),
+		ke1,
+		encoding.EncodeVector(identities.ServerIdentity),
+		ke2.CredentialResponse.Serialize(),
+		ke2.ServerNonce,
+		ke2.ServerPublicKeyshare.Encode(),
+	)
+}
+
+func addToHash(conf *internal.Configuration, data ...[]byte) {
+	for _, d := range data {
+		conf.Hash.Write(d)
+	}
 }
 
 func deriveKeys(h *internal.KDF, ikm, context []byte) (serverMacKey, clientMacKey, sessionSecret []byte) {

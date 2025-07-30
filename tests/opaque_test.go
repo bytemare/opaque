@@ -11,27 +11,29 @@ package opaque_test
 import (
 	"bytes"
 	"crypto"
+	"encoding/hex"
 	"errors"
 	"reflect"
 	"strings"
 	"testing"
 
-	group "github.com/bytemare/ecc"
+	"github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
-	ksf2 "github.com/bytemare/opaque/internal/ksf"
-	"github.com/bytemare/opaque/internal/oprf"
+	"github.com/bytemare/opaque/message"
 )
 
 const dbgErr = "%v"
 
 type testParams struct {
 	*opaque.Configuration
-	username, userID, serverID, password, serverSecretKey, serverPublicKey, oprfSeed, ksfSalt, kdfSalt []byte
-	ksfParameters                                                                                      []int
-	ksfLength, nonceLength                                                                             int
+	serverSecretKey                                                  *ecc.Scalar
+	serverPublicKey                                                  *ecc.Element
+	username, userID, serverID, password, oprfSeed, ksfSalt, kdfSalt []byte
+	ksfParameters                                                    []int
+	ksfLength, nonceLength                                           int
 }
 
 func TestFull(t *testing.T) {
@@ -56,9 +58,7 @@ func TestFull(t *testing.T) {
 		nonceLength:   internal.NonceLength,
 	}
 
-	serverSecretKey, pks := conf.KeyGen()
-	tester.serverSecretKey = serverSecretKey
-	tester.serverPublicKey = pks
+	tester.serverSecretKey, tester.serverPublicKey = conf.KeyGen()
 
 	/*
 		Registration
@@ -95,6 +95,10 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 	var credID []byte
 	{
 		server, _ := p.Server()
+		server.ServerKeyMaterial = &opaque.ServerKeyMaterial{
+			OPRFGlobalSeed: p.oprfSeed,
+		}
+
 		m1, err := server.Deserialize.RegistrationRequest(m1s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
@@ -102,11 +106,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 
 		credID = internal.RandomBytes(32)
 
-		if err = server.SetKeyMaterial(nil, nil, p.serverPublicKey, p.oprfSeed); err != nil {
-			t.Fatalf(dbgErr, err)
-		}
-
-		respReg, err := server.RegistrationResponse(m1, credID, nil)
+		respReg, err := server.RegistrationResponse(m1, p.serverPublicKey.Encode(), credID)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -123,13 +123,11 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 			t.Fatalf(dbgErr, err)
 		}
 
-		upload, key, err := client.RegistrationFinalize(m2, opaque.ClientOptions{
-			ClientIdentity: p.username,
-			ServerIdentity: p.serverID,
-			KDFSalt:        p.kdfSalt,
-			KSFSalt:        p.ksfSalt,
-			KSFParameters:  p.ksfParameters,
-			KSFLength:      p.ksfLength,
+		upload, key, err := client.RegistrationFinalize(m2, p.username, p.serverID, &opaque.ClientOptions{
+			KDFSalt:       p.kdfSalt,
+			KSFSalt:       p.ksfSalt,
+			KSFParameters: p.ksfParameters,
+			KSFLength:     p.ksfLength,
 		})
 		if err != nil {
 			t.Fatalf(dbgErr, err)
@@ -162,7 +160,10 @@ func testAuthentication(
 	record *opaque.ClientRecord,
 ) (*opaque.Client, *opaque.Server, []byte) {
 	// Client
-	client, _ := p.Client()
+	client, err := p.Client()
+	if err != nil {
+		t.Fatalf(dbgErr, err)
+	}
 
 	var m4s []byte
 	{
@@ -176,11 +177,17 @@ func testAuthentication(
 
 	// Server
 	var m5s []byte
-	var state []byte
 	server, _ := p.Server()
+	var serverOutput *opaque.ServerOutput
 	{
-		if err := server.SetKeyMaterial(p.serverID, p.serverSecretKey, p.serverPublicKey, p.oprfSeed); err != nil {
-			t.Fatal(err)
+		skm := &opaque.ServerKeyMaterial{
+			Identity:       p.serverID,
+			SecretKey:      p.serverSecretKey,
+			OPRFGlobalSeed: p.oprfSeed,
+		}
+
+		if err := server.SetKeyMaterial(skm); err != nil {
+			t.Fatalf(dbgErr, err)
 		}
 
 		m4, err := server.Deserialize.KE1(m4s)
@@ -188,12 +195,11 @@ func testAuthentication(
 			t.Fatalf(dbgErr, err)
 		}
 
-		ke2, err := server.GenerateKE2(m4, record)
+		var ke2 *message.KE2
+		ke2, serverOutput, err = server.GenerateKE2(m4, record)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
-
-		state = server.SerializeState()
 
 		m5s = ke2.Serialize()
 	}
@@ -208,45 +214,35 @@ func testAuthentication(
 			t.Fatalf(dbgErr, err)
 		}
 
-		ke3, key, err := client.GenerateKE3(m5, opaque.ClientOptions{
-			ClientIdentity: p.username,
-			ServerIdentity: p.serverID,
-			KDFSalt:        p.kdfSalt,
-			KSFSalt:        p.ksfSalt,
-			KSFParameters:  p.ksfParameters,
-			KSFLength:      p.ksfLength,
+		var ke3 *message.KE3
+		ke3, clientKey, exportKeyLogin, err = client.GenerateKE3(m5, p.username, p.serverID, &opaque.ClientOptions{
+			KDFSalt:       p.kdfSalt,
+			KSFSalt:       p.ksfSalt,
+			KSFParameters: p.ksfParameters,
+			KSFLength:     p.ksfLength,
 		})
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
-		exportKeyLogin = key
 
 		m6s = ke3.Serialize()
-		clientKey = client.SessionKey()
 	}
 
 	// Server
-	var serverKey []byte
 	{
-		// here we spawn a new server instance to test setting the state
-		resumedServer, _ := p.Server()
-		if err := resumedServer.SetAKEState(state); err != nil {
-			t.Fatalf(dbgErr, err)
-		}
-
-		m6, err := resumedServer.Deserialize.KE3(m6s)
+		m6, err := server.Deserialize.KE3(m6s)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
 
-		if err := resumedServer.LoginFinish(m6); err != nil {
+		if err := server.LoginFinish(m6, serverOutput.ClientMAC); err != nil {
 			t.Fatalf(dbgErr, err)
 		}
-
-		serverKey = resumedServer.SessionKey()
 	}
 
-	if !bytes.Equal(clientKey, serverKey) {
+	if !bytes.Equal(clientKey, serverOutput.SessionSecret) {
+		t.Log(hex.EncodeToString(clientKey))
+		t.Log(hex.EncodeToString(serverOutput.SessionSecret))
 		t.Fatalf("session keys differ")
 	}
 
@@ -307,9 +303,7 @@ func TestFlush(t *testing.T) {
 		oprfSeed:      conf.GenerateOPRFSeed(),
 	}
 
-	serverSecretKey, pks := conf.KeyGen()
-	test.serverSecretKey = serverSecretKey
-	test.serverPublicKey = pks
+	test.serverSecretKey, test.serverPublicKey = conf.KeyGen()
 
 	/*
 		Registration
@@ -319,28 +313,15 @@ func TestFlush(t *testing.T) {
 	/*
 		Login
 	*/
-	client, server, _ := testAuthentication(t, test, record)
+	client, _, _ := testAuthentication(t, test, record)
 
-	client.Ake.Flush()
-	if client.SessionKey() != nil {
-		t.Fatalf("client flush failed, the session key is non-nil: %v", client.SessionKey())
+	client.Flush()
+	if client.SecretKey() != nil {
+		t.Fatalf("client flush failed, the secret key is non-nil: %v", client.SecretKey())
 	}
 
-	if client.Ake.GetEphemeralSecretKey() != nil {
-		t.Fatalf("client flush failed, the ephemeral session key is non-nil: %v", client.Ake.GetEphemeralSecretKey())
-	}
-
-	server.Flush()
-	if server.SessionKey() != nil {
-		t.Fatalf("server flush failed, the session key is non-nil: %v", server.SessionKey())
-	}
-
-	if server.GetEphemeralSecretKey() != nil {
-		t.Fatalf("server flush failed, the ephemeral session key is non-nil: %v", server.GetEphemeralSecretKey())
-	}
-
-	if server.ExpectedMAC() != nil {
-		t.Fatalf("server flush failed, the expected client mac is non-nil: %v", server.ExpectedMAC())
+	if client.EphemeralSecretKeyShare() != nil {
+		t.Fatalf("client flush failed, the ephemeral session key is non-nil: %v", client.EphemeralSecretKeyShare())
 	}
 }
 
@@ -359,29 +340,6 @@ func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
 			expected,
 			err,
 		)
-	}
-}
-
-func TestNilConfiguration(t *testing.T) {
-	def := opaque.DefaultConfiguration()
-	g := group.Group(def.AKE)
-	defaultConfiguration := &internal.Configuration{
-		OPRF:     oprf.IDFromGroup(g),
-		Group:    g,
-		KSF:      ksf2.NewKSF(def.KSF),
-		KDF:      internal.NewKDF(def.KDF),
-		MAC:      internal.NewMac(def.MAC),
-		Hash:     internal.NewHash(def.Hash),
-		NonceLen: internal.NonceLength,
-		Context:  def.Context,
-	}
-
-	if s, _ := opaque.NewServer(nil); reflect.DeepEqual(s.GetConf(), defaultConfiguration) {
-		t.Errorf("server did not default to correct configuration")
-	}
-
-	if c, _ := opaque.NewClient(nil); reflect.DeepEqual(c.GetConf(), defaultConfiguration) {
-		t.Errorf("client did not default to correct configuration")
 	}
 }
 

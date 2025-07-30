@@ -26,12 +26,6 @@ import (
 )
 
 var (
-	// errInvalidMaskedLength happens when unmasking a masked response.
-	errInvalidMaskedLength = errors.New("invalid masked response length")
-
-	// ErrKe1Missing happens when GenerateKE3 is called and the client has no Ke1 in state.
-	ErrKe1Missing = errors.New("client state: missing KE1 message - call GenerateKE1 first")
-
 	errClientOptionsPrefix = errors.New("invalid client options")
 
 	// ErrClientOptionsBlindZero indicates the OPRF blind is zero.
@@ -42,33 +36,14 @@ var (
 )
 
 // Client represents an OPAQUE Client, exposing its functions and holding its state.
+// The state includes the OPRF blind, during a registration or authentication session, and the ephemeral secret key
+// share during an authentication session.
 type Client struct {
 	Deserialize *Deserializer
 	OPRF        *oprf.Client
-	Ake         *ake.Client
 	conf        *internal.Configuration
-}
-
-// ClientOptions enables setting internal client values to override secure defaults if otherwise not set.
-type ClientOptions struct {
-	OPRFBlind           *ecc.Scalar
-	KSFSalt             []byte
-	ServerIdentity      []byte
-	EnvelopeNonce       []byte
-	KDFSalt             []byte
-	ClientIdentity      []byte
-	KSFParameters       []int
-	AKE                 AKEOptions
-	EnvelopeNonceLength int
-	KSFLength           int
-}
-
-type AKEOptions struct {
-	EphemeralSecretKey *ecc.Scalar
-	KeyShareSeed       []byte
-	Nonce              []byte
-	KeyShareSeedLength int
-	NonceLength        int
+	ake         ake.KeyMaterial
+	ke1         []byte
 }
 
 // NewClient returns a new Client instantiation given the application Configuration.
@@ -84,29 +59,32 @@ func NewClient(c *Configuration) (*Client, error) {
 
 	return &Client{
 		OPRF:        conf.OPRF.Client(),
-		Ake:         ake.NewClient(),
 		Deserialize: &Deserializer{conf: conf},
 		conf:        conf,
 	}, nil
 }
 
-// GetConf returns the internal configuration.
-func (c *Client) GetConf() *internal.Configuration {
-	return c.conf
-}
-
-// buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation *ecc.Element, kdfSalt, ksfSalt []byte, ksfLength int) []byte {
-	output := c.OPRF.Finalize(evaluation)
-	stretched := c.conf.KSF.Harden(output, ksfSalt, ksfLength)
-
-	return c.conf.KDF.Extract(kdfSalt, encoding.Concat(output, stretched))
+// ClientOptions override the secure default values or internally generated values.
+// Only use this if you know what you're doing. Reusing seeds and nonces across sessions is a security risk,
+// and breaks forward secrecy.
+type ClientOptions struct {
+	OPRFBlind           *ecc.Scalar
+	AKE                 *AKEOptions
+	KE1                 []byte
+	KSFSalt             []byte
+	EnvelopeNonce       []byte
+	KDFSalt             []byte
+	KSFParameters       []int
+	EnvelopeNonceLength int
+	KSFLength           int
 }
 
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
+// This will initiate a state, so the same client instance should be used to call RegistrationFinalize() later on.
+// Optionally, that value can be overridden by providing a ClientOptions with a OPRF Blind value, but at your own risks.
 func (c *Client) RegistrationInit(
 	password []byte,
-	options ...ClientOptions,
+	options ...*ClientOptions,
 ) (*message.RegistrationRequest, error) {
 	blind, err := c.verifyOptionBlind(options...)
 	if err != nil {
@@ -124,9 +102,10 @@ func (c *Client) RegistrationInit(
 // and the export key, that the client can use for other means.
 func (c *Client) RegistrationFinalize(
 	resp *message.RegistrationResponse,
-	options ...ClientOptions,
+	clientIdentity, serverIdentity []byte,
+	options ...*ClientOptions,
 ) (record *message.RegistrationRecord, exportKey []byte, err error) {
-	o, err := c.parseOptions(options, true, false)
+	o, err := c.parseOptions(options, true, true, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -143,8 +122,8 @@ func (c *Client) RegistrationFinalize(
 		c.conf,
 		randomizedPassword,
 		resp.ServerPublicKey,
-		o.Identities.ClientIdentity,
-		o.Identities.ServerIdentity,
+		clientIdentity,
+		serverIdentity,
 		envelopeNonce,
 	)
 
@@ -159,16 +138,22 @@ func (c *Client) RegistrationFinalize(
 // initiates a state, so the same client instance should be used to call GenerateKE3() later on.
 // Alternatively, provide a OPRF Blind in the ClientOptions to use a custom blind value, and reuse the same blind when
 // invoking GenerateKE3() for the the same message but different client instances.
-func (c *Client) GenerateKE1(password []byte, options ...ClientOptions) (*message.KE1, error) {
-	o, err := c.parseOptions(options, false, true)
+func (c *Client) GenerateKE1(password []byte, options ...*ClientOptions) (*message.KE1, error) {
+	if c.ake.EphemeralSecretKey != nil {
+		return nil, fmt.Errorf("an AKE secret key share exists in the client state, indicating a prior run." +
+			"Flush the Client state before starting a new run of the protocol")
+	}
+
+	o, err := c.parseOptions(options, false, false, false)
 	if err != nil {
 		return nil, err
 	}
 
 	m := c.OPRF.Blind(password, o.OPRFBlind)
-	ke1 := c.Ake.Start(c.conf.Group, o.AKEOptions)
+	var ke1 *message.KE1
+	ke1, c.ake.EphemeralSecretKey = ake.Start(c.conf.Group, o.AKEOptions)
 	ke1.CredentialRequest = message.NewCredentialRequest(m)
-	c.Ake.Ke1 = ke1.Serialize()
+	c.ke1 = ke1.Serialize()
 
 	return ke1, nil
 }
@@ -176,20 +161,26 @@ func (c *Client) GenerateKE1(password []byte, options ...ClientOptions) (*messag
 // GenerateKE3 returns a KE3 message given the server's KE2 response message and the identities. If the client or server
 // identity parameters are nil, the client and server's public keys are taken as identities for both.
 func (c *Client) GenerateKE3(
-	ke2 *message.KE2, options ...ClientOptions,
-) (ke3 *message.KE3, exportKey []byte, err error) {
-	if len(c.Ake.Ke1) == 0 {
-		return nil, nil, ErrKe1Missing
+	ke2 *message.KE2,
+	clientIdentity, serverIdentity []byte,
+	options ...*ClientOptions,
+) (ke3 *message.KE3, sessionKey, exportKey []byte, err error) {
+	if len(c.ke1) == 0 {
+		return nil, nil, nil, ErrKe1Missing
 	}
 
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
 	if len(ke2.MaskedResponse) != c.conf.Group.ElementLength()+c.conf.EnvelopeSize {
-		return nil, nil, errInvalidMaskedLength
+		return nil, nil, nil, ErrInvalidMaskedLength
 	}
 
-	o, err := c.parseOptions(options, true, false)
+	o, err := c.parseOptions(options, false, true, true)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+
+	if err = c.ke2SetEphemeralKeyShare(o.AKEOptions); err != nil {
+		return nil, nil, nil, fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
 	}
 
 	// Finalize the OPRF.
@@ -199,7 +190,7 @@ func (c *Client) GenerateKE3(
 	serverPublicKey, serverPublicKeyBytes,
 		envelope, err := masking.Unmask(c.conf, randomizedPassword, ke2.MaskingNonce, ke2.MaskedResponse)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unmasking: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to unmask KE2: %w", err)
 	}
 
 	// Recover the client keys.
@@ -208,64 +199,64 @@ func (c *Client) GenerateKE3(
 		c.conf,
 		randomizedPassword,
 		serverPublicKeyBytes,
-		o.Identities.ClientIdentity,
-		o.Identities.ServerIdentity,
+		clientIdentity,
+		serverIdentity,
 		envelope)
 	if err != nil {
-		return nil, nil, fmt.Errorf("key recovery: %w", err)
+		return nil, nil, nil, fmt.Errorf("failed to recover client key: %w", err)
 	}
 
 	// Finalize the AKE.
-	identities := o.Identities.SetIdentities(clientPublicKey, serverPublicKeyBytes)
+	identities := (&ake.Identities{
+		ClientIdentity: clientIdentity,
+		ServerIdentity: serverIdentity,
+	}).SetIdentities(clientPublicKey, serverPublicKeyBytes)
 
-	// If we want to be able to recover a client we need to be able to set the AKE options here
-	if o.AKEOptions.EphemeralSecretKeyShare != nil {
-		c.Ake.EphemeralSecretKey = o.AKEOptions.EphemeralSecretKeyShare
+	c.ake.SecretKey = clientSecretKey
+
+	ke3, sessionKey, macOK := ake.Finalize(c.conf, &c.ake, identities, serverPublicKey, ke2, c.ke1)
+	if !macOK {
+		return nil, nil, nil, ErrClientAkeFailedHandshakeServerMac
 	}
 
-	clientKM := ake.MakeKeyMaterial2(identities.ClientIdentity,
-		nil,
-		c.Ake.EphemeralSecretKey,
-		clientSecretKey,
-		nil)
-	serverKM := ake.MakePeerKeyMaterial(identities.ServerIdentity,
-		ke2.ServerPublicKeyshare,
-		serverPublicKey)
-
-	ke3, err = c.Ake.Finalize(c.conf, ke2, clientKM, serverKM)
-	if err != nil {
-		return nil, nil, fmt.Errorf("finalizing AKE: %w", err)
-	}
-
-	return ke3, exportKey, nil
+	return ke3, sessionKey, exportKey, nil
 }
 
-// SessionKey returns the session key if the previous call to GenerateKE3() was successful.
-func (c *Client) SessionKey() []byte {
-	return c.Ake.SessionKey()
+// EphemeralSecretKeyShare returns the client's ephemeral session secret key share, if it has been set in GenerateKE2.
+func (c *Client) EphemeralSecretKeyShare() *ecc.Scalar {
+	return c.ake.EphemeralSecretKey
 }
 
-type options struct {
-	OPRFBlind  *ecc.Scalar
-	KSFOptions *ksf.Options
-	AKEOptions *ake.Options
-	Identities ake.Identities
-	KDFSalt    []byte
+// SecretKey returns the client's long-term secret key, if it has been recovered in GenerateKE2.
+func (c *Client) SecretKey() *ecc.Scalar {
+	return c.ake.SecretKey
 }
 
-func (c *Client) verifyOptionBlind(clientOptions ...ClientOptions) (*ecc.Scalar, error) {
+// Flush attempts to zero out the ephemeral and secret keys, and sets them to nil.
+func (c *Client) Flush() {
+	c.ake.Flush()
+}
+
+// buildPRK derives the randomized password from the OPRF output.
+func (c *Client) buildPRK(evaluation *ecc.Element, kdfSalt, ksfSalt []byte, ksfLength int) []byte {
+	output := c.OPRF.Finalize(evaluation)
+	stretched := c.conf.KSF.Harden(output, ksfSalt, ksfLength)
+	return c.conf.KDF.Extract(kdfSalt, encoding.Concat(output, stretched))
+}
+
+func (c *Client) verifyOptionBlind(clientOptions ...*ClientOptions) (*ecc.Scalar, error) {
 	if len(clientOptions) == 0 || clientOptions[0].OPRFBlind == nil {
 		return nil, nil
 	}
 
-	if err := c.conf.OPRF.ValidateBlind(clientOptions[0].OPRFBlind); err != nil {
+	if err := IsValidScalar(c.conf.OPRF.Group(), clientOptions[0].OPRFBlind); err != nil {
 		return nil, fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
 	}
 
 	return clientOptions[0].OPRFBlind, nil
 }
 
-func getEnvelopeNonce(clientOptions ...ClientOptions) ([]byte, error) {
+func getEnvelopeNonce(clientOptions ...*ClientOptions) ([]byte, error) {
 	if len(clientOptions) == 0 {
 		return internal.RandomBytes(internal.NonceLength), nil
 	}
@@ -274,73 +265,140 @@ func getEnvelopeNonce(clientOptions ...ClientOptions) ([]byte, error) {
 	nonceLength := clientOptions[0].EnvelopeNonceLength
 
 	if err := internal.ValidateOptionsLength(nonce, nonceLength, internal.NonceLength); err != nil {
-		return nil, fmt.Errorf("envelope nonce: %w", err)
-	}
-
-	if nonceLength == 0 {
-		nonceLength = internal.NonceLength
+		return nil, fmt.Errorf("%w: failed to verify envelope nonce parameters: %w", errClientOptionsPrefix, err)
 	}
 
 	if nonce == nil {
+		if nonceLength == 0 {
+			nonceLength = internal.NonceLength
+		}
+
 		nonce = internal.RandomBytes(nonceLength)
 	}
 
 	return nonce, nil
 }
 
-func (c *Client) parseOptions(clientOptions []ClientOptions, withKSF, withAKE bool) (*options, error) {
-	o := &options{
+type clientOptions struct {
+	OPRFBlind     *ecc.Scalar
+	KSFOptions    *ksf.Options
+	AKEOptions    *ake.Options
+	Identities    ake.Identities
+	EnvelopeNonce []byte
+	KDFSalt       []byte
+}
+
+func (c *Client) clientOptionsKSFParser(out *clientOptions, in *ClientOptions) error {
+	if err := out.KSFOptions.Set(c.conf.KSF, in.KSFSalt, in.KSFParameters, in.KSFLength); err != nil {
+		return fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+	}
+
+	if len(out.KSFOptions.Parameters) != 0 {
+		c.conf.KSF.Parameterize(out.KSFOptions.Parameters...)
+	}
+
+	return nil
+}
+
+func (c *Client) clientOptionsKE1Parser(in *ClientOptions) error {
+	if len(c.ke1) == 0 && len(in.KE1) == 0 {
+		return fmt.Errorf("%w: KE1 is missing in state and not provided", errClientOptionsPrefix)
+	}
+
+	if len(c.ke1) != 0 && len(in.KE1) == 0 {
+		return nil
+	}
+
+	if _, err := c.Deserialize.KE1(in.KE1); err != nil {
+		return fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+	}
+
+	c.ke1 = in.KE1
+	return nil
+}
+
+func (c *Client) ke2SetEphemeralKeyShare(options *ake.Options) error {
+	if (c.ake.EphemeralSecretKey == nil) && (options.EphemeralSecretKeyShare == nil) {
+		return fmt.Errorf("no ephemeral secret key share set in the options or in the client state")
+	}
+
+	if (c.ake.EphemeralSecretKey != nil) && (options.EphemeralSecretKeyShare != nil) {
+		if !c.ake.EphemeralSecretKey.Equal(options.EphemeralSecretKeyShare) {
+			return fmt.Errorf("an AKE secret key share exists in the client state, but a different one" +
+				"was provided in the options. Only one must be set")
+		}
+	}
+
+	if options.EphemeralSecretKeyShare != nil {
+		// Here, a new ephemeral secret key share is set in the options, and the client state is empty. So we set the key
+		// share up. // todo: verify whether this key is compatible with the public key set in KE1.
+		c.ake.EphemeralSecretKey = options.EphemeralSecretKeyShare
+	}
+
+	return nil
+}
+
+func (c *Client) parseOptions(options []*ClientOptions, withNonce, withKSF, withKE1 bool) (*clientOptions, error) {
+	o := &clientOptions{
 		OPRFBlind:  nil,
 		KDFSalt:    nil,
 		KSFOptions: ksf.NewOptions(c.conf.OPRF.Group().ElementLength()),
-		Identities: ake.Identities{},
 		AKEOptions: ake.NewOptions(),
 	}
 
-	if len(clientOptions) == 0 {
-		if withAKE {
-			o.AKEOptions.Nonce = internal.RandomBytes(internal.NonceLength)
-			o.AKEOptions.EphemeralKeyShareSeed = internal.RandomBytes(internal.NonceLength)
+	if len(options) == 0 {
+		if err := processAkeOptions(c.conf.Group, o.AKEOptions, nil); err != nil {
+			return nil, err
 		}
 
 		return o, nil
 	}
 
-	o.Identities.ClientIdentity = clientOptions[0].ClientIdentity
-	o.Identities.ServerIdentity = clientOptions[0].ServerIdentity
-
 	// OPRF Blind.
 	var err error
-	o.OPRFBlind, err = c.verifyOptionBlind(clientOptions...)
+	o.OPRFBlind, err = c.verifyOptionBlind(options...)
 	if err != nil {
 		return nil, err
 	}
 
 	// KDF salt.
-	if clientOptions[0].KDFSalt != nil {
-		o.KDFSalt = clientOptions[0].KDFSalt
+	if options[0].KDFSalt != nil {
+		o.KDFSalt = options[0].KDFSalt
+	}
+
+	// AKE options.
+	if err = processAkeOptions(c.conf.Group, o.AKEOptions, options[0].AKE); err != nil {
+		return nil, err
+	}
+
+	if options[0].AKE != nil {
+		if options[0].AKE.EphemeralSecretKeyShare != nil {
+			if c.ake.EphemeralSecretKey != nil {
+				return nil, fmt.Errorf("%w: an AKE secret key share was provided in the client options,"+
+					"but the client already has an existing secret key share registered in its state", errClientOptionsPrefix)
+			}
+		}
+	}
+
+	// Envelope nonce.
+	if withNonce {
+		o.EnvelopeNonce, err = getEnvelopeNonce(options...)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+		}
 	}
 
 	// KSF options.
 	if withKSF {
-		if err = o.KSFOptions.Set(
-			c.conf.KSF, clientOptions[0].KSFSalt, clientOptions[0].KSFParameters, clientOptions[0].KSFLength); err != nil {
-			return nil, fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
-		}
-
-		if len(o.KSFOptions.Parameters) != 0 {
-			c.conf.KSF.Parameterize(o.KSFOptions.Parameters...)
+		if err = c.clientOptionsKSFParser(o, options[0]); err != nil {
+			return nil, err
 		}
 	}
 
-	// AKE options.
-	if withAKE {
-		o2 := clientOptions[0].AKE
-
-		if err = o.AKEOptions.Set(
-			o2.KeyShareSeed, o2.KeyShareSeedLength,
-			o2.Nonce, o2.NonceLength); err != nil {
-			return nil, fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+	// KE1 options.
+	if withKE1 {
+		if err = c.clientOptionsKE1Parser(options[0]); err != nil {
+			return nil, err
 		}
 	}
 

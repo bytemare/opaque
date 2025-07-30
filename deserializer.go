@@ -9,23 +9,12 @@
 package opaque
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
-)
-
-var (
-	errInvalidMessageLength = errors.New("invalid message length for the configuration")
-	errInvalidBlindedData   = errors.New("blinded data is an invalid point")
-	errInvalidClientEPK     = errors.New("invalid ephemeral client public key")
-	errInvalidEvaluatedData = errors.New("invalid OPRF evaluation")
-	errInvalidServerEPK     = errors.New("invalid ephemeral server public key")
-	errInvalidServerPK      = errors.New("invalid server public key")
-	errInvalidClientPK      = errors.New("invalid client public key")
 )
 
 // Deserializer exposes the message deserialization functions.
@@ -37,12 +26,14 @@ type Deserializer struct {
 // RegistrationRequest structure.
 func (d *Deserializer) RegistrationRequest(registrationRequest []byte) (*message.RegistrationRequest, error) {
 	if len(registrationRequest) != d.conf.OPRF.Group().ElementLength() {
-		return nil, errInvalidMessageLength
+		return nil, ErrInvalidMessageLength
 	}
 
 	blindedMessage := d.conf.OPRF.Group().NewElement()
-	if err := blindedMessage.Decode(registrationRequest[:d.conf.OPRF.Group().ElementLength()]); err != nil {
-		return nil, errInvalidBlindedData
+
+	err := blindedMessage.Decode(registrationRequest[:d.conf.OPRF.Group().ElementLength()])
+	if err != nil || blindedMessage.IsIdentity() {
+		return nil, ErrInvalidBlindedData
 	}
 
 	return &message.RegistrationRequest{BlindedMessage: blindedMessage}, nil
@@ -56,19 +47,21 @@ func (d *Deserializer) registrationResponseLength() int {
 // RegistrationResponse structure.
 func (d *Deserializer) RegistrationResponse(registrationResponse []byte) (*message.RegistrationResponse, error) {
 	if len(registrationResponse) != d.registrationResponseLength() {
-		return nil, errInvalidMessageLength
+		return nil, ErrInvalidMessageLength
 	}
 
 	evaluatedMessage := d.conf.OPRF.Group().NewElement()
-	if err := evaluatedMessage.Decode(registrationResponse[:d.conf.OPRF.Group().ElementLength()]); err != nil {
-		return nil, errInvalidEvaluatedData
+
+	err := evaluatedMessage.Decode(registrationResponse[:d.conf.OPRF.Group().ElementLength()])
+	if err != nil || evaluatedMessage.IsIdentity() {
+		return nil, ErrInvalidEvaluatedData
 	}
 
 	pksBytes := registrationResponse[d.conf.OPRF.Group().ElementLength():]
 
 	pks := d.conf.Group.NewElement()
-	if err := pks.Decode(pksBytes); err != nil {
-		return nil, errInvalidServerPK
+	if err = pks.Decode(pksBytes); err != nil || pks.IsIdentity() {
+		return nil, ErrInvalidServerPK
 	}
 
 	return &message.RegistrationResponse{
@@ -85,7 +78,7 @@ func (d *Deserializer) recordLength() int {
 // RegistrationRecord structure.
 func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationRecord, error) {
 	if len(record) != d.recordLength() {
-		return nil, errInvalidMessageLength
+		return nil, ErrInvalidMessageLength
 	}
 
 	pk := record[:d.conf.Group.ElementLength()]
@@ -93,8 +86,8 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 	env := record[d.conf.Group.ElementLength()+d.conf.Hash.Size():]
 
 	pku := d.conf.Group.NewElement()
-	if err := pku.Decode(pk); err != nil {
-		return nil, errInvalidClientPK
+	if err := pku.Decode(pk); err != nil || pku.IsIdentity() {
+		return nil, ErrInvalidClientPK
 	}
 
 	return &message.RegistrationRecord{
@@ -106,8 +99,10 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 
 func (d *Deserializer) deserializeCredentialRequest(input []byte) (*message.CredentialRequest, error) {
 	blindedMessage := d.conf.OPRF.Group().NewElement()
-	if err := blindedMessage.Decode(input[:d.conf.OPRF.Group().ElementLength()]); err != nil {
-		return nil, errInvalidBlindedData
+
+	err := blindedMessage.Decode(input[:d.conf.OPRF.Group().ElementLength()])
+	if err != nil || blindedMessage.IsIdentity() {
+		return nil, ErrInvalidBlindedData
 	}
 
 	return message.NewCredentialRequest(blindedMessage), nil
@@ -117,12 +112,14 @@ func (d *Deserializer) deserializeCredentialResponse(
 	input []byte,
 	maxResponseLength int,
 ) (*message.CredentialResponse, error) {
-	data := d.conf.OPRF.Group().NewElement()
-	if err := data.Decode(input[:d.conf.OPRF.Group().ElementLength()]); err != nil {
-		return nil, errInvalidEvaluatedData
+	evaluatedOPRF := d.conf.OPRF.Group().NewElement()
+
+	err := evaluatedOPRF.Decode(input[:d.conf.OPRF.Group().ElementLength()])
+	if err != nil || evaluatedOPRF.IsIdentity() {
+		return nil, ErrInvalidEvaluatedData
 	}
 
-	return message.NewCredentialResponse(data,
+	return message.NewCredentialResponse(evaluatedOPRF,
 		input[d.conf.OPRF.Group().ElementLength():d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen],
 		input[d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen:maxResponseLength]), nil
 }
@@ -134,7 +131,7 @@ func (d *Deserializer) ke1Length() int {
 // KE1 takes a serialized KE1 message and returns a deserialized KE1 structure.
 func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 	if len(ke1) != d.ke1Length() {
-		return nil, errInvalidMessageLength
+		return nil, ErrInvalidMessageLength
 	}
 
 	request, err := d.deserializeCredentialRequest(ke1)
@@ -145,8 +142,8 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 	nonceU := ke1[d.conf.OPRF.Group().ElementLength() : d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen]
 
 	epku := d.conf.Group.NewElement()
-	if err = epku.Decode(ke1[d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen:]); err != nil {
-		return nil, errInvalidClientEPK
+	if err = epku.Decode(ke1[d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen:]); err != nil || epku.IsIdentity() {
+		return nil, ErrInvalidClientEPK
 	}
 
 	return &message.KE1{
@@ -171,7 +168,7 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 
 	// Verify it matches the size of a legal KE2
 	if len(ke2) != maxResponseLength+d.ke2LengthWithoutCreds() {
-		return nil, errInvalidMessageLength
+		return nil, ErrInvalidMessageLength
 	}
 
 	cresp, err := d.deserializeCredentialResponse(ke2, maxResponseLength)
@@ -186,8 +183,8 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 	mac := ke2[offset:]
 
 	epks := d.conf.Group.NewElement()
-	if err = epks.Decode(epk); err != nil {
-		return nil, errInvalidServerEPK
+	if err = epks.Decode(epk); err != nil || epks.IsIdentity() {
+		return nil, ErrInvalidServerEPK
 	}
 
 	return &message.KE2{
@@ -201,27 +198,35 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 // KE3 takes a serialized KE3 message and returns a deserialized KE3 structure.
 func (d *Deserializer) KE3(ke3 []byte) (*message.KE3, error) {
 	if len(ke3) != d.conf.MAC.Size() {
-		return nil, errInvalidMessageLength
+		return nil, ErrInvalidMessageLength
 	}
 
 	return &message.KE3{ClientMac: ke3}, nil
 }
 
-// DecodeAkePrivateKey takes a serialized private key (a scalar) and attempts to return it's decoded form.
-func (d *Deserializer) DecodeAkePrivateKey(encoded []byte) (*ecc.Scalar, error) {
+// DecodePrivateKey takes a serialized private key (a scalar) and attempts to return it's decoded form.
+func (d *Deserializer) DecodePrivateKey(encoded []byte) (*ecc.Scalar, error) {
 	sk := d.conf.Group.NewScalar()
 	if err := sk.Decode(encoded); err != nil {
 		return nil, fmt.Errorf("invalid private key: %w", err)
 	}
 
+	if sk.IsZero() {
+		return nil, fmt.Errorf("invalid private key: %w", ErrPrivateKeyZero)
+	}
+
 	return sk, nil
 }
 
-// DecodeAkePublicKey takes a serialized public key (a point) and attempts to return it's decoded form.
-func (d *Deserializer) DecodeAkePublicKey(encoded []byte) (*ecc.Element, error) {
+// DecodePublicKey takes a serialized public key (a point) and attempts to return it's decoded form.
+func (d *Deserializer) DecodePublicKey(encoded []byte) (*ecc.Element, error) {
 	pk := d.conf.Group.NewElement()
 	if err := pk.Decode(encoded); err != nil {
 		return nil, fmt.Errorf("invalid public key: %w", err)
+	}
+
+	if pk.IsIdentity() {
+		return nil, fmt.Errorf("invalid public key: %w", ErrPublicKeyIdentity)
 	}
 
 	return pk, nil

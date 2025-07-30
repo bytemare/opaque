@@ -45,7 +45,7 @@ func (o *Options) Set(f ksfInterface, salt []byte, parameters []int, length int)
 	}
 
 	if length < 0 {
-		return fmt.Errorf("the provided KSF output length must not be negative", length)
+		return fmt.Errorf("the provided KSF output length must not be negative: %q", length)
 	}
 
 	if length != 0 {

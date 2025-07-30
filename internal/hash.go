@@ -15,6 +15,12 @@ import (
 	"github.com/bytemare/hash"
 )
 
+// IsHashFunctionValid checks whether the given crypto.Hash is valid, available, and has a fixed output length.
+func IsHashFunctionValid(h crypto.Hash) bool {
+	h2 := hash.FromCrypto(h)
+	return h2 != 0 && h2.Type() == hash.FixedOutputLength
+}
+
 // NewKDF returns a newly instantiated KDF.
 func NewKDF(id crypto.Hash) *KDF {
 	return &KDF{h: hash.FromCrypto(id).GetHashFunction()}

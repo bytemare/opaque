@@ -24,6 +24,7 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/keyrecovery"
+	internalKSF "github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
@@ -31,17 +32,74 @@ import (
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	for _, c := range configurationTable {
+		var err error
+		c.internal, err = toInternal(c.conf)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 // helper functions
 
 type configuration struct {
-	curve elliptic.Curve
-	conf  *opaque.Configuration
-	name  string
+	curve    elliptic.Curve
+	conf     *opaque.Configuration
+	internal *internal.Configuration
+	name     string
 }
 
-var configurationTable = []configuration{
+func verify(c *opaque.Configuration) error {
+	if !c.OPRF.Available() || !c.OPRF.OPRF().Available() {
+		return opaque.ErrInvalidOPRFid
+	}
+
+	if !c.AKE.Available() || !c.AKE.Group().Available() {
+		return opaque.ErrInvalidAKEid
+	}
+
+	if !internal.IsHashFunctionValid(c.KDF) {
+		return opaque.ErrInvalidKDFid
+	}
+
+	if !internal.IsHashFunctionValid(c.MAC) {
+		return opaque.ErrInvalidMACid
+	}
+
+	if !internal.IsHashFunctionValid(c.Hash) {
+		return opaque.ErrInvalidHASHid
+	}
+
+	if c.KSF != 0 && !c.KSF.Available() {
+		return opaque.ErrInvalidKSFid
+	}
+
+	return nil
+}
+
+func toInternal(c *opaque.Configuration) (*internal.Configuration, error) {
+	if err := verify(c); err != nil {
+		return nil, err
+	}
+
+	g := c.AKE.Group()
+	o := c.OPRF.OPRF()
+	mac := internal.NewMac(c.MAC)
+	return &internal.Configuration{
+		OPRF:         o,
+		Group:        g,
+		KSF:          internalKSF.NewKSF(c.KSF),
+		KDF:          internal.NewKDF(c.KDF),
+		MAC:          mac,
+		Hash:         internal.NewHash(c.Hash),
+		NonceLen:     internal.NonceLength,
+		EnvelopeSize: internal.NonceLength + mac.Size(),
+		Context:      c.Context,
+	}, nil
+}
+
+var configurationTable = []*configuration{
 	{
 		name:  "Ristretto255",
 		conf:  opaque.DefaultConfiguration(),
@@ -88,7 +146,7 @@ var configurationTable = []configuration{
 func testAll(t *testing.T, f func(*testing.T, *configuration)) {
 	for _, test := range configurationTable {
 		t.Run(test.name, func(t *testing.T) {
-			f(t, &test)
+			f(t, test)
 		})
 	}
 }
@@ -122,6 +180,7 @@ func getBad25519Scalar() []byte {
 }
 
 func badScalar(t *testing.T, g group.Group, curve elliptic.Curve) []byte {
+	t.Helper()
 	order := curve.Params().P
 	exceeded := new(big.Int).Add(order, big.NewInt(2)).Bytes()
 
@@ -167,7 +226,7 @@ func getBadScalar(t *testing.T, c *configuration) []byte {
 }
 
 func buildRecord(
-	credID, password []byte,
+	serverPublicKey, credID, password []byte,
 	client *opaque.Client,
 	server *opaque.Server,
 ) (*opaque.ClientRecord, error) {
@@ -176,12 +235,12 @@ func buildRecord(
 		return nil, err
 	}
 
-	r2, err := server.RegistrationResponse(r1, credID, nil)
+	r2, err := server.RegistrationResponse(r1, serverPublicKey, credID, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	r3, _, err := client.RegistrationFinalize(r2)
+	r3, _, err := client.RegistrationFinalize(r2, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -210,18 +269,19 @@ func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
 	return dst
 }
 
-func buildPRK(client *opaque.Client, evaluation *group.Element) ([]byte, error) {
-	conf := client.GetConf()
+func buildPRK(conf *internal.Configuration, client *opaque.Client, evaluation *group.Element) ([]byte, error) {
 	unblinded := client.OPRF.Finalize(evaluation)
 	hardened := conf.KSF.Harden(unblinded, nil, conf.OPRF.Group().ElementLength())
 
 	return conf.KDF.Extract(nil, encoding.Concat(unblinded, hardened)), nil
 }
 
-func getEnvelope(client *opaque.Client, ke2 *message.KE2) (*keyrecovery.Envelope, []byte, error) {
-	conf := client.GetConf()
-
-	randomizedPassword, err := buildPRK(client, ke2.EvaluatedMessage)
+func getEnvelope(
+	conf *internal.Configuration,
+	client *opaque.Client,
+	ke2 *message.KE2,
+) (*keyrecovery.Envelope, []byte, error) {
+	randomizedPassword, err := buildPRK(conf, client, ke2.EvaluatedMessage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}

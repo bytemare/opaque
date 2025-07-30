@@ -18,7 +18,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bytemare/hash"
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque"
@@ -49,9 +48,9 @@ func skipErrorOnCondition(t *testing.T, expected error, ce *fuzzConfError) error
 func fuzzTestConfigurationError(t *testing.T, c *opaque.Configuration, err error) error {
 	// Errors tested for
 	errorTests := []*fuzzConfError{
-		{errors.New("invalid KDF id"), c.KDF, hash.Hash(c.KDF).Available()},
-		{errors.New("invalid MAC id"), c.MAC, hash.Hash(c.MAC).Available()},
-		{errors.New("invalid Hash id"), c.Hash, hash.Hash(c.Hash).Available()},
+		{errors.New("invalid KDF id"), c.KDF, internal.IsHashFunctionValid(c.KDF)},
+		{errors.New("invalid MAC id"), c.MAC, internal.IsHashFunctionValid(c.MAC)},
+		{errors.New("invalid Hash id"), c.Hash, internal.IsHashFunctionValid(c.Hash)},
 		{errors.New("invalid KSF id"), c.KSF, c.KSF == 0 && c.KSF.Available()},
 		{errors.New("invalid OPRF group id"), c.OPRF, c.OPRF.Available() && c.OPRF.OPRF().Available()},
 		{errors.New("invalid AKE group id"), c.AKE, c.AKE.Available() && c.AKE.Group().Available()},
@@ -209,10 +208,8 @@ func inputToConfig(context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) 
 
 func FuzzDeserializeRegistrationRequest(f *testing.F) {
 	// Errors tested for
-	var (
-		errInvalidMessageLength = errors.New("invalid message length for the configuration")
-		errInvalidBlindedData   = errors.New("blinded data is an invalid point")
-	)
+
+	errInvalidBlindedData := errors.New("blinded data is an invalid point")
 
 	loadVectorSeedCorpus(f, "RegistrationRequest")
 
@@ -225,10 +222,14 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 
 		_, err = server.Deserialize.RegistrationRequest(r1)
 		if err != nil {
-			conf := server.GetConf()
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
+			conf, _err := toInternal(c)
+			if _err != nil {
+				t.Fatalf("encountered error %q, but could not proceed due to internal conf error %q", err, _err)
+			}
+
+			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) &&
 				len(r1) == conf.OPRF.Group().ElementLength() {
-				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
+				t.Fatalf("got %q but input length is valid", err)
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
@@ -243,7 +244,6 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 func FuzzDeserializeRegistrationResponse(f *testing.F) {
 	// Errors tested for
 	var (
-		errInvalidMessageLength = errors.New("invalid message length for the configuration")
 		errInvalidEvaluatedData = errors.New("invalid OPRF evaluation")
 		errInvalidServerPK      = errors.New("invalid server public key")
 	)
@@ -259,11 +259,15 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 
 		_, err = client.Deserialize.RegistrationResponse(r2)
 		if err != nil {
-			conf := client.GetConf()
+			conf, _err := toInternal(c)
+			if _err != nil {
+				t.Fatalf("encountered error %q, but could not proceed due to internal conf error %q", err, _err)
+			}
+
 			maxResponseLength := conf.OPRF.Group().ElementLength() + conf.Group.ElementLength()
 
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r2) == maxResponseLength {
-				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
+			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) && len(r2) == maxResponseLength {
+				t.Fatalf(fmtGotValidInput, opaque.ErrInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
@@ -283,10 +287,8 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 
 func FuzzDeserializeRegistrationRecord(f *testing.F) {
 	// Errors tested for
-	var (
-		errInvalidMessageLength = errors.New("invalid message length for the configuration")
-		errInvalidClientPK      = errors.New("invalid client public key")
-	)
+
+	errInvalidClientPK := errors.New("invalid client public key")
 
 	loadVectorSeedCorpus(f, "RegistrationRecord")
 
@@ -297,14 +299,17 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 			t.Skip()
 		}
 
-		conf := server.GetConf()
+		conf, err := toInternal(c)
+		if err != nil {
+			t.Skip()
+		}
 
 		_, err = server.Deserialize.RegistrationRecord(r3)
 		if err != nil {
 			maxMessageLength := conf.Group.ElementLength() + conf.Hash.Size() + conf.EnvelopeSize
 
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(r3) == maxMessageLength {
-				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
+			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) && len(r3) == maxMessageLength {
+				t.Fatalf(fmtGotValidInput, opaque.ErrInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidClientPK.Error()) {
@@ -319,15 +324,19 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 func FuzzDeserializeKE1(f *testing.F) {
 	// Errors tested for
 	var (
-		errInvalidMessageLength = errors.New("invalid message length for the configuration")
-		errInvalidBlindedData   = errors.New("blinded data is an invalid point")
-		errInvalidClientEPK     = errors.New("invalid ephemeral client public key")
+		errInvalidBlindedData = errors.New("blinded data is an invalid point")
+		errInvalidClientEPK   = errors.New("invalid ephemeral client public key")
 	)
 
 	loadVectorSeedCorpus(f, "KE1")
 
 	f.Fuzz(func(t *testing.T, ke1, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
 		c := inputToConfig(context, kdf, mac, h, oprf, ksfID, ake)
+		conf, err := toInternal(c)
+		if err != nil {
+			t.Skip()
+		}
+
 		server, err := c.Server()
 		if err != nil {
 			t.Skip()
@@ -335,10 +344,9 @@ func FuzzDeserializeKE1(f *testing.F) {
 
 		_, err = server.Deserialize.KE1(ke1)
 		if err != nil {
-			conf := server.GetConf()
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
-				len(ke1) == conf.OPRF.Group().ElementLength()+conf.NonceLen+conf.Group.ElementLength() {
-				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
+			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) &&
+				len(ke1) == c.OPRF.Group().ElementLength()+conf.NonceLen+conf.Group.ElementLength() {
+				t.Fatalf("got %q but input length is valid", opaque.ErrInvalidMessageLength)
 			}
 
 			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
@@ -385,13 +393,6 @@ func isValidOPRFPoint(conf *internal.Configuration, input []byte, err error) err
 }
 
 func FuzzDeserializeKE2(f *testing.F) {
-	// Errors tested for
-	var (
-		errInvalidMessageLength = errors.New("invalid message length for the configuration")
-		errInvalidEvaluatedData = errors.New("invalid OPRF evaluation")
-		errInvalidServerEPK     = errors.New("invalid ephemeral server public key")
-	)
-
 	loadVectorSeedCorpus(f, "KE2")
 
 	f.Fuzz(func(t *testing.T, ke2, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
@@ -403,26 +404,30 @@ func FuzzDeserializeKE2(f *testing.F) {
 
 		_, err = client.Deserialize.KE2(ke2)
 		if err != nil {
-			conf := client.GetConf()
+			conf, _err := toInternal(c)
+			if _err != nil {
+				t.Fatalf("encountered error %q, but could not proceed due to internal conf error %q", err, _err)
+			}
+
 			maxResponseLength := conf.OPRF.Group().
 				ElementLength() +
 				conf.NonceLen + conf.Group.ElementLength() + conf.EnvelopeSize
 
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) &&
+			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) &&
 				len(ke2) == maxResponseLength+conf.NonceLen+conf.Group.ElementLength()+conf.MAC.Size() {
-				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
+				t.Fatalf(fmtGotValidInput, opaque.ErrInvalidMessageLength)
 			}
 
-			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
+			if strings.Contains(err.Error(), opaque.ErrInvalidEvaluatedData.Error()) {
 				input := ke2[:conf.OPRF.Group().ElementLength()]
-				if err := isValidOPRFPoint(conf, input, errInvalidEvaluatedData); err != nil {
+				if err := isValidOPRFPoint(conf, input, opaque.ErrInvalidEvaluatedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			if strings.Contains(err.Error(), errInvalidServerEPK.Error()) {
+			if strings.Contains(err.Error(), opaque.ErrInvalidServerEPK.Error()) {
 				input := ke2[conf.OPRF.Group().ElementLength()+conf.NonceLen:]
-				if err := isValidAKEPoint(conf, input, errInvalidServerEPK); err != nil {
+				if err := isValidAKEPoint(conf, input, opaque.ErrInvalidServerEPK); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -431,9 +436,6 @@ func FuzzDeserializeKE2(f *testing.F) {
 }
 
 func FuzzDeserializeKE3(f *testing.F) {
-	// Error tested for
-	errInvalidMessageLength := errors.New("invalid message length for the configuration")
-
 	loadVectorSeedCorpus(f, "KE3")
 
 	f.Fuzz(func(t *testing.T, ke3, context []byte, kdf, mac, h uint, oprf []byte, ksfID, ake byte) {
@@ -445,11 +447,10 @@ func FuzzDeserializeKE3(f *testing.F) {
 
 		_, err = server.Deserialize.KE3(ke3)
 		if err != nil {
-			conf := server.GetConf()
-			maxMessageLength := conf.MAC.Size()
+			maxMessageLength := internal.NewMac(c.MAC).Size()
 
-			if strings.Contains(err.Error(), errInvalidMessageLength.Error()) && len(ke3) == maxMessageLength {
-				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
+			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) && len(ke3) == maxMessageLength {
+				t.Fatalf(fmtGotValidInput, opaque.ErrInvalidMessageLength)
 			}
 		}
 	})

@@ -141,21 +141,3 @@ func (i Identifier) Client() *Client {
 		blind:      nil,
 	}
 }
-
-// ValidateBlind checks whether the blind is of the same group and different from 0.
-func (i Identifier) ValidateBlind(blind *ecc.Scalar) error {
-	if blind.Group() != i.Group() {
-		return fmt.Errorf(
-			"%w: expected %s, got %s",
-			ErrBlindGroup,
-			i.Group(),
-			blind.Group(),
-		)
-	}
-
-	if blind.IsZero() {
-		return ErrBlindZero
-	}
-
-	return nil
-}

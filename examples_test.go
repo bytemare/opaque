@@ -16,14 +16,18 @@ import (
 	"log"
 	"reflect"
 
+	"github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque"
+	"github.com/bytemare/opaque/message"
 )
 
 var (
-	exampleClientRecord                                     *opaque.ClientRecord
-	secretGlobalOprfSeed, serverPrivateKey, serverPublicKey []byte
+	exampleClientRecord  *opaque.ClientRecord
+	secretGlobalOprfSeed []byte
+	serverPrivateKey     *ecc.Scalar
+	serverPublicKey      *ecc.Element
 )
 
 func isSameConf(a, b *opaque.Configuration) bool {
@@ -106,7 +110,13 @@ func Example_serverSetup() {
 		log.Fatalln(err)
 	}
 
-	if err = server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretGlobalOprfSeed); err != nil {
+	skm := &opaque.ServerKeyMaterial{
+		Identity:       serverID,
+		SecretKey:      serverPrivateKey,
+		OPRFGlobalSeed: secretGlobalOprfSeed,
+	}
+
+	if err = server.SetKeyMaterial(skm); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -186,13 +196,24 @@ func Example_deserialization() {
 // client (e.g. database entry ID), and that must absolutely stay the same for the whole client existence and
 // never be reused.
 func Example_registration() {
-	// Secret client information.
-	password := []byte("password")
-
 	// Information shared by both client and server.
 	serverID := []byte("server")
 	clientID := []byte("username")
 	conf := opaque.DefaultConfiguration()
+
+	// Secret client information.
+	password := []byte("password")
+
+	// Secret server information, this is set up once and for all, and must be the same for a given client.
+	// This can be encoded and backed up with the Encode() and Hex() methods, and later recovered.
+	secretGlobalOprfSeed = conf.GenerateOPRFSeed()
+	serverPrivateKey, serverPublicKey = conf.KeyGen()
+
+	skm := &opaque.ServerKeyMaterial{
+		Identity:       serverID,
+		SecretKey:      serverPrivateKey,
+		OPRFGlobalSeed: secretGlobalOprfSeed,
+	}
 
 	// Runtime instantiation of the server.
 	server, err := conf.Server()
@@ -200,10 +221,7 @@ func Example_registration() {
 		log.Fatalln(err)
 	}
 
-	secretGlobalOprfSeed = conf.GenerateOPRFSeed()
-	serverPrivateKey, serverPublicKey = conf.KeyGen()
-
-	if err = server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretGlobalOprfSeed); err != nil {
+	if err = server.SetKeyMaterial(skm); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -241,7 +259,7 @@ func Example_registration() {
 		credID = opaque.RandomBytes(64)
 
 		// The server uses its public key and secret OPRF seed created at the setup.
-		response, err := server.RegistrationResponse(request, credID, nil)
+		response, err := server.RegistrationResponse(request, serverPublicKey.Encode(), credID)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -259,10 +277,7 @@ func Example_registration() {
 
 		// The client produces its record and a client-only-known secret export_key, that the client can use for other purposes (e.g. encrypt
 		// information to store on the server, and that the server can't decrypt). We don't use in the example here.
-		record, _, err := client.RegistrationFinalize(response, opaque.ClientOptions{
-			ClientIdentity: clientID,
-			ServerIdentity: serverID,
-		})
+		record, _, err := client.RegistrationFinalize(response, clientID, serverID)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -298,13 +313,21 @@ func Example_loginKeyExchange() {
 		Example_registration()
 	}
 
-	// Secret client information.
-	password := []byte("password")
-
 	// Information shared by both client and server.
 	serverID := []byte("server")
 	clientID := []byte("username")
 	conf := opaque.DefaultConfiguration()
+
+	// Secret client information.
+	password := []byte("password")
+
+	// Secret server information.
+	// This can be encoded and backed up with the Encode() and Hex() methods, and later recovered.
+	skm := &opaque.ServerKeyMaterial{
+		Identity:       serverID,
+		SecretKey:      serverPrivateKey,
+		OPRFGlobalSeed: secretGlobalOprfSeed,
+	}
 
 	// Runtime instantiation of the server.
 	server, err := conf.Server()
@@ -312,7 +335,7 @@ func Example_loginKeyExchange() {
 		log.Fatalln(err)
 	}
 
-	if err = server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretGlobalOprfSeed); err != nil {
+	if err = server.SetKeyMaterial(skm); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -338,13 +361,19 @@ func Example_loginKeyExchange() {
 	}
 
 	// The server interprets ke1, and sends back ke2.
+	var serverOutput *opaque.ServerOutput
 	{
-		ke1, err := server.Deserialize.KE1(message1)
+		var (
+			ke1 *message.KE1
+			ke2 *message.KE2
+		)
+
+		ke1, err = server.Deserialize.KE1(message1)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		ke2, err := server.GenerateKE2(ke1, exampleClientRecord)
+		ke2, serverOutput, err = server.GenerateKE2(ke1, exampleClientRecord)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -355,24 +384,22 @@ func Example_loginKeyExchange() {
 	// The client interprets ke2. If everything went fine, the server is considered trustworthy and the client
 	// can use the shared session key and secret export key.
 	{
+		var ke3 *message.KE3
 		ke2, err := client.Deserialize.KE2(message2)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
 		// In this example, we don't use the secret export key. The client sends the serialized ke3 to the server.
-		ke3, _, err := client.GenerateKE3(ke2, opaque.ClientOptions{
-			ClientIdentity: clientID,
-			ServerIdentity: serverID,
-		})
+		ke3, clientSessionKey, _, err = client.GenerateKE3(ke2, clientID, serverID)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
 		message3 = ke3.Serialize()
 
-		// If no error occurred, the server can be trusted, and the client can use the session key.
-		clientSessionKey = client.SessionKey()
+		// If no error occurred here, the server can be trusted, and the client can use the session key.
+		fmt.Println("OPAQUE succeeded from the client perspective, which can now safely use the session key.")
 	}
 
 	// The server must absolutely validate this last message to authenticate the client and continue. If this message
@@ -384,12 +411,15 @@ func Example_loginKeyExchange() {
 			log.Fatalln(err)
 		}
 
-		if err := server.LoginFinish(ke3); err != nil {
+		if err = server.LoginFinish(ke3, serverOutput.ClientMAC); err != nil {
 			log.Fatalln(err)
 		}
 
+		// If no error occurred here, the client can be trusted, and the server can use the session key.
+		fmt.Println("OPAQUE succeeded from the server perspective, which can now safely use the session key.")
+
 		// If no error occurred at this point, the server can trust the client and safely extract the shared session key.
-		serverSessionKey = server.SessionKey()
+		serverSessionKey = serverOutput.SessionSecret
 	}
 
 	// The following test does not exist in the real world and simply proves the point that the keys match for the demo.
@@ -399,12 +429,14 @@ func Example_loginKeyExchange() {
 
 	fmt.Println("OPAQUE is much awesome!")
 	// Output: OPAQUE registration is easy!
+	// OPAQUE succeeded from the client perspective, which can now safely use the session key.
+	// OPAQUE succeeded from the server perspective, which can now safely use the session key.
 	// OPAQUE is much awesome!
 }
 
 // Example_FakeResponse shows how to counter some client enumeration attacks by faking an existing client entry.
 // Precompute the fake client record, and return it when no valid record was found.
-// Use this with the server's GenerateKE1 function whenever a client wants to retrieve an envelope but a client
+// Use this with the server's GenerateKE2 function whenever a client wants to retrieve an envelope but a client
 // entry does not exist. Failing to do so results in an attacker being able to enumerate users.
 func Example_fakeResponse() {
 	// The server must have been set up with its long term values once. So we're calling this, here, for the demo.
@@ -412,12 +444,27 @@ func Example_fakeResponse() {
 		Example_serverSetup()
 	}
 
-	// Precompute the fake client record, and return it when no valid record was found. The malicious client will
-	// purposefully fail, but can't determine the difference with an existing client record. Choose the same
-	// configuration as in your app.
+	// Precompute the fake client record, store it, and use it when no valid record was found for the requested client
+	// id. The malicious client will purposefully fail, but can't determine the difference with an existing
+	// client record. Choose the same configuration as in your app.
 	conf := opaque.DefaultConfiguration()
-	fakeRecord, err := conf.GetFakeRecord([]byte("fake_client"))
+	fakeRecord, err := conf.GetFakeRecord([]byte("id_to_the_fake_client"))
 	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// Runtime instantiation of the server. Note that there's no change to the regular server setup.
+	server, err := conf.Server()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	skm := &opaque.ServerKeyMaterial{
+		SecretKey:      serverPrivateKey,
+		OPRFGlobalSeed: secretGlobalOprfSeed,
+	}
+
+	if err = server.SetKeyMaterial(skm); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -431,22 +478,12 @@ func Example_fakeResponse() {
 	// back the serialized ke2 message message2.
 	var message2 []byte
 	{
-		serverID := []byte("server")
-		server, err := conf.Server()
-		if err != nil {
-			log.Fatalln(err)
-		}
-
-		if err := server.SetKeyMaterial(serverID, serverPrivateKey, serverPublicKey, secretGlobalOprfSeed); err != nil {
-			log.Fatalln(err)
-		}
-
 		ke1, err := server.Deserialize.KE1(message1)
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		ke2, err := server.GenerateKE2(ke1, fakeRecord)
+		ke2, _, err := server.GenerateKE2(ke1, fakeRecord)
 		if err != nil {
 			log.Fatalln(err)
 		}

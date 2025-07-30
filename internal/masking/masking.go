@@ -11,6 +11,7 @@ package masking
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/bytemare/ecc"
 
@@ -20,8 +21,13 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 )
 
-// errUnmaskInvalidPKS happens when the client reads an invalid public key while unmasking.
-var errUnmaskInvalidPKS = errors.New("invalid server public key in masked response")
+var (
+	// errUnmaskInvalidPKS happens when the client reads an invalid public key while unmasking.
+	errUnmaskInvalidPKS = errors.New("invalid server public key in masked response")
+
+	// ErrPublicKeyIdentity happens when the public key is the identity element (point at infinity).
+	ErrPublicKeyIdentity = errors.New("public key is identity element")
+)
 
 // Keys contains all the output keys from the masking mechanism.
 type Keys struct {
@@ -63,7 +69,11 @@ func Unmask(
 
 	serverPublicKey = conf.Group.NewElement()
 	if err = serverPublicKey.Decode(serverPublicKeyBytes); err != nil {
-		return nil, nil, nil, errUnmaskInvalidPKS
+		return nil, nil, nil, fmt.Errorf("%w: %w", errUnmaskInvalidPKS, err)
+	}
+
+	if serverPublicKey.IsIdentity() {
+		return nil, nil, nil, ErrPublicKeyIdentity
 	}
 
 	return serverPublicKey, serverPublicKeyBytes, envelope, nil

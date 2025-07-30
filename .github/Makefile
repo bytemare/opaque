@@ -48,3 +48,14 @@ vectors:
 cover:
 	@echo "Testing with coverage ..."
 	@go test -v -race -covermode=atomic -coverpkg=../... -coverprofile=./coverage.out ../tests
+
+.PHONY: fuzz
+fuzz:
+	@echo "Running fuzz tests ..."
+	@fuzzTime=$${FUZZTIME:-10}; \
+	find .. -name '*_test.go' -exec grep -l '^func Fuzz' {} \; | while read -r file; do \
+		grep '^func Fuzz' "$$file" | sed -E 's/^func ([^(]+).*/\1/' | while read -r func; do \
+			echo "Fuzzing $$func in $$file"; \
+			go test "$$(dirname "$$file")" -run="$$func" -fuzz="$$func" -fuzztime="$${fuzzTime}s"; \
+		done; \
+	done

@@ -7,13 +7,12 @@
   import "github.com/bytemare/opaque"
 ```
 
-This package implements [OPAQUE](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque), an asymmetric password-authenticated
-key exchange protocol that is secure against pre-computation attacks. It enables a client to authenticate to a server
-without ever revealing its password to the server. 
+This package implements [OPAQUE (RFC 9807)](https://datatracker.ietf.org/doc/rfc9807), the augmented password-authenticated key exchange (aPAKE) protocol,
+that is secure against pre-computation attacks. It enables a client to authenticate to a server without ever revealing its
+password to the server. 
 
-This implementation is developed by one of the authors of the RFC [Internet Draft](https://github.com/cfrg/draft-irtf-cfrg-opaque).
-The main branch is in sync with the latest developments of the draft, and [the releases](https://github.com/bytemare/opaque/releases)
-correspond to the [official draft versions](https://datatracker.ietf.org/doc/draft-irtf-cfrg-opaque).
+This implementation is developed by one of the authors of the [RFC](https://datatracker.ietf.org/doc/rfc9807). It has not
+been audited, and even though great care about security and performance has been taken, it comes with no warranty.
 
 #### What is OPAQUE?
 
@@ -25,12 +24,33 @@ correspond to the [official draft versions](https://datatracker.ietf.org/doc/dra
 
 #### References
 - [The original paper](https://eprint.iacr.org/2018/163.pdf) from Jarecki, Krawczyk, and Xu.
+- [RFC 9807](https://datatracker.ietf.org/doc/rfc9807).
 - [OPAQUE is used in WhatsApp](https://www.whatsapp.com/security/WhatsApp_Security_Encrypted_Backups_Whitepaper.pdf) to enable end-to-end encrypted backups.
-- [The GitHub repo](https://github.com/cfrg/draft-irtf-cfrg-opaque) where the draft is being specified.
 
 ## Documentation [![Go Reference](https://pkg.go.dev/badge/github.com/bytemare/opaque.svg)](https://pkg.go.dev/github.com/bytemare/opaque)
 
 You can find the documentation and usage examples in [the package doc](https://pkg.go.dev/github.com/bytemare/opaque) and [the project wiki](https://github.com/bytemare/opaque/wiki) . 
+
+
+# TODO
+- list good aspects:
+  - easy to use
+  - server is stateless, therefore thread safe and can be used by multiple goroutines serving clients
+  - secure defaults, no need to worry about configuring the protocol
+  - highly configurable, but beware of the pitfalls, and use at your own risk
+- protocol overview and usage examples
+- some indicators of good use
+  - use the latest version of the protocol
+  - secure defaults
+  - store and retrieve the server key material securely
+  - verify KE3 before using the session key
+  - the client can use the extra key to encrypt more stuff, that the server cannot decrypt
+- list pitfalls
+  - rate limit and add user enumeration protections of top of the fake credentials mechanism
+  - same configuration throughout the client lifecycle
+    - same base config
+    - same server key material and public key
+  - client 
 
 ## Versioning
 
