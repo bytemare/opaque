@@ -269,8 +269,8 @@ func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
 	return dst
 }
 
-func buildPRK(conf *internal.Configuration, client *opaque.Client, evaluation *group.Element) ([]byte, error) {
-	unblinded := client.OPRF.Finalize(evaluation)
+func buildPRK(conf *internal.Configuration, blind *group.Scalar, password []byte, evaluation *group.Element) ([]byte, error) {
+	unblinded := conf.OPRF.Finalize(blind, password, evaluation)
 	hardened := conf.KSF.Harden(unblinded, nil, conf.OPRF.Group().ElementLength())
 
 	return conf.KDF.Extract(nil, encoding.Concat(unblinded, hardened)), nil
@@ -278,10 +278,11 @@ func buildPRK(conf *internal.Configuration, client *opaque.Client, evaluation *g
 
 func getEnvelope(
 	conf *internal.Configuration,
-	client *opaque.Client,
+	blind *group.Scalar,
+	password []byte,
 	ke2 *message.KE2,
 ) (*keyrecovery.Envelope, []byte, error) {
-	randomizedPassword, err := buildPRK(conf, client, ke2.EvaluatedMessage)
+	randomizedPassword, err := buildPRK(conf, blind, password, ke2.EvaluatedMessage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}

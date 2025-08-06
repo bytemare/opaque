@@ -84,15 +84,15 @@ type inputs struct {
 }
 
 type intermediates struct {
-	AuthKey         ByteToHex `json:"auth_key"`       //
-	ClientMacKey    ByteToHex `json:"client_mac_key"` //
-	ClientPublicKey ByteToHex `json:"client_public_key"`
-	Envelope        ByteToHex `json:"envelope"`         //
-	HandshakeSecret ByteToHex `json:"handshake_secret"` //
-	MaskingKey      ByteToHex `json:"masking_key"`
-	OprfKey         ByteToHex `json:"oprf_key"`
-	RandomPWD       ByteToHex `json:"randomized_pwd"` //
-	ServerMacKey    ByteToHex `json:"server_mac_key"` //
+	AuthKey            ByteToHex `json:"auth_key"`       //
+	ClientMacKey       ByteToHex `json:"client_mac_key"` //
+	ClientPublicKey    ByteToHex `json:"client_public_key"`
+	Envelope           ByteToHex `json:"envelope"`         //
+	HandshakeSecret    ByteToHex `json:"handshake_secret"` //
+	MaskingKey         ByteToHex `json:"masking_key"`
+	OprfKey            ByteToHex `json:"oprf_key"`
+	RandomizedPassword ByteToHex `json:"randomized_password"` //
+	ServerMacKey       ByteToHex `json:"server_mac_key"`      //
 }
 
 type outputs struct {
@@ -217,11 +217,9 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 		KE1, err := client.GenerateKE1(v.Inputs.Password, &opaque.ClientOptions{
 			OPRFBlind: blind,
 			AKE: &opaque.AKEOptions{
-				EphemeralSecretKeyShare:  nil,
-				SecretKeyShareSeed:       v.Inputs.ClientKeyshareSeed,
-				Nonce:                    v.Inputs.ClientNonce,
-				SecretKeyShareSeedLength: 0,
-				NonceLength:              internal.NonceLength,
+				EphemeralSecretKeyShare: nil,
+				SecretKeyShareSeed:      v.Inputs.ClientKeyshareSeed,
+				Nonce:                   v.Inputs.ClientNonce,
 			},
 		})
 		if err != nil {
@@ -366,11 +364,10 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		ke1,
 		record,
 		&opaque.ServerOptions{
-			AKE: opaque.AKEOptions{
+			AKE: &opaque.AKEOptions{
 				EphemeralSecretKeyShare: nil,
 				SecretKeyShareSeed:      v.Inputs.ServerKeyshareSeed,
 				Nonce:                   v.Inputs.ServerNonce,
-				NonceLength:             internal.NonceLength,
 			},
 			MaskingNonce: v.Inputs.MaskingNonce,
 		},
@@ -528,15 +525,13 @@ func groupToGroup(g string) opaque.Group {
 	}
 }
 
-type draftVectors []*vector
-
-func loadOpaqueVectors(filepath string) (draftVectors, error) {
+func loadOpaqueVectors(filepath string) ([]*vector, error) {
 	contents, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, err
 	}
 
-	var v draftVectors
+	var v []*vector
 	errJSON := json.Unmarshal(contents, &v)
 	if errJSON != nil {
 		return nil, errJSON

@@ -10,20 +10,19 @@ package ake
 
 import (
 	"github.com/bytemare/ecc"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
 
 // Start initiates the 3DH protocol, and returns a KE1 message with clientInfo.
-func Start(g ecc.Group, options *Options) (*message.KE1, *ecc.Scalar) {
-	esk, epk := options.GetEphemeralKeyShare(g)
+func Start(g ecc.Group, esk *ecc.Scalar, nonce []byte) *message.KE1 {
+	epk := g.Base().Multiply(esk)
 
 	return &message.KE1{
 		CredentialRequest:    nil,
-		ClientNonce:          options.Nonce,
+		ClientNonce:          nonce,
 		ClientPublicKeyshare: epk,
-	}, esk
+	}
 }
 
 // Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions

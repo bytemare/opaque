@@ -11,9 +11,7 @@ package ake
 
 import (
 	"fmt"
-
 	"github.com/bytemare/ecc"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
@@ -30,9 +28,7 @@ func KeyGen(g ecc.Group, seed ...[]byte) (*ecc.Scalar, *ecc.Element) {
 		s = internal.RandomBytes(internal.SeedLength)
 	}
 
-	sk := oprf.IDFromGroup(g).DeriveKey(s, []byte(tag.DeriveDiffieHellmanKeyPair))
-
-	return sk, g.Base().Multiply(sk)
+	return oprf.IDFromGroup(g).DeriveKeyPair(s, []byte(tag.DeriveDiffieHellmanKeyPair))
 }
 
 func diffieHellman(s *ecc.Scalar, e *ecc.Element) *ecc.Element {
@@ -77,69 +73,26 @@ func (id *Identities) SetIdentities(clientPublicKey *ecc.Element, serverPublicKe
 	return id
 }
 
-// Options enable setting optional ephemeral values, which default to secure random values if not set.
-type Options struct {
-	EphemeralSecretKeyShare     *ecc.Scalar
-	EphemeralKeyShareSeed       []byte
-	Nonce                       []byte
-	EphemeralKeyShareSeedLength uint32
-	NonceLength                 uint32
-}
-
-// NewOptions returns a new Options structure with default values.
-func NewOptions() *Options {
-	return &Options{
-		EphemeralSecretKeyShare:     nil,
-		EphemeralKeyShareSeed:       nil,
-		Nonce:                       nil,
-		EphemeralKeyShareSeedLength: internal.SeedLength,
-		NonceLength:                 internal.NonceLength,
-	}
-}
-
-// Set sets the ephemeral key share seed and nonce given the provided values, or generates secure random values
-// if not provided.
-func (o *Options) Set(seed []byte, seedLength int, nonce []byte, nonceLength int) error {
-	if err := setOptions(&o.EphemeralKeyShareSeed, &o.EphemeralKeyShareSeedLength,
-		seed, seedLength, internal.SeedLength); err != nil {
-		return fmt.Errorf("invalid AKE key share seed: %w", err)
+// DetermineNonceOrSeed sets s to input, if it matches the requested or required length, or to a newly generated
+// random value of the requested or required length.
+func DetermineNonceOrSeed(input []byte, requestedLength int, referenceLength uint32) ([]byte, error) {
+	// Verify whether the provided input matches the requested length or is shorter than the reference length.
+	if err := internal.ValidateOptionsLength(input, requestedLength, referenceLength); err != nil {
+		return nil, fmt.Errorf("invalid length specification in the options: %w", err)
 	}
 
-	if err := setOptions(&o.Nonce, &o.NonceLength,
-		nonce, nonceLength, internal.NonceLength); err != nil {
-		return fmt.Errorf("invalid AKE nonce: %w", err)
+	// If the input is not empty, we set the slice to the input value.
+	if len(input) != 0 {
+		return input, nil
 	}
 
-	return nil
-}
-
-// GetEphemeralKeyShare returns the ephemeral secret key share and its corresponding public key share.
-func (o *Options) GetEphemeralKeyShare(g ecc.Group) (*ecc.Scalar, *ecc.Element) {
-	esk := o.EphemeralSecretKeyShare
-	if esk == nil {
-		esk = oprf.IDFromGroup(g).
-			DeriveKey(o.EphemeralKeyShareSeed, []byte(tag.DeriveDiffieHellmanKeyPair))
+	// Otherwise, we generate a new random value of the requested or required length.
+	length := requestedLength
+	if length == 0 {
+		length = int(referenceLength)
 	}
 
-	return esk, g.Base().Multiply(esk)
-}
-
-func setOptions(s *[]byte, l *uint32, input []byte, length int, referenceLength uint32) error {
-	if err := internal.ValidateOptionsLength(input, length, referenceLength); err != nil {
-		return err
-	}
-
-	if length != 0 {
-		*l = uint32(length)
-	}
-
-	if len(input) == 0 {
-		*s = internal.RandomBytes(int(*l))
-	} else {
-		*s = input
-	}
-
-	return nil
+	return internal.RandomBytes(length), nil
 }
 
 func k3dh(
@@ -150,8 +103,6 @@ func k3dh(
 	p3 *ecc.Element,
 	s3 *ecc.Scalar,
 ) []byte {
-	// slog.Info("3DH", "p1", p1.Hex(), "s1", s1.Hex(), "p2", p2.Hex(), "s2", s2.Hex(), "p3", p3.Hex(), "s3", s3.Hex())
-
 	e1 := diffieHellman(s1, p1).Encode()
 	e2 := diffieHellman(s2, p2).Encode()
 	e3 := diffieHellman(s3, p3).Encode()

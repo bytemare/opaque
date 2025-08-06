@@ -15,9 +15,9 @@ package opaque
 import (
 	"crypto"
 	"fmt"
-
 	"github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
+	"github.com/bytemare/opaque/internal/tag"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
@@ -296,42 +296,72 @@ func IsValidElement(g ecc.Group, e *ecc.Element) error {
 // to instantiate, or the lengths will be set to zero, which is not secure. Only use this if you know what you're
 // doing. Reusing seeds and nonces across sessions is a security risk, and breaks forward secrecy.
 type AKEOptions struct {
-	EphemeralSecretKeyShare  *ecc.Scalar
-	SecretKeyShareSeed       []byte
-	Nonce                    []byte
-	SecretKeyShareSeedLength int
-	NonceLength              int
+	EphemeralSecretKeyShare *ecc.Scalar
+	SecretKeyShareSeed      []byte
+	Nonce                   []byte
 }
 
 // NewAKEOptions returns a new AKEOptions structure with secure default values. Use this to ensure that secure lengths
 // are set by default.
 func NewAKEOptions() *AKEOptions {
 	return &AKEOptions{
-		EphemeralSecretKeyShare:  nil,
-		SecretKeyShareSeed:       nil,
-		Nonce:                    nil,
-		SecretKeyShareSeedLength: internal.SeedLength,
-		NonceLength:              internal.NonceLength,
+		EphemeralSecretKeyShare: nil,
+		SecretKeyShareSeed:      nil,
+		Nonce:                   nil,
+		// TODO: maybe add KE1 here
+		// TODO: "ExportState" to transfer the state?
 	}
 }
 
-func processAkeOptions(g ecc.Group, out *ake.Options, o *AKEOptions) error {
+func processAkeOptions2(g ecc.Group, o *AKEOptions) error {
 	if o == nil {
-		o = NewAKEOptions()
-	}
-
-	// The ephemeral key share seed is created regardless of whether it's provided. TODO: maybe change that.
-	if err := out.Set(o.SecretKeyShareSeed, o.SecretKeyShareSeedLength, o.Nonce, o.NonceLength); err != nil {
-		return fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+		return nil
 	}
 
 	if o.EphemeralSecretKeyShare != nil {
 		if err := IsValidScalar(g, o.EphemeralSecretKeyShare); err != nil {
-			return fmt.Errorf("%w: ephemeral secret key, %w", errClientOptionsPrefix, err)
+			return fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
 		}
-
-		out.EphemeralSecretKeyShare = o.EphemeralSecretKeyShare
 	}
 
 	return nil
+}
+
+func processAkeOptions(g ecc.Group, o *AKEOptions) (*ecc.Scalar, []byte, error) {
+	if o == nil {
+		o = NewAKEOptions()
+	}
+
+	esk, err := determineEphemeralSecretKey(g, o.EphemeralSecretKeyShare, o.SecretKeyShareSeed, internal.SeedLength)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	nonce, err := ake.DetermineNonceOrSeed(o.Nonce, internal.NonceLength, internal.NonceLength)
+	if err != nil {
+		return nil, nil, fmt.Errorf("invalid AKE key share nonce: %w", err)
+	}
+
+	return esk, nonce, nil
+}
+
+func determineEphemeralSecretKey(g ecc.Group, esk *ecc.Scalar, seed []byte, seedLength int) (*ecc.Scalar, error) {
+	// If an ephemeral secret key share is provided, we check it, and use it.
+	if esk != nil {
+		if err := IsValidScalar(g, esk); err != nil {
+			return nil, fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+		}
+
+		return esk, nil
+	}
+
+	// If no ephemeral secret key share is provided, we generate one from the seed.
+	s, err := ake.DetermineNonceOrSeed(seed, seedLength, internal.SeedLength)
+	if err != nil {
+		return nil, fmt.Errorf("invalid AKE key share seed: %w", err)
+	}
+
+	esk = oprf.IDFromGroup(g).DeriveKey(s, []byte(tag.DeriveDiffieHellmanKeyPair))
+
+	return esk, nil
 }

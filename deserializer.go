@@ -10,14 +10,13 @@ package opaque
 
 import (
 	"fmt"
-
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
 
-// Deserializer exposes the message deserialization functions.
+// Deserializer exposes the message deserialization methods.
 type Deserializer struct {
 	conf *internal.Configuration
 }

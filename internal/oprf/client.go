@@ -19,43 +19,32 @@ import (
 
 var errInvalidInput = errors.New("invalid input - OPRF input deterministically maps to the group identity element")
 
-// Client implements the OPRF client and holds its state.
-type Client struct {
-	blind *ecc.Scalar
-	Identifier
-	input []byte
-}
-
 // Blind masks the input.
-func (c *Client) Blind(input []byte, blind *ecc.Scalar) *ecc.Element {
-	if blind != nil {
-		c.blind = blind.Copy()
-	} else {
-		c.blind = c.Group().NewScalar().Random()
+func (i Identifier) Blind(input []byte, blind *ecc.Scalar) (*ecc.Scalar, *ecc.Element) {
+	if blind == nil {
+		blind = i.Group().NewScalar().Random()
 	}
 
-	p := c.Group().HashToGroup(input, c.dst(tag.OPRFPointPrefix))
+	p := i.Group().HashToGroup(input, i.dst(tag.OPRFPointPrefix))
 	if p.IsIdentity() {
 		panic(errInvalidInput)
 	}
 
-	c.input = input
-
-	return p.Multiply(c.blind)
+	return blind, p.Multiply(blind)
 }
 
-func (c *Client) hashTranscript(input, unblinded []byte) []byte {
+func (i Identifier) hashTranscript(input, unblinded []byte) []byte {
 	encInput := encoding.EncodeVector(input)
 	encElement := encoding.EncodeVector(unblinded)
 	encDST := []byte(tag.OPRFFinalize)
 
-	return c.hash(encInput, encElement, encDST)
+	return i.hash(encInput, encElement, encDST)
 }
 
 // Finalize terminates the OPRF by unblinding the evaluation and hashing the transcript.
-func (c *Client) Finalize(evaluation *ecc.Element) []byte {
-	invert := c.blind.Copy().Invert()
+func (i Identifier) Finalize(blind *ecc.Scalar, input []byte, evaluation *ecc.Element) []byte {
+	invert := blind.Copy().Invert()
 	u := evaluation.Copy().Multiply(invert).Encode()
 
-	return c.hashTranscript(c.input, u)
+	return i.hashTranscript(input, u)
 }

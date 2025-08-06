@@ -3,7 +3,6 @@ linters:
   default: none
   disable:
     - embeddedstructfieldcheck
-    - funcorder
     - noinlineerr
     - nonamedreturns
     - varnamelen

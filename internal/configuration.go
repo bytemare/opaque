@@ -13,8 +13,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"math"
-
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/ksf"
@@ -58,36 +56,36 @@ func RandomBytes(length int) []byte {
 
 var (
 	// ErrSliceDifferentLength indicates the provided slice is of different length than the configured value.
-	ErrSliceDifferentLength = fmt.Errorf("provided slice is different length than the configured value")
+	ErrSliceDifferentLength = errors.New("provided slice is different length than the configured value")
 
 	// ErrSliceShorterLength indicates the provided slice is shorter than the configured value.
-	ErrSliceShorterLength = fmt.Errorf("provided slice is shorter than the configured value")
+	ErrSliceShorterLength = errors.New("provided slice is shorter than the configured value")
 )
 
-// ValidateOptionsLength returns an error if the input slice does not match the provided length or is shorter than
-// the reference length.
+// ValidateOptionsLength returns an error if the input slice does not match the provided length (if != 0) or is shorter
+// than the reference length.
 func ValidateOptionsLength(input []byte, length int, referenceLength uint32) error {
 	if input == nil {
 		return nil
 	}
 
-	// If a length is provided, the input slice must match it.
-	if length != 0 {
-		if length < 0 {
-			return fmt.Errorf("the provided length %d is negative", length)
-		}
+	if length < 0 {
+		return fmt.Errorf("the provided length %d is negative", length)
+	}
 
-		if length > math.MaxUint32 {
-			return fmt.Errorf("the provided length %d exceeds maximum uint32 value", length)
-		}
-
-		if length != len(input) {
-			return fmt.Errorf("%w: want %d, got %d", ErrSliceDifferentLength, length, len(input))
-		}
-	} else {
+	// If the length is 0, it means the required length is not overridden, and the input slice must be at least the
+	// reference length.
+	if length == 0 {
 		if len(input) < int(referenceLength) {
 			return fmt.Errorf("%w: want %d, got %d", ErrSliceShorterLength, referenceLength, len(input))
 		}
+
+		return nil
+	}
+
+	// If a length is provided, the input slice must match it.
+	if length != len(input) {
+		return fmt.Errorf("%w: want %d, got %d", ErrSliceDifferentLength, length, len(input))
 	}
 
 	return nil

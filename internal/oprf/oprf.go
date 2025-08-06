@@ -13,7 +13,6 @@ package oprf
 import (
 	"crypto"
 	"errors"
-	"fmt"
 
 	"github.com/bytemare/ecc"
 
@@ -49,7 +48,7 @@ var (
 	ErrBlindGroup = errors.New("OPRF blind is from a different group than the configuration")
 
 	// ErrBlindZero indicates the OPRF blind is zero.
-	ErrBlindZero = fmt.Errorf("OPRF blind is zero")
+	ErrBlindZero = errors.New("OPRF blind is zero")
 )
 
 func (i Identifier) dst(prefix string) []byte {
@@ -131,13 +130,4 @@ func (i Identifier) DeriveKey(seed, info []byte) *ecc.Scalar {
 func (i Identifier) DeriveKeyPair(seed, info []byte) (*ecc.Scalar, *ecc.Element) {
 	sk := i.DeriveKey(seed, info)
 	return sk, i.Group().Base().Multiply(sk)
-}
-
-// Client returns an OPRF client.
-func (i Identifier) Client() *Client {
-	return &Client{
-		Identifier: i,
-		input:      nil,
-		blind:      nil,
-	}
 }

@@ -11,10 +11,7 @@ package keyrecovery
 
 import (
 	"errors"
-	"fmt"
-
 	"github.com/bytemare/ecc"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
@@ -120,29 +117,4 @@ func Recover(
 	export = exportKey(conf, randomizedPassword, envelope.Nonce)
 
 	return clientSecretKey, clientPublicKey, export, nil
-}
-
-type Options struct {
-	Nonce       []byte
-	NonceLength uint32
-}
-
-func NewOptions() *Options {
-	return &Options{
-		Nonce:       nil,
-		NonceLength: internal.NonceLength,
-	}
-}
-
-func (o *Options) Set(nonce []byte, length int) error {
-	if err := internal.ValidateOptionsLength(nonce, length, internal.NonceLength); err != nil {
-		return fmt.Errorf("envelope nonce: %w", err)
-	}
-
-	o.Nonce = nonce
-	if length != 0 {
-		o.NonceLength = uint32(length)
-	}
-
-	return nil
 }

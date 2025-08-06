@@ -10,7 +10,6 @@ package ake
 
 import (
 	"github.com/bytemare/ecc"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )

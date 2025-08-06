@@ -12,111 +12,19 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-
 	"github.com/bytemare/ecc"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/masking"
+	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
 
-var (
-	// ErrNoCredentialIdentifier indicates no credential identifier has been provided.
-	ErrNoCredentialIdentifier = errors.New("no credential identifier provided")
-
-	// ErrOPRFKeyNoSeedAndCredID indicates that neither the OPRF seed nor the credential identifier has been provided.
-	ErrOPRFKeyNoSeedAndCredID = errors.New("no OPRF seed or credential identifier provided, cannot derive OPRF key")
-
-	// ErrCredentialIdentifierWithSeed indicates that the credential identifier should not be provided if the client
-	//  OPRF key is set. This is to avoid confusion in the usage of the secret OPRF seed.
-	ErrCredentialIdentifierWithSeed = errors.New("the credential identifier should not be provided with a client" +
-		"OPRF seed, to avoid usage confusion")
-
-	// ErrAkeInvalidClientMac indicates that the MAC contained in the KE3 message is not valid in the given session.
-	ErrAkeInvalidClientMac = errors.New("failed to authenticate client: invalid client mac")
-
-	// ErrInvalidState indicates that the given state is not valid due to a wrong length.
-	ErrInvalidState = errors.New("invalid state length")
-
-	errKeyMaterialPrefix = errors.New("invalid server key material")
-
-	// ErrServerKeyMaterialNilPKS indicates that the server's public key is nil.
-	ErrServerKeyMaterialNilPKS = fmt.Errorf("%w: server public key is nil", errKeyMaterialPrefix)
-
-	// ErrServerKeyMaterialPKSInvalidLength indicates the input public key is not of right length.
-	ErrServerKeyMaterialPKSInvalidLength = fmt.Errorf("%w: server public key length is invalid", errKeyMaterialPrefix)
-
-	// ErrServerKeyMaterialPKSBase indicates that the server's public key is the group base element.
-	ErrServerKeyMaterialPKSBase = fmt.Errorf(
-		"%w: server public key cannot be the group base element",
-		errKeyMaterialPrefix,
-	)
-
-	// ErrServerKeyMaterialNil indicates that the server's key material has not been set.
-	ErrServerKeyMaterialNil = fmt.Errorf(
-		"%w: key material not set - use SetKeyMaterial() to set and validate values",
-		errKeyMaterialPrefix,
-	)
-
-	// ErrServerKeyMaterialInvalid indicates that the server's key material is not valid.
-	ErrServerKeyMaterialInvalid = fmt.Errorf(
-		"%w: use SetKeyMaterial() to set and validate values",
-		errKeyMaterialPrefix,
-	)
-
-	// ErrServerKeyMaterialNoOPRFSeed indicates that no OPRF seed has been provided in the server key material.
-	ErrServerKeyMaterialNoOPRFSeed = fmt.Errorf("%w: no OPRF seed provided", errKeyMaterialPrefix)
-
-	// ErrServerKeyMaterialInvalidOPRFSeedLength indicates that the OPRF seed is not of right length.
-	ErrServerKeyMaterialInvalidOPRFSeedLength = fmt.Errorf(
-		"%w: invalid OPRF seed length (must be of hash output length)",
-		errKeyMaterialPrefix,
-	)
-
-	// ErrServerKeyMaterialZeroSKS indicates that the server's private key is a zero scalar.
-	ErrServerKeyMaterialZeroSKS = fmt.Errorf("%w: server private key is zero", errKeyMaterialPrefix)
-
-	// ErrServerKeyMaterialNilSKS indicates that the server's private key is a nil.
-	ErrServerKeyMaterialNilSKS = fmt.Errorf("%w: server private key is nil", errKeyMaterialPrefix)
-
-	// ErrServerKeyMaterialSKSInvalidGroup indicates that the server's secret key does not match the configuration's group.
-	ErrServerKeyMaterialSKSInvalidGroup = fmt.Errorf(
-		"%w: server secret key does not match the configuration's group",
-		errKeyMaterialPrefix,
-	)
-
-	errRecordPrefix = errors.New("invalid client record")
-
-	// ErrClientRecordNil indicates that the client record is nil.
-	ErrClientRecordNil = fmt.Errorf("%w: client record is nil", errRecordPrefix)
-
-	// ErrClientRecordNilRegistrationRecord indicates that the registration record contained in the client record is nil.
-	ErrClientRecordNilRegistrationRecord = fmt.Errorf("%w: registration record is nil", errRecordPrefix)
-
-	// ErrClientRecordNilPubKey indicates that the client's public key is nil.
-	ErrClientRecordNilPubKey = fmt.Errorf("%w: client public key is nil", errRecordPrefix)
-
-	// ErrClientRecordPublicKeyGroupMismatch indicates that the client's public key group does not match the
-	// configuration's group.
-	ErrClientRecordPublicKeyGroupMismatch = fmt.Errorf(
-		"%w: client public key group does not match the configuration's group",
-		errRecordPrefix,
-	)
-
-	// ErrClientRecordInvalidEnvelopeLength indicates the envelope contained in the record is of invalid length.
-	ErrClientRecordInvalidEnvelopeLength = fmt.Errorf("%w: invalid envelope length", errRecordPrefix)
-
-	// ErrClientRecordInvalidMaskingKeyLength indicates that the length of the masking key contained in the record
-	// is not valid.
-	ErrClientRecordInvalidMaskingKeyLength = fmt.Errorf("%w: invalid masking key length", errRecordPrefix)
-)
-
 // Server represents an OPAQUE Server, exposing its functions and holding its key material. The server is thread-safe
-// and can be used concurrently by multiple goroutines to serve clients. The server's key material must be set before
-// using the
+// and can be used concurrently by multiple goroutines to serve clients, given the same key material.
+// The server's key material must be set before using the registration and login functions.
 type Server struct {
 	ServerKeyMaterial *ServerKeyMaterial
 	Deserialize       *Deserializer
@@ -146,7 +54,8 @@ type ServerKeyMaterial struct {
 	// The server's identity. If empty, will be set to the server's public key.
 	Identity []byte
 
-	// The server's long-term secret key. Required only for Login, and unused for Registration.
+	// The server's long-t
+	//erm secret key. Required only for Login, and unused for Registration.
 	SecretKey *ecc.Scalar
 
 	// The seed to derive the OPRF key for the clients with. Recommended to be set for both Registration and Login,
@@ -221,7 +130,7 @@ func (s *ServerKeyMaterial) DecodeHex(data string) error {
 type ServerOptions struct {
 	ClientOPRFKey *ecc.Scalar
 	MaskingNonce  []byte
-	AKE           AKEOptions
+	AKE           *AKEOptions
 }
 
 // RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given
@@ -297,12 +206,12 @@ func (s *Server) GenerateKE2(
 		return nil, nil, err
 	}
 
-	op, maskingNonce, clientOPRFKey, err := s.parseOptions(options)
+	so, err := s.parseOptions(options)
 	if err != nil {
 		return nil, nil, fmt.Errorf("getting server options: %w", err)
 	}
 
-	oprfKey, err := s.getOPRFKey(record.CredentialIdentifier, clientOPRFKey)
+	oprfKey, err := s.getOPRFKey(record.CredentialIdentifier, so.ClientOPRFKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -316,7 +225,8 @@ func (s *Server) GenerateKE2(
 	}
 
 	// All input and parameters have been verified for correctness, we can now proceed to generate the KE2 message.
-	ke2, out := s.coreGenerateKE2(ke1, record, maskingNonce, oprfKey, op)
+	//ke2, out := s.coreGenerateKE2(ke1, record, maskingNonce, oprfKey, esk, op)
+	ke2, out := s.coreGenerateKE2(ke1, record, so, oprfKey)
 
 	return ke2, out, nil
 }
@@ -334,29 +244,27 @@ func (s *Server) LoginFinish(ke3 *message.KE3, expectedClientMac []byte) error {
 func (s *Server) coreGenerateKE2(
 	ke1 *message.KE1,
 	record *ClientRecord,
-	maskingNonce []byte, oprfKey *ecc.Scalar, op *ake.Options,
+	//	maskingNonce []byte, oprfKey *ecc.Scalar, op *ake.Options,
+	so *serverOptions, oprfKey *ecc.Scalar,
 ) (*message.KE2, *ServerOutput) {
 	// Todo: this could be precomputed. Maybe part of the key material.
 	pksBytes := s.conf.Group.Base().Multiply(s.ServerKeyMaterial.SecretKey).Encode()
 	response := s.credentialResponse(ke1.CredentialRequest.BlindedMessage,
-		record.RegistrationRecord, maskingNonce, pksBytes, oprfKey)
+		record.RegistrationRecord, so.MaskingNonce, pksBytes, oprfKey)
 
 	identities := (&ake.Identities{
 		ClientIdentity: record.ClientIdentity,
 		ServerIdentity: s.ServerKeyMaterial.Identity,
 	}).SetIdentities(record.ClientPublicKey, pksBytes)
 
-	esk, epk := op.GetEphemeralKeyShare(s.conf.Group)
-
 	serverKM := &ake.KeyMaterial{
-		EphemeralSecretKey: esk,
+		EphemeralSecretKey: so.EphemeralSecretKey,
 		SecretKey:          s.ServerKeyMaterial.SecretKey,
 	}
-
 	ke2 := &message.KE2{
 		CredentialResponse:   response,
-		ServerPublicKeyshare: epk,
-		ServerNonce:          op.Nonce,
+		ServerPublicKeyshare: s.conf.Group.Base().Multiply(so.EphemeralSecretKey),
+		ServerNonce:          so.AKENonce,
 		ServerMac:            nil,
 	}
 
@@ -429,30 +337,11 @@ func (s *Server) credentialResponse(
 	return message.NewCredentialResponse(z, maskingNonce, maskedResponse)
 }
 
-func (s *Server) parseOptions(options []*ServerOptions) (*ake.Options, []byte, *ecc.Scalar, error) {
-	var maskingNonce []byte
-	var oprfClientKey *ecc.Scalar
-
-	op := ake.NewOptions()
-	var akeOptions *AKEOptions
-
-	if len(options) != 0 {
-		akeOptions = &options[0].AKE
-		maskingNonce = options[0].MaskingNonce
-		oprfClientKey = options[0].ClientOPRFKey
-
-		if oprfClientKey != nil {
-			if err := IsValidScalar(s.conf.OPRF.Group(), oprfClientKey); err != nil {
-				return nil, nil, nil, err
-			}
-		}
-	}
-
-	if err := processAkeOptions(s.conf.Group, op, akeOptions); err != nil {
-		return nil, nil, nil, err
-	}
-
-	return op, maskingNonce, oprfClientKey, nil
+type serverOptions struct {
+	ClientOPRFKey      *ecc.Scalar
+	MaskingNonce       []byte
+	EphemeralSecretKey *ecc.Scalar
+	AKENonce           []byte
 }
 
 func (s *Server) verifyRecord(record *ClientRecord) error {
@@ -518,6 +407,8 @@ func (s *Server) validateKE1(ke1 *message.KE1) error {
 		return fmt.Errorf("invalid blinded message in KE1: %w", err)
 	}
 
+	// todo: cepk should have been checked for identity. What happens if it is identity?
+
 	return nil
 }
 
@@ -553,4 +444,87 @@ func (s *Server) isOPRFSeedValid(seed []byte) error {
 	}
 
 	return nil
+}
+
+func (s *Server) parseOptions(options []*ServerOptions) (*serverOptions, error) {
+	o := &serverOptions{
+		ClientOPRFKey:      nil,
+		MaskingNonce:       nil,
+		EphemeralSecretKey: nil,
+		AKENonce:           nil,
+	}
+
+	if len(options) == 0 || options[0] == nil {
+		o.MaskingNonce = internal.RandomBytes(s.conf.NonceLen)
+		o.EphemeralSecretKey, o.AKENonce = makeEskAndNonce(s.conf.Group)
+
+		return o, nil
+	}
+
+	// ClientOPRFKey
+	if options[0].ClientOPRFKey != nil {
+		if err := IsValidScalar(s.conf.OPRF.Group(), options[0].ClientOPRFKey); err != nil {
+			return nil, ErrServerOptionsClientOPRFKey
+		}
+
+		o.ClientOPRFKey = options[0].ClientOPRFKey
+	}
+
+	// MaskingNonce.
+	if len(options[0].MaskingNonce) != 0 {
+		if len(options[0].MaskingNonce) != s.conf.NonceLen {
+			return nil, ErrServerOptionsMaskingNonceLength
+		}
+		o.MaskingNonce = options[0].MaskingNonce
+	} else {
+		o.MaskingNonce = internal.RandomBytes(s.conf.NonceLen)
+	}
+
+	// AKE options.
+	if options[0].AKE == nil {
+		o.EphemeralSecretKey, o.AKENonce = makeEskAndNonce(s.conf.Group)
+
+		return o, nil
+	}
+
+	// AKE nonce.
+	o.AKENonce = options[0].AKE.Nonce
+	if len(o.AKENonce) == 0 {
+		o.AKENonce = internal.RandomBytes(internal.NonceLength)
+	}
+
+	// Ephemeral secret key share.
+	var err error
+	o.EphemeralSecretKey, err = options[0].AKE.getEphemeralSecretKeyShare(s.conf.Group)
+	if err != nil {
+		return nil, err
+	}
+
+	return o, nil
+
+}
+
+// getEphemeralSecretKeyShare assumes either EphemeralSecretKeyShare is set or SecretKeyShareSeed is != 0.
+func (o *AKEOptions) getEphemeralSecretKeyShare(g ecc.Group) (*ecc.Scalar, error) {
+	if o.EphemeralSecretKeyShare != nil {
+		if err := IsValidScalar(g, o.EphemeralSecretKeyShare); err != nil {
+			return nil, fmt.Errorf("invalid EphemeralSecretKeyShare: %w", err)
+		}
+
+		return o.EphemeralSecretKeyShare, nil
+	}
+
+	return makeESK(g, o.SecretKeyShareSeed), nil
+}
+
+func makeESK(g ecc.Group, seed []byte) *ecc.Scalar {
+	if len(seed) == 0 {
+		seed = internal.RandomBytes(internal.SeedLength)
+	}
+
+	return oprf.IDFromGroup(g).DeriveKey(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
+}
+
+func makeEskAndNonce(g ecc.Group) (*ecc.Scalar, []byte) {
+	return makeESK(g, nil), internal.RandomBytes(internal.NonceLength)
 }
