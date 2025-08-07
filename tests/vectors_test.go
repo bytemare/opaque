@@ -140,7 +140,7 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	server, _ := conf.Server()
 	server.ServerKeyMaterial = &opaque.ServerKeyMaterial{
 		Identity:       nil,
-		SecretKey:      nil,
+		PrivateKey:     nil,
 		OPRFGlobalSeed: v.Inputs.OprfSeed,
 	}
 
@@ -352,7 +352,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 
 	skm := &opaque.ServerKeyMaterial{
 		Identity:       v.Inputs.ServerIdentity,
-		SecretKey:      sk,
+		PrivateKey:     sk,
 		OPRFGlobalSeed: v.Inputs.OprfSeed,
 	}
 

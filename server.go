@@ -10,9 +10,9 @@ package opaque
 
 import (
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/bytemare/ecc"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -43,8 +43,9 @@ func NewServer(c *Configuration) (*Server, error) {
 	}
 
 	return &Server{
-		Deserialize: &Deserializer{conf: conf},
-		conf:        conf,
+		ServerKeyMaterial: nil,
+		Deserialize:       &Deserializer{conf: conf},
+		conf:              conf,
 	}, nil
 }
 
@@ -54,21 +55,31 @@ type ServerKeyMaterial struct {
 	// The server's identity. If empty, will be set to the server's public key.
 	Identity []byte
 
-	// The server's long-t
-	//erm secret key. Required only for Login, and unused for Registration.
-	SecretKey *ecc.Scalar
+	// The server's long-term secret key. Required only for Login, and unused for Registration.
+	PrivateKey *ecc.Scalar
 
 	// The seed to derive the OPRF key for the clients with. Recommended to be set for both Registration and Login,
 	// but optional if the clientOPRFKey is set.
 	OPRFGlobalSeed []byte
 }
 
+// Flush does a best-effort attempt to clear the server key material from memory. It is not guaranteed that the contents
+// are correctly wiped from memory.
+func (s *ServerKeyMaterial) Flush() {
+	internal.ClearScalar(s.PrivateKey)
+	s.PrivateKey = nil
+	internal.ClearSlice(s.OPRFGlobalSeed)
+	s.OPRFGlobalSeed = nil
+	internal.ClearSlice(s.Identity)
+	s.Identity = nil
+}
+
 // Encode encodes the server key material into a byte slice.
 func (s *ServerKeyMaterial) Encode() []byte {
 	return encoding.Concatenate(
-		[]byte{byte(s.SecretKey.Group())},
+		[]byte{byte(s.PrivateKey.Group())},
 		encoding.EncodeVector(s.Identity),
-		encoding.EncodeVector(s.SecretKey.Encode()),
+		encoding.EncodeVector(s.PrivateKey.Encode()),
 		encoding.EncodeVector(s.OPRFGlobalSeed),
 	)
 }
@@ -81,30 +92,30 @@ func (s *ServerKeyMaterial) Hex() string {
 // Decode decodes the server key material to s from a byte slice. If an error is encountered, s is unchanged.
 func (s *ServerKeyMaterial) Decode(data []byte) error {
 	if len(data) < 7 {
-		return errors.New("decoding server key material: invalid encoding")
+		return ErrServerKeyMaterialInvalidEncodingLength
 	}
 
 	g := Group(data[0])
 	if !g.Available() {
-		return fmt.Errorf("decoding server key material: invalid group %d", g)
+		return ErrServerKeyMaterialInvalidGroupEncoding
 	}
 
 	var id, skBytes, seed []byte
 	if err := encoding.DecodeLongVector(data[1:], &id, &skBytes, &seed); err != nil {
-		return fmt.Errorf("decoding server key material: %w", err)
+		return fmt.Errorf("%w: %w", ErrServerKeyMaterialInvalidEncoding, err)
 	}
 
 	sk := g.Group().NewScalar()
 	if err := sk.Decode(skBytes); err != nil {
-		return fmt.Errorf("decoding server key material: invalid secret key: %w", err)
+		return fmt.Errorf("%w: %w", ErrServerKeyMaterialInvalidPrivateKeyEncoding, err)
 	}
 
 	if sk.IsZero() {
-		return fmt.Errorf("%w: server private key is zero", ErrServerKeyMaterialZeroSKS)
+		return ErrServerKeyMaterialPrivateKeyZero
 	}
 
 	s.Identity = id
-	s.SecretKey = sk
+	s.PrivateKey = sk
 	s.OPRFGlobalSeed = seed
 
 	return nil
@@ -112,16 +123,28 @@ func (s *ServerKeyMaterial) Decode(data []byte) error {
 
 // DecodeHex decodes the server key material to s from a hex string. If an error is encountered, s is unchanged.
 func (s *ServerKeyMaterial) DecodeHex(data string) error {
-	if len(data) == 0 {
-		return fmt.Errorf("decoding server key material: empty hex string")
+	if data == "" {
+		return ErrServerKeyMaterialDecodingEmptyHex
 	}
 
 	decoded, err := hex.DecodeString(data)
 	if err != nil {
-		return fmt.Errorf("decoding server key material: %w", err)
+		return fmt.Errorf("%w: %w", ErrServerKeyMaterialDecoding, err)
 	}
 
 	return s.Decode(decoded)
+}
+
+// SetKeyMaterial sets the server's key material. The ServerKeyMaterial must be set before calling RegistrationResponse
+// or GenerateKE2. It validates the key material and returns an error if it is invalid.
+func (s *Server) SetKeyMaterial(skm *ServerKeyMaterial) error {
+	if err := s.validateKeyMaterial(skm); err != nil {
+		return err
+	}
+
+	s.ServerKeyMaterial = skm
+
+	return nil
 }
 
 // ServerOptions override the secure default values or internally generated values.
@@ -129,8 +152,8 @@ func (s *ServerKeyMaterial) DecodeHex(data string) error {
 // and breaks forward secrecy.
 type ServerOptions struct {
 	ClientOPRFKey *ecc.Scalar
-	MaskingNonce  []byte
 	AKE           *AKEOptions
+	MaskingNonce  []byte
 }
 
 // RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given
@@ -154,7 +177,7 @@ func (s *Server) RegistrationResponse(
 	// of deriving it from the credentialIdentifier and globalOPRFSeed.
 ) (*message.RegistrationResponse, error) {
 	if len(serverPublicKeyBytes) != s.conf.Group.ElementLength() {
-		return nil, fmt.Errorf("%w: invalid server public key length", ErrServerKeyMaterialNilPKS)
+		return nil, ErrServerInvalidPublicKeyLength
 	}
 
 	var clientOPRFKey *ecc.Scalar
@@ -167,7 +190,13 @@ func (s *Server) RegistrationResponse(
 		return nil, err
 	}
 
-	if err := s.verifyRegistrationRequest(req); err != nil {
+	defer func() {
+		if clientOPRFKey == nil {
+			internal.ClearScalar(ku)
+		}
+	}()
+
+	if err = s.verifyRegistrationRequest(req); err != nil {
 		return nil, err
 	}
 
@@ -175,15 +204,6 @@ func (s *Server) RegistrationResponse(
 		EvaluatedMessage: s.conf.OPRF.Evaluate(ku, req.BlindedMessage),
 		ServerPublicKey:  serverPublicKeyBytes,
 	}, nil
-}
-
-func (s *Server) SetKeyMaterial(skm *ServerKeyMaterial) error {
-	if err := s.validateKeyMaterial(skm); err != nil {
-		return err
-	}
-
-	s.ServerKeyMaterial = skm
-	return nil
 }
 
 // ServerOutput is the result of a successful GenerateKE2 call, containing the client MAC and session secret. The
@@ -206,33 +226,50 @@ func (s *Server) GenerateKE2(
 		return nil, nil, err
 	}
 
-	so, err := s.parseOptions(options)
+	o := &serverOptions{
+		ClientOPRFKey:      nil,
+		MaskingNonce:       nil,
+		EphemeralSecretKey: nil,
+		AKENonce:           nil,
+	}
+
+	err := s.parseOptions(o, options)
 	if err != nil {
 		return nil, nil, fmt.Errorf("getting server options: %w", err)
 	}
 
-	oprfKey, err := s.getOPRFKey(record.CredentialIdentifier, so.ClientOPRFKey)
+	var oprfKey *ecc.Scalar
+
+	defer func() {
+		internal.ClearScalar(o.EphemeralSecretKey)
+
+		if o.ClientOPRFKey == nil {
+			// we clear the oprfKey only if it was derived from the credentialIdentifier and globalOPRFSeed.
+			internal.ClearScalar(oprfKey)
+		}
+	}()
+
+	oprfKey, err = s.getOPRFKey(record.CredentialIdentifier, o.ClientOPRFKey)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if err := s.verifyRecord(record); err != nil {
+	if err = s.verifyRecord(record); err != nil {
 		return nil, nil, err
 	}
 
-	if err := s.validateKE1(ke1); err != nil {
+	if err = s.validateKE1(ke1); err != nil {
 		return nil, nil, err
 	}
 
 	// All input and parameters have been verified for correctness, we can now proceed to generate the KE2 message.
-	//ke2, out := s.coreGenerateKE2(ke1, record, maskingNonce, oprfKey, esk, op)
-	ke2, out := s.coreGenerateKE2(ke1, record, so, oprfKey)
+	ke2, out := s.coreGenerateKE2(ke1, record, o, oprfKey)
 
 	return ke2, out, nil
 }
 
-// LoginFinish returns an error if the KE3 received from the client holds an invalid mac, and nil if correct.
-// The optionalClientMac can be provided in case of a resumed server that does not have the previous
+// LoginFinish verifies whether the KE3 message holds the client MAC that matches expectedClientMac. If this method
+// returns an error, the session secret must not be used. If it returns nil, the session secret can be used.
 func (s *Server) LoginFinish(ke3 *message.KE3, expectedClientMac []byte) error {
 	if ok := ake.VerifyClientMac(s.conf, ke3, expectedClientMac); !ok {
 		return ErrAkeInvalidClientMac
@@ -244,12 +281,11 @@ func (s *Server) LoginFinish(ke3 *message.KE3, expectedClientMac []byte) error {
 func (s *Server) coreGenerateKE2(
 	ke1 *message.KE1,
 	record *ClientRecord,
-	//	maskingNonce []byte, oprfKey *ecc.Scalar, op *ake.Options,
 	so *serverOptions, oprfKey *ecc.Scalar,
 ) (*message.KE2, *ServerOutput) {
 	// Todo: this could be precomputed. Maybe part of the key material.
-	pksBytes := s.conf.Group.Base().Multiply(s.ServerKeyMaterial.SecretKey).Encode()
-	response := s.credentialResponse(ke1.CredentialRequest.BlindedMessage,
+	pksBytes := s.conf.Group.Base().Multiply(s.ServerKeyMaterial.PrivateKey).Encode()
+	response := s.credentialResponse(ke1.BlindedMessage,
 		record.RegistrationRecord, so.MaskingNonce, pksBytes, oprfKey)
 
 	identities := (&ake.Identities{
@@ -257,10 +293,6 @@ func (s *Server) coreGenerateKE2(
 		ServerIdentity: s.ServerKeyMaterial.Identity,
 	}).SetIdentities(record.ClientPublicKey, pksBytes)
 
-	serverKM := &ake.KeyMaterial{
-		EphemeralSecretKey: so.EphemeralSecretKey,
-		SecretKey:          s.ServerKeyMaterial.SecretKey,
-	}
 	ke2 := &message.KE2{
 		CredentialResponse:   response,
 		ServerPublicKeyshare: s.conf.Group.Base().Multiply(so.EphemeralSecretKey),
@@ -268,17 +300,20 @@ func (s *Server) coreGenerateKE2(
 		ServerMac:            nil,
 	}
 
-	clientMac, sessionSecret := ake.Respond(s.conf, serverKM, identities, record.ClientPublicKey, ke2, ke1)
+	clientMac, sessionSecret := ake.Respond(
+		s.conf,
+		s.ServerKeyMaterial.PrivateKey,
+		so.EphemeralSecretKey,
+		identities,
+		record.ClientPublicKey,
+		ke2,
+		ke1,
+	)
 
 	return ke2, &ServerOutput{
 		ClientMAC:     clientMac,
 		SessionSecret: sessionSecret,
 	}
-}
-
-func (s *Server) oprfResponse(element *ecc.Element, seed []byte) *ecc.Element {
-	ku := s.conf.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair))
-	return s.conf.OPRF.Evaluate(ku, element)
 }
 
 func (s *Server) verifyBlindedMessage(blinded *ecc.Element) error {
@@ -385,8 +420,8 @@ func (s *Server) validateKeyMaterial(skm *ServerKeyMaterial) error {
 		return ErrServerKeyMaterialNil
 	}
 
-	if err := IsValidScalar(s.conf.Group, skm.SecretKey); err != nil {
-		return err
+	if err := IsValidScalar(s.conf.Group, skm.PrivateKey); err != nil {
+		return fmt.Errorf("%w: %w: %w", ErrServerKeyMaterial, ErrServerKeyMaterialInvalidPrivateKey, err)
 	}
 
 	if skm.OPRFGlobalSeed != nil {
@@ -399,11 +434,11 @@ func (s *Server) validateKeyMaterial(skm *ServerKeyMaterial) error {
 }
 
 func (s *Server) validateKE1(ke1 *message.KE1) error {
-	if ke1 == nil || ke1.CredentialRequest == nil || ke1.CredentialRequest.BlindedMessage == nil {
+	if ke1 == nil || ke1.CredentialRequest == nil || ke1.BlindedMessage == nil {
 		return ErrServerNilKE1
 	}
 
-	if err := s.verifyBlindedMessage(ke1.CredentialRequest.BlindedMessage); err != nil {
+	if err := s.verifyBlindedMessage(ke1.BlindedMessage); err != nil {
 		return fmt.Errorf("invalid blinded message in KE1: %w", err)
 	}
 
@@ -446,36 +481,31 @@ func (s *Server) isOPRFSeedValid(seed []byte) error {
 	return nil
 }
 
-func (s *Server) parseOptions(options []*ServerOptions) (*serverOptions, error) {
-	o := &serverOptions{
-		ClientOPRFKey:      nil,
-		MaskingNonce:       nil,
-		EphemeralSecretKey: nil,
-		AKENonce:           nil,
-	}
-
+func (s *Server) parseOptions(o *serverOptions, options []*ServerOptions) error {
 	if len(options) == 0 || options[0] == nil {
 		o.MaskingNonce = internal.RandomBytes(s.conf.NonceLen)
 		o.EphemeralSecretKey, o.AKENonce = makeEskAndNonce(s.conf.Group)
 
-		return o, nil
+		return nil
 	}
 
 	// ClientOPRFKey
 	if options[0].ClientOPRFKey != nil {
 		if err := IsValidScalar(s.conf.OPRF.Group(), options[0].ClientOPRFKey); err != nil {
-			return nil, ErrServerOptionsClientOPRFKey
+			return ErrServerOptionsClientOPRFKey
 		}
 
-		o.ClientOPRFKey = options[0].ClientOPRFKey
+		o.ClientOPRFKey = s.conf.OPRF.Group().NewScalar().Set(options[0].ClientOPRFKey)
 	}
 
 	// MaskingNonce.
 	if len(options[0].MaskingNonce) != 0 {
 		if len(options[0].MaskingNonce) != s.conf.NonceLen {
-			return nil, ErrServerOptionsMaskingNonceLength
+			return ErrServerOptionsMaskingNonceLength
 		}
-		o.MaskingNonce = options[0].MaskingNonce
+
+		o.MaskingNonce = make([]byte, len(options[0].MaskingNonce))
+		copy(o.MaskingNonce, options[0].MaskingNonce)
 	} else {
 		o.MaskingNonce = internal.RandomBytes(s.conf.NonceLen)
 	}
@@ -484,24 +514,26 @@ func (s *Server) parseOptions(options []*ServerOptions) (*serverOptions, error) 
 	if options[0].AKE == nil {
 		o.EphemeralSecretKey, o.AKENonce = makeEskAndNonce(s.conf.Group)
 
-		return o, nil
+		return nil
 	}
 
 	// AKE nonce.
-	o.AKENonce = options[0].AKE.Nonce
-	if len(o.AKENonce) == 0 {
+	if len(options[0].AKE.Nonce) == 0 {
 		o.AKENonce = internal.RandomBytes(internal.NonceLength)
+	} else {
+		o.AKENonce = make([]byte, len(options[0].AKE.Nonce))
+		copy(o.AKENonce, options[0].AKE.Nonce)
 	}
 
 	// Ephemeral secret key share.
 	var err error
+
 	o.EphemeralSecretKey, err = options[0].AKE.getEphemeralSecretKeyShare(s.conf.Group)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return o, nil
-
+	return nil
 }
 
 // getEphemeralSecretKeyShare assumes either EphemeralSecretKeyShare is set or SecretKeyShareSeed is != 0.
@@ -511,7 +543,7 @@ func (o *AKEOptions) getEphemeralSecretKeyShare(g ecc.Group) (*ecc.Scalar, error
 			return nil, fmt.Errorf("invalid EphemeralSecretKeyShare: %w", err)
 		}
 
-		return o.EphemeralSecretKeyShare, nil
+		return g.NewScalar().Set(o.EphemeralSecretKeyShare), nil
 	}
 
 	return makeESK(g, o.SecretKeyShareSeed), nil

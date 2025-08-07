@@ -10,6 +10,7 @@ package ake
 
 import (
 	"github.com/bytemare/ecc"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
@@ -25,11 +26,11 @@ func Start(g ecc.Group, esk *ecc.Scalar, nonce []byte) *message.KE1 {
 	}
 }
 
-// Finalize verifies and responds to KE3. If the handshake is successful, the session key is stored and this functions
-// returns a KE3 message.
+// Finalize verifies and responds to KE2. If the handshake is successful, this functions
+// returns a KE3 message and the session secret.
 func Finalize(
 	conf *internal.Configuration,
-	clientKM *KeyMaterial,
+	secretKey, ephemeralSecretKey *ecc.Scalar,
 	identities *Identities,
 	serverPublicKey *ecc.Element,
 	ke2 *message.KE2,
@@ -37,11 +38,11 @@ func Finalize(
 ) (*message.KE3, []byte, bool) {
 	ikm := k3dh(
 		ke2.ServerPublicKeyshare,
-		clientKM.EphemeralSecretKey,
+		ephemeralSecretKey,
 		serverPublicKey,
-		clientKM.EphemeralSecretKey,
+		ephemeralSecretKey,
 		ke2.ServerPublicKeyshare,
-		clientKM.SecretKey,
+		secretKey,
 	)
 	sessionSecret, serverMac, clientMac := core3DH(conf, identities, ikm, ke1, ke2)
 

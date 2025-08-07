@@ -64,7 +64,7 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       nil,
-			SecretKey:      sk,
+			PrivateKey:     sk,
 			OPRFGlobalSeed: nil,
 		}
 
@@ -196,7 +196,7 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 		sk, pk := conf.conf.KeyGen()
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       nil,
-			SecretKey:      sk,
+			PrivateKey:     sk,
 			OPRFGlobalSeed: internal.RandomBytes(conf.conf.Hash.Size()),
 		}
 
@@ -204,12 +204,7 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		client, err := conf.conf.Client()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		rec, err := buildRecord(pk.Encode(), internal.RandomBytes(32), []byte("yo"), client, server)
+		rec, err := buildRecord(conf.conf, skm, pk.Encode(), internal.RandomBytes(32), []byte("yo"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -288,7 +283,7 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	sk, pk := conf.KeyGen()
 	skm := &opaque.ServerKeyMaterial{
 		Identity:       nil,
-		SecretKey:      sk,
+		PrivateKey:     sk,
 		OPRFGlobalSeed: internal.RandomBytes(conf.Hash.Size()),
 	}
 
@@ -296,7 +291,7 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	rec, err := buildRecord(pk.Encode(), credId, password, client, server)
+	rec, err := buildRecord(conf, skm, pk.Encode(), credId, password)
 	if err != nil {
 		t.Fatal(err)
 	}

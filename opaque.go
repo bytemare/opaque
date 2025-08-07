@@ -15,9 +15,9 @@ package opaque
 import (
 	"crypto"
 	"fmt"
+
 	"github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
-	"github.com/bytemare/opaque/internal/tag"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
@@ -111,59 +111,6 @@ func (c *Configuration) GenerateOPRFSeed() []byte {
 // KeyGen returns a key pair in the AKE ecc.
 func (c *Configuration) KeyGen() (secretKey *ecc.Scalar, publicKey *ecc.Element) {
 	return ake.KeyGen(ecc.Group(c.AKE))
-}
-
-// verify returns an error on the first non-compliant parameter, nil otherwise.
-func (c *Configuration) verify() error {
-	if !c.OPRF.Available() || !c.OPRF.OPRF().Available() {
-		return ErrInvalidOPRFid
-	}
-
-	if !c.AKE.Available() || !c.AKE.Group().Available() {
-		return ErrInvalidAKEid
-	}
-
-	if !internal.IsHashFunctionValid(c.KDF) {
-		return ErrInvalidKDFid
-	}
-
-	if !internal.IsHashFunctionValid(c.MAC) {
-		return ErrInvalidMACid
-	}
-
-	if !internal.IsHashFunctionValid(c.Hash) {
-		return ErrInvalidHASHid
-	}
-
-	if c.KSF != 0 && !c.KSF.Available() {
-		return ErrInvalidKSFid
-	}
-
-	return nil
-}
-
-// toInternal builds the internal representation of the configuration parameters.
-func (c *Configuration) toInternal() (*internal.Configuration, error) {
-	if err := c.verify(); err != nil {
-		return nil, err
-	}
-
-	g := c.AKE.Group()
-	o := c.OPRF.OPRF()
-	mac := internal.NewMac(c.MAC)
-	ip := &internal.Configuration{
-		OPRF:         o,
-		Group:        g,
-		KSF:          internalKSF.NewKSF(c.KSF),
-		KDF:          internal.NewKDF(c.KDF),
-		MAC:          mac,
-		Hash:         internal.NewHash(c.Hash),
-		NonceLen:     internal.NonceLength,
-		EnvelopeSize: internal.NonceLength + mac.Size(),
-		Context:      c.Context,
-	}
-
-	return ip, nil
 }
 
 // Deserializer returns a pointer to a Deserializer structure allowing deserialization of messages in the given
@@ -292,8 +239,7 @@ func IsValidElement(g ecc.Group, e *ecc.Element) error {
 	return nil
 }
 
-// AKEOptions override the secure default values or internally generated values. It is recommended to use NewAKEOptions
-// to instantiate, or the lengths will be set to zero, which is not secure. Only use this if you know what you're
+// AKEOptions override the secure default values or internally generated values. Only use this if you know what you're
 // doing. Reusing seeds and nonces across sessions is a security risk, and breaks forward secrecy.
 type AKEOptions struct {
 	EphemeralSecretKeyShare *ecc.Scalar
@@ -301,67 +247,55 @@ type AKEOptions struct {
 	Nonce                   []byte
 }
 
-// NewAKEOptions returns a new AKEOptions structure with secure default values. Use this to ensure that secure lengths
-// are set by default.
-func NewAKEOptions() *AKEOptions {
-	return &AKEOptions{
-		EphemeralSecretKeyShare: nil,
-		SecretKeyShareSeed:      nil,
-		Nonce:                   nil,
-		// TODO: maybe add KE1 here
-		// TODO: "ExportState" to transfer the state?
-	}
-}
-
-func processAkeOptions2(g ecc.Group, o *AKEOptions) error {
-	if o == nil {
-		return nil
+// verify returns an error on the first non-compliant parameter, nil otherwise.
+func (c *Configuration) verify() error {
+	if !c.OPRF.Available() || !c.OPRF.OPRF().Available() {
+		return ErrInvalidOPRFid
 	}
 
-	if o.EphemeralSecretKeyShare != nil {
-		if err := IsValidScalar(g, o.EphemeralSecretKeyShare); err != nil {
-			return fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
-		}
+	if !c.AKE.Available() || !c.AKE.Group().Available() {
+		return ErrInvalidAKEid
+	}
+
+	if !internal.IsHashFunctionValid(c.KDF) {
+		return ErrInvalidKDFid
+	}
+
+	if !internal.IsHashFunctionValid(c.MAC) {
+		return ErrInvalidMACid
+	}
+
+	if !internal.IsHashFunctionValid(c.Hash) {
+		return ErrInvalidHASHid
+	}
+
+	if c.KSF != 0 && !c.KSF.Available() {
+		return ErrInvalidKSFid
 	}
 
 	return nil
 }
 
-func processAkeOptions(g ecc.Group, o *AKEOptions) (*ecc.Scalar, []byte, error) {
-	if o == nil {
-		o = NewAKEOptions()
+// toInternal builds the internal representation of the configuration parameters.
+func (c *Configuration) toInternal() (*internal.Configuration, error) {
+	if err := c.verify(); err != nil {
+		return nil, err
 	}
 
-	esk, err := determineEphemeralSecretKey(g, o.EphemeralSecretKeyShare, o.SecretKeyShareSeed, internal.SeedLength)
-	if err != nil {
-		return nil, nil, err
+	g := c.AKE.Group()
+	o := c.OPRF.OPRF()
+	mac := internal.NewMac(c.MAC)
+	ip := &internal.Configuration{
+		OPRF:         o,
+		Group:        g,
+		KSF:          internalKSF.NewKSF(c.KSF),
+		KDF:          internal.NewKDF(c.KDF),
+		MAC:          mac,
+		Hash:         internal.NewHash(c.Hash),
+		NonceLen:     internal.NonceLength,
+		EnvelopeSize: internal.NonceLength + mac.Size(),
+		Context:      c.Context,
 	}
 
-	nonce, err := ake.DetermineNonceOrSeed(o.Nonce, internal.NonceLength, internal.NonceLength)
-	if err != nil {
-		return nil, nil, fmt.Errorf("invalid AKE key share nonce: %w", err)
-	}
-
-	return esk, nonce, nil
-}
-
-func determineEphemeralSecretKey(g ecc.Group, esk *ecc.Scalar, seed []byte, seedLength int) (*ecc.Scalar, error) {
-	// If an ephemeral secret key share is provided, we check it, and use it.
-	if esk != nil {
-		if err := IsValidScalar(g, esk); err != nil {
-			return nil, fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
-		}
-
-		return esk, nil
-	}
-
-	// If no ephemeral secret key share is provided, we generate one from the seed.
-	s, err := ake.DetermineNonceOrSeed(seed, seedLength, internal.SeedLength)
-	if err != nil {
-		return nil, fmt.Errorf("invalid AKE key share seed: %w", err)
-	}
-
-	esk = oprf.IDFromGroup(g).DeriveKey(s, []byte(tag.DeriveDiffieHellmanKeyPair))
-
-	return esk, nil
+	return ip, nil
 }

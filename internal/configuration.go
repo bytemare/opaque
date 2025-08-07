@@ -13,6 +13,8 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"runtime"
+
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/ksf"
@@ -89,4 +91,22 @@ func ValidateOptionsLength(input []byte, length int, referenceLength uint32) err
 	}
 
 	return nil
+}
+
+// ClearScalar attempts to safely clearing the internal secret value of the scalar, by first setting its bytes to a
+// random value and then zeroes it out.
+func ClearScalar(s *ecc.Scalar) {
+	if s != nil {
+		s.Random()
+		s.Zero()
+		runtime.KeepAlive(s) // prevent early GC and abstracting this call away
+	}
+}
+
+// ClearSlice attempts to safely clearing the internal secret value of the slice.
+func ClearSlice(b []byte) {
+	if b != nil {
+		clear(b)
+		runtime.KeepAlive(b) // prevent early GC and abstracting this call away
+	}
 }

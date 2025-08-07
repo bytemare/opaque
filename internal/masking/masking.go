@@ -12,7 +12,6 @@ package masking
 import (
 	"errors"
 	"fmt"
-
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"

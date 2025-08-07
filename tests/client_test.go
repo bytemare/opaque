@@ -48,7 +48,7 @@ func TestClient_Deserialize_RegistrationResponse(t *testing.T) {
 		sks, pks := conf.conf.KeyGen()
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       nil,
-			SecretKey:      sks,
+			PrivateKey:     sks,
 			OPRFGlobalSeed: internal.RandomBytes(conf.conf.Hash.Size()),
 		}
 
@@ -149,7 +149,7 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 		sks, pks := conf.conf.KeyGen()
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       nil,
-			SecretKey:      sks,
+			PrivateKey:     sks,
 			OPRFGlobalSeed: internal.RandomBytes(conf.conf.Hash.Size()),
 		}
 
@@ -157,7 +157,7 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rec, err := buildRecord(pks.Encode(), credID, []byte("yo"), client, server)
+		rec, err := buildRecord(conf.conf, skm, pks.Encode(), credID, []byte("yo"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -210,7 +210,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		sks, pks := conf.conf.KeyGen()
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       nil,
-			SecretKey:      sks,
+			PrivateKey:     sks,
 			OPRFGlobalSeed: internal.RandomBytes(conf.conf.Hash.Size()),
 		}
 
@@ -220,7 +220,7 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 
 		blind := conf.conf.OPRF.Group().NewScalar().Random()
 
-		rec, err := buildRecord(pks.Encode(), credID, password, client, server)
+		rec, err := buildRecord(conf.conf, skm, pks.Encode(), credID, password)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -285,7 +285,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		sks, pks := conf.conf.KeyGen()
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       nil,
-			SecretKey:      sks,
+			PrivateKey:     sks,
 			OPRFGlobalSeed: internal.RandomBytes(conf.conf.Hash.Size()),
 		}
 
@@ -295,7 +295,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rec, err := buildRecord(pks.Encode(), credID, password, client, server)
+		rec, err := buildRecord(conf.conf, skm, pks.Encode(), credID, password)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -322,7 +322,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		}
 
 		// tamper PKS
-		//ke2.ServerPublicKeyshare = conf.internal.Group.NewElement().Multiply(conf.internal.Group.NewScalar().Random())
+		// ke2.ServerPublicKeyshare = conf.internal.Group.NewElement().Multiply(conf.internal.Group.NewScalar().Random())
 		env, randomizedPassword, err := getEnvelope(conf.internal, blind, password, ke2)
 		if err != nil {
 			t.Fatal(err)
@@ -385,15 +385,20 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 		sks, pks := conf.conf.KeyGen()
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       nil,
-			SecretKey:      sks,
+			PrivateKey:     sks,
 			OPRFGlobalSeed: internal.RandomBytes(conf.conf.Hash.Size()),
+		}
+
+		ppks := conf.internal.Group.NewElement()
+		if err := ppks.Decode(pks.Encode()); err != nil {
+			t.Fatal(err)
 		}
 
 		if err := server.SetKeyMaterial(skm); err != nil {
 			log.Fatal(err)
 		}
 
-		rec, err := buildRecord(pks.Encode(), credID, []byte("yo"), client, server)
+		rec, err := buildRecord(conf.conf, skm, pks.Encode(), credID, []byte("yo"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -411,7 +416,7 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 		ke2.ServerMac = internal.RandomBytes(conf.internal.MAC.Size())
 		expected := "3DH handshake failed: invalid server mac"
 		if _, _, _, err := client.GenerateKE3(ke2, nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
-			t.Fatalf("expected error %q for invalid epks encoding - got %q", expected, err)
+			t.Fatalf("expected error %q for invalid server mac - got %q", expected, err)
 		}
 	})
 }
@@ -433,7 +438,7 @@ func TestClientFinish_MissingKe1(t *testing.T) {
 	sks, pks := conf.KeyGen()
 	skm := &opaque.ServerKeyMaterial{
 		Identity:       nil,
-		SecretKey:      sks,
+		PrivateKey:      sks,
 		OPRFGlobalSeed: internal.RandomBytes(conf.Hash.Size()),
 	}
 	if err := server.SetKeyMaterial(skm); err != nil {

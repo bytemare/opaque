@@ -21,14 +21,14 @@ func IsHashFunctionValid(h crypto.Hash) bool {
 	return h2 != 0 && h2.Type() == hash.FixedOutputLength
 }
 
-// NewKDF returns a newly instantiated KDF.
-func NewKDF(id crypto.Hash) *KDF {
-	return &KDF{h: hash.FromCrypto(id).GetHashFunction()}
-}
-
 // KDF wraps a hash function and exposes KDF methods.
 type KDF struct {
 	h *hash.Fixed
+}
+
+// NewKDF returns a newly instantiated KDF.
+func NewKDF(id crypto.Hash) *KDF {
+	return &KDF{h: hash.FromCrypto(id).GetHashFunction()}
 }
 
 // Extract exposes an Extract only KDF method.
@@ -46,14 +46,14 @@ func (k *KDF) Size() int {
 	return k.h.Size()
 }
 
-// NewMac returns a newly instantiated Mac.
-func NewMac(id crypto.Hash) *Mac {
-	return &Mac{h: hash.FromCrypto(id).GetHashFunction()}
-}
-
 // Mac wraps a hash function and exposes Message Authentication Code methods.
 type Mac struct {
 	h *hash.Fixed
+}
+
+// NewMac returns a newly instantiated Mac.
+func NewMac(id crypto.Hash) *Mac {
+	return &Mac{h: hash.FromCrypto(id).GetHashFunction()}
 }
 
 // Equal returns a constant-time comparison of the input.
@@ -71,14 +71,14 @@ func (m *Mac) Size() int {
 	return m.h.Size()
 }
 
-// NewHash returns a newly instantiated Hash.
-func NewHash(id crypto.Hash) *Hash {
-	return &Hash{h: hash.FromCrypto(id).GetHashFunction()}
-}
-
 // Hash wraps a hash function and exposes only necessary hashing methods.
 type Hash struct {
 	h *hash.Fixed
+}
+
+// NewHash returns a newly instantiated Hash.
+func NewHash(id crypto.Hash) *Hash {
+	return &Hash{h: hash.FromCrypto(id).GetHashFunction()}
 }
 
 // Size returns the output size of the hashing function.

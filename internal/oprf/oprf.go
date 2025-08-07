@@ -12,7 +12,6 @@ package oprf
 
 import (
 	"crypto"
-	"errors"
 
 	"github.com/bytemare/ecc"
 
@@ -42,38 +41,6 @@ const (
 	nbIDs                 = 4
 	maxDeriveKeyPairTries = 255
 )
-
-var (
-	// ErrBlindGroup indicates the OPRF blind's group does not match the OPRF configuration.
-	ErrBlindGroup = errors.New("OPRF blind is from a different group than the configuration")
-
-	// ErrBlindZero indicates the OPRF blind is zero.
-	ErrBlindZero = errors.New("OPRF blind is zero")
-)
-
-func (i Identifier) dst(prefix string) []byte {
-	return encoding.Concat([]byte(prefix), i.contextString())
-}
-
-func (i Identifier) contextString() []byte {
-	return encoding.Concatenate([]byte(tag.OPRFVersionPrefix), []byte(i))
-}
-
-func (i Identifier) hash(input ...[]byte) []byte {
-	h := map[Identifier]crypto.Hash{
-		Ristretto255Sha512: crypto.SHA512,
-		P256Sha256:         crypto.SHA256,
-		P384Sha384:         crypto.SHA384,
-		P521Sha512:         crypto.SHA512,
-	}[i].New()
-	h.Reset()
-
-	for _, i := range input {
-		_, _ = h.Write(i)
-	}
-
-	return h.Sum(nil)
-}
 
 // Available returns whether the Identifier has been registered of not.
 func (i Identifier) Available() bool {
@@ -130,4 +97,28 @@ func (i Identifier) DeriveKey(seed, info []byte) *ecc.Scalar {
 func (i Identifier) DeriveKeyPair(seed, info []byte) (*ecc.Scalar, *ecc.Element) {
 	sk := i.DeriveKey(seed, info)
 	return sk, i.Group().Base().Multiply(sk)
+}
+
+func (i Identifier) dst(prefix string) []byte {
+	return encoding.Concat([]byte(prefix), i.contextString())
+}
+
+func (i Identifier) contextString() []byte {
+	return encoding.Concatenate([]byte(tag.OPRFVersionPrefix), []byte(i))
+}
+
+func (i Identifier) hash(input ...[]byte) []byte {
+	h := map[Identifier]crypto.Hash{
+		Ristretto255Sha512: crypto.SHA512,
+		P256Sha256:         crypto.SHA256,
+		P384Sha384:         crypto.SHA384,
+		P521Sha512:         crypto.SHA512,
+	}[i].New()
+	h.Reset()
+
+	for _, i := range input {
+		_, _ = h.Write(i)
+	}
+
+	return h.Sum(nil)
 }

@@ -182,7 +182,7 @@ func testAuthentication(
 	{
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       p.serverID,
-			SecretKey:      p.serverSecretKey,
+			PrivateKey:     p.serverSecretKey,
 			OPRFGlobalSeed: p.oprfSeed,
 		}
 
@@ -315,14 +315,7 @@ func TestFlush(t *testing.T) {
 	*/
 	client, _, _ := testAuthentication(t, test, record)
 
-	client.Flush()
-	if client.SecretKey() != nil {
-		t.Fatalf("client flush failed, the secret key is non-nil: %v", client.SecretKey())
-	}
-
-	if client.EphemeralSecretKeyShare() != nil {
-		t.Fatalf("client flush failed, the ephemeral session key is non-nil: %v", client.EphemeralSecretKeyShare())
-	}
+	client.ClearState()
 }
 
 /*

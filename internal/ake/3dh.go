@@ -10,8 +10,8 @@
 package ake
 
 import (
-	"fmt"
 	"github.com/bytemare/ecc"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
@@ -40,20 +40,6 @@ func diffieHellman(s *ecc.Scalar, e *ecc.Element) *ecc.Element {
 	return e.Copy().Multiply(s)
 }
 
-// KeyMaterial holds the ephemeral and secret keys used in the 3DH protocol.
-type KeyMaterial struct {
-	EphemeralSecretKey *ecc.Scalar
-	SecretKey          *ecc.Scalar
-}
-
-// Flush attempts to zero out the ephemeral and secret keys, and sets them to nil.
-func (m *KeyMaterial) Flush() {
-	m.EphemeralSecretKey.Zero()
-	m.EphemeralSecretKey = nil
-	m.SecretKey.Zero()
-	m.SecretKey = nil
-}
-
 // Identities holds the client and server identities.
 type Identities struct {
 	ClientIdentity []byte
@@ -71,28 +57,6 @@ func (id *Identities) SetIdentities(clientPublicKey *ecc.Element, serverPublicKe
 	}
 
 	return id
-}
-
-// DetermineNonceOrSeed sets s to input, if it matches the requested or required length, or to a newly generated
-// random value of the requested or required length.
-func DetermineNonceOrSeed(input []byte, requestedLength int, referenceLength uint32) ([]byte, error) {
-	// Verify whether the provided input matches the requested length or is shorter than the reference length.
-	if err := internal.ValidateOptionsLength(input, requestedLength, referenceLength); err != nil {
-		return nil, fmt.Errorf("invalid length specification in the options: %w", err)
-	}
-
-	// If the input is not empty, we set the slice to the input value.
-	if len(input) != 0 {
-		return input, nil
-	}
-
-	// Otherwise, we generate a new random value of the requested or required length.
-	length := requestedLength
-	if length == 0 {
-		length = int(referenceLength)
-	}
-
-	return internal.RandomBytes(length), nil
 }
 
 func k3dh(

@@ -226,10 +226,24 @@ func getBadScalar(t *testing.T, c *configuration) []byte {
 }
 
 func buildRecord(
+	conf *opaque.Configuration,
+	serverKM *opaque.ServerKeyMaterial,
 	serverPublicKey, credID, password []byte,
-	client *opaque.Client,
-	server *opaque.Server,
 ) (*opaque.ClientRecord, error) {
+	client, err := conf.Client()
+	if err != nil {
+		return nil, err
+	}
+
+	server, err := conf.Server()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := server.SetKeyMaterial(serverKM); err != nil {
+		return nil, fmt.Errorf("setting server key material: %w", err)
+	}
+
 	r1, err := client.RegistrationInit(password)
 	if err != nil {
 		return nil, err
@@ -269,7 +283,12 @@ func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
 	return dst
 }
 
-func buildPRK(conf *internal.Configuration, blind *group.Scalar, password []byte, evaluation *group.Element) ([]byte, error) {
+func buildPRK(
+	conf *internal.Configuration,
+	blind *group.Scalar,
+	password []byte,
+	evaluation *group.Element,
+) ([]byte, error) {
 	unblinded := conf.OPRF.Finalize(blind, password, evaluation)
 	hardened := conf.KSF.Harden(unblinded, nil, conf.OPRF.Group().ElementLength())
 

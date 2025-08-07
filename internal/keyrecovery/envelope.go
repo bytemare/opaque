@@ -11,7 +11,9 @@ package keyrecovery
 
 import (
 	"errors"
+
 	"github.com/bytemare/ecc"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"

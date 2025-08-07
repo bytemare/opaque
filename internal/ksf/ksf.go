@@ -61,6 +61,11 @@ func (o *Options) Set(f ksfInterface, salt []byte, parameters []int, length int)
 	return nil
 }
 
+// KSF wraps a key stretching function and exposes its functions.
+type KSF struct {
+	ksfInterface
+}
+
 // NewKSF returns a newly instantiated KSF.
 func NewKSF(id ksf.Identifier) *KSF {
 	if id == 0 {
@@ -68,11 +73,6 @@ func NewKSF(id ksf.Identifier) *KSF {
 	}
 
 	return &KSF{id.Get()}
-}
-
-// KSF wraps a key stretching function and exposes its functions.
-type KSF struct {
-	ksfInterface
 }
 
 type ksfInterface interface {

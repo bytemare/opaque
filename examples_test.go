@@ -112,7 +112,7 @@ func Example_serverSetup() {
 
 	skm := &opaque.ServerKeyMaterial{
 		Identity:       serverID,
-		SecretKey:      serverPrivateKey,
+		PrivateKey:     serverPrivateKey,
 		OPRFGlobalSeed: secretGlobalOprfSeed,
 	}
 
@@ -211,7 +211,7 @@ func Example_registration() {
 
 	skm := &opaque.ServerKeyMaterial{
 		Identity:       serverID,
-		SecretKey:      serverPrivateKey,
+		PrivateKey:     serverPrivateKey,
 		OPRFGlobalSeed: secretGlobalOprfSeed,
 	}
 
@@ -325,7 +325,7 @@ func Example_loginKeyExchange() {
 	// This can be encoded and backed up with the Encode() and Hex() methods, and later recovered.
 	skm := &opaque.ServerKeyMaterial{
 		Identity:       serverID,
-		SecretKey:      serverPrivateKey,
+		PrivateKey:     serverPrivateKey,
 		OPRFGlobalSeed: secretGlobalOprfSeed,
 	}
 
@@ -460,7 +460,7 @@ func Example_fakeResponse() {
 	}
 
 	skm := &opaque.ServerKeyMaterial{
-		SecretKey:      serverPrivateKey,
+		PrivateKey:     serverPrivateKey,
 		OPRFGlobalSeed: secretGlobalOprfSeed,
 	}
 

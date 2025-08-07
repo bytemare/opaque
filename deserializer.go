@@ -10,6 +10,7 @@ package opaque
 
 import (
 	"fmt"
+
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
@@ -36,10 +37,6 @@ func (d *Deserializer) RegistrationRequest(registrationRequest []byte) (*message
 	}
 
 	return &message.RegistrationRequest{BlindedMessage: blindedMessage}, nil
-}
-
-func (d *Deserializer) registrationResponseLength() int {
-	return d.conf.OPRF.Group().ElementLength() + d.conf.Group.ElementLength()
 }
 
 // RegistrationResponse takes a serialized RegistrationResponse message and returns a deserialized
@@ -69,10 +66,6 @@ func (d *Deserializer) RegistrationResponse(registrationResponse []byte) (*messa
 	}, nil
 }
 
-func (d *Deserializer) recordLength() int {
-	return d.conf.Group.ElementLength() + d.conf.Hash.Size() + d.conf.EnvelopeSize
-}
-
 // RegistrationRecord takes a serialized RegistrationRecord message and returns a deserialized
 // RegistrationRecord structure.
 func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationRecord, error) {
@@ -94,37 +87,6 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 		MaskingKey:      maskingKey,
 		Envelope:        env,
 	}, nil
-}
-
-func (d *Deserializer) deserializeCredentialRequest(input []byte) (*message.CredentialRequest, error) {
-	blindedMessage := d.conf.OPRF.Group().NewElement()
-
-	err := blindedMessage.Decode(input[:d.conf.OPRF.Group().ElementLength()])
-	if err != nil || blindedMessage.IsIdentity() {
-		return nil, ErrInvalidBlindedData
-	}
-
-	return message.NewCredentialRequest(blindedMessage), nil
-}
-
-func (d *Deserializer) deserializeCredentialResponse(
-	input []byte,
-	maxResponseLength int,
-) (*message.CredentialResponse, error) {
-	evaluatedOPRF := d.conf.OPRF.Group().NewElement()
-
-	err := evaluatedOPRF.Decode(input[:d.conf.OPRF.Group().ElementLength()])
-	if err != nil || evaluatedOPRF.IsIdentity() {
-		return nil, ErrInvalidEvaluatedData
-	}
-
-	return message.NewCredentialResponse(evaluatedOPRF,
-		input[d.conf.OPRF.Group().ElementLength():d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen],
-		input[d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen:maxResponseLength]), nil
-}
-
-func (d *Deserializer) ke1Length() int {
-	return d.conf.OPRF.Group().ElementLength() + d.conf.NonceLen + d.conf.Group.ElementLength()
 }
 
 // KE1 takes a serialized KE1 message and returns a deserialized KE1 structure.
@@ -150,14 +112,6 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 		ClientNonce:          nonceU,
 		ClientPublicKeyshare: epku,
 	}, nil
-}
-
-func (d *Deserializer) ke2LengthWithoutCreds() int {
-	return d.conf.NonceLen + d.conf.Group.ElementLength() + d.conf.MAC.Size()
-}
-
-func (d *Deserializer) credentialResponseLength() int {
-	return d.conf.OPRF.Group().ElementLength() + d.conf.NonceLen + d.conf.Group.ElementLength() + d.conf.EnvelopeSize
 }
 
 // KE2 takes a serialized KE2 message and returns a deserialized KE2 structure.
@@ -229,4 +183,51 @@ func (d *Deserializer) DecodePublicKey(encoded []byte) (*ecc.Element, error) {
 	}
 
 	return pk, nil
+}
+
+func (d *Deserializer) registrationResponseLength() int {
+	return d.conf.OPRF.Group().ElementLength() + d.conf.Group.ElementLength()
+}
+
+func (d *Deserializer) recordLength() int {
+	return d.conf.Group.ElementLength() + d.conf.Hash.Size() + d.conf.EnvelopeSize
+}
+
+func (d *Deserializer) deserializeCredentialRequest(input []byte) (*message.CredentialRequest, error) {
+	blindedMessage := d.conf.OPRF.Group().NewElement()
+
+	err := blindedMessage.Decode(input[:d.conf.OPRF.Group().ElementLength()])
+	if err != nil || blindedMessage.IsIdentity() {
+		return nil, ErrInvalidBlindedData
+	}
+
+	return message.NewCredentialRequest(blindedMessage), nil
+}
+
+func (d *Deserializer) deserializeCredentialResponse(
+	input []byte,
+	maxResponseLength int,
+) (*message.CredentialResponse, error) {
+	evaluatedOPRF := d.conf.OPRF.Group().NewElement()
+
+	err := evaluatedOPRF.Decode(input[:d.conf.OPRF.Group().ElementLength()])
+	if err != nil || evaluatedOPRF.IsIdentity() {
+		return nil, ErrInvalidEvaluatedData
+	}
+
+	return message.NewCredentialResponse(evaluatedOPRF,
+		input[d.conf.OPRF.Group().ElementLength():d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen],
+		input[d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen:maxResponseLength]), nil
+}
+
+func (d *Deserializer) ke1Length() int {
+	return d.conf.OPRF.Group().ElementLength() + d.conf.NonceLen + d.conf.Group.ElementLength()
+}
+
+func (d *Deserializer) ke2LengthWithoutCreds() int {
+	return d.conf.NonceLen + d.conf.Group.ElementLength() + d.conf.MAC.Size()
+}
+
+func (d *Deserializer) credentialResponseLength() int {
+	return d.conf.OPRF.Group().ElementLength() + d.conf.NonceLen + d.conf.Group.ElementLength() + d.conf.EnvelopeSize
 }

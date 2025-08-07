@@ -37,8 +37,83 @@ var (
 	ErrInvalidAKEid = errors.New("invalid AKE group id")
 )
 
+// ServerKeyMaterial errors.
+var (
+	ErrServerKeyMaterial                  = errors.New("invalid server key material")
+	ErrServerKeyMaterialDecoding          = fmt.Errorf("%w: decoding error", ErrServerKeyMaterial)
+	ErrServerKeyMaterialInvalidPrivateKey = errors.New("invalid private key")
+
+	ErrServerKeyMaterialInvalidEncodingLength = fmt.Errorf("%w: invalid encoding length", ErrServerKeyMaterialDecoding)
+
+	ErrServerKeyMaterialInvalidGroupEncoding = fmt.Errorf("%w: invalid group", ErrServerKeyMaterialDecoding)
+
+	ErrServerKeyMaterialInvalidEncoding = fmt.Errorf("%w: invalid encoding", ErrServerKeyMaterialDecoding)
+
+	ErrServerKeyMaterialInvalidPrivateKeyEncoding = fmt.Errorf("%w: %w: invalid encoding", ErrServerKeyMaterialDecoding, ErrServerKeyMaterialInvalidPrivateKey)
+
+	ErrServerKeyMaterialPrivateKeyZero = fmt.Errorf("%w: %w: private key is zero", ErrServerKeyMaterialDecoding, ErrServerKeyMaterialInvalidPrivateKey)
+
+	ErrServerKeyMaterialDecodingEmptyHex = fmt.Errorf("%w: empty hex string", ErrServerKeyMaterialDecoding)
+
+	// ErrServerKeyMaterialNil indicates that the server's key material has not been set.
+	ErrServerKeyMaterialNil = fmt.Errorf(
+		"%w: key material not set - use SetKeyMaterial() to set and validate values",
+		ErrServerKeyMaterial,
+	)
+
+	// ErrServerKeyMaterialNoOPRFSeed indicates that no OPRF seed has been provided in the server key material.
+	ErrServerKeyMaterialNoOPRFSeed = fmt.Errorf("%w: no OPRF seed provided", ErrServerKeyMaterial)
+
+	// ErrServerKeyMaterialInvalidOPRFSeedLength indicates that the OPRF seed is not of right length.
+	ErrServerKeyMaterialInvalidOPRFSeedLength = fmt.Errorf(
+		"%w: invalid OPRF seed length (must be equal to the hash output length)",
+		ErrServerKeyMaterial,
+	)
+
+	/*
+
+
+
+
+	 */
+
+	// ErrServerKeyMaterialPKSBase indicates that the server's public key is the group base element.
+	ErrServerKeyMaterialPKSBase = fmt.Errorf(
+		"%w: server public key cannot be the group base element",
+		ErrServerKeyMaterial,
+	)
+
+	// ErrServerKeyMaterialInvalid indicates that the server's key material is not valid.
+	ErrServerKeyMaterialInvalid = fmt.Errorf(
+		"%w: use SetKeyMaterial() to set and validate values",
+		ErrServerKeyMaterial,
+	)
+
+	// ErrServerKeyMaterialZeroSKS indicates that the server's private key is a zero scalar.
+	ErrServerKeyMaterialZeroSKS = fmt.Errorf("%w: server private key is zero", ErrServerKeyMaterial)
+
+	// ErrServerKeyMaterialNilSKS indicates that the server's private key is a nil.
+	ErrServerKeyMaterialNilSKS = fmt.Errorf("%w: server private key is nil", ErrServerKeyMaterial)
+
+	// ErrServerKeyMaterialSKSInvalidGroup indicates that the server's secret key does not match the configuration's group.
+	ErrServerKeyMaterialSKSInvalidGroup = fmt.Errorf(
+		"%w: server secret key does not match the configuration's group",
+		ErrServerKeyMaterial,
+	)
+)
+
 // Server errors.
 var (
+	ErrServerInvalidPublicKeyLength = errors.New("the provided server public key is not a valid encoding for the " +
+		"configuration")
+
+	ErrServerOverrideClientOPRFKey = errors.New("a client OPRF key has been provided, but the server has been set " +
+		"to use a global OPRF key with per-user credential identifiers - this indicated a misuse of the protocol")
+
+	/*
+
+	 */
+
 	// ErrOPRFKeyNoSeed happens when no OPRF key seed is provided.
 	ErrOPRFKeyNoSeed = errors.New("no OPRF key seed provided")
 
@@ -58,53 +133,6 @@ var (
 
 	// ErrInvalidState indicates that the given state is not valid due to a wrong length.
 	ErrInvalidState = errors.New("invalid state length")
-
-	errKeyMaterialPrefix = errors.New("invalid server key material")
-
-	// ErrServerKeyMaterialNilPKS indicates that the server's public key is nil.
-	ErrServerKeyMaterialNilPKS = fmt.Errorf("%w: server public key is nil", errKeyMaterialPrefix)
-
-	// ErrServerKeyMaterialPKSInvalidLength indicates the input public key is not of right length.
-	ErrServerKeyMaterialPKSInvalidLength = fmt.Errorf("%w: server public key length is invalid", errKeyMaterialPrefix)
-
-	// ErrServerKeyMaterialPKSBase indicates that the server's public key is the group base element.
-	ErrServerKeyMaterialPKSBase = fmt.Errorf(
-		"%w: server public key cannot be the group base element",
-		errKeyMaterialPrefix,
-	)
-
-	// ErrServerKeyMaterialNil indicates that the server's key material has not been set.
-	ErrServerKeyMaterialNil = fmt.Errorf(
-		"%w: key material not set - use SetKeyMaterial() to set and validate values",
-		errKeyMaterialPrefix,
-	)
-
-	// ErrServerKeyMaterialInvalid indicates that the server's key material is not valid.
-	ErrServerKeyMaterialInvalid = fmt.Errorf(
-		"%w: use SetKeyMaterial() to set and validate values",
-		errKeyMaterialPrefix,
-	)
-
-	// ErrServerKeyMaterialNoOPRFSeed indicates that no OPRF seed has been provided in the server key material.
-	ErrServerKeyMaterialNoOPRFSeed = fmt.Errorf("%w: no OPRF seed provided", errKeyMaterialPrefix)
-
-	// ErrServerKeyMaterialInvalidOPRFSeedLength indicates that the OPRF seed is not of right length.
-	ErrServerKeyMaterialInvalidOPRFSeedLength = fmt.Errorf(
-		"%w: invalid OPRF seed length (must be of hash output length)",
-		errKeyMaterialPrefix,
-	)
-
-	// ErrServerKeyMaterialZeroSKS indicates that the server's private key is a zero scalar.
-	ErrServerKeyMaterialZeroSKS = fmt.Errorf("%w: server private key is zero", errKeyMaterialPrefix)
-
-	// ErrServerKeyMaterialNilSKS indicates that the server's private key is a nil.
-	ErrServerKeyMaterialNilSKS = fmt.Errorf("%w: server private key is nil", errKeyMaterialPrefix)
-
-	// ErrServerKeyMaterialSKSInvalidGroup indicates that the server's secret key does not match the configuration's group.
-	ErrServerKeyMaterialSKSInvalidGroup = fmt.Errorf(
-		"%w: server secret key does not match the configuration's group",
-		errKeyMaterialPrefix,
-	)
 
 	errRecordPrefix = errors.New("invalid client record")
 
@@ -175,7 +203,7 @@ var (
 		" (it's all zeroes or wrong length) for the configuration")
 
 	// ErrServerOptionsClientOPRFKey indicates the provided OPRF key for the client is invalid. Note that providing this
-	// key is not required. Use this option at your own risk. The
+	// key is not required. Use this option at your own risk.
 	ErrServerOptionsClientOPRFKey = errors.New("the provided OPRF key for the client is invalid: ")
 )
 

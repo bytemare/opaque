@@ -10,6 +10,7 @@ package ake
 
 import (
 	"github.com/bytemare/ecc"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
@@ -17,7 +18,7 @@ import (
 // Respond produces a 3DH server response message.
 func Respond(
 	conf *internal.Configuration,
-	serverKM *KeyMaterial,
+	secretKey, ephemeralSecretKey *ecc.Scalar,
 	identities *Identities,
 	clientPublicKey *ecc.Element,
 	ke2 *message.KE2,
@@ -25,13 +26,11 @@ func Respond(
 ) (clientMac, sessionSecret []byte) {
 	ikm := k3dh(
 		ke1.ClientPublicKeyshare,
-		serverKM.EphemeralSecretKey,
-
+		ephemeralSecretKey,
 		ke1.ClientPublicKeyshare,
-		serverKM.SecretKey,
-
+		secretKey,
 		clientPublicKey,
-		serverKM.EphemeralSecretKey,
+		ephemeralSecretKey,
 	)
 	sessionSecret, serverMac, clientMac := core3DH(conf, identities, ikm, ke1.Serialize(), ke2)
 
