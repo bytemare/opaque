@@ -144,7 +144,7 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 		OPRFGlobalSeed: v.Inputs.OprfSeed,
 	}
 
-	regResp, err := server.RegistrationResponse(regReq, v.Inputs.ServerPublicKey, v.Inputs.CredentialIdentifier)
+	regResp, err := server.RegistrationResponse(regReq, v.Inputs.ServerPublicKey, v.Inputs.CredentialIdentifier, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -395,11 +395,19 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		}
 
 		if !bytes.Equal(vectorKE3.ClientMac, serverOutput.ClientMAC) {
-			t.Fatalf("Expected client MACs do not match : %v", serverOutput.ClientMAC)
+			t.Fatalf(
+				"Expected client MACs do not match : want %q, got %q",
+				hex.EncodeToString(serverOutput.ClientMAC),
+				hex.EncodeToString(vectorKE3.ClientMac),
+			)
 		}
 
 		if !bytes.Equal(v.Outputs.SessionKey, serverOutput.SessionSecret) {
-			t.Fatalf("Server's session key is invalid : %v", serverOutput.SessionSecret)
+			t.Fatalf(
+				"Server's session key is invalid : want %q, got %q",
+				hex.EncodeToString(serverOutput.SessionSecret),
+				hex.EncodeToString(v.Outputs.SessionKey),
+			)
 		}
 	}
 

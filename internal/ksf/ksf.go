@@ -16,8 +16,13 @@ import (
 	"github.com/bytemare/ksf"
 )
 
-// ErrParameters indicates an invalid amount of KSF parameters.
-var ErrParameters = errors.New("invalid number of KSF parameters")
+var (
+	// ErrParameters indicates an invalid amount of KSF parameters.
+	ErrParameters = errors.New("invalid number of KSF parameters")
+
+	// ErrNegativeKSFLength indicates that the requested KSF output length is negative.
+	ErrNegativeKSFLength = errors.New("the requested KSF output length is negative")
+)
 
 // Options holds optional parameters to tweak the KSF and provide a custom salt.
 type Options struct {
@@ -49,7 +54,7 @@ func (o *Options) Set(f ksfInterface, salt []byte, parameters []int, length int)
 	}
 
 	if length < 0 {
-		return fmt.Errorf("the provided KSF output length must not be negative: %q", length)
+		return ErrNegativeKSFLength
 	}
 
 	if length != 0 {

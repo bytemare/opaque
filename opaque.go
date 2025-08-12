@@ -24,6 +24,7 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	internalKSF "github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
+	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -298,4 +299,29 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 	}
 
 	return ip, nil
+}
+
+// getEphemeralSecretKeyShare assumes either EphemeralSecretKeyShare is set or SecretKeyShareSeed is != 0.
+func (o *AKEOptions) getEphemeralSecretKeyShare(g ecc.Group) (*ecc.Scalar, error) {
+	if o.EphemeralSecretKeyShare != nil {
+		if err := IsValidScalar(g, o.EphemeralSecretKeyShare); err != nil {
+			return nil, fmt.Errorf("invalid EphemeralSecretKeyShare: %w", err)
+		}
+
+		return g.NewScalar().Set(o.EphemeralSecretKeyShare), nil
+	}
+
+	return makeESK(g, o.SecretKeyShareSeed), nil
+}
+
+func makeESK(g ecc.Group, seed []byte) *ecc.Scalar {
+	if len(seed) == 0 {
+		seed = internal.RandomBytes(internal.SeedLength)
+	}
+
+	return oprf.IDFromGroup(g).DeriveKey(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
+}
+
+func makeEskAndNonce(g ecc.Group) (*ecc.Scalar, []byte) {
+	return makeESK(g, nil), internal.RandomBytes(internal.NonceLength)
 }

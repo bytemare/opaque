@@ -106,7 +106,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 
 		credID = internal.RandomBytes(32)
 
-		respReg, err := server.RegistrationResponse(m1, p.serverPublicKey.Encode(), credID)
+		respReg, err := server.RegistrationResponse(m1, p.serverPublicKey.Encode(), credID, nil)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -353,51 +353,51 @@ func TestBadConfiguration(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
+		error   error
 		makeBad func() []byte
-		error   string
+		name    string
 	}{
 		{
 			name: "Bad OPRF",
 			makeBad: func() []byte {
 				return setBadValue(0, 0)
 			},
-			error: "invalid OPRF group id",
+			error: opaque.ErrInvalidOPRFid,
 		},
 		{
 			name: "Bad AKE",
 			makeBad: func() []byte {
 				return setBadValue(1, 0)
 			},
-			error: "invalid AKE group id",
+			error: opaque.ErrInvalidAKEid,
 		},
 		{
 			name: "Bad KSF",
 			makeBad: func() []byte {
 				return setBadValue(2, 10)
 			},
-			error: "invalid KSF id",
+			error: opaque.ErrInvalidKSFid,
 		},
 		{
 			name: "Bad KDF",
 			makeBad: func() []byte {
 				return setBadValue(3, 0)
 			},
-			error: "invalid KDF id",
+			error: opaque.ErrInvalidKDFid,
 		},
 		{
 			name: "Bad MAC",
 			makeBad: func() []byte {
 				return setBadValue(4, 0)
 			},
-			error: "invalid MAC id",
+			error: opaque.ErrInvalidMACid,
 		},
 		{
 			name: "Bad Hash",
 			makeBad: func() []byte {
 				return setBadValue(5, 0)
 			},
-			error: "invalid Hash id",
+			error: opaque.ErrInvalidHASHid,
 		},
 	}
 
@@ -418,8 +418,7 @@ func TestBadConfiguration(t *testing.T) {
 			// Test Deserialization for bad conf
 			badEncoded := badConf.makeBad()
 
-			if _, err := opaque.DeserializeConfiguration(badEncoded); err == nil ||
-				!strings.EqualFold(err.Error(), badConf.error) {
+			if _, err := opaque.DeserializeConfiguration(badEncoded); !errors.Is(err, badConf.error) {
 				t.Fatalf(
 					"Expected error for %s. Want %q, got %q.\n\tEncoded: %v",
 					badConf.name,
@@ -432,15 +431,15 @@ func TestBadConfiguration(t *testing.T) {
 			// Test bad configuration for client, server, and deserializer setup
 			bad := convertToBadConf(badEncoded)
 
-			if _, err := bad.Client(); err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+			if _, err := bad.Client(); !errors.Is(err, badConf.error) {
 				t.Fatalf("Expected error for %s / client. Want %q, got %q", badConf.name, badConf.error, err)
 			}
 
-			if _, err := bad.Server(); err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+			if _, err := bad.Server(); !errors.Is(err, badConf.error) {
 				t.Fatalf("Expected error for %s / server. Want %q, got %q", badConf.name, badConf.error, err)
 			}
 
-			if _, err := bad.Deserializer(); err == nil || !strings.EqualFold(err.Error(), badConf.error) {
+			if _, err := bad.Deserializer(); !errors.Is(err, badConf.error) {
 				t.Fatalf("Expected error for %s / deserializer. Want %q, got %q", badConf.name, badConf.error, err)
 			}
 		})

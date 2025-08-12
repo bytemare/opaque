@@ -10,6 +10,7 @@ package opaque_test
 
 import (
 	"encoding/hex"
+	"errors"
 	"testing"
 
 	group "github.com/bytemare/ecc"
@@ -56,14 +57,18 @@ func TestDeserializeRegistrationRequest(t *testing.T) {
 
 	server, _ := c.Server()
 	length := c.OPRF.Group().ElementLength() + 1
-	if _, err := server.Deserialize.RegistrationRequest(internal.RandomBytes(length)); err == nil ||
-		err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.Deserialize.RegistrationRequest(internal.RandomBytes(length)); !errors.Is(
+		err,
+		errInvalidMessageLength,
+	) {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	client, _ := c.Client()
-	if _, err := client.Deserialize.RegistrationRequest(internal.RandomBytes(length)); err == nil ||
-		err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.Deserialize.RegistrationRequest(internal.RandomBytes(length)); !errors.Is(
+		err,
+		errInvalidMessageLength,
+	) {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
@@ -73,14 +78,18 @@ func TestDeserializeRegistrationResponse(t *testing.T) {
 
 	server, _ := c.Server()
 	length := c.OPRF.Group().ElementLength() + c.AKE.Group().ElementLength() + 1
-	if _, err := server.Deserialize.RegistrationResponse(internal.RandomBytes(length)); err == nil ||
-		err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.Deserialize.RegistrationResponse(internal.RandomBytes(length)); !errors.Is(
+		err,
+		errInvalidMessageLength,
+	) {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	client, _ := c.Client()
-	if _, err := client.Deserialize.RegistrationResponse(internal.RandomBytes(length)); err == nil ||
-		err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.Deserialize.RegistrationResponse(internal.RandomBytes(length)); !errors.Is(
+		err,
+		errInvalidMessageLength,
+	) {
 		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
@@ -94,25 +103,32 @@ func TestDeserializeRegistrationRecord(t *testing.T) {
 
 		c := conf.internal
 		length := c.Group.ElementLength() + c.Hash.Size() + c.EnvelopeSize + 1
-		if _, err := server.Deserialize.RegistrationRecord(internal.RandomBytes(length)); err == nil ||
-			err.Error() != errInvalidMessageLength.Error() {
+		if _, err := server.Deserialize.RegistrationRecord(internal.RandomBytes(length)); !errors.Is(
+			err,
+			errInvalidMessageLength,
+		) {
 			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 		}
 
 		badPKu := getBadElement(t, conf)
 		rec := encoding.Concat(badPKu, internal.RandomBytes(c.Hash.Size()+c.EnvelopeSize))
 
-		expect := "invalid client public key"
-		if _, err := server.Deserialize.RegistrationRecord(rec); err == nil || err.Error() != expect {
-			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", expect, err)
+		if _, err = server.Deserialize.RegistrationRecord(rec); !errors.Is(err, opaque.ErrInvalidClientPublicKey) {
+			t.Fatalf(
+				"Expected error for DeserializeRegistrationRequest. want %q, got %q",
+				opaque.ErrInvalidClientPublicKey,
+				err,
+			)
 		}
 
 		client, err := conf.conf.Client()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := client.Deserialize.RegistrationRecord(internal.RandomBytes(length)); err == nil ||
-			err.Error() != errInvalidMessageLength.Error() {
+		if _, err = client.Deserialize.RegistrationRecord(internal.RandomBytes(length)); !errors.Is(
+			err,
+			errInvalidMessageLength,
+		) {
 			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
 		}
 	})
@@ -124,14 +140,12 @@ func TestDeserializeKE1(t *testing.T) {
 	ke1Length := g.ElementLength() + internal.NonceLength + g.ElementLength()
 
 	server, _ := c.Server()
-	if _, err := server.Deserialize.KE1(internal.RandomBytes(ke1Length + 1)); err == nil ||
-		err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.Deserialize.KE1(internal.RandomBytes(ke1Length + 1)); !errors.Is(err, errInvalidMessageLength) {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	client, _ := c.Client()
-	if _, err := client.Deserialize.KE1(internal.RandomBytes(ke1Length + 1)); err == nil ||
-		err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.Deserialize.KE1(internal.RandomBytes(ke1Length + 1)); !errors.Is(err, errInvalidMessageLength) {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
@@ -143,8 +157,7 @@ func TestDeserializeKE2(t *testing.T) {
 	client, _ := c.Client()
 	ke2Length := conf.OPRF.Group().ElementLength() +
 		2*conf.NonceLen + 2*conf.Group.ElementLength() + conf.EnvelopeSize + conf.MAC.Size()
-	if _, err := client.Deserialize.KE2(internal.RandomBytes(ke2Length + 1)); err == nil ||
-		err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.Deserialize.KE2(internal.RandomBytes(ke2Length + 1)); !errors.Is(err, errInvalidMessageLength) {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 
@@ -152,8 +165,7 @@ func TestDeserializeKE2(t *testing.T) {
 	ke2Length = conf.OPRF.Group().
 		ElementLength() +
 		2*conf.NonceLen + 2*conf.Group.ElementLength() + conf.EnvelopeSize + conf.MAC.Size()
-	if _, err := server.Deserialize.KE2(internal.RandomBytes(ke2Length + 1)); err == nil ||
-		err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.Deserialize.KE2(internal.RandomBytes(ke2Length + 1)); !errors.Is(err, errInvalidMessageLength) {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 }
@@ -163,14 +175,12 @@ func TestDeserializeKE3(t *testing.T) {
 	ke3Length := c.MAC.Size()
 
 	server, _ := c.Server()
-	if _, err := server.Deserialize.KE3(internal.RandomBytes(ke3Length + 1)); err == nil ||
-		err.Error() != errInvalidMessageLength.Error() {
+	if _, err := server.Deserialize.KE3(internal.RandomBytes(ke3Length + 1)); !errors.Is(err, errInvalidMessageLength) {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 
 	client, _ := c.Client()
-	if _, err := client.Deserialize.KE3(internal.RandomBytes(ke3Length + 1)); err == nil ||
-		err.Error() != errInvalidMessageLength.Error() {
+	if _, err := client.Deserialize.KE3(internal.RandomBytes(ke3Length + 1)); !errors.Is(err, errInvalidMessageLength) {
 		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
 	}
 }

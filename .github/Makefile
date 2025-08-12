@@ -52,10 +52,26 @@ cover:
 .PHONY: fuzz
 fuzz:
 	@echo "Running fuzz tests ..."
-	@fuzzTime=$${FUZZTIME:-10}; \
-	find .. -name '*_test.go' -exec grep -l '^func Fuzz' {} \; | while read -r file; do \
-		grep '^func Fuzz' "$$file" | sed -E 's/^func ([^(]+).*/\1/' | while read -r func; do \
-			echo "Fuzzing $$func in $$file"; \
-			go test "$$(dirname "$$file")" -run="$$func" -fuzz="$$func" -fuzztime="$${fuzzTime}s"; \
-		done; \
-	done
+	@fuzzTime=$${FUZZTIME:-2}; \
+    failed=0; \
+    find .. -name '*_test.go' -exec grep -l '^func Fuzz' {} \; | while read -r file; do \
+    	grep '^func Fuzz' "$$file" | sed -E 's/^func ([^(]+).*/\1/' | while read -r func; do \
+    		echo "Fuzzing $$func in $$file"; \
+    		if ! go test "$$(dirname "$$file")" -run="$$func" -fuzz="$$func" -fuzztime="$${fuzzTime}s"; then \
+    			failed=1; \
+    			echo "Crasher found for $$func. Crashing input:"; \
+    			testdata_dir="$$(dirname "$$file")/testdata/fuzz/$$func"; \
+    			if [ -d "$$testdata_dir" ]; then \
+    				latest_crasher=$$(ls -t "$$testdata_dir" | head -n 1); \
+    				if [ -n "$$latest_crasher" ]; then \
+    					cat "$$testdata_dir/$$latest_crasher"; \
+    				else \
+    					echo "Could not find crasher file in $$testdata_dir"; \
+    				fi; \
+    			else \
+    				echo "Could not find testdata directory: $$testdata_dir"; \
+    			fi; \
+    		fi; \
+    	done; \
+    done; \
+    exit $$failed

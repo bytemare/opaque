@@ -62,6 +62,9 @@ var (
 
 	// ErrSliceShorterLength indicates the provided slice is shorter than the configured value.
 	ErrSliceShorterLength = errors.New("provided slice is shorter than the configured value")
+
+	// ErrProvidedLengthNegative indicates the provided length is negative.
+	ErrProvidedLengthNegative = errors.New("provided length is negative")
 )
 
 // ValidateOptionsLength returns an error if the input slice does not match the provided length (if != 0) or is shorter
@@ -72,7 +75,7 @@ func ValidateOptionsLength(input []byte, length int, referenceLength uint32) err
 	}
 
 	if length < 0 {
-		return fmt.Errorf("the provided length %d is negative", length)
+		return ErrProvidedLengthNegative
 	}
 
 	// If the length is 0, it means the required length is not overridden, and the input slice must be at least the

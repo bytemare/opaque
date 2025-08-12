@@ -259,7 +259,7 @@ func Example_registration() {
 		credID = opaque.RandomBytes(64)
 
 		// The server uses its public key and secret OPRF seed created at the setup.
-		response, err := server.RegistrationResponse(request, serverPublicKey.Encode(), credID)
+		response, err := server.RegistrationResponse(request, serverPublicKey.Encode(), credID, nil)
 		if err != nil {
 			log.Fatalln(err)
 		}

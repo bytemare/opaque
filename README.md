@@ -31,26 +31,36 @@ been audited, and even though great care about security and performance has been
 
 You can find the documentation and usage examples in [the package doc](https://pkg.go.dev/github.com/bytemare/opaque) and [the project wiki](https://github.com/bytemare/opaque/wiki) . 
 
-
-# TODO
+[//]: # (
+# TODO: provide a more detailed documentation in the README.md for quick start 
 - list good aspects:
   - easy to use
   - server is stateless, therefore thread safe and can be used by multiple goroutines serving clients
   - secure defaults, no need to worry about configuring the protocol
   - highly configurable, but beware of the pitfalls, and use at your own risk
 - protocol overview and usage examples
+- mention that there's state
 - some indicators of good use
   - use the latest version of the protocol
   - secure defaults
+  - don't send errors details back to the client, to avoid giving hints to an attacker
   - store and retrieve the server key material securely
   - verify KE3 before using the session key
   - the client can use the extra key to encrypt more stuff, that the server cannot decrypt
+  - use the client session key to encrypt more stuff, that the server cannot decrypt
+  - deport client OPRF key derivation to another service, such as a key management service, to avoid storing the global OPRF key on the same service that the rest of the protocol, though compromise of these keys does not immediately lead to account compromise.
+  - since OPAQUE necessarily reveals the client identity to the server during regsitration and autehntication, it is recommended to use a secure channel to protect the client identity, such as TLS 1.3+
 - list pitfalls
   - rate limit and add user enumeration protections of top of the fake credentials mechanism
   - same configuration throughout the client lifecycle
     - same base config
     - same server key material and public key
-  - client 
+  - client blinding is on the password: for the same password and same blind, the same element comes out. Users of this package
+  may want to bind the session and provide a some context to the password, such as the username or email address, a session ID, or a nonce.
+    - Maybe use or implement OPAQUE-TLS as described in Password-Authenticated TLS via OPAQUE and Post-Handshake Authentication at https://eprint.iacr.org/2023/220.pdf
+    - Use exported authenticators TLS1.3 extension compatible with the standard library
+# todo: continue with the list or make it shorter?
+)
 
 ## Versioning
 

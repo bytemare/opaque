@@ -413,21 +413,21 @@ func FuzzDeserializeKE2(f *testing.F) {
 				ElementLength() +
 				conf.NonceLen + conf.Group.ElementLength() + conf.EnvelopeSize
 
-			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) &&
+			if errors.Is(err, opaque.ErrInvalidMessageLength) &&
 				len(ke2) == maxResponseLength+conf.NonceLen+conf.Group.ElementLength()+conf.MAC.Size() {
 				t.Fatalf(fmtGotValidInput, opaque.ErrInvalidMessageLength)
 			}
 
-			if strings.Contains(err.Error(), opaque.ErrInvalidEvaluatedData.Error()) {
+			if errors.Is(err, opaque.ErrInvalidEvaluatedMessage) {
 				input := ke2[:conf.OPRF.Group().ElementLength()]
-				if err := isValidOPRFPoint(conf, input, opaque.ErrInvalidEvaluatedData); err != nil {
+				if err := isValidOPRFPoint(conf, input, opaque.ErrInvalidEvaluatedMessage); err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			if strings.Contains(err.Error(), opaque.ErrInvalidServerEPK.Error()) {
+			if errors.Is(err, opaque.ErrInvalidServerKeyShare) {
 				input := ke2[conf.OPRF.Group().ElementLength()+conf.NonceLen:]
-				if err := isValidAKEPoint(conf, input, opaque.ErrInvalidServerEPK); err != nil {
+				if err := isValidAKEPoint(conf, input, opaque.ErrInvalidServerKeyShare); err != nil {
 					t.Fatal(err)
 				}
 			}

@@ -9,8 +9,8 @@
 package opaque
 
 import (
-	"errors"
 	"fmt"
+
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
@@ -21,16 +21,6 @@ import (
 	"github.com/bytemare/opaque/internal/masking"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
-)
-
-var (
-	errClientOptionsPrefix = errors.New("invalid client options")
-
-	// ErrClientOptionsBlindZero indicates the OPRF blind is zero.
-	ErrClientOptionsBlindZero = fmt.Errorf("%w: OPRF blind is zero", errClientOptionsPrefix)
-
-	// ErrClientOptionsEnvelope indicates the envelope nonce is invalid.
-	ErrClientOptionsEnvelope = fmt.Errorf("%w: invalid envelope", errClientOptionsPrefix)
 )
 
 type oprfState struct {
@@ -95,18 +85,23 @@ type ClientOptions struct {
 
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
 // This will initiate a state, so the same client instance should be used to call RegistrationFinalize() later on.
-// Optionally, that value can be overridden by providing a ClientOptions with a OPRF Blind value, but at your own risks.
+// Optionally, that value can be overridden by providing a ClientOptions with an OPRF Blind value, but at your own risks.
 func (c *Client) RegistrationInit(
 	password []byte,
 	options ...*ClientOptions,
 ) (*message.RegistrationRequest, error) {
 	if c.oprf.blind != nil {
-		return nil, fmt.Errorf("%w: %s", errClientOptionsPrefix, "an OPRF blind previously set in state")
+		return nil, ErrClientPreviousBlind
 	}
 
-	blind, err := c.verifyOptionBlind(options...)
-	if err != nil {
-		return nil, err
+	var blind *ecc.Scalar
+	var err error
+
+	if len(options) != 0 {
+		blind, err = c.verifyOptionBlind(options...)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var m *ecc.Element
@@ -155,7 +150,7 @@ func (c *Client) RegistrationFinalize(
 // invoking GenerateKE3() for the same message but different client instances.
 func (c *Client) GenerateKE1(password []byte, options ...*ClientOptions) (*message.KE1, error) {
 	if c.oprf.blind != nil {
-		return nil, fmt.Errorf("%w: %s", errClientOptionsPrefix, "an OPRF blind previously set in state")
+		return nil, fmt.Errorf("%w: %s", ErrClientInvalidOptions, "an OPRF blind previously set in state")
 	}
 
 	if c.ake.esk != nil {
@@ -202,7 +197,7 @@ func (c *Client) GenerateKE3(
 	serverPublicKey, serverPublicKeyBytes,
 		envelope, err := masking.Unmask(c.conf, randomizedPassword, ke2.MaskingNonce, ke2.MaskedResponse)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to unmask KE2: %w", err)
+		return nil, nil, nil, prefixError(ErrAuthenticationInvalidServerPublicKey, err)
 	}
 
 	var clientSecretKey *ecc.Scalar
@@ -218,7 +213,7 @@ func (c *Client) GenerateKE3(
 		serverIdentity,
 		envelope)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to recover client key: %w", err)
+		return nil, nil, nil, prefixError(ErrAuthenticationClientKey, err)
 	}
 
 	// Finalize the AKE.
@@ -237,7 +232,7 @@ func (c *Client) GenerateKE3(
 		c.ake.ke1,
 	)
 	if !macOK {
-		return nil, nil, nil, ErrClientAkeFailedHandshakeServerMac
+		return nil, nil, nil, ErrServerAuthentication
 	}
 
 	return ke3, sessionKey, exportKey, nil
@@ -271,12 +266,10 @@ func (c *Client) buildPRK(evaluation *ecc.Element, kdfSalt, ksfSalt []byte, ksfL
 }
 
 func (c *Client) verifyOptionBlind(clientOptions ...*ClientOptions) (*ecc.Scalar, error) {
-	if len(clientOptions) == 0 || clientOptions[0].OPRFBlind == nil {
-		return nil, nil
-	}
-
-	if err := IsValidScalar(c.conf.OPRF.Group(), clientOptions[0].OPRFBlind); err != nil {
-		return nil, fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+	if clientOptions[0].OPRFBlind != nil {
+		if err := IsValidScalar(c.conf.OPRF.Group(), clientOptions[0].OPRFBlind); err != nil {
+			return nil, prefixError(ErrClientInvalidOptionsOPRFBlind, err)
+		}
 	}
 
 	return clientOptions[0].OPRFBlind, nil
@@ -291,7 +284,7 @@ func getEnvelopeNonce(clientOptions ...*ClientOptions) ([]byte, error) {
 	nonceLength := clientOptions[0].EnvelopeNonceLength
 
 	if err := internal.ValidateOptionsLength(nonce, nonceLength, internal.NonceLength); err != nil {
-		return nil, fmt.Errorf("%w: failed to verify envelope nonce parameters: %w", errClientOptionsPrefix, err)
+		return nil, fmt.Errorf("failed to verify envelope nonce parameters: %w", err)
 	}
 
 	if nonce == nil {
@@ -315,7 +308,7 @@ type clientOptions struct {
 
 func (c *Client) clientOptionsKSFParser(out *clientOptions, in *ClientOptions) error {
 	if err := out.KSFOptions.Set(c.conf.KSF, in.KSFSalt, in.KSFParameters, in.KSFLength); err != nil {
-		return fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+		return prefixError(ErrClientInvalidOptions, err)
 	}
 
 	if len(out.KSFOptions.Parameters) != 0 {
@@ -329,18 +322,18 @@ func (c *Client) clientOptionsKSFParser(out *clientOptions, in *ClientOptions) e
 func (c *Client) clientOptionsKE1Parser(in *ClientOptions) error {
 	if len(c.ake.ke1) != 0 {
 		if len(in.KE1) != 0 {
-			return fmt.Errorf("%w: KE1 already in state but provided in options", errClientOptionsPrefix)
+			return ErrClientInvalidOptionsDoubleKE1
 		}
 
 		return nil
 	}
 
 	if len(in.KE1) == 0 {
-		return fmt.Errorf("%w: KE1 is missing in state and not provided", errClientOptionsPrefix)
+		return ErrClientInvalidOptionsKE1Missing
 	}
 
 	if _, err := c.Deserialize.KE1(in.KE1); err != nil {
-		return fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+		return prefixError(ErrClientInvalidOptionsInvalidKE1, err)
 	}
 
 	c.ake.ke1 = in.KE1
@@ -359,7 +352,7 @@ func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*cl
 
 	if len(options) == 0 {
 		if c.oprf.blind == nil {
-			return nil, fmt.Errorf("%w: OPRF blind is missing", errClientOptionsPrefix)
+			return nil, ErrClientInvalidOptionsNoOPRFBlind
 		}
 
 		o.EnvelopeNonce = internal.RandomBytes(internal.NonceLength)
@@ -371,11 +364,11 @@ func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*cl
 	var err error
 
 	if c.oprf.blind != nil && options[0].OPRFBlind != nil {
-		return nil, fmt.Errorf("%w: %s", errClientOptionsPrefix, "OPRF blind is already set in state")
+		return nil, ErrClientInvalidOptionsDoubleOPRFBlind
 	}
 
 	if o.OPRFBlind == nil && c.oprf.blind == nil {
-		return nil, fmt.Errorf("%w: OPRF blind is missing", errClientOptionsPrefix)
+		return nil, ErrClientInvalidOptionsNoOPRFBlind
 	}
 
 	o.OPRFBlind, err = c.verifyOptionBlind(options...)
@@ -396,7 +389,7 @@ func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*cl
 	// Envelope nonce.
 	o.EnvelopeNonce, err = getEnvelopeNonce(options...)
 	if err != nil {
-		return nil, err
+		return nil, prefixError(ErrClientInvalidOptions, err)
 	}
 
 	return o, nil
@@ -441,7 +434,7 @@ func (c *Client) parseOptionsKE1(options []*ClientOptions) (*clientOptions, erro
 	// Ephemeral secret key share.
 	c.ake.esk, err = options[0].AKE.getEphemeralSecretKeyShare(c.conf.Group)
 	if err != nil {
-		return nil, err
+		return nil, prefixError(ErrClientInvalidOptions, err)
 	}
 
 	return o, nil
@@ -449,32 +442,32 @@ func (c *Client) parseOptionsKE1(options []*ClientOptions) (*clientOptions, erro
 
 func (c *Client) validateKE2(ke2 *message.KE2) error {
 	if ke2 == nil {
-		return fmt.Errorf("%w: KE2 message is nil", errClientOptionsPrefix)
+		return ErrClientKE2Nil
 	}
 
 	if ke2.CredentialResponse == nil || ke2.EvaluatedMessage == nil {
-		return fmt.Errorf("%w: KE2 message is missing evaluated message", errClientOptionsPrefix)
+		return ErrClientKE2InvalidCredentialResponse
 	}
 
 	if err := IsValidElement(c.conf.Group, ke2.EvaluatedMessage); err != nil {
-		return fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+		return prefixError(ErrClientKE2InvalidEvaluatedMessage, err)
 	}
 
 	if ke2.ServerPublicKeyshare == nil {
-		return fmt.Errorf("%w: KE2 message is missing server public key share", errClientOptionsPrefix)
+		return ErrClientKE2MissingServerKeyShare
 	}
 
 	if err := IsValidElement(c.conf.Group, ke2.ServerPublicKeyshare); err != nil {
-		return fmt.Errorf("%w: %w", errClientOptionsPrefix, err)
+		return prefixError(ErrClientKE2InvalidServerKeyShare, err)
 	}
 
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
 	if len(ke2.MaskedResponse) != c.conf.Group.ElementLength()+c.conf.EnvelopeSize {
-		return ErrInvalidMaskedLength
+		return ErrClientKE2InvalidMaskedLength
 	}
 
 	if len(ke2.MaskingNonce) == 0 {
-		return errors.New("no KE2 masking nonce")
+		return ErrClientKE2NoMaskingNonce
 	}
 
 	return nil
@@ -491,15 +484,15 @@ func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, erro
 
 	if len(options) == 0 || options[0] == nil {
 		if c.oprf.blind == nil {
-			return nil, fmt.Errorf("%w: OPRF blind is missing", errClientOptionsPrefix)
+			return nil, ErrClientInvalidOptionsNoOPRFBlind
 		}
 
 		if c.ake.esk == nil {
-			return nil, ErrClientNoKeyShare
+			return nil, ErrClientInvalidOptionsNoKeyShare
 		}
 
 		if len(c.ake.ke1) == 0 {
-			return nil, fmt.Errorf("%w: KE1 message is missing", errClientOptionsPrefix)
+			return nil, ErrClientInvalidOptionsKE1Missing
 		}
 
 		return o, nil
@@ -509,11 +502,11 @@ func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, erro
 	var err error
 
 	if c.oprf.blind != nil && options[0].OPRFBlind != nil {
-		return nil, fmt.Errorf("%w: %s", errClientOptionsPrefix, "OPRF blind is already set in state")
+		return nil, ErrClientInvalidOptionsDoubleOPRFBlind
 	}
 
 	if options[0].OPRFBlind == nil && c.oprf.blind == nil {
-		return nil, fmt.Errorf("%w: OPRF blind is missing", errClientOptionsPrefix)
+		return nil, ErrClientInvalidOptionsNoOPRFBlind
 	}
 
 	o.OPRFBlind, err = c.verifyOptionBlind(options...)
@@ -539,7 +532,7 @@ func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, erro
 	// Ephemeral secret key share.
 	c.ake.esk, err = c.parseOptionsKE3ESK(options[0].AKE)
 	if err != nil {
-		return nil, err
+		return nil, prefixError(ErrClientInvalidOptions, err)
 	}
 
 	return o, nil
@@ -549,14 +542,14 @@ func (c *Client) parseOptionsKE3ESK(options *AKEOptions) (*ecc.Scalar, error) {
 	if c.ake.esk != nil {
 		// return an error if options are present
 		if options != nil && (options.EphemeralSecretKeyShare != nil || len(options.SecretKeyShareSeed) != 0) {
-			return nil, fmt.Errorf("%w: %w", errClientOptionsPrefix, ErrClientExistingKeyShare)
+			return nil, ErrClientExistingKeyShare
 		}
 
 		return c.ake.esk, nil
 	}
 
 	if options == nil || (options.EphemeralSecretKeyShare == nil && len(options.SecretKeyShareSeed) == 0) {
-		return nil, ErrClientNoKeyShare
+		return nil, ErrClientInvalidOptionsNoKeyShare
 	}
 
 	return options.getEphemeralSecretKeyShare(c.conf.Group)

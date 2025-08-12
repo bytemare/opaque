@@ -11,6 +11,7 @@ package opaque_test
 import (
 	"crypto"
 	"encoding/hex"
+	"errors"
 	"log"
 	"strings"
 	"testing"
@@ -63,32 +64,29 @@ func TestClient_Deserialize_RegistrationResponse(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		r2, err := server.RegistrationResponse(r1, pks.Encode(), credID)
+		r2, err := server.RegistrationResponse(r1, pks.Encode(), credID, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// message length
 		badr2 := internal.RandomBytes(15)
-		expected := "invalid message length"
 		if _, err = client.Deserialize.RegistrationResponse(badr2); err == nil ||
-			!strings.HasPrefix(err.Error(), expected) {
+			!errors.Is(err, opaque.ErrInvalidMessageLength) {
 			t.Fatalf("expected error for empty server public key - got %v", err)
 		}
 
 		// invalid data
 		badr2 = encoding.Concat(getBadElement(t, conf), pks.Encode())
-		expected = "invalid OPRF evaluation"
 		if _, err = client.Deserialize.RegistrationResponse(badr2); err == nil ||
-			!strings.HasPrefix(err.Error(), expected) {
+			!errors.Is(err, opaque.ErrInvalidEvaluatedMessage) {
 			t.Fatalf("expected error for empty server public key - got %v", err)
 		}
 
 		// invalid pks
-		expected = "invalid server public key"
 		badr2 = encoding.Concat(r2.Serialize()[:conf.internal.OPRF.Group().ElementLength()], getBadElement(t, conf))
 		if _, err = client.Deserialize.RegistrationResponse(badr2); err == nil ||
-			!strings.HasPrefix(err.Error(), expected) {
+			!errors.Is(err, opaque.ErrInvalidServerPK) {
 			t.Fatalf("expected error for invalid server public key - got %v", err)
 		}
 	})
@@ -122,8 +120,7 @@ func TestClientFinish_BadEvaluation(t *testing.T) {
 			),
 		)
 
-		expected := "invalid OPRF evaluation"
-		if _, err = client.Deserialize.KE2(badKe2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, err = client.Deserialize.KE2(badKe2); err == nil || !errors.Is(err, opaque.ErrInvalidEvaluatedMessage) {
 			t.Fatalf("expected error for invalid evaluated element - got %v", err)
 		}
 	})
@@ -173,17 +170,17 @@ func TestClientFinish_BadMaskedResponse(t *testing.T) {
 		}
 
 		goodLength := conf.internal.Group.ElementLength() + conf.internal.EnvelopeSize
-		expected := "invalid masked response length"
+		expected := opaque.ErrInvalidMaskedLength
 
 		// too short
 		ke2.MaskedResponse = internal.RandomBytes(goodLength - 1)
-		if _, _, _, err = client.GenerateKE3(ke2, nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, _, err = client.GenerateKE3(ke2, nil, nil); err == nil || !errors.Is(err, expected) {
 			t.Fatalf("expected error for short response - got %v", err)
 		}
 
 		// too long
 		ke2.MaskedResponse = internal.RandomBytes(goodLength + 1)
-		if _, _, _, err = client.GenerateKE3(ke2, nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, _, _, err = client.GenerateKE3(ke2, nil, nil); err == nil || !errors.Is(err, expected) {
 			t.Fatalf("expected error for long response - got %v", err)
 		}
 	})
@@ -245,8 +242,8 @@ func TestClientFinish_InvalidEnvelopeTag(t *testing.T) {
 		clearText := encoding.Concat(pks.Encode(), env.Serialize())
 		ke2.MaskedResponse = xorResponse(conf.internal, rec.MaskingKey, ke2.MaskingNonce, clearText)
 
-		expected := "failed to recover client key: invalid envelope authentication tag"
-		if _, _, _, err := client.GenerateKE3(ke2, nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		expected := "invalid envelope authentication tag"
+		if _, _, _, err := client.GenerateKE3(ke2, nil, nil); err == nil || !strings.HasSuffix(err.Error(), expected) {
 			t.Fatalf("expected error = %q for invalid envelope mac - got %q", expected, err)
 		}
 	})
@@ -316,8 +313,7 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		offset := conf.internal.Group.ElementLength() + conf.internal.MAC.Size()
 		encoded := ke2.Serialize()
 		badKe2 := encoding.Concat3(encoded[:len(encoded)-offset], getBadElement(t, conf), ke2.ServerMac)
-		expected := "invalid ephemeral server public key"
-		if _, err := client.Deserialize.KE2(badKe2); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		if _, err := client.Deserialize.KE2(badKe2); err == nil || !errors.Is(err, opaque.ErrInvalidServerKeyShare) {
 			t.Fatalf("expected error for invalid epks encoding - got %q", err)
 		}
 
@@ -347,8 +343,8 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		clearText := encoding.Concat(badpks, env.Serialize())
 		ke2.MaskedResponse = xorResponse(conf.internal, rec.MaskingKey, ke2.MaskingNonce, clearText)
 
-		expected = "failed to unmask KE2: invalid server public key in masked response"
-		if _, _, _, err := client.GenerateKE3(ke2, nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
+		expected := opaque.ErrAuthenticationInvalidServerPublicKey
+		if _, _, _, err := client.GenerateKE3(ke2, nil, nil); !errors.Is(err, expected) {
 			t.Fatalf("expected error %q for invalid envelope mac - got %q", expected, err)
 		}
 
@@ -358,9 +354,10 @@ func TestClientFinish_InvalidKE2KeyEncoding(t *testing.T) {
 		clearText = encoding.Concat(fakepks, env.Serialize())
 		ke2.MaskedResponse = xorResponse(conf.internal, rec.MaskingKey, ke2.MaskingNonce, clearText)
 
-		expected = "failed to recover client key: invalid envelope authentication tag"
-		if _, _, _, err := client.GenerateKE3(ke2, nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
-			t.Fatalf("expected error %q for invalid envelope mac - got %q", expected, err)
+		expectedError := "invalid envelope authentication tag"
+		if _, _, _, err := client.GenerateKE3(ke2, nil, nil); err == nil ||
+			!strings.HasSuffix(err.Error(), expectedError) {
+			t.Fatalf("expected error %q for invalid envelope mac - got %q", expectedError, err)
 		}
 	})
 }
@@ -414,9 +411,9 @@ func TestClientFinish_InvalidKE2Mac(t *testing.T) {
 		}
 
 		ke2.ServerMac = internal.RandomBytes(conf.internal.MAC.Size())
-		expected := "3DH handshake failed: invalid server mac"
-		if _, _, _, err := client.GenerateKE3(ke2, nil, nil); err == nil || !strings.HasPrefix(err.Error(), expected) {
-			t.Fatalf("expected error %q for invalid server mac - got %q", expected, err)
+		if _, _, _, err := client.GenerateKE3(ke2, nil, nil); err == nil ||
+			!errors.Is(err, opaque.ErrServerAuthentication) {
+			t.Fatalf("expected error %q for invalid server mac - got %q", opaque.ErrServerAuthentication, err)
 		}
 	})
 }
