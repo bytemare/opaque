@@ -217,9 +217,9 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 		KE1, err := client.GenerateKE1(v.Inputs.Password, &opaque.ClientOptions{
 			OPRFBlind: blind,
 			AKE: &opaque.AKEOptions{
-				EphemeralSecretKeyShare: nil,
-				SecretKeyShareSeed:      v.Inputs.ClientKeyshareSeed,
-				Nonce:                   v.Inputs.ClientNonce,
+				SecretKeyShare:     nil,
+				SecretKeyShareSeed: v.Inputs.ClientKeyshareSeed,
+				Nonce:              v.Inputs.ClientNonce,
 			},
 		})
 		if err != nil {
@@ -229,7 +229,7 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 		if !bytes.Equal(v.Outputs.KE1, KE1.Serialize()) {
 			log.Println(hex.EncodeToString(v.Inputs.ClientNonce))
 			log.Println(hex.EncodeToString(v.Inputs.ClientKeyshareSeed))
-			log.Println(KE1.ClientPublicKeyshare.Hex())
+			log.Println(KE1.ClientKeyShare.Hex())
 			log.Println(hex.EncodeToString(KE1.ClientNonce))
 			t.Fatalf(
 				"KE1 do not match:\nwant %v,\ngot  %v",
@@ -365,9 +365,9 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		record,
 		&opaque.ServerOptions{
 			AKE: &opaque.AKEOptions{
-				EphemeralSecretKeyShare: nil,
-				SecretKeyShareSeed:      v.Inputs.ServerKeyshareSeed,
-				Nonce:                   v.Inputs.ServerNonce,
+				SecretKeyShare:     nil,
+				SecretKeyShareSeed: v.Inputs.ServerKeyshareSeed,
+				Nonce:              v.Inputs.ServerNonce,
 			},
 			MaskingNonce: v.Inputs.MaskingNonce,
 		},
@@ -439,7 +439,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal("nonces do not match")
 	}
 
-	if !bytes.Equal(vectorKE2.ServerPublicKeyshare.Encode(), ke2.ServerPublicKeyshare.Encode()) {
+	if !bytes.Equal(vectorKE2.ServerKeyShare.Encode(), ke2.ServerKeyShare.Encode()) {
 		t.Fatal("epks do not match")
 	}
 

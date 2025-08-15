@@ -14,7 +14,7 @@ package opaque
 
 import (
 	"crypto"
-	"fmt"
+	"errors"
 
 	"github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
@@ -143,12 +143,12 @@ func (c *Configuration) Serialize() []byte {
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	// corresponds to the configuration length + 2-byte encoding of empty context
 	if len(encoded) < confIDsLength+2 {
-		return nil, internal.ErrConfigurationInvalidLength
+		return nil, ErrConfiguration.Join(internal.ErrInvalidEncodingLength)
 	}
 
 	ctx, _, err := encoding.DecodeVector(encoded[confIDsLength:])
 	if err != nil {
-		return nil, fmt.Errorf("decoding the configuration context: %w", err)
+		return nil, ErrConfiguration.Join(internal.ErrInvalidContextEncoding, err)
 	}
 
 	c := &Configuration{
@@ -161,8 +161,8 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		Context: ctx,
 	}
 
-	if err2 := c.verify(); err2 != nil {
-		return nil, err2
+	if err = c.verify(); err != nil {
+		return nil, err
 	}
 
 	return c, nil
@@ -207,16 +207,16 @@ func RandomBytes(length int) []byte {
 // IsValidScalar checks if the provided scalar is valid for the given group.
 func IsValidScalar(g ecc.Group, s *ecc.Scalar) error {
 	if s == nil {
-		return ErrScalarNil
+		return internal.ErrScalarNil
 	}
 
 	if s.Group() != g {
-		return ErrScalarGroupMismatch
+		return internal.ErrScalarGroupMismatch
 	}
 
 	// Check if the scalar is zero.
 	if s.IsZero() {
-		return ErrScalarZero
+		return internal.ErrScalarZero
 	}
 
 	return nil
@@ -225,16 +225,16 @@ func IsValidScalar(g ecc.Group, s *ecc.Scalar) error {
 // IsValidElement checks if the provided element is valid for the given group.
 func IsValidElement(g ecc.Group, e *ecc.Element) error {
 	if e == nil {
-		return ErrElementNil
+		return internal.ErrElementNil
 	}
 
 	if e.Group() != g {
-		return ErrElementGroupMismatch
+		return internal.ErrElementGroupMismatch
 	}
 
 	// Check if the element is the identity element (point at infinity).
 	if e.IsIdentity() {
-		return ErrElementIdentity
+		return internal.ErrElementIdentity
 	}
 
 	return nil
@@ -243,35 +243,35 @@ func IsValidElement(g ecc.Group, e *ecc.Element) error {
 // AKEOptions override the secure default values or internally generated values. Only use this if you know what you're
 // doing. Reusing seeds and nonces across sessions is a security risk, and breaks forward secrecy.
 type AKEOptions struct {
-	EphemeralSecretKeyShare *ecc.Scalar
-	SecretKeyShareSeed      []byte
-	Nonce                   []byte
+	SecretKeyShare     *ecc.Scalar
+	SecretKeyShareSeed []byte
+	Nonce              []byte
 }
 
 // verify returns an error on the first non-compliant parameter, nil otherwise.
 func (c *Configuration) verify() error {
 	if !c.OPRF.Available() || !c.OPRF.OPRF().Available() {
-		return ErrInvalidOPRFid
+		return ErrConfiguration.Join(internal.ErrInvalidOPRFid)
 	}
 
 	if !c.AKE.Available() || !c.AKE.Group().Available() {
-		return ErrInvalidAKEid
+		return ErrConfiguration.Join(internal.ErrInvalidAKEid)
 	}
 
 	if !internal.IsHashFunctionValid(c.KDF) {
-		return ErrInvalidKDFid
+		return ErrConfiguration.Join(internal.ErrInvalidKDFid)
 	}
 
 	if !internal.IsHashFunctionValid(c.MAC) {
-		return ErrInvalidMACid
+		return ErrConfiguration.Join(internal.ErrInvalidMACid)
 	}
 
 	if !internal.IsHashFunctionValid(c.Hash) {
-		return ErrInvalidHASHid
+		return ErrConfiguration.Join(internal.ErrInvalidHASHid)
 	}
 
 	if c.KSF != 0 && !c.KSF.Available() {
-		return ErrInvalidKSFid
+		return ErrConfiguration.Join(internal.ErrInvalidKSFid)
 	}
 
 	return nil
@@ -301,14 +301,14 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 	return ip, nil
 }
 
-// getEphemeralSecretKeyShare assumes either EphemeralSecretKeyShare is set or SecretKeyShareSeed is != 0.
-func (o *AKEOptions) getEphemeralSecretKeyShare(g ecc.Group) (*ecc.Scalar, error) {
-	if o.EphemeralSecretKeyShare != nil {
-		if err := IsValidScalar(g, o.EphemeralSecretKeyShare); err != nil {
-			return nil, fmt.Errorf("invalid EphemeralSecretKeyShare: %w", err)
+// getSecretKeyShare assumes either SecretKeyShare is set or SecretKeyShareSeed is != 0.
+func (o *AKEOptions) getSecretKeyShare(g ecc.Group) (*ecc.Scalar, error) {
+	if o.SecretKeyShare != nil {
+		if err := IsValidScalar(g, o.SecretKeyShare); err != nil {
+			return nil, errors.Join(internal.ErrSecretShareInvalid, err)
 		}
 
-		return g.NewScalar().Set(o.EphemeralSecretKeyShare), nil
+		return g.NewScalar().Set(o.SecretKeyShare), nil
 	}
 
 	return makeESK(g, o.SecretKeyShareSeed), nil

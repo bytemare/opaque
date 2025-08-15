@@ -9,7 +9,6 @@
 package opaque_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/bytemare/opaque"
@@ -33,14 +32,17 @@ func TestServer_BadRegistrationRequest(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if _, err = server.Deserialize.RegistrationRequest(nil); !errors.Is(err, errInvalidMessageLength) {
-			t.Fatalf("expected error %q - Got %v", errInvalidMessageLength, err)
-		}
+		expectErrors(t, func() error {
+			_, err = server.Deserialize.RegistrationRequest(nil)
+			return err
+		}, errInvalidMessageLength)
 
 		bad := getBadElement(t, conf)
-		if _, err = server.Deserialize.RegistrationRequest(bad); !errors.Is(err, opaque.ErrInvalidRegistrationRequest) {
-			t.Fatalf("expected error %q - Got %v", errInvalidMessageLength, err)
-		}
+
+		expectErrors(t, func() error {
+			_, err = server.Deserialize.RegistrationRequest(bad)
+			return err
+		}, opaque.ErrRegistrationRequest)
 	})
 }
 
@@ -83,17 +85,17 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 			{
 				name:     "nil seed",
 				seed:     nil,
-				expected: opaque.ErrServerKeymaterialOPRFKeyNoSeed,
+				expected: internal.ErrOPRFKeyNoSeed,
 			},
 			{
 				name:     "short seed",
 				seed:     internal.RandomBytes(conf.conf.Hash.Size() - 1),
-				expected: opaque.ErrServerKeyMaterialInvalidOPRFSeedLength,
+				expected: internal.ErrInvalidOPRFSeedLength,
 			},
 			{
 				name:     "long seed",
 				seed:     internal.RandomBytes(conf.conf.Hash.Size() + 1),
-				expected: opaque.ErrServerKeyMaterialInvalidOPRFSeedLength,
+				expected: internal.ErrInvalidOPRFSeedLength,
 			},
 		}
 
@@ -101,10 +103,10 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 			t.Run(tt.name, func(t2 *testing.T) {
 				server.ServerKeyMaterial.OPRFGlobalSeed = tt.seed
 
-				if _, err := server.RegistrationResponse(nil, pk.Encode(), []byte("credid"), nil); err == nil ||
-					!errors.Is(err, tt.expected) {
-					t.Fatalf("expected error on bad seed length - want %q, got %q", tt.expected, err)
-				}
+				expectErrors(t, func() error {
+					_, err = server.RegistrationResponse(nil, pk.Encode(), []byte("credid"), nil)
+					return err
+				}, tt.expected)
 
 				ke1, err := client.GenerateKE1([]byte("password"))
 				if err != nil {
@@ -113,9 +115,10 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 
 				client.ClearState()
 
-				if _, _, err := server.GenerateKE2(ke1, fakeRecord); err == nil || !errors.Is(err, tt.expected) {
-					t.Fatalf("expected error on bad seed length - want %q, got %q", tt.expected, err)
-				}
+				expectErrors(t, func() error {
+					_, _, err := server.GenerateKE2(ke1, fakeRecord)
+					return err
+				}, tt.expected)
 			})
 		}
 	})
@@ -176,11 +179,11 @@ func TestServerInit_NoKeyMaterial(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expected := opaque.ErrServerKeyMaterialNil
 
-		if err := server.SetKeyMaterial(nil); err == nil || !errors.Is(err, expected) {
-			t.Fatalf("expected error on nil key material - got %q", err)
-		}
+		expectErrors(t, func() error {
+			err = server.SetKeyMaterial(nil)
+			return err
+		}, internal.ErrServerKeyMaterialNil)
 
 		client, err := conf.conf.Client()
 		if err != nil {
@@ -192,10 +195,10 @@ func TestServerInit_NoKeyMaterial(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expected = opaque.ErrServerKeyMaterialNil
-		if _, _, err := server.GenerateKE2(ke1, nil); err == nil || !errors.Is(err, expected) {
-			t.Fatalf("expected error not calling SetKeyMaterial - want %q, got %q", expected, err)
-		}
+		expectErrors(t, func() error {
+			_, _, err = server.GenerateKE2(ke1, nil)
+			return err
+		}, internal.ErrServerKeyMaterialNil)
 	})
 }
 
@@ -236,10 +239,10 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		expected := opaque.ErrClientRecordInvalidEnvelopeLength
-		if _, _, err = server.GenerateKE2(ke1, rec); err == nil || !errors.Is(err, expected) {
-			t.Fatalf("expected error on invalid envelope length - got %s", err)
-		}
+		expectErrors(t, func() error {
+			_, _, err = server.GenerateKE2(ke1, rec)
+			return err
+		}, opaque.ErrClientRecord, internal.ErrEnvelopeInvalid, internal.ErrInvalidEncodingLength)
 	})
 }
 
@@ -259,9 +262,10 @@ func TestServerInit_InvalidData(t *testing.T) {
 			internal.RandomBytes(conf.internal.Group.ElementLength()),
 		)
 
-		if _, err = server.Deserialize.KE1(ke1); !errors.Is(err, opaque.ErrInvalidKE1) {
-			t.Fatalf("expected error on bad oprf request - got %s", err)
-		}
+		expectErrors(t, func() error {
+			_, err = server.Deserialize.KE1(ke1)
+			return err
+		}, opaque.ErrKE1)
 	})
 }
 
@@ -289,10 +293,10 @@ func TestServerInit_InvalidEPKU(t *testing.T) {
 			getBadElement(t, conf),
 		)
 
-		expected := opaque.ErrInvalidClientKeyShare
-		if _, err = server.Deserialize.KE1(badke1); !errors.Is(err, expected) {
-			t.Fatalf("expected error on bad epku, want %q - got %q", expected, err)
-		}
+		expectErrors(t, func() error {
+			_, err = server.Deserialize.KE1(badke1)
+			return err
+		}, internal.ErrInvalidClientKeyShare)
 	})
 }
 
@@ -336,8 +340,8 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	}
 	ke3.ClientMac[0] = ^ke3.ClientMac[0]
 
-	expected := opaque.ErrClientAuthentication
-	if err := server.LoginFinish(ke3, serverOutput.ClientMAC); err == nil || err.Error() != expected.Error() {
-		t.Fatalf("expected error on invalid mac - got %v", err)
-	}
+	expectErrors(t, func() error {
+		err = server.LoginFinish(ke3, serverOutput.ClientMAC)
+		return err
+	}, opaque.ErrAuthentication, internal.ErrClientAuthentication)
 }

@@ -29,9 +29,6 @@ const (
 	SeedLength = 32
 )
 
-// ErrConfigurationInvalidLength happens when deserializing a configuration of invalid length.
-var ErrConfigurationInvalidLength = errors.New("invalid encoded configuration length")
-
 // Configuration is the internal representation of the instance runtime parameters.
 type Configuration struct {
 	KDF          *KDF

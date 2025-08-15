@@ -12,6 +12,7 @@ import (
 	"crypto"
 	"crypto/elliptic"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -52,27 +53,27 @@ type configuration struct {
 
 func verify(c *opaque.Configuration) error {
 	if !c.OPRF.Available() || !c.OPRF.OPRF().Available() {
-		return opaque.ErrInvalidOPRFid
+		return internal.ErrInvalidOPRFid
 	}
 
 	if !c.AKE.Available() || !c.AKE.Group().Available() {
-		return opaque.ErrInvalidAKEid
+		return internal.ErrInvalidAKEid
 	}
 
 	if !internal.IsHashFunctionValid(c.KDF) {
-		return opaque.ErrInvalidKDFid
+		return internal.ErrInvalidKDFid
 	}
 
 	if !internal.IsHashFunctionValid(c.MAC) {
-		return opaque.ErrInvalidMACid
+		return internal.ErrInvalidMACid
 	}
 
 	if !internal.IsHashFunctionValid(c.Hash) {
-		return opaque.ErrInvalidHASHid
+		return internal.ErrInvalidHASHid
 	}
 
 	if c.KSF != 0 && !c.KSF.Available() {
-		return opaque.ErrInvalidKSFid
+		return internal.ErrInvalidKSFid
 	}
 
 	return nil
@@ -141,6 +142,19 @@ var configurationTable = []*configuration{
 		},
 		curve: elliptic.P521(),
 	},
+}
+
+func expectErrors(t *testing.T, f func() error, expected ...error) {
+	t.Helper()
+	if err := f(); err == nil {
+		t.Fatal("expected error but got nil")
+	} else {
+		for _, e := range expected {
+			if !errors.Is(err, e) {
+				t.Fatalf("expected error %q not present in %q", e, err)
+			}
+		}
+	}
 }
 
 func testAll(t *testing.T, f func(*testing.T, *configuration)) {

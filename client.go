@@ -9,7 +9,7 @@
 package opaque
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/bytemare/ecc"
 
@@ -91,7 +91,7 @@ func (c *Client) RegistrationInit(
 	options ...*ClientOptions,
 ) (*message.RegistrationRequest, error) {
 	if c.oprf.blind != nil {
-		return nil, ErrClientPreviousBlind
+		return nil, ErrClientState.Join(internal.ErrClientPreviousBlind)
 	}
 
 	var blind *ecc.Scalar
@@ -126,6 +126,10 @@ func (c *Client) RegistrationFinalize(
 		return nil, nil, err
 	}
 
+	if err = c.validateRegistrationResponse(resp); err != nil {
+		return nil, nil, ErrRegistration.Join(err)
+	}
+
 	randomizedPassword := c.buildPRK(resp.EvaluatedMessage, o.KDFSalt, o.KSFOptions.Salt, o.KSFOptions.Length)
 	maskingKey := c.conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), c.conf.KDF.Size())
 	envelope, clientPublicKey, exportKey := keyrecovery.Store(
@@ -150,11 +154,11 @@ func (c *Client) RegistrationFinalize(
 // invoking GenerateKE3() for the same message but different client instances.
 func (c *Client) GenerateKE1(password []byte, options ...*ClientOptions) (*message.KE1, error) {
 	if c.oprf.blind != nil {
-		return nil, fmt.Errorf("%w: %s", ErrClientInvalidOptions, "an OPRF blind previously set in state")
+		return nil, ErrClientState.Join(internal.ErrClientPreviousBlind)
 	}
 
 	if c.ake.esk != nil {
-		return nil, ErrClientPreExistingKeyShare
+		return nil, ErrClientState.Join(internal.ErrClientPreExistingKeyShare)
 	}
 
 	o, err := c.parseOptionsKE1(options)
@@ -167,7 +171,7 @@ func (c *Client) GenerateKE1(password []byte, options ...*ClientOptions) (*messa
 	c.oprf.blind, m = c.conf.OPRF.Blind(password, o.OPRFBlind)
 	c.oprf.password = password
 	ke1 := ake.Start(c.conf.Group, c.ake.esk, o.AKENonce)
-	ke1.CredentialRequest = message.NewCredentialRequest(m)
+	ke1.CredentialRequest.BlindedMessage = m
 	c.ake.ke1 = ke1.Serialize()
 
 	return ke1, nil
@@ -197,7 +201,7 @@ func (c *Client) GenerateKE3(
 	serverPublicKey, serverPublicKeyBytes,
 		envelope, err := masking.Unmask(c.conf, randomizedPassword, ke2.MaskingNonce, ke2.MaskedResponse)
 	if err != nil {
-		return nil, nil, nil, prefixError(ErrAuthenticationInvalidServerPublicKey, err)
+		return nil, nil, nil, ErrAuthentication.Join(internal.ErrAuthenticationInvalidServerPublicKey, err)
 	}
 
 	var clientSecretKey *ecc.Scalar
@@ -213,7 +217,7 @@ func (c *Client) GenerateKE3(
 		serverIdentity,
 		envelope)
 	if err != nil {
-		return nil, nil, nil, prefixError(ErrAuthenticationClientKey, err)
+		return nil, nil, nil, ErrAuthentication.Join(err)
 	}
 
 	// Finalize the AKE.
@@ -232,7 +236,10 @@ func (c *Client) GenerateKE3(
 		c.ake.ke1,
 	)
 	if !macOK {
-		return nil, nil, nil, ErrServerAuthentication
+		return nil, nil, nil, ErrAuthentication.Join(
+			internal.ErrServerAuthentication,
+			internal.ErrInvalidServerMac,
+		)
 	}
 
 	return ke3, sessionKey, exportKey, nil
@@ -261,14 +268,14 @@ func (c *Client) ClearState() {
 func (c *Client) buildPRK(evaluation *ecc.Element, kdfSalt, ksfSalt []byte, ksfLength int) []byte {
 	output := c.conf.OPRF.Finalize(c.oprf.blind, c.oprf.password, evaluation)
 	stretched := c.conf.KSF.Harden(output, ksfSalt, ksfLength)
-
+	// todo: what happens if the unblinded output is all zeroes? (it will get hashed, but still?)
 	return c.conf.KDF.Extract(kdfSalt, encoding.Concat(output, stretched))
 }
 
 func (c *Client) verifyOptionBlind(clientOptions ...*ClientOptions) (*ecc.Scalar, error) {
 	if clientOptions[0].OPRFBlind != nil {
 		if err := IsValidScalar(c.conf.OPRF.Group(), clientOptions[0].OPRFBlind); err != nil {
-			return nil, prefixError(ErrClientInvalidOptionsOPRFBlind, err)
+			return nil, ErrClientOptions.Join(internal.ErrInvalidOPRFBlind, err)
 		}
 	}
 
@@ -284,7 +291,7 @@ func getEnvelopeNonce(clientOptions ...*ClientOptions) ([]byte, error) {
 	nonceLength := clientOptions[0].EnvelopeNonceLength
 
 	if err := internal.ValidateOptionsLength(nonce, nonceLength, internal.NonceLength); err != nil {
-		return nil, fmt.Errorf("failed to verify envelope nonce parameters: %w", err)
+		return nil, ErrClientOptions.Join(internal.ErrEnvelopeNonceOptions, err)
 	}
 
 	if nonce == nil {
@@ -308,7 +315,7 @@ type clientOptions struct {
 
 func (c *Client) clientOptionsKSFParser(out *clientOptions, in *ClientOptions) error {
 	if err := out.KSFOptions.Set(c.conf.KSF, in.KSFSalt, in.KSFParameters, in.KSFLength); err != nil {
-		return prefixError(ErrClientInvalidOptions, err)
+		return ErrClientOptions.Join(err)
 	}
 
 	if len(out.KSFOptions.Parameters) != 0 {
@@ -322,18 +329,18 @@ func (c *Client) clientOptionsKSFParser(out *clientOptions, in *ClientOptions) e
 func (c *Client) clientOptionsKE1Parser(in *ClientOptions) error {
 	if len(c.ake.ke1) != 0 {
 		if len(in.KE1) != 0 {
-			return ErrClientInvalidOptionsDoubleKE1
+			return ErrClientOptions.Join(internal.ErrDoubleKE1)
 		}
 
 		return nil
 	}
 
 	if len(in.KE1) == 0 {
-		return ErrClientInvalidOptionsKE1Missing
+		return ErrClientOptions.Join(internal.ErrKE1Missing)
 	}
 
 	if _, err := c.Deserialize.KE1(in.KE1); err != nil {
-		return prefixError(ErrClientInvalidOptionsInvalidKE1, err)
+		return ErrClientOptions.Join(err)
 	}
 
 	c.ake.ke1 = in.KE1
@@ -352,7 +359,7 @@ func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*cl
 
 	if len(options) == 0 {
 		if c.oprf.blind == nil {
-			return nil, ErrClientInvalidOptionsNoOPRFBlind
+			return nil, ErrClientOptions.Join(internal.ErrNoOPRFBlind)
 		}
 
 		o.EnvelopeNonce = internal.RandomBytes(internal.NonceLength)
@@ -364,11 +371,11 @@ func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*cl
 	var err error
 
 	if c.oprf.blind != nil && options[0].OPRFBlind != nil {
-		return nil, ErrClientInvalidOptionsDoubleOPRFBlind
+		return nil, ErrClientOptions.Join(internal.ErrDoubleOPRFBlind)
 	}
 
 	if o.OPRFBlind == nil && c.oprf.blind == nil {
-		return nil, ErrClientInvalidOptionsNoOPRFBlind
+		return nil, ErrClientOptions.Join(internal.ErrNoOPRFBlind)
 	}
 
 	o.OPRFBlind, err = c.verifyOptionBlind(options...)
@@ -389,7 +396,7 @@ func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*cl
 	// Envelope nonce.
 	o.EnvelopeNonce, err = getEnvelopeNonce(options...)
 	if err != nil {
-		return nil, prefixError(ErrClientInvalidOptions, err)
+		return nil, ErrClientOptions.Join(err)
 	}
 
 	return o, nil
@@ -432,42 +439,79 @@ func (c *Client) parseOptionsKE1(options []*ClientOptions) (*clientOptions, erro
 	}
 
 	// Ephemeral secret key share.
-	c.ake.esk, err = options[0].AKE.getEphemeralSecretKeyShare(c.conf.Group)
+	c.ake.esk, err = options[0].AKE.getSecretKeyShare(c.conf.Group)
 	if err != nil {
-		return nil, prefixError(ErrClientInvalidOptions, err)
+		return nil, ErrClientOptions.Join(err)
 	}
 
 	return o, nil
 }
 
-func (c *Client) validateKE2(ke2 *message.KE2) error {
-	if ke2 == nil {
-		return ErrClientKE2Nil
+func (c *Client) validateRegistrationResponse(resp *message.RegistrationResponse) error {
+	if resp == nil {
+		return ErrRegistrationResponse.Join(internal.ErrRegistrationResponseNil)
 	}
 
-	if ke2.CredentialResponse == nil || ke2.EvaluatedMessage == nil {
-		return ErrClientKE2InvalidCredentialResponse
+	if resp.EvaluatedMessage == nil || len(resp.ServerPublicKey) == 0 {
+		return ErrRegistrationResponse.Join(internal.ErrRegistrationResponseEmpty)
 	}
 
-	if err := IsValidElement(c.conf.Group, ke2.EvaluatedMessage); err != nil {
-		return prefixError(ErrClientKE2InvalidEvaluatedMessage, err)
+	if err := IsValidElement(c.conf.Group, resp.EvaluatedMessage); err != nil {
+		return ErrRegistrationResponse.Join(internal.ErrInvalidEvaluatedMessage, err)
 	}
 
-	if ke2.ServerPublicKeyshare == nil {
-		return ErrClientKE2MissingServerKeyShare
+	if _, err := DeserializeElement(c.conf.Group, resp.ServerPublicKey); err != nil {
+		return ErrRegistrationResponse.Join(internal.ErrInvalidServerPublicKey, err)
 	}
 
-	if err := IsValidElement(c.conf.Group, ke2.ServerPublicKeyshare); err != nil {
-		return prefixError(ErrClientKE2InvalidServerKeyShare, err)
+	return nil
+}
+
+func (c *Client) validateCredentialResponse(cr *message.CredentialResponse) error {
+	if cr == nil {
+		return internal.ErrCredentialResponseNil
+	}
+
+	if err := IsValidElement(c.conf.Group, cr.EvaluatedMessage); err != nil {
+		return errors.Join(internal.ErrCredentialResponseInvalid, internal.ErrInvalidEvaluatedMessage, err)
+	}
+
+	if len(cr.MaskingNonce) == 0 {
+		return errors.Join(internal.ErrCredentialResponseInvalid, internal.ErrCredentialResponseNoMaskingNonce)
 	}
 
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
-	if len(ke2.MaskedResponse) != c.conf.Group.ElementLength()+c.conf.EnvelopeSize {
-		return ErrClientKE2InvalidMaskedLength
+	// todo: is this tested against?
+	if len(cr.MaskedResponse) != c.conf.Group.ElementLength()+c.conf.EnvelopeSize {
+		return errors.Join(internal.ErrCredentialResponseInvalid, internal.ErrCredentialResponseInvalidMaskedLength)
 	}
 
-	if len(ke2.MaskingNonce) == 0 {
-		return ErrClientKE2NoMaskingNonce
+	return nil
+}
+
+func (c *Client) validateKE2(ke2 *message.KE2) error {
+	if ke2 == nil {
+		return ErrKE2.Join(internal.ErrKE2Nil)
+	}
+
+	if err := c.validateCredentialResponse(ke2.CredentialResponse); err != nil {
+		return ErrKE2.Join(err)
+	}
+
+	if ke2.ServerKeyShare == nil {
+		return ErrKE2.Join(internal.ErrServerKeyShareMissing)
+	}
+
+	if err := IsValidElement(c.conf.Group, ke2.ServerKeyShare); err != nil {
+		return ErrKE2.Join(internal.ErrInvalidServerKeyShare, err)
+	}
+
+	if len(ke2.ServerNonce) == 0 {
+		return ErrKE2.Join(internal.ErrMissingNonce)
+	}
+
+	if len(ke2.ServerMac) == 0 {
+		return ErrKE2.Join(internal.ErrMissingMAC)
 	}
 
 	return nil
@@ -484,15 +528,15 @@ func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, erro
 
 	if len(options) == 0 || options[0] == nil {
 		if c.oprf.blind == nil {
-			return nil, ErrClientInvalidOptionsNoOPRFBlind
+			return nil, ErrClientOptions.Join(internal.ErrNoOPRFBlind)
 		}
 
 		if c.ake.esk == nil {
-			return nil, ErrClientInvalidOptionsNoKeyShare
+			return nil, ErrClientOptions.Join(internal.ErrClientNoKeyShare)
 		}
 
 		if len(c.ake.ke1) == 0 {
-			return nil, ErrClientInvalidOptionsKE1Missing
+			return nil, ErrClientOptions.Join(internal.ErrKE1Missing)
 		}
 
 		return o, nil
@@ -502,11 +546,11 @@ func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, erro
 	var err error
 
 	if c.oprf.blind != nil && options[0].OPRFBlind != nil {
-		return nil, ErrClientInvalidOptionsDoubleOPRFBlind
+		return nil, ErrClientOptions.Join(internal.ErrDoubleOPRFBlind)
 	}
 
 	if options[0].OPRFBlind == nil && c.oprf.blind == nil {
-		return nil, ErrClientInvalidOptionsNoOPRFBlind
+		return nil, ErrClientOptions.Join(internal.ErrNoOPRFBlind)
 	}
 
 	o.OPRFBlind, err = c.verifyOptionBlind(options...)
@@ -532,7 +576,7 @@ func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, erro
 	// Ephemeral secret key share.
 	c.ake.esk, err = c.parseOptionsKE3ESK(options[0].AKE)
 	if err != nil {
-		return nil, prefixError(ErrClientInvalidOptions, err)
+		return nil, ErrClientOptions.Join(err)
 	}
 
 	return o, nil
@@ -541,16 +585,16 @@ func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, erro
 func (c *Client) parseOptionsKE3ESK(options *AKEOptions) (*ecc.Scalar, error) {
 	if c.ake.esk != nil {
 		// return an error if options are present
-		if options != nil && (options.EphemeralSecretKeyShare != nil || len(options.SecretKeyShareSeed) != 0) {
-			return nil, ErrClientExistingKeyShare
+		if options != nil && (options.SecretKeyShare != nil || len(options.SecretKeyShareSeed) != 0) {
+			return nil, ErrClientOptions.Join(internal.ErrClientExistingKeyShare)
 		}
 
 		return c.ake.esk, nil
 	}
 
-	if options == nil || (options.EphemeralSecretKeyShare == nil && len(options.SecretKeyShareSeed) == 0) {
-		return nil, ErrClientInvalidOptionsNoKeyShare
+	if options == nil || (options.SecretKeyShare == nil && len(options.SecretKeyShareSeed) == 0) {
+		return nil, ErrClientOptions.Join(internal.ErrClientNoKeyShare)
 	}
 
-	return options.getEphemeralSecretKeyShare(c.conf.Group)
+	return options.getSecretKeyShare(c.conf.Group)
 }

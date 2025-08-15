@@ -92,6 +92,11 @@ func (h *Hash) Sum() []byte {
 }
 
 // Write adds input to the running state.
-func (h *Hash) Write(p []byte) {
-	_, _ = h.h.Write(p)
+func (h *Hash) Write(input []byte) {
+	_, _ = h.h.Write(input)
+}
+
+// Reset resets the hash to its initial state.
+func (h *Hash) Reset() {
+	h.h.Reset()
 }

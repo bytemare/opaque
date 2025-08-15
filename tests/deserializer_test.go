@@ -9,26 +9,34 @@
 package opaque_test
 
 import (
-	"encoding/hex"
-	"errors"
 	"testing"
 
 	group "github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encoding"
 )
 
 const testErrValidConf = "unexpected error on valid configuration: %v"
 
-var errInvalidMessageLength = opaque.ErrInvalidMessageLength
+var errInvalidMessageLength = internal.ErrInvalidMessageLength
+
+func getDeserializer(t *testing.T, c *opaque.Configuration) *opaque.Deserializer {
+	t.Helper()
+
+	d, err := c.Deserializer()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return d
+}
 
 /*
 	Message Deserialization
 */
 
-func TestDeserializer(t *testing.T) {
+func TestDeserializer_New(t *testing.T) {
 	// Test valid configurations
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		if _, err := conf.conf.Deserializer(); err != nil {
@@ -52,149 +60,100 @@ func TestDeserializer(t *testing.T) {
 	}
 }
 
-func TestDeserializeRegistrationRequest(t *testing.T) {
-	c := opaque.DefaultConfiguration()
-
-	server, _ := c.Server()
-	length := c.OPRF.Group().ElementLength() + 1
-	if _, err := server.Deserialize.RegistrationRequest(internal.RandomBytes(length)); !errors.Is(
-		err,
-		errInvalidMessageLength,
-	) {
-		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
-	}
-
-	client, _ := c.Client()
-	if _, err := client.Deserialize.RegistrationRequest(internal.RandomBytes(length)); !errors.Is(
-		err,
-		errInvalidMessageLength,
-	) {
-		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
-	}
-}
-
-func TestDeserializeRegistrationResponse(t *testing.T) {
-	c := opaque.DefaultConfiguration()
-
-	server, _ := c.Server()
-	length := c.OPRF.Group().ElementLength() + c.AKE.Group().ElementLength() + 1
-	if _, err := server.Deserialize.RegistrationResponse(internal.RandomBytes(length)); !errors.Is(
-		err,
-		errInvalidMessageLength,
-	) {
-		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
-	}
-
-	client, _ := c.Client()
-	if _, err := client.Deserialize.RegistrationResponse(internal.RandomBytes(length)); !errors.Is(
-		err,
-		errInvalidMessageLength,
-	) {
-		t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
-	}
-}
-
-func TestDeserializeRegistrationRecord(t *testing.T) {
+func TestDeserializer_RegistrationRequest_InvalidLength(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		server, err := conf.conf.Server()
-		if err != nil {
-			t.Fatal(err)
-		}
+		c := conf.conf
+		length := c.OPRF.Group().ElementLength() + 1
+		d := getDeserializer(t, c)
 
-		c := conf.internal
-		length := c.Group.ElementLength() + c.Hash.Size() + c.EnvelopeSize + 1
-		if _, err := server.Deserialize.RegistrationRecord(internal.RandomBytes(length)); !errors.Is(
-			err,
-			errInvalidMessageLength,
-		) {
-			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
-		}
-
-		badPKu := getBadElement(t, conf)
-		rec := encoding.Concat(badPKu, internal.RandomBytes(c.Hash.Size()+c.EnvelopeSize))
-
-		if _, err = server.Deserialize.RegistrationRecord(rec); !errors.Is(err, opaque.ErrInvalidClientPublicKey) {
-			t.Fatalf(
-				"Expected error for DeserializeRegistrationRequest. want %q, got %q",
-				opaque.ErrInvalidClientPublicKey,
-				err,
-			)
-		}
-
-		client, err := conf.conf.Client()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = client.Deserialize.RegistrationRecord(internal.RandomBytes(length)); !errors.Is(
-			err,
-			errInvalidMessageLength,
-		) {
-			t.Fatalf("Expected error for DeserializeRegistrationRequest. want %q, got %q", errInvalidMessageLength, err)
-		}
+		expectErrors(t, func() error {
+			_, err := d.RegistrationRequest(internal.RandomBytes(length))
+			return err
+		}, opaque.ErrRegistrationRequest, errInvalidMessageLength)
 	})
 }
 
-func TestDeserializeKE1(t *testing.T) {
-	c := opaque.DefaultConfiguration()
-	g := group.Group(c.AKE)
-	ke1Length := g.ElementLength() + internal.NonceLength + g.ElementLength()
+func TestDeserializer_RegistrationResponse_InvalidLength(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		c := conf.conf
+		length := c.OPRF.Group().ElementLength() + c.AKE.Group().ElementLength() + 1
+		d := getDeserializer(t, c)
 
-	server, _ := c.Server()
-	if _, err := server.Deserialize.KE1(internal.RandomBytes(ke1Length + 1)); !errors.Is(err, errInvalidMessageLength) {
-		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
-	}
-
-	client, _ := c.Client()
-	if _, err := client.Deserialize.KE1(internal.RandomBytes(ke1Length + 1)); !errors.Is(err, errInvalidMessageLength) {
-		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
-	}
+		expectErrors(t, func() error {
+			_, err := d.RegistrationResponse(internal.RandomBytes(length))
+			return err
+		}, opaque.ErrRegistrationResponse, errInvalidMessageLength)
+	})
 }
 
-func TestDeserializeKE2(t *testing.T) {
-	c := opaque.DefaultConfiguration()
-	conf, _ := toInternal(c)
+func TestDeserialize_RegistrationRecord_InvalidLength(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		c := conf.conf
+		length := c.AKE.Group().ElementLength() + c.Hash.Size() + conf.internal.EnvelopeSize + 1
+		d := getDeserializer(t, conf.conf)
 
-	client, _ := c.Client()
-	ke2Length := conf.OPRF.Group().ElementLength() +
-		2*conf.NonceLen + 2*conf.Group.ElementLength() + conf.EnvelopeSize + conf.MAC.Size()
-	if _, err := client.Deserialize.KE2(internal.RandomBytes(ke2Length + 1)); !errors.Is(err, errInvalidMessageLength) {
-		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
-	}
-
-	server, _ := c.Server()
-	ke2Length = conf.OPRF.Group().
-		ElementLength() +
-		2*conf.NonceLen + 2*conf.Group.ElementLength() + conf.EnvelopeSize + conf.MAC.Size()
-	if _, err := server.Deserialize.KE2(internal.RandomBytes(ke2Length + 1)); !errors.Is(err, errInvalidMessageLength) {
-		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
-	}
+		expectErrors(t, func() error {
+			_, err := d.RegistrationRecord(internal.RandomBytes(length))
+			return err
+		}, opaque.ErrRegistrationRecord, errInvalidMessageLength)
+	})
 }
 
-func TestDeserializeKE3(t *testing.T) {
-	c := opaque.DefaultConfiguration()
-	ke3Length := c.MAC.Size()
+func TestDeserializer_KE1_InvalidLength(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		c := conf.conf
+		g := group.Group(c.AKE)
+		ke1Length := g.ElementLength() + internal.NonceLength + g.ElementLength()
 
-	server, _ := c.Server()
-	if _, err := server.Deserialize.KE3(internal.RandomBytes(ke3Length + 1)); !errors.Is(err, errInvalidMessageLength) {
-		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
-	}
+		d := getDeserializer(t, c)
 
-	client, _ := c.Client()
-	if _, err := client.Deserialize.KE3(internal.RandomBytes(ke3Length + 1)); !errors.Is(err, errInvalidMessageLength) {
-		t.Fatalf("Expected error for DeserializeKE1. want %q, got %q", errInvalidMessageLength, err)
-	}
+		expectErrors(t, func() error {
+			_, err := d.KE1(internal.RandomBytes(ke1Length + 1))
+			return err
+		}, opaque.ErrKE1, errInvalidMessageLength)
+	})
 }
+
+func TestDeserializer_KE2_InvalidLength(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		c := conf.conf
+		ke2Length := c.OPRF.Group().ElementLength() +
+			2*conf.internal.NonceLen + 2*conf.internal.Group.ElementLength() + conf.internal.EnvelopeSize + conf.internal.MAC.Size()
+
+		d := getDeserializer(t, c)
+
+		expectErrors(t, func() error {
+			_, err := d.KE1(internal.RandomBytes(ke2Length + 1))
+			return err
+		}, opaque.ErrKE2, errInvalidMessageLength)
+	})
+}
+
+func TestDeserializer_KE3_InvalidLength(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		c := conf.conf
+		ke3Length := c.MAC.Size()
+
+		d := getDeserializer(t, c)
+
+		expectErrors(t, func() error {
+			_, err := d.KE1(internal.RandomBytes(ke3Length + 1))
+			return err
+		}, opaque.ErrKE3, errInvalidMessageLength)
+	})
+}
+
+/*
+	Decode Keys
+*/
 
 func TestDecodeAkePrivateKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		key := conf.conf.AKE.Group().NewScalar().Random()
 
-		des, err := conf.conf.Deserializer()
-		if err != nil {
-			t.Fatalf(testErrValidConf, err)
-		}
+		d := getDeserializer(t, conf.conf)
 
-		if _, err = des.DecodePrivateKey(key.Encode()); err != nil {
+		if _, err := d.DecodePrivateKey(key.Encode()); err != nil {
 			t.Fatalf("unexpected error on valid private key. Group %v, key %v",
 				conf.conf.AKE,
 				key.Hex(),
@@ -206,35 +165,40 @@ func TestDecodeAkePrivateKey(t *testing.T) {
 func TestDecodeBadAkePrivateKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		badKey := getBadScalar(t, conf)
+		d := getDeserializer(t, conf.conf)
 
-		des, err := conf.conf.Deserializer()
-		if err != nil {
-			t.Fatalf(testErrValidConf, err)
-		}
-
-		if _, err := des.DecodePrivateKey(badKey); err == nil {
-			t.Fatalf("expect error on invalid private key. Group %v, key %v",
-				conf.conf.AKE,
-				hex.EncodeToString(badKey),
-			)
-		}
+		expectErrors(t, func() error {
+			_, err := d.DecodePrivateKey(badKey)
+			return err
+		}, internal.ErrInvalidPrivateKey)
 	})
 }
 
 func TestDecodeAkePublicKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		badKey := getBadElement(t, conf)
+		s := conf.conf.AKE.Group().NewScalar().Random()
+		p := conf.conf.AKE.Group().Base().Multiply(s)
 
-		des, err := conf.conf.Deserializer()
-		if err != nil {
-			t.Fatalf(testErrValidConf, err)
-		}
+		d := getDeserializer(t, conf.conf)
 
-		if _, err := des.DecodePublicKey(badKey); err == nil {
-			t.Fatalf("expect error on invalid public key. Group %v, key %v",
+		if _, err := d.DecodePublicKey(p.Encode()); err != nil {
+			t.Fatalf("unexpected error on valid public key. Group %v, element %v",
 				conf.conf.AKE,
-				hex.EncodeToString(badKey),
+				p.Hex(),
 			)
 		}
+	})
+}
+
+func TestDecodeBadAkePublicKey(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		badKey := getBadElement(t, conf)
+
+		d := getDeserializer(t, conf.conf)
+
+		expectErrors(t, func() error {
+			_, err := d.DecodePublicKey(badKey)
+			return err
+		}, internal.ErrInvalidPublicKey)
 	})
 }

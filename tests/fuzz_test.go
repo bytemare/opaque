@@ -35,6 +35,7 @@ type fuzzConfError struct {
 
 // skipErrorOnCondition skips the test if we find the expected error in err and cond if false.
 func skipErrorOnCondition(t *testing.T, expected error, ce *fuzzConfError) error {
+	// if errors.Is(ce.error, expected)
 	if strings.Contains(expected.Error(), ce.error.Error()) {
 		if ce.isAvailable {
 			return fmt.Errorf("got %q but input is valid: %q", ce.error, ce.value)
@@ -227,12 +228,12 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 				t.Fatalf("encountered error %q, but could not proceed due to internal conf error %q", err, _err)
 			}
 
-			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) &&
+			if errors.Is(err, errInvalidMessageLength) &&
 				len(r1) == conf.OPRF.Group().ElementLength() {
 				t.Fatalf("got %q but input length is valid", err)
 			}
 
-			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
+			if errors.Is(err, errInvalidBlindedData) {
 				if err := isValidOPRFPoint(conf, r1[:conf.OPRF.Group().ElementLength()], errInvalidBlindedData); err != nil {
 					t.Fatal(err)
 				}
@@ -266,17 +267,17 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 
 			maxResponseLength := conf.OPRF.Group().ElementLength() + conf.Group.ElementLength()
 
-			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) && len(r2) == maxResponseLength {
-				t.Fatalf(fmtGotValidInput, opaque.ErrInvalidMessageLength)
+			if errors.Is(err, errInvalidMessageLength) && len(r2) == maxResponseLength {
+				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 
-			if strings.Contains(err.Error(), errInvalidEvaluatedData.Error()) {
+			if errors.Is(err, errInvalidEvaluatedData) {
 				if err := isValidOPRFPoint(conf, r2[:conf.OPRF.Group().ElementLength()], errInvalidEvaluatedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			if strings.Contains(err.Error(), errInvalidServerPK.Error()) {
+			if errors.Is(err, errInvalidServerPK) {
 				if err := isValidAKEPoint(conf, r2[conf.OPRF.Group().ElementLength():], errInvalidServerPK); err != nil {
 					t.Fatal(err)
 				}
@@ -308,11 +309,11 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 		if err != nil {
 			maxMessageLength := conf.Group.ElementLength() + conf.Hash.Size() + conf.EnvelopeSize
 
-			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) && len(r3) == maxMessageLength {
-				t.Fatalf(fmtGotValidInput, opaque.ErrInvalidMessageLength)
+			if errors.Is(err, errInvalidMessageLength) && len(r3) == maxMessageLength {
+				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 
-			if strings.Contains(err.Error(), errInvalidClientPK.Error()) {
+			if errors.Is(err, errInvalidClientPK) {
 				if err := isValidAKEPoint(conf, r3[:conf.Group.ElementLength()], errInvalidClientPK); err != nil {
 					t.Fatal(err)
 				}
@@ -344,19 +345,19 @@ func FuzzDeserializeKE1(f *testing.F) {
 
 		_, err = server.Deserialize.KE1(ke1)
 		if err != nil {
-			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) &&
+			if errors.Is(err, errInvalidMessageLength) &&
 				len(ke1) == c.OPRF.Group().ElementLength()+conf.NonceLen+conf.Group.ElementLength() {
-				t.Fatalf("got %q but input length is valid", opaque.ErrInvalidMessageLength)
+				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
 			}
 
-			if strings.Contains(err.Error(), errInvalidBlindedData.Error()) {
+			if errors.Is(err, errInvalidBlindedData) {
 				input := ke1[:conf.OPRF.Group().ElementLength()]
 				if err := isValidOPRFPoint(conf, input, errInvalidBlindedData); err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			if strings.Contains(err.Error(), errInvalidClientEPK.Error()) {
+			if errors.Is(err, errInvalidClientEPK) {
 				input := ke1[conf.OPRF.Group().ElementLength()+conf.NonceLen:]
 				if err := isValidOPRFPoint(conf, input, errInvalidClientEPK); err != nil {
 					t.Fatal(err)
@@ -413,21 +414,21 @@ func FuzzDeserializeKE2(f *testing.F) {
 				ElementLength() +
 				conf.NonceLen + conf.Group.ElementLength() + conf.EnvelopeSize
 
-			if errors.Is(err, opaque.ErrInvalidMessageLength) &&
+			if errors.Is(err, errInvalidMessageLength) &&
 				len(ke2) == maxResponseLength+conf.NonceLen+conf.Group.ElementLength()+conf.MAC.Size() {
-				t.Fatalf(fmtGotValidInput, opaque.ErrInvalidMessageLength)
+				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 
-			if errors.Is(err, opaque.ErrInvalidEvaluatedMessage) {
+			if errors.Is(err, internal.ErrInvalidEvaluatedMessage) {
 				input := ke2[:conf.OPRF.Group().ElementLength()]
-				if err := isValidOPRFPoint(conf, input, opaque.ErrInvalidEvaluatedMessage); err != nil {
+				if err := isValidOPRFPoint(conf, input, internal.ErrInvalidEvaluatedMessage); err != nil {
 					t.Fatal(err)
 				}
 			}
 
-			if errors.Is(err, opaque.ErrInvalidServerKeyShare) {
+			if errors.Is(err, internal.ErrInvalidServerKeyShare) {
 				input := ke2[conf.OPRF.Group().ElementLength()+conf.NonceLen:]
-				if err := isValidAKEPoint(conf, input, opaque.ErrInvalidServerKeyShare); err != nil {
+				if err := isValidAKEPoint(conf, input, internal.ErrInvalidServerKeyShare); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -449,8 +450,8 @@ func FuzzDeserializeKE3(f *testing.F) {
 		if err != nil {
 			maxMessageLength := internal.NewMac(c.MAC).Size()
 
-			if strings.Contains(err.Error(), opaque.ErrInvalidMessageLength.Error()) && len(ke3) == maxMessageLength {
-				t.Fatalf(fmtGotValidInput, opaque.ErrInvalidMessageLength)
+			if errors.Is(err, errInvalidMessageLength) && len(ke3) == maxMessageLength {
+				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 		}
 	})

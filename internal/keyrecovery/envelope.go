@@ -10,8 +10,6 @@
 package keyrecovery
 
 import (
-	"errors"
-
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
@@ -19,8 +17,6 @@ import (
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 )
-
-var errEnvelopeInvalidMac = errors.New("invalid envelope authentication tag")
 
 // Credentials structure is currently used for testing purposes.
 type Credentials struct {
@@ -113,7 +109,7 @@ func Recover(
 
 	expectedTag := authTag(conf, randomizedPassword, envelope.Nonce, ctc)
 	if !conf.MAC.Equal(expectedTag, envelope.AuthTag) {
-		return nil, nil, nil, errEnvelopeInvalidMac
+		return nil, nil, nil, internal.ErrEnvelopeInvalidMac
 	}
 
 	export = exportKey(conf, randomizedPassword, envelope.Nonce)

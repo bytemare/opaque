@@ -12,11 +12,14 @@ package encoding
 import "errors"
 
 var (
-	errHeaderLength  = errors.New("insufficient header length for decoding")
-	errTotalLength   = errors.New("insufficient total length for decoding")
-	errMissingOutput = errors.New("missing output slice for decoding")
-	errNilOutput     = errors.New("nil output slice for decoding")
-	errEmptyEncoded  = errors.New("decoding yielded empty data")
+	// ErrDecoding indicates a decoding error.
+	ErrDecoding = errors.New("decoding error")
+
+	ErrHeaderLength  = errors.New("insufficient header length for decoding")
+	ErrTotalLength   = errors.New("insufficient total length for decoding")
+	ErrMissingOutput = errors.New("missing output slice for decoding")
+	ErrNilOutput     = errors.New("nil output slice for decoding")
+	ErrEmptyEncoded  = errors.New("decoding yielded empty data")
 )
 
 // EncodeVectorLen returns the input prepended with a byte encoding of its length.
@@ -31,14 +34,14 @@ func EncodeVector(input []byte) []byte {
 
 func decodeVectorLen(in []byte, size int) (data []byte, offset int, err error) {
 	if len(in) < size {
-		return nil, 0, errHeaderLength
+		return nil, 0, errors.Join(ErrDecoding, ErrHeaderLength)
 	}
 
 	dataLen := OS2IP(in[0:size])
 	offset = size + dataLen
 
 	if len(in) < offset {
-		return nil, 0, errTotalLength
+		return nil, 0, errors.Join(ErrDecoding, ErrTotalLength)
 	}
 
 	return in[size:offset], offset, nil
@@ -53,11 +56,11 @@ func DecodeVector(in []byte) (data []byte, offset int, err error) {
 // in the provided output slice.
 func DecodeLongVector(in []byte, out ...*[]byte) error {
 	if len(in) < 2 {
-		return errHeaderLength
+		return errors.Join(ErrDecoding, ErrHeaderLength)
 	}
 
 	if len(out) == 0 {
-		return errMissingOutput
+		return errors.Join(ErrDecoding, ErrMissingOutput)
 	}
 
 	var (
@@ -68,7 +71,7 @@ func DecodeLongVector(in []byte, out ...*[]byte) error {
 
 	for _, target := range out {
 		if target == nil {
-			return errNilOutput
+			return errors.Join(ErrDecoding, ErrNilOutput)
 		}
 
 		d, offset, err = decodeVectorLen(in[offset:], 2)
@@ -77,7 +80,7 @@ func DecodeLongVector(in []byte, out ...*[]byte) error {
 		}
 
 		if len(d) == 0 {
-			return errEmptyEncoded
+			return errors.Join(ErrDecoding, ErrEmptyEncoded)
 		}
 
 		*target = d

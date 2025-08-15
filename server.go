@@ -10,7 +10,6 @@ package opaque
 
 import (
 	"encoding/hex"
-	"fmt"
 
 	"github.com/bytemare/ecc"
 
@@ -92,26 +91,22 @@ func (s *ServerKeyMaterial) Hex() string {
 // Decode decodes the server key material to s from a byte slice. If an error is encountered, s is unchanged.
 func (s *ServerKeyMaterial) Decode(data []byte) error {
 	if len(data) < 7 {
-		return ErrServerKeyMaterialInvalidEncodingLength
+		return ErrServerKeyMaterial.Join(internal.ErrInvalidEncodingLength)
 	}
 
 	g := Group(data[0])
 	if !g.Available() {
-		return ErrServerKeyMaterialInvalidGroupEncoding
+		return ErrServerKeyMaterial.Join(internal.ErrInvalidGroupEncoding)
 	}
 
 	var id, skBytes, seed []byte
 	if err := encoding.DecodeLongVector(data[1:], &id, &skBytes, &seed); err != nil {
-		return prefixError(ErrServerKeyMaterialDecoding, err)
+		return ErrServerKeyMaterial.Join(err)
 	}
 
-	sk := g.Group().NewScalar()
-	if err := sk.Decode(skBytes); err != nil {
-		return prefixError(ErrServerKeyMaterialInvalidPrivateKeyEncoding, err)
-	}
-
-	if sk.IsZero() {
-		return ErrServerKeyMaterialPrivateKeyZero
+	sk, err := DeserializeScalar(g.Group(), skBytes)
+	if err != nil {
+		return ErrServerKeyMaterial.Join(internal.ErrInvalidPrivateKey, err)
 	}
 
 	s.Identity = id
@@ -124,12 +119,12 @@ func (s *ServerKeyMaterial) Decode(data []byte) error {
 // DecodeHex decodes the server key material to s from a hex string. If an error is encountered, s is unchanged.
 func (s *ServerKeyMaterial) DecodeHex(data string) error {
 	if data == "" {
-		return ErrServerKeyMaterialDecodingEmptyHex
+		return ErrServerKeyMaterial.Join(internal.ErrDecodingEmptyHex)
 	}
 
 	decoded, err := hex.DecodeString(data)
 	if err != nil {
-		return prefixError(ErrServerKeyMaterialDecoding, err)
+		return ErrServerKeyMaterial.Join(err)
 	}
 
 	return s.Decode(decoded)
@@ -184,7 +179,7 @@ func (s *Server) RegistrationResponse(
 	// of deriving it from the credentialIdentifier and globalOPRFSeed.
 ) (*message.RegistrationResponse, error) {
 	if len(serverPublicKeyBytes) != s.conf.Group.ElementLength() {
-		return nil, ErrServerInvalidPublicKeyLength
+		return nil, internal.ErrServerInvalidPublicKeyLength
 	}
 
 	ku, err := s.chooseOPRFKey(clientCredentialIdentifier, clientOPRFKey)
@@ -200,7 +195,7 @@ func (s *Server) RegistrationResponse(
 	}()
 
 	if err = s.verifyRegistrationRequest(req); err != nil {
-		return nil, err
+		return nil, ErrRegistration.Join(err)
 	}
 
 	return &message.RegistrationResponse{
@@ -265,8 +260,12 @@ func (s *Server) GenerateKE2(
 // LoginFinish verifies whether the KE3 message holds the client MAC that matches expectedClientMac. If this method
 // returns an error, the session secret must not be used. If it returns nil, the session secret can be used.
 func (s *Server) LoginFinish(ke3 *message.KE3, expectedClientMac []byte) error {
+	if ke3 == nil {
+		return ErrKE3.Join(internal.ErrKE3Nil)
+	}
+
 	if ok := ake.VerifyClientMac(s.conf, ke3, expectedClientMac); !ok {
-		return ErrClientAuthentication
+		return ErrAuthentication.Join(internal.ErrClientAuthentication, internal.ErrInvalidClientMac)
 	}
 
 	return nil
@@ -288,10 +287,10 @@ func (s *Server) coreGenerateKE2(
 	}).SetIdentities(record.ClientPublicKey, pksBytes)
 
 	ke2 := &message.KE2{
-		CredentialResponse:   response,
-		ServerPublicKeyshare: s.conf.Group.Base().Multiply(o.EphemeralSecretKey),
-		ServerNonce:          o.AKENonce,
-		ServerMac:            nil,
+		CredentialResponse: response,
+		ServerKeyShare:     s.conf.Group.Base().Multiply(o.EphemeralSecretKey),
+		ServerNonce:        o.AKENonce,
+		ServerMac:          nil,
 	}
 
 	clientMac, sessionSecret := ake.Respond(
@@ -312,11 +311,11 @@ func (s *Server) coreGenerateKE2(
 
 func (s *Server) verifyRegistrationRequest(req *message.RegistrationRequest) error {
 	if req == nil {
-		return ErrRegistrationRequestNil
+		return ErrRegistrationRequest.Join(internal.ErrRegistrationRequestNil)
 	}
 
 	if err := IsValidElement(s.conf.OPRF.Group(), req.BlindedMessage); err != nil {
-		return prefixError(ErrServerRegistrationRequestBlindedMessage, err)
+		return ErrRegistrationRequest.Join(internal.ErrInvalidBlindedMessage, err)
 	}
 
 	return nil
@@ -327,10 +326,14 @@ func (s *Server) verifyRegistrationRequest(req *message.RegistrationRequest) err
 func (s *Server) chooseOPRFKey(clientCredentialIdentifier []byte, clientOPRFKey *ecc.Scalar) (*ecc.Scalar, error) {
 	if clientOPRFKey != nil {
 		if err := IsValidScalar(s.conf.OPRF.Group(), clientOPRFKey); err != nil {
-			return nil, prefixError(ErrServerOptionsClientOPRFKey, err)
+			return nil, ErrServerOptions.Join(internal.ErrClientOPRFKey, err)
 		}
 
 		return clientOPRFKey, nil
+	}
+
+	if len(clientCredentialIdentifier) == 0 {
+		return nil, internal.ErrNoCredentialIdentifier
 	}
 
 	return s.deriveOPRFKey(clientCredentialIdentifier)
@@ -338,20 +341,16 @@ func (s *Server) chooseOPRFKey(clientCredentialIdentifier []byte, clientOPRFKey 
 
 // deriveOPRFKey derives the client OPRF key from the credentialIdentifier and global OPRF seed.
 func (s *Server) deriveOPRFKey(clientCredentialIdentifier []byte) (*ecc.Scalar, error) {
-	if len(clientCredentialIdentifier) == 0 {
-		return nil, ErrNoCredentialIdentifier
-	}
-
 	if s.ServerKeyMaterial == nil {
-		return nil, ErrServerKeyMaterialNil
+		return nil, ErrServerKeyMaterial.Join(internal.ErrServerKeyMaterialNil)
 	}
 
 	if len(s.ServerKeyMaterial.OPRFGlobalSeed) == 0 {
-		return nil, ErrServerKeymaterialOPRFKeyNoSeed
+		return nil, ErrServerKeyMaterial.Join(internal.ErrOPRFKeyNoSeed)
 	}
 
 	if err := s.isOPRFSeedValid(s.ServerKeyMaterial.OPRFGlobalSeed); err != nil {
-		return nil, err
+		return nil, ErrServerKeyMaterial.Join(err)
 	}
 
 	seed := s.conf.KDF.Expand(
@@ -391,31 +390,23 @@ type serverOptions struct {
 
 func (s *Server) verifyRecord(record *ClientRecord) error {
 	if record == nil {
-		return ErrClientRecordNil
+		return ErrClientRecord.Join(internal.ErrClientRecordNil)
 	}
 
 	if record.RegistrationRecord == nil {
-		return ErrClientRecordNilRegistrationRecord
+		return ErrClientRecord.Join(internal.ErrNilRegistrationRecord)
 	}
 
-	if record.ClientPublicKey == nil {
-		return ErrClientRecordNilPubKey
-	}
-
-	if record.ClientPublicKey.Group() != s.conf.Group {
-		return ErrClientRecordPublicKeyGroupMismatch
-	}
-
-	if record.ClientPublicKey.IsIdentity() {
-		return ErrClientRecordPublicKeyIdentity
+	if err := IsValidElement(s.conf.Group, record.ClientPublicKey); err != nil {
+		return ErrClientRecord.Join(internal.ErrInvalidClientPublicKey, err)
 	}
 
 	if len(record.Envelope) != s.conf.EnvelopeSize {
-		return ErrClientRecordInvalidEnvelopeLength
+		return ErrClientRecord.Join(internal.ErrEnvelopeInvalid, internal.ErrInvalidEncodingLength)
 	}
 
 	if len(record.MaskingKey) != s.conf.KDF.Size() {
-		return ErrClientRecordInvalidMaskingKeyLength
+		return ErrClientRecord.Join(internal.ErrEnvelopeInvalid, internal.ErrInvalidMaskingKeyLength)
 	}
 
 	return nil
@@ -423,16 +414,16 @@ func (s *Server) verifyRecord(record *ClientRecord) error {
 
 func (s *Server) validateKeyMaterial(skm *ServerKeyMaterial) error {
 	if skm == nil {
-		return ErrServerKeyMaterialNil
+		return ErrServerKeyMaterial.Join(internal.ErrServerKeyMaterialNil)
 	}
 
 	if err := IsValidScalar(s.conf.Group, skm.PrivateKey); err != nil {
-		return fmt.Errorf("%w: %w: %w", ErrServerKeyMaterial, ErrInvalidPrivateKey, err)
+		return ErrServerKeyMaterial.Join(internal.ErrInvalidPrivateKey, err)
 	}
 
 	if skm.OPRFGlobalSeed != nil {
 		if err := s.isOPRFSeedValid(skm.OPRFGlobalSeed); err != nil {
-			return err
+			return ErrServerKeyMaterial.Join(err)
 		}
 	}
 
@@ -440,20 +431,20 @@ func (s *Server) validateKeyMaterial(skm *ServerKeyMaterial) error {
 }
 
 func (s *Server) validateKE1(ke1 *message.KE1) error {
-	if ke1 == nil ||
-		ke1.CredentialRequest == nil ||
-		ke1.BlindedMessage == nil ||
-		ke1.ClientPublicKeyshare == nil ||
-		len(ke1.ClientNonce) == 0 {
-		return ErrServerKE1Incomplete
+	if ke1 == nil {
+		return ErrKE1.Join(internal.ErrKE1Nil)
 	}
 
 	if err := IsValidElement(s.conf.OPRF.Group(), ke1.BlindedMessage); err != nil {
-		return prefixError(ErrServerKE1BlindedMessage, err)
+		return ErrKE1.Join(internal.ErrInvalidBlindedMessage, err)
 	}
 
-	if err := IsValidElement(s.conf.Group, ke1.ClientPublicKeyshare); err != nil {
-		return prefixError(ErrServerKE1InvalidClientKeyShare, err)
+	if err := IsValidElement(s.conf.OPRF.Group(), ke1.ClientKeyShare); err != nil {
+		return ErrKE1.Join(internal.ErrInvalidClientKeyShare, err)
+	}
+
+	if len(ke1.ClientNonce) == 0 {
+		return ErrKE1.Join(internal.ErrMissingNonce)
 	}
 
 	return nil
@@ -461,11 +452,11 @@ func (s *Server) validateKE1(ke1 *message.KE1) error {
 
 func (s *Server) isOPRFSeedValid(seed []byte) error {
 	if len(seed) == 0 {
-		return ErrServerKeymaterialOPRFKeyNoSeed
+		return internal.ErrOPRFKeyNoSeed
 	}
 
 	if len(seed) != 0 && len(seed) != s.conf.Hash.Size() {
-		return ErrServerKeyMaterialInvalidOPRFSeedLength
+		return internal.ErrInvalidOPRFSeedLength
 	}
 
 	return nil
@@ -482,7 +473,7 @@ func (s *Server) parseOptions(o *serverOptions, options []*ServerOptions) error 
 	// ClientOPRFKey
 	if options[0].ClientOPRFKey != nil {
 		if err := IsValidScalar(s.conf.OPRF.Group(), options[0].ClientOPRFKey); err != nil {
-			return prefixError(ErrServerOptionsClientOPRFKey, err)
+			return ErrServerOptions.Join(internal.ErrClientOPRFKey, err)
 		}
 
 		o.ClientOPRFKey = s.conf.OPRF.Group().NewScalar().Set(options[0].ClientOPRFKey)
@@ -491,7 +482,7 @@ func (s *Server) parseOptions(o *serverOptions, options []*ServerOptions) error 
 	// MaskingNonce.
 	if len(options[0].MaskingNonce) != 0 {
 		if len(options[0].MaskingNonce) != s.conf.NonceLen {
-			return prefixError(ErrServerOptions, ErrServerOptionsMaskingNonceLength)
+			return ErrServerOptions.Join(internal.ErrMaskingNonceLength)
 		}
 
 		o.MaskingNonce = make([]byte, len(options[0].MaskingNonce))
@@ -518,9 +509,9 @@ func (s *Server) parseOptions(o *serverOptions, options []*ServerOptions) error 
 	// Ephemeral secret key share.
 	var err error
 
-	o.EphemeralSecretKey, err = options[0].AKE.getEphemeralSecretKeyShare(s.conf.Group)
+	o.EphemeralSecretKey, err = options[0].AKE.getSecretKeyShare(s.conf.Group)
 	if err != nil {
-		return prefixError(ErrServerOptions, err)
+		return ErrServerOptions.Join(err)
 	}
 
 	return nil

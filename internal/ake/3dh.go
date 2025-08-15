@@ -77,6 +77,7 @@ func k3dh(
 func core3DH(
 	conf *internal.Configuration, identities *Identities, ikm, ke1 []byte, ke2 *message.KE2,
 ) (sessionSecret, macS, macC []byte) {
+	// todo: reset hash at the beginning and at the end
 	initTranscript(conf, identities, ke1, ke2)
 
 	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, conf.Hash.Sum()) // preamble
@@ -95,13 +96,9 @@ func buildLabel(length int, label, context []byte) []byte {
 		encoding.EncodeVectorLen(context, 1))
 }
 
-func expand(h *internal.KDF, secret, hkdfLabel []byte) []byte {
-	return h.Expand(secret, hkdfLabel, h.Size())
-}
-
 func expandLabel(h *internal.KDF, secret, label, context []byte) []byte {
 	hkdfLabel := buildLabel(h.Size(), label, context)
-	return expand(h, secret, hkdfLabel)
+	return h.Expand(secret, hkdfLabel, h.Size())
 }
 
 func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
@@ -116,7 +113,7 @@ func initTranscript(conf *internal.Configuration, identities *Identities, ke1 []
 		encoding.EncodeVector(identities.ServerIdentity),
 		ke2.CredentialResponse.Serialize(),
 		ke2.ServerNonce,
-		ke2.ServerPublicKeyshare.Encode(),
+		ke2.ServerKeyShare.Encode(),
 	)
 }
 
@@ -128,8 +125,8 @@ func addToHash(conf *internal.Configuration, data ...[]byte) {
 
 func deriveKeys(h *internal.KDF, ikm, context []byte) (serverMacKey, clientMacKey, sessionSecret []byte) {
 	prk := h.Extract(nil, ikm)
-	handshakeSecret := deriveSecret(h, prk, []byte(tag.Handshake), context)
 	sessionSecret = deriveSecret(h, prk, []byte(tag.SessionKey), context)
+	handshakeSecret := deriveSecret(h, prk, []byte(tag.Handshake), context)
 	serverMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacServer), nil)
 	clientMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacClient), nil)
 

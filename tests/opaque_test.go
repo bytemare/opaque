@@ -12,9 +12,7 @@ import (
 	"bytes"
 	"crypto"
 	"encoding/hex"
-	"errors"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/bytemare/ecc"
@@ -22,6 +20,7 @@ import (
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -326,23 +325,19 @@ func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
 	d := opaque.DefaultConfiguration().Serialize()
 	d[7] = 20
 
-	expected := "decoding the configuration context: "
-	if _, err := opaque.DeserializeConfiguration(d); err == nil || !strings.HasPrefix(err.Error(), expected) {
-		t.Errorf(
-			"DeserializeConfiguration did not return the appropriate error for vector invalid header. want %q, got %q",
-			expected,
-			err,
-		)
-	}
+	expectErrors(t, func() error {
+		_, err := opaque.DeserializeConfiguration(d)
+		return err
+	}, opaque.ErrConfiguration, internal.ErrInvalidContextEncoding, encoding.ErrTotalLength)
 }
 
 func TestDeserializeConfiguration_Short(t *testing.T) {
-	r9 := internal.RandomBytes(7)
+	r7 := internal.RandomBytes(7)
 
-	if _, err := opaque.DeserializeConfiguration(r9); !errors.Is(err, internal.ErrConfigurationInvalidLength) {
-		t.Errorf("DeserializeConfiguration did not return the appropriate error for vector r9. want %q, got %q",
-			internal.ErrConfigurationInvalidLength, err)
-	}
+	expectErrors(t, func() error {
+		_, err := opaque.DeserializeConfiguration(r7)
+		return err
+	}, opaque.ErrConfiguration, internal.ErrInvalidEncodingLength)
 }
 
 func TestBadConfiguration(t *testing.T) {
@@ -362,42 +357,42 @@ func TestBadConfiguration(t *testing.T) {
 			makeBad: func() []byte {
 				return setBadValue(0, 0)
 			},
-			error: opaque.ErrInvalidOPRFid,
+			error: internal.ErrInvalidOPRFid,
 		},
 		{
 			name: "Bad AKE",
 			makeBad: func() []byte {
 				return setBadValue(1, 0)
 			},
-			error: opaque.ErrInvalidAKEid,
+			error: internal.ErrInvalidAKEid,
 		},
 		{
 			name: "Bad KSF",
 			makeBad: func() []byte {
 				return setBadValue(2, 10)
 			},
-			error: opaque.ErrInvalidKSFid,
+			error: internal.ErrInvalidKSFid,
 		},
 		{
 			name: "Bad KDF",
 			makeBad: func() []byte {
 				return setBadValue(3, 0)
 			},
-			error: opaque.ErrInvalidKDFid,
+			error: internal.ErrInvalidKDFid,
 		},
 		{
 			name: "Bad MAC",
 			makeBad: func() []byte {
 				return setBadValue(4, 0)
 			},
-			error: opaque.ErrInvalidMACid,
+			error: internal.ErrInvalidMACid,
 		},
 		{
 			name: "Bad Hash",
 			makeBad: func() []byte {
 				return setBadValue(5, 0)
 			},
-			error: opaque.ErrInvalidHASHid,
+			error: internal.ErrInvalidHASHid,
 		},
 	}
 
@@ -418,30 +413,28 @@ func TestBadConfiguration(t *testing.T) {
 			// Test Deserialization for bad conf
 			badEncoded := badConf.makeBad()
 
-			if _, err := opaque.DeserializeConfiguration(badEncoded); !errors.Is(err, badConf.error) {
-				t.Fatalf(
-					"Expected error for %s. Want %q, got %q.\n\tEncoded: %v",
-					badConf.name,
-					badConf.error,
-					err,
-					badEncoded,
-				)
-			}
+			expectErrors(t, func() error {
+				_, err := opaque.DeserializeConfiguration(badEncoded)
+				return err
+			}, badConf.error)
 
 			// Test bad configuration for client, server, and deserializer setup
 			bad := convertToBadConf(badEncoded)
 
-			if _, err := bad.Client(); !errors.Is(err, badConf.error) {
-				t.Fatalf("Expected error for %s / client. Want %q, got %q", badConf.name, badConf.error, err)
-			}
+			expectErrors(t, func() error {
+				_, err := bad.Client()
+				return err
+			}, badConf.error)
 
-			if _, err := bad.Server(); !errors.Is(err, badConf.error) {
-				t.Fatalf("Expected error for %s / server. Want %q, got %q", badConf.name, badConf.error, err)
-			}
+			expectErrors(t, func() error {
+				_, err := bad.Server()
+				return err
+			}, badConf.error)
 
-			if _, err := bad.Deserializer(); !errors.Is(err, badConf.error) {
-				t.Fatalf("Expected error for %s / deserializer. Want %q, got %q", badConf.name, badConf.error, err)
-			}
+			expectErrors(t, func() error {
+				_, err := bad.Deserializer()
+				return err
+			}, badConf.error)
 		})
 	}
 }

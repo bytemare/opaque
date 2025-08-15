@@ -20,9 +20,11 @@ func Start(g ecc.Group, esk *ecc.Scalar, nonce []byte) *message.KE1 {
 	epk := g.Base().Multiply(esk)
 
 	return &message.KE1{
-		CredentialRequest:    nil,
-		ClientNonce:          nonce,
-		ClientPublicKeyshare: epk,
+		CredentialRequest: message.CredentialRequest{
+			BlindedMessage: nil,
+		},
+		ClientNonce:    nonce,
+		ClientKeyShare: epk,
 	}
 }
 
@@ -37,11 +39,11 @@ func Finalize(
 	ke1 []byte,
 ) (*message.KE3, []byte, bool) {
 	ikm := k3dh(
-		ke2.ServerPublicKeyshare,
+		ke2.ServerKeyShare,
 		ephemeralSecretKey,
 		serverPublicKey,
 		ephemeralSecretKey,
-		ke2.ServerPublicKeyshare,
+		ke2.ServerKeyShare,
 		secretKey,
 	)
 	sessionSecret, serverMac, clientMac := core3DH(conf, identities, ikm, ke1, ke2)

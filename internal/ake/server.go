@@ -25,9 +25,9 @@ func Respond(
 	ke1 *message.KE1,
 ) (clientMac, sessionSecret []byte) {
 	ikm := k3dh(
-		ke1.ClientPublicKeyshare,
+		ke1.ClientKeyShare,
 		ephemeralSecretKey,
-		ke1.ClientPublicKeyshare,
+		ke1.ClientKeyShare,
 		secretKey,
 		clientPublicKey,
 		ephemeralSecretKey,
@@ -40,6 +40,6 @@ func Respond(
 }
 
 // VerifyClientMac verifies the authentication tag contained in ke3.
-func VerifyClientMac(conf *internal.Configuration, ke3 *message.KE3, clientMAC []byte) bool {
-	return conf.MAC.Equal(clientMAC, ke3.ClientMac)
+func VerifyClientMac(conf *internal.Configuration, ke3 *message.KE3, expectedClientMac []byte) bool {
+	return conf.MAC.Equal(expectedClientMac, ke3.ClientMac)
 }
