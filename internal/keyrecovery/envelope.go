@@ -82,6 +82,7 @@ func Store(
 		clientIdentity,
 		serverIdentity,
 	)
+
 	auth := authTag(conf, randomizedPassword, nonce, ctc)
 	export = exportKey(conf, randomizedPassword, nonce)
 

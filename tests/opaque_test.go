@@ -91,10 +91,10 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 
 	// Server
 	var m2s []byte
-	var credID []byte
 	{
 		server, _ := p.Server()
 		server.ServerKeyMaterial = &opaque.ServerKeyMaterial{
+			PublicKeyBytes: p.serverPublicKey.Encode(),
 			OPRFGlobalSeed: p.oprfSeed,
 		}
 
@@ -103,9 +103,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 			t.Fatalf(dbgErr, err)
 		}
 
-		credID = internal.RandomBytes(32)
-
-		respReg, err := server.RegistrationResponse(m1, p.serverPublicKey.Encode(), credID, nil)
+		respReg, err := server.RegistrationResponse(m1, credentialIdentifier, nil)
 		if err != nil {
 			t.Fatalf(dbgErr, err)
 		}
@@ -146,7 +144,7 @@ func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Serv
 		}
 
 		return client, server, &opaque.ClientRecord{
-			CredentialIdentifier: credID,
+			CredentialIdentifier: credentialIdentifier,
 			ClientIdentity:       p.username,
 			RegistrationRecord:   m3,
 		}, exportKeyReg
@@ -182,6 +180,7 @@ func testAuthentication(
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       p.serverID,
 			PrivateKey:     p.serverSecretKey,
+			PublicKeyBytes: p.serverPublicKey.Encode(),
 			OPRFGlobalSeed: p.oprfSeed,
 		}
 
@@ -288,7 +287,6 @@ func TestConfiguration_Deserialization(t *testing.T) {
 func TestFlush(t *testing.T) {
 	ids := []byte("server")
 	username := []byte("client")
-	password := []byte("password")
 
 	conf := opaque.DefaultConfiguration()
 	conf.Context = []byte("OPAQUETest")

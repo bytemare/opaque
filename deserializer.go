@@ -40,7 +40,7 @@ func (d *Deserializer) RegistrationRequest(registrationRequest []byte) (*message
 // RegistrationResponse takes a serialized RegistrationResponse message and returns a deserialized
 // RegistrationResponse structure.
 func (d *Deserializer) RegistrationResponse(registrationResponse []byte) (*message.RegistrationResponse, error) {
-	if len(registrationResponse) != d.registrationResponseLength() {
+	if len(registrationResponse) != (d.conf.OPRF.Group().ElementLength() + d.conf.Group.ElementLength()) {
 		return nil, ErrRegistrationResponse.Join(internal.ErrInvalidMessageLength)
 	}
 
@@ -78,6 +78,13 @@ func (d *Deserializer) RegistrationRecord(record []byte) (*message.RegistrationR
 		return nil, ErrRegistrationRecord.Join(internal.ErrInvalidClientPublicKey, err)
 	}
 
+	if isAllZeros(maskingKey) {
+		return nil, ErrRegistrationRecord.Join(internal.ErrInvalidMaskingKey, internal.ErrSliceIsAllZeros)
+	}
+
+	// Note: we do not check whether the envelope is all zeros, as it must be supported for the
+	// anti-enumeration "fake envelope" feature.
+
 	return &message.RegistrationRecord{
 		ClientPublicKey: pku,
 		MaskingKey:      maskingKey,
@@ -97,6 +104,10 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 	}
 
 	nonceU := ke1[d.conf.OPRF.Group().ElementLength() : d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen]
+
+	if isAllZeros(nonceU) {
+		return nil, ErrKE1.Join(internal.ErrMissingNonce, internal.ErrSliceIsAllZeros)
+	}
 
 	epku, err := DeserializeElement(d.conf.Group, ke1[d.conf.OPRF.Group().ElementLength()+d.conf.NonceLen:])
 	if err != nil {
@@ -125,6 +136,16 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 		return nil, ErrKE2.Join(err)
 	}
 
+	if isAllZeros(cresp.MaskingNonce) {
+		return nil, ErrKE2.Join(internal.ErrCredentialResponseInvalid,
+			internal.ErrCredentialResponseNoMaskingNonce, internal.ErrSliceIsAllZeros)
+	}
+
+	if isAllZeros(cresp.MaskedResponse) {
+		return nil, ErrKE2.Join(internal.ErrCredentialResponseInvalid,
+			internal.ErrCredentialResponseInvalidMaskedResponse, internal.ErrSliceIsAllZeros)
+	}
+
 	nonceS := ke2[maxResponseLength : maxResponseLength+d.conf.NonceLen]
 	offset := maxResponseLength + d.conf.NonceLen
 	epk := ke2[offset : offset+d.conf.Group.ElementLength()]
@@ -134,6 +155,14 @@ func (d *Deserializer) KE2(ke2 []byte) (*message.KE2, error) {
 	epks, err := DeserializeElement(d.conf.Group, epk)
 	if err != nil {
 		return nil, ErrKE2.Join(internal.ErrInvalidServerKeyShare, err)
+	}
+
+	if isAllZeros(nonceS) {
+		return nil, ErrKE2.Join(internal.ErrMissingNonce, internal.ErrSliceIsAllZeros)
+	}
+
+	if isAllZeros(mac) {
+		return nil, ErrKE2.Join(internal.ErrMissingMAC, internal.ErrSliceIsAllZeros)
 	}
 
 	return &message.KE2{
@@ -150,18 +179,18 @@ func (d *Deserializer) KE3(ke3 []byte) (*message.KE3, error) {
 		return nil, ErrKE3.Join(internal.ErrInvalidMessageLength)
 	}
 
+	if isAllZeros(ke3) {
+		return nil, ErrKE3.Join(internal.ErrInvalidClientMac, internal.ErrSliceIsAllZeros)
+	}
+
 	return &message.KE3{ClientMac: ke3}, nil
 }
 
 // DecodePrivateKey takes a serialized private key (a scalar) and attempts to return it's decoded form.
 func (d *Deserializer) DecodePrivateKey(encoded []byte) (*ecc.Scalar, error) {
-	sk := d.conf.Group.NewScalar()
-	if err := sk.Decode(encoded); err != nil {
+	sk, err := DeserializeScalar(d.conf.Group, encoded)
+	if err != nil {
 		return nil, errors.Join(internal.ErrInvalidPrivateKey, err)
-	}
-
-	if sk.IsZero() {
-		return nil, internal.ErrPrivateKeyZero
 	}
 
 	return sk, nil
@@ -175,10 +204,6 @@ func (d *Deserializer) DecodePublicKey(encoded []byte) (*ecc.Element, error) {
 	}
 
 	return pk, nil
-}
-
-func (d *Deserializer) registrationResponseLength() int {
-	return d.conf.OPRF.Group().ElementLength() + d.conf.Group.ElementLength()
 }
 
 func (d *Deserializer) recordLength() int {
@@ -200,7 +225,7 @@ func (d *Deserializer) deserializeCredentialResponse(
 ) (*message.CredentialResponse, error) {
 	evaluatedMessage, err := DeserializeElement(d.conf.OPRF.Group(), input)
 	if err != nil {
-		return nil, errors.Join(internal.ErrInvalidBlindedMessage, err)
+		return nil, errors.Join(internal.ErrInvalidEvaluatedMessage, err)
 	}
 
 	return message.NewCredentialResponse(evaluatedMessage,
@@ -220,18 +245,28 @@ func (d *Deserializer) credentialResponseLength() int {
 	return d.conf.OPRF.Group().ElementLength() + d.conf.NonceLen + d.conf.Group.ElementLength() + d.conf.EnvelopeSize
 }
 
+func isAllZeros(input []byte) bool {
+	for _, b := range input {
+		if b != 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
 // DeserializeElement takes a byte slice and attempts to decode it into an Element of the given group, and returns an
 // error if the decoding fails or if the element is the identity element (point at infinity).
 func DeserializeElement(g ecc.Group, input []byte) (*ecc.Element, error) {
 	e := g.NewElement()
 
+	if len(input) < g.ElementLength() {
+		return nil, errors.Join(internal.ErrInvalidElement, internal.ErrInvalidEncodingLength)
+	}
+
 	err := e.Decode(input[:g.ElementLength()])
 	if err != nil {
 		return nil, err
-	}
-
-	if e.IsIdentity() {
-		return nil, internal.ErrElementIdentity
 	}
 
 	return e, nil
@@ -241,6 +276,10 @@ func DeserializeElement(g ecc.Group, input []byte) (*ecc.Element, error) {
 // error if the decoding fails or if the scalar is zero.
 func DeserializeScalar(g ecc.Group, input []byte) (*ecc.Scalar, error) {
 	s := g.NewScalar()
+
+	if len(input) < g.ScalarLength() {
+		return nil, errors.Join(internal.ErrInvalidScalar, internal.ErrInvalidEncodingLength)
+	}
 
 	err := s.Decode(input[:g.ScalarLength()])
 	if err != nil {

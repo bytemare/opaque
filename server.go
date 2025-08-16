@@ -54,8 +54,11 @@ type ServerKeyMaterial struct {
 	// The server's identity. If empty, will be set to the server's public key.
 	Identity []byte
 
-	// The server's long-term secret key. Required only for Login, and unused for Registration.
+	// The server's long-term secret key. Required only for Login, and not used in Registration.
 	PrivateKey *ecc.Scalar
+
+	// The server's public key in bytes. Must be provided during registration and login.
+	PublicKeyBytes []byte
 
 	// The seed to derive the OPRF key for the clients with. Recommended to be set for both Registration and Login,
 	// but optional if the clientOPRFKey is set.
@@ -79,6 +82,7 @@ func (s *ServerKeyMaterial) Encode() []byte {
 		[]byte{byte(s.PrivateKey.Group())},
 		encoding.EncodeVector(s.Identity),
 		encoding.EncodeVector(s.PrivateKey.Encode()),
+		encoding.EncodeVector(s.PublicKeyBytes),
 		encoding.EncodeVector(s.OPRFGlobalSeed),
 	)
 }
@@ -99,8 +103,8 @@ func (s *ServerKeyMaterial) Decode(data []byte) error {
 		return ErrServerKeyMaterial.Join(internal.ErrInvalidGroupEncoding)
 	}
 
-	var id, skBytes, seed []byte
-	if err := encoding.DecodeLongVector(data[1:], &id, &skBytes, &seed); err != nil {
+	var id, skBytes, pkBytes, seed []byte
+	if err := encoding.DecodeLongVector(data[1:], &id, &skBytes, &pkBytes, &seed); err != nil {
 		return ErrServerKeyMaterial.Join(err)
 	}
 
@@ -109,8 +113,18 @@ func (s *ServerKeyMaterial) Decode(data []byte) error {
 		return ErrServerKeyMaterial.Join(internal.ErrInvalidPrivateKey, err)
 	}
 
+	pk, err := DeserializeElement(g.Group(), pkBytes)
+	if err != nil {
+		return ErrServerKeyMaterial.Join(internal.ErrInvalidPublicKeyBytes, err)
+	}
+
+	if !pk.Equal(g.Group().Base().Multiply(sk)) {
+		return ErrServerKeyMaterial.Join(internal.ErrInvalidPublicKey)
+	}
+
 	s.Identity = id
 	s.PrivateKey = sk
+	s.PublicKeyBytes = pkBytes
 	s.OPRFGlobalSeed = seed
 
 	return nil
@@ -169,7 +183,6 @@ type ServerOptions struct {
 // instance to protect it.
 func (s *Server) RegistrationResponse(
 	req *message.RegistrationRequest,
-	serverPublicKeyBytes []byte, // The server's public key to be sent to the client.
 	clientCredentialIdentifier []byte, // The credentialIdentifier and global OPRF seed derive the client
 	// specific OPRF key. If nil, this yields the same OPRF key for all clients. The same credentialIdentifier should
 	// be used for the same client across registration and login, and be different for each client. The globalOPRFSeed
@@ -178,8 +191,8 @@ func (s *Server) RegistrationResponse(
 	clientOPRFKey *ecc.Scalar, // If set, this will be used as the client OPRF key directly instead
 	// of deriving it from the credentialIdentifier and globalOPRFSeed.
 ) (*message.RegistrationResponse, error) {
-	if len(serverPublicKeyBytes) != s.conf.Group.ElementLength() {
-		return nil, internal.ErrServerInvalidPublicKeyLength
+	if len(s.ServerKeyMaterial.PublicKeyBytes) != s.conf.Group.ElementLength() {
+		return nil, ErrServerKeyMaterial.Join(internal.ErrServerInvalidPublicKeyLength)
 	}
 
 	ku, err := s.chooseOPRFKey(clientCredentialIdentifier, clientOPRFKey)
@@ -200,7 +213,7 @@ func (s *Server) RegistrationResponse(
 
 	return &message.RegistrationResponse{
 		EvaluatedMessage: s.conf.OPRF.Evaluate(ku, req.BlindedMessage),
-		ServerPublicKey:  serverPublicKeyBytes,
+		ServerPublicKey:  s.ServerKeyMaterial.PublicKeyBytes,
 	}, nil
 }
 
@@ -276,15 +289,13 @@ func (s *Server) coreGenerateKE2(
 	record *ClientRecord,
 	o *serverOptions, ku *ecc.Scalar,
 ) (*message.KE2, *ServerOutput) {
-	// Todo: this could be precomputed. Maybe part of the key material.
-	pksBytes := s.conf.Group.Base().Multiply(s.ServerKeyMaterial.PrivateKey).Encode()
 	response := s.credentialResponse(ke1.BlindedMessage,
-		record.RegistrationRecord, o.MaskingNonce, pksBytes, ku)
+		record.RegistrationRecord, o.MaskingNonce, s.ServerKeyMaterial.PublicKeyBytes, ku)
 
 	identities := (&ake.Identities{
 		ClientIdentity: record.ClientIdentity,
 		ServerIdentity: s.ServerKeyMaterial.Identity,
-	}).SetIdentities(record.ClientPublicKey, pksBytes)
+	}).SetIdentities(record.ClientPublicKey, s.ServerKeyMaterial.PublicKeyBytes)
 
 	ke2 := &message.KE2{
 		CredentialResponse: response,
@@ -369,7 +380,6 @@ func (s *Server) credentialResponse(
 	ku *ecc.Scalar,
 ) *message.CredentialResponse {
 	z := s.conf.OPRF.Evaluate(ku, blindedMessage)
-
 	maskingNonce, maskedResponse := masking.Mask(
 		s.conf,
 		maskingNonce,
@@ -406,7 +416,11 @@ func (s *Server) verifyRecord(record *ClientRecord) error {
 	}
 
 	if len(record.MaskingKey) != s.conf.KDF.Size() {
-		return ErrClientRecord.Join(internal.ErrEnvelopeInvalid, internal.ErrInvalidMaskingKeyLength)
+		return ErrClientRecord.Join(internal.ErrEnvelopeInvalid, internal.ErrInvalidMaskingKey)
+	}
+
+	if isAllZeros(record.MaskingKey) {
+		return ErrClientRecord.Join(internal.ErrInvalidMaskingKey, internal.ErrSliceIsAllZeros)
 	}
 
 	return nil
@@ -419,6 +433,12 @@ func (s *Server) validateKeyMaterial(skm *ServerKeyMaterial) error {
 
 	if err := IsValidScalar(s.conf.Group, skm.PrivateKey); err != nil {
 		return ErrServerKeyMaterial.Join(internal.ErrInvalidPrivateKey, err)
+	}
+
+	if pk, err := s.Deserialize.DecodePublicKey(skm.PublicKeyBytes); err != nil {
+		return ErrServerKeyMaterial.Join(err)
+	} else if !pk.Equal(s.conf.Group.Base().Multiply(skm.PrivateKey)) {
+		return ErrServerKeyMaterial.Join(internal.ErrInvalidPublicKeyBytes)
 	}
 
 	if skm.OPRFGlobalSeed != nil {

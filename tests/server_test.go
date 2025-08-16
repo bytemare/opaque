@@ -13,7 +13,6 @@ import (
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
-	"github.com/bytemare/opaque/internal/encoding"
 )
 
 /*
@@ -37,7 +36,7 @@ func TestServer_BadRegistrationRequest(t *testing.T) {
 			return err
 		}, errInvalidMessageLength)
 
-		bad := getBadElement(t, conf)
+		bad := conf.getBadElement()
 
 		expectErrors(t, func() error {
 			_, err = server.Deserialize.RegistrationRequest(bad)
@@ -60,14 +59,15 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       nil,
 			PrivateKey:     sk,
+			PublicKeyBytes: pk.Encode(),
 			OPRFGlobalSeed: nil,
 		}
 
-		if err := server.SetKeyMaterial(skm); err != nil {
+		if err = server.SetKeyMaterial(skm); err != nil {
 			t.Fatalf("unexpected error %s", err)
 		}
 
-		fakeRecord, err := conf.conf.GetFakeRecord([]byte("credid"))
+		fakeRecord, err := conf.conf.GetFakeRecord(credentialIdentifier)
 		if err != nil {
 			t.Fatalf("unexpected error %s", err)
 		}
@@ -104,11 +104,11 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 				server.ServerKeyMaterial.OPRFGlobalSeed = tt.seed
 
 				expectErrors(t, func() error {
-					_, err = server.RegistrationResponse(nil, pk.Encode(), []byte("credid"), nil)
+					_, err = server.RegistrationResponse(nil, credentialIdentifier, nil)
 					return err
 				}, tt.expected)
 
-				ke1, err := client.GenerateKE1([]byte("password"))
+				ke1, err := client.GenerateKE1(password)
 				if err != nil {
 					t.Fatalf("unexpected error %s", err)
 				}
@@ -190,7 +190,7 @@ func TestServerInit_NoKeyMaterial(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ke1, err := client.GenerateKE1([]byte("yo"))
+		ke1, err := client.GenerateKE1(password)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -211,10 +211,11 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sk, pk := conf.conf.KeyGen()
+		sk, pks := conf.conf.KeyGen()
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       nil,
 			PrivateKey:     sk,
+			PublicKeyBytes: pks.Encode(),
 			OPRFGlobalSeed: internal.RandomBytes(conf.conf.Hash.Size()),
 		}
 
@@ -222,7 +223,7 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		rec, err := buildRecord(conf.conf, skm, pk.Encode(), internal.RandomBytes(32), []byte("yo"))
+		rec, err := buildRecord(t, conf, internal.RandomBytes(32), password)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -234,7 +235,7 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		ke1, err := client.GenerateKE1([]byte("yo"))
+		ke1, err := client.GenerateKE1(password)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -246,91 +247,21 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 	})
 }
 
-func TestServerInit_InvalidData(t *testing.T) {
-	/*
-		Invalid OPRF data in KE1
-	*/
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		server, err := conf.conf.Server()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		ke1 := encoding.Concatenate(
-			getBadElement(t, conf),
-			internal.RandomBytes(conf.internal.NonceLen),
-			internal.RandomBytes(conf.internal.Group.ElementLength()),
-		)
-
-		expectErrors(t, func() error {
-			_, err = server.Deserialize.KE1(ke1)
-			return err
-		}, opaque.ErrKE1)
-	})
-}
-
-func TestServerInit_InvalidEPKU(t *testing.T) {
-	/*
-		Invalid EPKU in KE1
-	*/
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		server, err := conf.conf.Server()
-		if err != nil {
-			t.Fatal(err)
-		}
-		client, err := conf.conf.Client()
-		if err != nil {
-			t.Fatal(err)
-		}
-		ke1, err := client.GenerateKE1([]byte("yo"))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		ke1m := ke1.Serialize()
-		badke1 := encoding.Concat(
-			ke1m[:conf.internal.OPRF.Group().ElementLength()+conf.internal.NonceLen],
-			getBadElement(t, conf),
-		)
-
-		expectErrors(t, func() error {
-			_, err = server.Deserialize.KE1(badke1)
-			return err
-		}, internal.ErrInvalidClientKeyShare)
-	})
-}
-
 func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	/*
 		ke3 mac is invalid
 	*/
-	password := []byte("yo")
-	conf := opaque.DefaultConfiguration()
-	credId := internal.RandomBytes(32)
-	client, _ := conf.Client()
-	server, _ := conf.Server()
+	conf := configurationTable[0]
+	client, server := setup(t, conf)
 
-	sk, pk := conf.KeyGen()
-	skm := &opaque.ServerKeyMaterial{
-		Identity:       nil,
-		PrivateKey:     sk,
-		OPRFGlobalSeed: internal.RandomBytes(conf.Hash.Size()),
-	}
-
-	if err := server.SetKeyMaterial(skm); err != nil {
-		t.Fatal(err)
-	}
-
-	rec, err := buildRecord(conf, skm, pk.Encode(), credId, password)
-	if err != nil {
-		t.Fatal(err)
-	}
+	record := registration(t, client, server, password, credentialIdentifier, nil, nil)
+	client.ClearState()
 
 	ke1, err := client.GenerateKE1(password)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ke2, serverOutput, err := server.GenerateKE2(ke1, rec)
+	ke2, serverOutput, err := server.GenerateKE2(ke1, record)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,6 +10,7 @@ package opaque
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/bytemare/ecc"
 
@@ -107,7 +108,7 @@ func (c *Client) RegistrationInit(
 	var m *ecc.Element
 
 	c.oprf.blind, m = c.conf.OPRF.Blind(password, blind)
-	c.oprf.password = password
+	c.oprf.password = slices.Clone(password)
 
 	return &message.RegistrationRequest{
 		BlindedMessage: m,
@@ -141,6 +142,7 @@ func (c *Client) RegistrationFinalize(
 		o.EnvelopeNonce,
 	)
 
+	// todo: note that this needs a confidential channel
 	return &message.RegistrationRecord{
 		ClientPublicKey: clientPublicKey,
 		MaskingKey:      maskingKey,
@@ -169,7 +171,7 @@ func (c *Client) GenerateKE1(password []byte, options ...*ClientOptions) (*messa
 	var m *ecc.Element
 
 	c.oprf.blind, m = c.conf.OPRF.Blind(password, o.OPRFBlind)
-	c.oprf.password = password
+	c.oprf.password = slices.Clone(password)
 	ke1 := ake.Start(c.conf.Group, c.ake.esk, o.AKENonce)
 	ke1.CredentialRequest.BlindedMessage = m
 	c.ake.ke1 = ke1.Serialize()
@@ -251,6 +253,10 @@ func (c *Client) ClearState() {
 	if c.ake.esk != nil {
 		internal.ClearScalar(c.ake.esk)
 		c.ake.esk = nil
+	}
+
+	if len(c.ake.ke1) > 0 {
+		internal.ClearSlice(c.ake.ke1)
 	}
 
 	if c.oprf.blind != nil {
@@ -480,10 +486,19 @@ func (c *Client) validateCredentialResponse(cr *message.CredentialResponse) erro
 		return errors.Join(internal.ErrCredentialResponseInvalid, internal.ErrCredentialResponseNoMaskingNonce)
 	}
 
+	if isAllZeros(cr.MaskingNonce) {
+		return errors.Join(internal.ErrCredentialResponseInvalid,
+			internal.ErrCredentialResponseInvalidMaskingNonce, internal.ErrSliceIsAllZeros)
+	}
+
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
 	// todo: is this tested against?
 	if len(cr.MaskedResponse) != c.conf.Group.ElementLength()+c.conf.EnvelopeSize {
-		return errors.Join(internal.ErrCredentialResponseInvalid, internal.ErrCredentialResponseInvalidMaskedLength)
+		return errors.Join(
+			internal.ErrCredentialResponseInvalid,
+			internal.ErrCredentialResponseInvalidMaskedResponse,
+			internal.ErrInvalidEncodingLength,
+		)
 	}
 
 	return nil
@@ -510,8 +525,16 @@ func (c *Client) validateKE2(ke2 *message.KE2) error {
 		return ErrKE2.Join(internal.ErrMissingNonce)
 	}
 
+	if isAllZeros(ke2.ServerNonce) {
+		return ErrKE2.Join(internal.ErrMissingNonce, internal.ErrSliceIsAllZeros)
+	}
+
 	if len(ke2.ServerMac) == 0 {
 		return ErrKE2.Join(internal.ErrMissingMAC)
+	}
+
+	if isAllZeros(ke2.ServerMac) {
+		return ErrKE2.Join(internal.ErrMissingMAC, internal.ErrSliceIsAllZeros)
 	}
 
 	return nil

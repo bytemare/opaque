@@ -26,7 +26,6 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/keyrecovery"
 	internalKSF "github.com/bytemare/opaque/internal/ksf"
-	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
@@ -42,7 +41,10 @@ func init() {
 	}
 }
 
-// helper functions
+var (
+	password             = []byte("test-password")
+	credentialIdentifier = []byte("test-credential-identifier")
+)
 
 type configuration struct {
 	curve    elliptic.Curve
@@ -100,6 +102,7 @@ func toInternal(c *opaque.Configuration) (*internal.Configuration, error) {
 	}, nil
 }
 
+// todo Add test that catches if a suite has been added without being added to the configuration table.
 var configurationTable = []*configuration{
 	{
 		name:  "Ristretto255",
@@ -144,10 +147,23 @@ var configurationTable = []*configuration{
 	},
 }
 
+type testError struct {
+	name   string
+	f      func() error
+	errors []error
+}
+
+func testForErrors(t *testing.T, te *testError) {
+	t.Helper()
+	t.Run(te.name, func(t2 *testing.T) {
+		expectErrors(t, te.f, te.errors...)
+	})
+}
+
 func expectErrors(t *testing.T, f func() error, expected ...error) {
 	t.Helper()
 	if err := f(); err == nil {
-		t.Fatal("expected error but got nil")
+		t.Fatal("expected error, got nil")
 	} else {
 		for _, e := range expected {
 			if !errors.Is(err, e) {
@@ -155,6 +171,104 @@ func expectErrors(t *testing.T, f func() error, expected ...error) {
 			}
 		}
 	}
+}
+
+func getClient(t *testing.T, c *configuration) *opaque.Client {
+	t.Helper()
+
+	client, err := c.conf.Client()
+	if err != nil {
+		t.Fatalf("failed to create client: %v", err)
+	}
+
+	return client
+}
+
+func getServer(t *testing.T, c *configuration) *opaque.Server {
+	t.Helper()
+
+	server, err := c.conf.Server()
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	return server
+}
+
+func setup(t *testing.T, c *configuration) (*opaque.Client, *opaque.Server) {
+	t.Helper()
+
+	client := getClient(t, c)
+	server := getServer(t, c)
+	sks, pks := c.conf.KeyGen()
+	skm := &opaque.ServerKeyMaterial{
+		Identity:       nil,
+		PrivateKey:     sks,
+		PublicKeyBytes: pks.Encode(),
+		OPRFGlobalSeed: internal.RandomBytes(c.conf.Hash.Size()),
+	}
+
+	if err := server.SetKeyMaterial(skm); err != nil {
+		t.Fatalf("failed to set server key material: %v", err)
+	}
+
+	return client, server
+}
+
+func registration(t *testing.T, client *opaque.Client, server *opaque.Server,
+	password, credentialIdentifier, clientIdentity, serverIdentity []byte,
+) *opaque.ClientRecord {
+	t.Helper()
+
+	r1, err := client.RegistrationInit(password)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r2, err := server.RegistrationResponse(r1, credentialIdentifier, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r3, _, err := client.RegistrationFinalize(r2, clientIdentity, serverIdentity)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return &opaque.ClientRecord{
+		CredentialIdentifier: credentialIdentifier,
+		ClientIdentity:       clientIdentity,
+		RegistrationRecord:   r3,
+	}
+}
+
+func authentication(
+	t *testing.T,
+	client *opaque.Client,
+	password []byte,
+	co *opaque.ClientOptions,
+	server *opaque.Server,
+	so *opaque.ServerOptions,
+	record *opaque.ClientRecord,
+) (*message.KE1, *message.KE2, *message.KE3, []byte, []byte) {
+	t.Helper()
+
+	ke1, err := client.GenerateKE1(password, co)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ke2, _, err := server.GenerateKE2(ke1, record, so)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ke3, sessionKey, exportKey, err := client.GenerateKE3(ke2, nil, nil, co)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return ke1, ke2, ke3, sessionKey, exportKey
 }
 
 func testAll(t *testing.T, f func(*testing.T, *configuration)) {
@@ -193,77 +307,64 @@ func getBad25519Scalar() []byte {
 	return decoded
 }
 
-func badScalar(t *testing.T, g group.Group, curve elliptic.Curve) []byte {
-	t.Helper()
-	order := curve.Params().P
-	exceeded := new(big.Int).Add(order, big.NewInt(2)).Bytes()
-
-	err := g.NewScalar().Decode(exceeded)
-	if err == nil {
-		t.Errorf("Exceeding order did not yield an error for group %s", g)
-	}
-
-	return exceeded
-}
-
-func getBadNistElement(t *testing.T, id group.Group) []byte {
-	size := id.ElementLength()
-	element := internal.RandomBytes(size)
-	// detag compression
-	element[0] = 4
-
-	// test if invalid compression is detected
-	err := id.NewElement().Decode(element)
-	if err == nil {
-		t.Errorf("detagged compressed point did not yield an error for group %s", id)
-	}
-
-	return element
-}
-
-func getBadElement(t *testing.T, c *configuration) []byte {
-	switch c.conf.AKE {
-	case opaque.RistrettoSha512:
-		return getBadRistrettoElement()
-	default:
-		return getBadNistElement(t, group.Group(c.conf.AKE))
-	}
-}
-
-func getBadScalar(t *testing.T, c *configuration) []byte {
+func (c *configuration) getBadScalar() []byte {
 	switch c.conf.AKE {
 	case opaque.RistrettoSha512:
 		return getBadRistrettoScalar()
 	default:
-		return badScalar(t, oprf.IDFromGroup(group.Group(c.conf.AKE)).Group(), c.curve)
+		order := c.curve.Params().P
+		exceeded := new(big.Int).Add(order, big.NewInt(2)).Bytes()
+
+		err := c.internal.Group.NewScalar().Decode(exceeded)
+		if err == nil {
+			panic(fmt.Sprintf("Exceeding order did not yield an error for group %s", c.internal.Group))
+		}
+
+		return exceeded
 	}
 }
 
-func buildRecord(
-	conf *opaque.Configuration,
-	serverKM *opaque.ServerKeyMaterial,
-	serverPublicKey, credID, password []byte,
+func (c *configuration) getBadElement() []byte {
+	switch c.conf.AKE {
+	case opaque.RistrettoSha512:
+		return getBadRistrettoElement()
+	default:
+		size := c.internal.Group.ElementLength()
+		element := internal.RandomBytes(size)
+		// detag compression
+		element[0] = 4
+
+		// test if invalid compression is detected
+		err := c.internal.Group.NewElement().Decode(element)
+		if err == nil {
+			panic(fmt.Sprintf("detagged compressed point did not yield an error for group %s", c.internal.Group))
+		}
+
+		return element
+	}
+}
+
+func (c *configuration) getValidElement() *group.Element {
+	s := c.internal.Group.NewScalar().Random()
+	return c.internal.Group.Base().Multiply(s)
+}
+
+func (c *configuration) getValidElementBytes() []byte {
+	return c.getValidElement().Encode()
+}
+
+func buildRecord(t *testing.T,
+	conf *configuration,
+	credentialIdentifier, password []byte,
 ) (*opaque.ClientRecord, error) {
-	client, err := conf.Client()
-	if err != nil {
-		return nil, err
-	}
-
-	server, err := conf.Server()
-	if err != nil {
-		return nil, err
-	}
-
-	if err := server.SetKeyMaterial(serverKM); err != nil {
-		return nil, fmt.Errorf("setting server key material: %w", err)
-	}
+	client, server := setup(t, conf)
 
 	r1, err := client.RegistrationInit(password)
 	if err != nil {
 		return nil, err
 	}
 
-	r2, err := server.RegistrationResponse(r1, serverPublicKey, credID, nil)
+	r2, err := server.RegistrationResponse(r1, credentialIdentifier, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +375,7 @@ func buildRecord(
 	}
 
 	return &opaque.ClientRecord{
-		CredentialIdentifier: credID,
+		CredentialIdentifier: credentialIdentifier,
 		ClientIdentity:       nil,
 		RegistrationRecord:   r3,
 	}, nil

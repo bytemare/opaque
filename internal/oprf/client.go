@@ -33,7 +33,8 @@ func (i Identifier) Blind(input []byte, blind *ecc.Scalar) (*ecc.Scalar, *ecc.El
 	return blind, p.Multiply(blind)
 }
 
-func (i Identifier) hashTranscript(input, unblinded []byte) []byte {
+// HashTranscript hashes the input and unblinded evaluation into a transcript.
+func (i Identifier) HashTranscript(input, unblinded []byte) []byte {
 	encInput := encoding.EncodeVector(input)
 	encElement := encoding.EncodeVector(unblinded)
 	encDST := []byte(tag.OPRFFinalize)
@@ -46,5 +47,5 @@ func (i Identifier) Finalize(blind *ecc.Scalar, input []byte, evaluation *ecc.El
 	invert := blind.Copy().Invert()
 	u := evaluation.Copy().Multiply(invert).Encode()
 
-	return i.hashTranscript(input, u)
+	return i.HashTranscript(input, u)
 }

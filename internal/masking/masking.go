@@ -66,10 +66,6 @@ func Unmask(
 		return nil, nil, nil, err
 	}
 
-	if serverPublicKey.IsIdentity() {
-		return nil, nil, nil, ErrPublicKeyIdentity
-	}
-
 	return serverPublicKey, serverPublicKeyBytes, envelope, nil
 }
 

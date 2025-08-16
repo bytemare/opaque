@@ -112,8 +112,8 @@ var (
 	// ErrEnvelopeInvalid indicates that the envelope or its components are invalid.
 	ErrEnvelopeInvalid = errors.New("envelope error")
 
-	// ErrInvalidMaskingKeyLength indicates that the length of the masking key is not valid.
-	ErrInvalidMaskingKeyLength = errors.New("invalid masking key length")
+	// ErrInvalidMaskingKey indicates that the length of the masking key is not valid.
+	ErrInvalidMaskingKey = errors.New("invalid masking key")
 )
 
 // Client state errors.
@@ -144,8 +144,11 @@ var (
 	// which is required.
 	ErrCredentialResponseNoMaskingNonce = errors.New("no masking nonce")
 
-	// ErrCredentialResponseInvalidMaskedLength indicates that the masked response length in KE2 is invalid.
-	ErrCredentialResponseInvalidMaskedLength = errors.New("invalid masked response length")
+	// ErrCredentialResponseInvalidMaskingNonce indicates that the masking nonce in the credential response is invalid.
+	ErrCredentialResponseInvalidMaskingNonce = errors.New("invalid masking nonce")
+
+	// ErrCredentialResponseInvalidMaskedResponse indicates that the masked response is invalid.
+	ErrCredentialResponseInvalidMaskedResponse = errors.New("invalid masked response")
 
 	ErrMissingMAC = errors.New("missing MAC")
 
@@ -203,6 +206,12 @@ var (
 	// ErrInvalidPublicKey indicates that the provided public key is invalid.
 	ErrInvalidPublicKey = errors.New("invalid public key")
 
+	// ErrInvalidPublicKeyBytes indicates that the provided public key bytes are not valid.
+	ErrInvalidPublicKeyBytes = errors.New("invalid public key encoding")
+
+	// ErrInvalidScalar indicates that the provided scalar is invalid.
+	ErrInvalidScalar = errors.New("invalid scalar")
+
 	// ErrScalarNil indicates the provided scalar is nil.
 	ErrScalarNil = errors.New("scalar is nil")
 
@@ -211,6 +220,9 @@ var (
 
 	// ErrScalarZero indicates the provided scalar is zero.
 	ErrScalarZero = errors.New("scalar is zero")
+
+	// ErrInvalidElement indicates that the provided element is invalid.
+	ErrInvalidElement = errors.New("invalid element")
 
 	// ErrElementNil indicates the provided element is nil.
 	ErrElementNil = errors.New("element is nil")
@@ -230,6 +242,9 @@ var (
 
 	// ErrInvalidClientPublicKey indicates the provided client public key is invalid.
 	ErrInvalidClientPublicKey = errors.New("invalid client public key")
+
+	// ErrSliceIsAllZeros indicates that the provided slice is all zeros.
+	ErrSliceIsAllZeros = errors.New("slice is all zeros")
 )
 
 // KE1 related errors
@@ -279,5 +294,6 @@ var (
 	// ErrKE3Nil indicates that the KE3 message is nil.
 	ErrKE3Nil = errors.New("KE3 is nil")
 
+	// ErrMissingNonce indicates that the nonce is missing.
 	ErrMissingNonce = errors.New("missing nonce")
 )

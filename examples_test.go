@@ -113,6 +113,7 @@ func Example_serverSetup() {
 	skm := &opaque.ServerKeyMaterial{
 		Identity:       serverID,
 		PrivateKey:     serverPrivateKey,
+		PublicKeyBytes: serverPublicKey.Encode(),
 		OPRFGlobalSeed: secretGlobalOprfSeed,
 	}
 
@@ -212,6 +213,7 @@ func Example_registration() {
 	skm := &opaque.ServerKeyMaterial{
 		Identity:       serverID,
 		PrivateKey:     serverPrivateKey,
+		PublicKeyBytes: serverPublicKey.Encode(),
 		OPRFGlobalSeed: secretGlobalOprfSeed,
 	}
 
@@ -259,7 +261,7 @@ func Example_registration() {
 		credID = opaque.RandomBytes(64)
 
 		// The server uses its public key and secret OPRF seed created at the setup.
-		response, err := server.RegistrationResponse(request, serverPublicKey.Encode(), credID, nil)
+		response, err := server.RegistrationResponse(request, credID, nil)
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -326,6 +328,7 @@ func Example_loginKeyExchange() {
 	skm := &opaque.ServerKeyMaterial{
 		Identity:       serverID,
 		PrivateKey:     serverPrivateKey,
+		PublicKeyBytes: serverPublicKey.Encode(),
 		OPRFGlobalSeed: secretGlobalOprfSeed,
 	}
 
@@ -461,6 +464,7 @@ func Example_fakeResponse() {
 
 	skm := &opaque.ServerKeyMaterial{
 		PrivateKey:     serverPrivateKey,
+		PublicKeyBytes: serverPublicKey.Encode(),
 		OPRFGlobalSeed: secretGlobalOprfSeed,
 	}
 

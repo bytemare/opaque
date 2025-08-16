@@ -141,10 +141,11 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	server.ServerKeyMaterial = &opaque.ServerKeyMaterial{
 		Identity:       nil,
 		PrivateKey:     nil,
+		PublicKeyBytes: v.Inputs.ServerPublicKey,
 		OPRFGlobalSeed: v.Inputs.OprfSeed,
 	}
 
-	regResp, err := server.RegistrationResponse(regReq, v.Inputs.ServerPublicKey, v.Inputs.CredentialIdentifier, nil)
+	regResp, err := server.RegistrationResponse(regReq, v.Inputs.CredentialIdentifier, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -350,9 +351,12 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal(err)
 	}
 
+	pk := sk.Group().Base().Multiply(sk)
+
 	skm := &opaque.ServerKeyMaterial{
 		Identity:       v.Inputs.ServerIdentity,
 		PrivateKey:     sk,
+		PublicKeyBytes: pk.Encode(),
 		OPRFGlobalSeed: v.Inputs.OprfSeed,
 	}
 

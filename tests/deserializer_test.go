@@ -9,12 +9,12 @@
 package opaque_test
 
 import (
+	"fmt"
 	"testing"
-
-	group "github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/encoding"
 )
 
 const testErrValidConf = "unexpected error on valid configuration: %v"
@@ -60,86 +60,428 @@ func TestDeserializer_New(t *testing.T) {
 	}
 }
 
-func TestDeserializer_RegistrationRequest_InvalidLength(t *testing.T) {
+type deserializerErrorTest struct {
+	method string
+	name   string
+	input  []byte
+	errors []error
+}
+
+func getDeserializerMethodTopError(method string) error {
+	switch method {
+	case "RegistrationRequest":
+		return opaque.ErrRegistrationRequest
+	case "RegistrationResponse":
+		return opaque.ErrRegistrationResponse
+	case "RegistrationRecord":
+		return opaque.ErrRegistrationRecord
+	case "KE1":
+		return opaque.ErrKE1
+	case "KE2":
+		return opaque.ErrKE2
+	case "KE3":
+		return opaque.ErrKE3
+	default:
+		panic("unknown deserializer method: " + method)
+	}
+}
+
+func getDeserializerMethod(method string) func(d *opaque.Deserializer, input []byte) error {
+	switch method {
+	case "RegistrationRequest":
+		return func(d *opaque.Deserializer, input []byte) error {
+			_, err := d.RegistrationRequest(input)
+			return err
+		}
+	case "RegistrationResponse":
+		return func(d *opaque.Deserializer, input []byte) error {
+			_, err := d.RegistrationResponse(input)
+			return err
+		}
+	case "RegistrationRecord":
+		return func(d *opaque.Deserializer, input []byte) error {
+			_, err := d.RegistrationRecord(input)
+			return err
+		}
+	case "KE1":
+		return func(d *opaque.Deserializer, input []byte) error {
+			_, err := d.KE1(input)
+			return err
+		}
+	case "KE2":
+		return func(d *opaque.Deserializer, input []byte) error {
+			_, err := d.KE2(input)
+			return err
+		}
+	case "KE3":
+		return func(d *opaque.Deserializer, input []byte) error {
+			_, err := d.KE3(input)
+			return err
+		}
+	default:
+		panic("unknown deserializer method: " + method)
+	}
+}
+
+func generateDeserializerErrorTestNilInput(method string) deserializerErrorTest {
+	return generateDeserializerErrorTest(method, "nil input", nil, errInvalidMessageLength)
+}
+
+func generateDeserializerErrorTestEmptyInput(method string) deserializerErrorTest {
+	return generateDeserializerErrorTest(method, "empty input", []byte{}, errInvalidMessageLength)
+}
+
+func generateDeserializerErrorTestInputTooShort(method string) deserializerErrorTest {
+	// should be too short for all suites
+	return generateDeserializerErrorTest(method, "input too short", internal.RandomBytes(30), errInvalidMessageLength)
+}
+
+func generateDeserializerErrorTestInputTooLong(method string) deserializerErrorTest {
+	// should be too long for all suites
+	return generateDeserializerErrorTest(method, "input too long", internal.RandomBytes(100), errInvalidMessageLength)
+}
+
+func generateDeserializerErrorTest(method, name string, input []byte, errors ...error) deserializerErrorTest {
+	return deserializerErrorTest{
+		method: method,
+		name:   fmt.Sprintf("%s:%s", method, name),
+		input:  input,
+		errors: append([]error{getDeserializerMethodTopError(method)}, errors...),
+	}
+}
+
+func TestDeserializer_RegistrationRequest_Errors(t *testing.T) {
+	method := "RegistrationRequest"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		c := conf.conf
-		length := c.OPRF.Group().ElementLength() + 1
 		d := getDeserializer(t, c)
 
-		expectErrors(t, func() error {
-			_, err := d.RegistrationRequest(internal.RandomBytes(length))
-			return err
-		}, opaque.ErrRegistrationRequest, errInvalidMessageLength)
+		tests := []deserializerErrorTest{
+			generateDeserializerErrorTestNilInput(method),
+			generateDeserializerErrorTestEmptyInput(method),
+			generateDeserializerErrorTestInputTooShort(method),
+			generateDeserializerErrorTestInputTooLong(method),
+			generateDeserializerErrorTest(method, "invalid data",
+				conf.getBadElement(),
+				opaque.ErrRegistrationRequest, internal.ErrInvalidBlindedMessage),
+			generateDeserializerErrorTest(method, "blinded element is zero",
+				conf.conf.OPRF.Group().NewElement().Encode(),
+				opaque.ErrRegistrationRequest, internal.ErrInvalidBlindedMessage),
+		}
+
+		for _, te := range tests {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+				f := getDeserializerMethod(te.method)
+
+				expectErrors(t, func() error {
+					return f(d, te.input)
+				}, te.errors...)
+			})
+		}
 	})
 }
 
-func TestDeserializer_RegistrationResponse_InvalidLength(t *testing.T) {
+func TestDeserializer_RegistrationResponse_Errors(t *testing.T) {
+	method := "RegistrationResponse"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		c := conf.conf
-		length := c.OPRF.Group().ElementLength() + c.AKE.Group().ElementLength() + 1
 		d := getDeserializer(t, c)
 
-		expectErrors(t, func() error {
-			_, err := d.RegistrationResponse(internal.RandomBytes(length))
-			return err
-		}, opaque.ErrRegistrationResponse, errInvalidMessageLength)
+		badElement := conf.getBadElement()
+		randomElement := conf.getValidElementBytes()
+		zeroElement := c.OPRF.Group().NewElement().Encode()
+
+		tests := []deserializerErrorTest{
+			generateDeserializerErrorTestNilInput(method),
+			generateDeserializerErrorTestEmptyInput(method),
+			generateDeserializerErrorTestInputTooShort(method),
+			generateDeserializerErrorTestInputTooLong(method),
+			generateDeserializerErrorTest(method, "invalid data",
+				encoding.Concat(badElement, randomElement),
+				opaque.ErrRegistrationResponse, internal.ErrInvalidEvaluatedMessage),
+			generateDeserializerErrorTest(method, "evaluate zero element",
+				encoding.Concat(zeroElement, randomElement),
+				opaque.ErrRegistrationResponse, internal.ErrInvalidEvaluatedMessage),
+			generateDeserializerErrorTest(method, "invalid server public key",
+				encoding.Concat(randomElement, badElement),
+				opaque.ErrRegistrationResponse, internal.ErrInvalidServerPublicKey),
+			generateDeserializerErrorTest(method, "server public key is zero",
+				encoding.Concat(randomElement, zeroElement),
+				opaque.ErrRegistrationResponse, internal.ErrInvalidServerPublicKey),
+		}
+
+		for _, te := range tests {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+				f := getDeserializerMethod(te.method)
+
+				expectErrors(t, func() error {
+					return f(d, te.input)
+				}, te.errors...)
+			})
+		}
 	})
 }
 
-func TestDeserialize_RegistrationRecord_InvalidLength(t *testing.T) {
+func TestDeserializer_RegistrationRecord_Errors(t *testing.T) {
+	method := "RegistrationRecord"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		c := conf.conf
-		length := c.AKE.Group().ElementLength() + c.Hash.Size() + conf.internal.EnvelopeSize + 1
-		d := getDeserializer(t, conf.conf)
+		d := getDeserializer(t, c)
 
-		expectErrors(t, func() error {
-			_, err := d.RegistrationRecord(internal.RandomBytes(length))
-			return err
-		}, opaque.ErrRegistrationRecord, errInvalidMessageLength)
+		badElement := conf.getBadElement()
+		randomElement := conf.getValidElementBytes()
+		zeroElement := c.OPRF.Group().NewElement().Encode()
+		okMaskingKey := internal.RandomBytes(c.Hash.Size())
+		okEnvelope := internal.RandomBytes(conf.internal.EnvelopeSize)
+
+		makeBadRecord := func(pk, maskingKey, envelope []byte) []byte {
+			return encoding.Concat3(pk, maskingKey, envelope)
+		}
+
+		recordBadPublicKey := makeBadRecord(badElement, okMaskingKey, okEnvelope)
+		recordBadPublicKeyZero := makeBadRecord(zeroElement, okMaskingKey, okEnvelope)
+		recordMaskingKeyZeros := makeBadRecord(randomElement, make([]byte, c.Hash.Size()), okEnvelope)
+
+		tests := []deserializerErrorTest{
+			generateDeserializerErrorTestNilInput(method),
+			generateDeserializerErrorTestEmptyInput(method),
+			generateDeserializerErrorTestInputTooShort(method),
+			generateDeserializerErrorTestInputTooLong(method),
+			generateDeserializerErrorTest(method, "invalid client public key",
+				recordBadPublicKey,
+				opaque.ErrRegistrationRecord, internal.ErrInvalidClientPublicKey),
+			generateDeserializerErrorTest(method, "server public key is zero",
+				recordBadPublicKeyZero,
+				opaque.ErrRegistrationRecord, internal.ErrInvalidClientPublicKey),
+			generateDeserializerErrorTest(method, "masking key is all zeros",
+				recordMaskingKeyZeros,
+				opaque.ErrRegistrationRecord, internal.ErrInvalidMaskingKey, internal.ErrSliceIsAllZeros),
+		}
+		for _, te := range tests {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+				f := getDeserializerMethod(te.method)
+
+				expectErrors(t, func() error {
+					return f(d, te.input)
+				}, te.errors...)
+			})
+		}
 	})
 }
 
-func TestDeserializer_KE1_InvalidLength(t *testing.T) {
+func TestDeserializer_KE1_Errors(t *testing.T) {
+	method := "KE1"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		c := conf.conf
-		g := group.Group(c.AKE)
-		ke1Length := g.ElementLength() + internal.NonceLength + g.ElementLength()
-
 		d := getDeserializer(t, c)
 
-		expectErrors(t, func() error {
-			_, err := d.KE1(internal.RandomBytes(ke1Length + 1))
-			return err
-		}, opaque.ErrKE1, errInvalidMessageLength)
+		badElement := conf.getBadElement()
+		randomElement := conf.getValidElementBytes()
+		zeroElement := c.OPRF.Group().NewElement().Encode()
+
+		tests := []deserializerErrorTest{
+			generateDeserializerErrorTestNilInput(method),
+			generateDeserializerErrorTestEmptyInput(method),
+			generateDeserializerErrorTestInputTooShort(method),
+			generateDeserializerErrorTestInputTooLong(method),
+			generateDeserializerErrorTest(method, "invalid blinded message",
+				encoding.Concat(badElement, internal.RandomBytes(conf.internal.NonceLen+c.AKE.Group().ElementLength())),
+				opaque.ErrKE1, internal.ErrInvalidBlindedMessage),
+			generateDeserializerErrorTest(
+				method,
+				"blinded message is zero",
+				encoding.Concat(
+					zeroElement,
+					internal.RandomBytes(conf.internal.NonceLen+c.AKE.Group().ElementLength()),
+				),
+				opaque.ErrKE1,
+				internal.ErrInvalidBlindedMessage,
+			),
+			generateDeserializerErrorTest(method, "nonce is all zeros",
+				encoding.Concat3(randomElement, make([]byte, conf.internal.NonceLen), randomElement),
+				opaque.ErrKE1, internal.ErrMissingNonce, internal.ErrSliceIsAllZeros),
+			generateDeserializerErrorTest(method, "invalid client key share",
+				encoding.Concat3(randomElement, internal.RandomBytes(conf.internal.NonceLen), badElement),
+				opaque.ErrKE1, internal.ErrInvalidClientKeyShare),
+			generateDeserializerErrorTest(method, "client key share is zero",
+				encoding.Concat3(randomElement, internal.RandomBytes(conf.internal.NonceLen), zeroElement),
+				opaque.ErrKE1, internal.ErrInvalidClientKeyShare),
+		}
+
+		for _, te := range tests {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+				f := getDeserializerMethod(te.method)
+
+				expectErrors(t, func() error {
+					return f(d, te.input)
+				}, te.errors...)
+			})
+		}
 	})
 }
 
-func TestDeserializer_KE2_InvalidLength(t *testing.T) {
+func TestDeserializer_KE2_Errors(t *testing.T) {
+	method := "KE2"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		c := conf.conf
-		ke2Length := c.OPRF.Group().ElementLength() +
-			2*conf.internal.NonceLen + 2*conf.internal.Group.ElementLength() + conf.internal.EnvelopeSize + conf.internal.MAC.Size()
-
 		d := getDeserializer(t, c)
 
-		expectErrors(t, func() error {
-			_, err := d.KE1(internal.RandomBytes(ke2Length + 1))
-			return err
-		}, opaque.ErrKE2, errInvalidMessageLength)
+		badElement := conf.getBadElement()
+		okElement := conf.getValidElementBytes()
+		zeroElement := c.OPRF.Group().NewElement().Encode()
+		okMaskingNonce := internal.RandomBytes(conf.internal.NonceLen)
+		okMaskedResponse := internal.RandomBytes(conf.internal.Group.ElementLength() + conf.internal.EnvelopeSize)
+		okServerNonce := internal.RandomBytes(conf.internal.NonceLen)
+		okServerMac := internal.RandomBytes(c.MAC.Size())
+
+		makeBadKe2 := func(evaluated, maskingNonce, maskedResponse, serverNonce, pks, serverMac []byte) []byte {
+			return encoding.Concatenate(evaluated, maskingNonce, maskedResponse, serverNonce, pks, serverMac)
+		}
+
+		ke2BadEvaluatedMessage := makeBadKe2(
+			badElement,
+			okMaskingNonce,
+			okMaskedResponse,
+			okServerNonce,
+			okElement,
+			okServerMac,
+		)
+		ke2BadEvaluatedMessageZero := makeBadKe2(
+			zeroElement,
+			okMaskingNonce,
+			okMaskedResponse,
+			okServerNonce,
+			okElement,
+			okServerMac,
+		)
+		ke2BadMaskingNonce := makeBadKe2(
+			okElement,
+			make([]byte, conf.internal.NonceLen),
+			okMaskedResponse,
+			okServerNonce,
+			okElement,
+			okServerMac,
+		)
+		ke2BadMaskedResponse := makeBadKe2(
+			okElement,
+			okMaskingNonce,
+			make([]byte, conf.internal.Group.ElementLength()+conf.internal.EnvelopeSize),
+			okServerNonce,
+			okElement,
+			okServerMac,
+		)
+		ke2BadServerKeyShare := makeBadKe2(
+			okElement,
+			okMaskingNonce,
+			okMaskedResponse,
+			okServerNonce,
+			badElement,
+			okServerMac,
+		)
+		ke2BadServerKeyShareZero := makeBadKe2(
+			okElement,
+			okMaskingNonce,
+			okMaskedResponse,
+			okServerNonce,
+			zeroElement,
+			okServerMac,
+		)
+		ke2BadServerNonce := makeBadKe2(
+			okElement,
+			okMaskingNonce,
+			okMaskedResponse,
+			make([]byte, conf.internal.NonceLen),
+			okElement,
+			okServerMac,
+		)
+		ke2BadServerMac := makeBadKe2(
+			okElement,
+			okMaskingNonce,
+			okMaskedResponse,
+			okServerNonce,
+			okElement,
+			make([]byte, c.MAC.Size()),
+		)
+
+		tests := []deserializerErrorTest{
+			generateDeserializerErrorTestNilInput(method),
+			generateDeserializerErrorTestEmptyInput(method),
+			generateDeserializerErrorTestInputTooShort(method),
+			generateDeserializerErrorTestInputTooLong(method),
+			generateDeserializerErrorTest(method, "invalid evaluated message",
+				ke2BadEvaluatedMessage,
+				opaque.ErrKE2, internal.ErrInvalidEvaluatedMessage),
+			generateDeserializerErrorTest(method, "blinded message is zero",
+				ke2BadEvaluatedMessageZero,
+				opaque.ErrKE2, internal.ErrInvalidEvaluatedMessage),
+			generateDeserializerErrorTest(
+				method,
+				"masking nonce is all zeros",
+				ke2BadMaskingNonce,
+				opaque.ErrKE2,
+				internal.ErrCredentialResponseInvalid,
+				internal.ErrCredentialResponseNoMaskingNonce,
+				internal.ErrSliceIsAllZeros,
+			),
+			generateDeserializerErrorTest(
+				method,
+				"masked response is all zeros",
+				ke2BadMaskedResponse,
+				opaque.ErrKE2,
+				internal.ErrCredentialResponseInvalid,
+				internal.ErrCredentialResponseInvalidMaskedResponse,
+				internal.ErrSliceIsAllZeros,
+			),
+			generateDeserializerErrorTest(method, "invalid server key share",
+				ke2BadServerKeyShare,
+				opaque.ErrKE2, internal.ErrInvalidServerKeyShare),
+			generateDeserializerErrorTest(method, "server key share is zero",
+				ke2BadServerKeyShareZero,
+				opaque.ErrKE2, internal.ErrInvalidServerKeyShare),
+			generateDeserializerErrorTest(method, "ke2 nonce is all zeros",
+				ke2BadServerNonce,
+				opaque.ErrKE2, internal.ErrMissingNonce, internal.ErrSliceIsAllZeros),
+			generateDeserializerErrorTest(method, "ke2 mac is all zeros",
+				ke2BadServerMac,
+				opaque.ErrKE2, internal.ErrMissingMAC, internal.ErrSliceIsAllZeros),
+		}
+		for _, te := range tests {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+				f := getDeserializerMethod(te.method)
+
+				expectErrors(t, func() error {
+					return f(d, te.input)
+				}, te.errors...)
+			})
+		}
 	})
 }
 
-func TestDeserializer_KE3_InvalidLength(t *testing.T) {
+func TestDeserializer_KE3_Errors(t *testing.T) {
+	method := "KE3"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		c := conf.conf
-		ke3Length := c.MAC.Size()
-
 		d := getDeserializer(t, c)
 
-		expectErrors(t, func() error {
-			_, err := d.KE1(internal.RandomBytes(ke3Length + 1))
-			return err
-		}, opaque.ErrKE3, errInvalidMessageLength)
+		tests := []deserializerErrorTest{
+			generateDeserializerErrorTestNilInput(method),
+			generateDeserializerErrorTestEmptyInput(method),
+			generateDeserializerErrorTestInputTooShort(method),
+			generateDeserializerErrorTestInputTooLong(method),
+			generateDeserializerErrorTest(method, "client mac is all zeros",
+				make([]byte, c.MAC.Size()),
+				opaque.ErrKE3, internal.ErrInvalidClientMac, internal.ErrSliceIsAllZeros),
+		}
+
+		for _, te := range tests {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+				f := getDeserializerMethod(te.method)
+
+				expectErrors(t, func() error {
+					return f(d, te.input)
+				}, te.errors...)
+			})
+		}
 	})
 }
 
@@ -164,7 +506,7 @@ func TestDecodeAkePrivateKey(t *testing.T) {
 
 func TestDecodeBadAkePrivateKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		badKey := getBadScalar(t, conf)
+		badKey := conf.getBadScalar()
 		d := getDeserializer(t, conf.conf)
 
 		expectErrors(t, func() error {
@@ -192,7 +534,7 @@ func TestDecodeAkePublicKey(t *testing.T) {
 
 func TestDecodeBadAkePublicKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		badKey := getBadElement(t, conf)
+		badKey := conf.getBadElement()
 
 		d := getDeserializer(t, conf.conf)
 
