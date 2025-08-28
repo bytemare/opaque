@@ -77,13 +77,13 @@ func k3dh(
 func core3DH(
 	conf *internal.Configuration, identities *Identities, ikm, ke1 []byte, ke2 *message.KE2,
 ) (sessionSecret, macS, macC []byte) {
-	// todo: reset hash at the beginning and at the end
+	conf.Hash.Reset()
 	initTranscript(conf, identities, ke1, ke2)
-
 	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, conf.Hash.Sum()) // preamble
 	serverMac := conf.MAC.MAC(serverMacKey, conf.Hash.Sum())                                // transcript2
 	conf.Hash.Write(serverMac)
 	transcript3 := conf.Hash.Sum()
+	conf.Hash.Reset()
 	clientMac := conf.MAC.MAC(clientMacKey, transcript3)
 
 	return sessionSecret, serverMac, clientMac

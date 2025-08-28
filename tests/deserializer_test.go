@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"testing"
 
+	group "github.com/bytemare/ecc"
+
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -319,6 +321,38 @@ func TestDeserializer_KE1_Errors(t *testing.T) {
 		}
 	})
 }
+
+func TestPointer(t *testing.T) {
+	type p struct {
+		pointer *group.Scalar
+	}
+
+	tester := &p{
+		//	pointer: group.Ristretto255Sha512.NewScalar().Random(),
+	}
+
+	// t.Log(tester.pointer.Hex())
+	t.Log(tester.pointer)
+	internal.ClearScalar(&tester.pointer)
+	t.Log(tester.pointer)
+}
+
+//func TestScalar(t *testing.T) {
+//	h := "25e852079d01b412ca9df1a8dcaefa99f52c757d69242d2edde02317a2d8760f02"
+//
+//	sb, err := hex.DecodeString(h)
+//	if err != nil {
+//		t.Fatalf("failed to decode hex string: %v", err)
+//	}
+//
+//	g := group.Ristretto255Sha512
+//
+//	s := g.NewScalar()
+//	if err := s.Decode(sb); err != nil {
+//		t.Fatalf("failed to decode scalar: %v", err)
+//	}
+//	t.Logf("Scalar: %s", s.Hex())
+//}
 
 func TestDeserializer_KE2_Errors(t *testing.T) {
 	method := "KE2"

@@ -233,6 +233,9 @@ var (
 	// ErrElementIdentity indicates the provided element is the identity element (point at infinity).
 	ErrElementIdentity = errors.New("element is the identity element")
 
+	// ErrElementIsBase indicates the provided element is the base point (generator).
+	ErrElementIsBase = errors.New("element is the base point (generator)")
+
 	// ErrPrivateKeyZero indicates the provided private key is zero.
 	ErrPrivateKeyZero = errors.New("private key is zero")
 

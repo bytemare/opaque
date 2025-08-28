@@ -437,7 +437,7 @@ func TestBadConfiguration(t *testing.T) {
 	}
 }
 
-func TestFakeRecord(t *testing.T) {
+func TestGetFakeRecord(t *testing.T) {
 	// Test valid configurations
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		if _, err := conf.conf.GetFakeRecord(nil); err != nil {

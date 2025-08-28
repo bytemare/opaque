@@ -14,32 +14,33 @@ import (
 )
 
 var (
-	errInputNegative  = errors.New("negative input")
-	errInputLarge     = errors.New("input is too high for length")
-	errLengthNegative = errors.New("length is negative or 0")
-	errLengthTooBig   = errors.New("requested length is > 4")
+	// todo: export and comment
+	ErrInputNegative  = errors.New("negative input")
+	ErrInputLarge     = errors.New("input is too high for length")
+	ErrLengthNegative = errors.New("length is negative or 0")
+	ErrLengthTooBig   = errors.New("requested length is > 4")
 
-	errInputEmpty    = errors.New("nil or empty input")
-	errInputTooLarge = errors.New("input too large for integer")
+	ErrInputEmpty    = errors.New("nil or empty input")
+	ErrInputTooLarge = errors.New("input too large for integer")
 )
 
 // I2OSP 32-bit Integer to Octet Stream Primitive on maximum 4 bytes.
 func I2OSP(value int, length uint16) []byte {
 	if length <= 0 {
-		panic(errLengthNegative)
+		panic(ErrLengthNegative)
 	}
 
 	if length > 4 {
-		panic(errLengthTooBig)
+		panic(ErrLengthTooBig)
 	}
 
 	out := make([]byte, 4)
 
 	switch v := value; {
 	case v < 0:
-		panic(errInputNegative)
+		panic(ErrInputNegative)
 	case v >= 1<<(8*length):
-		panic(errInputLarge)
+		panic(ErrInputLarge)
 	case length == 1:
 		binary.BigEndian.PutUint16(out, uint16(v)) //nolint:gosec // overflow is checked beforehand.
 		return out[1:2]
@@ -59,7 +60,7 @@ func I2OSP(value int, length uint16) []byte {
 func OS2IP(input []byte) int {
 	switch len(input) {
 	case 0:
-		panic(errInputEmpty)
+		panic(ErrInputEmpty)
 	case 1:
 		b := []byte{0, input[0]}
 		return int(binary.BigEndian.Uint16(b))
@@ -71,6 +72,6 @@ func OS2IP(input []byte) int {
 	case 4:
 		return int(binary.BigEndian.Uint32(input))
 	default:
-		panic(errInputTooLarge)
+		panic(ErrInputTooLarge)
 	}
 }

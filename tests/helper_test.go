@@ -44,6 +44,8 @@ func init() {
 var (
 	password             = []byte("test-password")
 	credentialIdentifier = []byte("test-credential-identifier")
+	clientIdentity       = []byte("test-client-identity")
+	serverIdentity       = []byte("test-server-identity")
 )
 
 type configuration struct {
@@ -342,6 +344,14 @@ func (c *configuration) getBadElement() []byte {
 
 		return element
 	}
+}
+
+func (c *configuration) getValidScalar() *group.Scalar {
+	return c.internal.Group.NewScalar().Random()
+}
+
+func (c *configuration) getValidScalarBytes() []byte {
+	return c.getValidScalar().Encode()
 }
 
 func (c *configuration) getValidElement() *group.Element {

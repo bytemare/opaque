@@ -19,6 +19,7 @@ import (
 
 	"github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
+	"github.com/bytemare/opaque/internal/tag"
 )
 
 const (
@@ -40,6 +41,15 @@ type Configuration struct {
 	NonceLen     int
 	EnvelopeSize int
 	Group        ecc.Group
+}
+
+// MakeSecretKeyShare generates a secret key share from the provided seed. If the seed is empty, it gets a random one.
+func (c *Configuration) MakeSecretKeyShare(seed []byte) *ecc.Scalar {
+	if len(seed) == 0 {
+		seed = RandomBytes(SeedLength)
+	}
+
+	return oprf.IDFromGroup(c.Group).DeriveKey(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
 }
 
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
@@ -95,18 +105,25 @@ func ValidateOptionsLength(input []byte, length int, referenceLength uint32) err
 
 // ClearScalar attempts to safely clearing the internal secret value of the scalar, by first setting its bytes to a
 // random value and then zeroes it out.
-func ClearScalar(s *ecc.Scalar) {
+func ClearScalar(s **ecc.Scalar) {
+	// todo: add a test and fuzz this function to ensure it works as expected
 	if s != nil {
-		s.Random()
-		s.Zero()
+		if *s != nil {
+			(*s).Random()
+			(*s).Zero()
+			*s = nil
+		}
+		*s = nil             // clear the scalar reference
 		runtime.KeepAlive(s) // prevent early GC and abstracting this call away
 	}
 }
 
-// ClearSlice attempts to safely clearing the internal secret value of the slice.
-func ClearSlice(b []byte) {
+// ClearSlice attempts to safely clear the internal values (i.e. set to zero) of the slice and sets the pointer to nil.
+func ClearSlice(b *[]byte) {
+	// todo: add a test and fuzz this function to ensure it works as expected
 	if b != nil {
-		clear(b)
+		clear(*b)
+		*b = nil             // clear the slice reference
 		runtime.KeepAlive(b) // prevent early GC and abstracting this call away
 	}
 }

@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/bytemare/opaque"
+	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 )
 
@@ -61,7 +63,13 @@ var I2OSPVectors = []i2ospTest{
 		[]byte{1}, 1, 1,
 	},
 	{
+		[]byte{0x20}, 32, 1,
+	},
+	{
 		[]byte{0xff}, 255, 1,
+	},
+	{
+		[]byte{0x00, 0x20}, 32, 2,
 	},
 	{
 		[]byte{0x01, 0x00}, 256, 2,
@@ -82,6 +90,13 @@ var I2OSPVectors = []i2ospTest{
 		[]byte{0xff, 0xff, 0xff, 0xff}, 4294967295, 4,
 	},
 }
+
+/*
+expectErrors(t, func() error {
+			_, _, err = server.GenerateKE2(ke1, nil)
+			return err
+		}, internal.ErrServerKeyMaterialNil)
+*/
 
 func TestI2OSP(t *testing.T) {
 	for i, v := range I2OSPVectors {
@@ -104,35 +119,6 @@ func TestI2OSP(t *testing.T) {
 		})
 	}
 
-	var length uint16 = 0
-	if hasPanic, err := expectPanic(nil, func() {
-		_ = encoding.I2OSP(1, length)
-	}); !hasPanic {
-		t.Fatalf("expected panic with with 0 length: %v", err)
-	}
-
-	length = 5
-	if hasPanic, err := expectPanic(nil, func() {
-		_ = encoding.I2OSP(1, length)
-	}); !hasPanic {
-		t.Fatalf("expected panic with length too big: %v", err)
-	}
-
-	negative := -1
-	if hasPanic, err := expectPanic(nil, func() {
-		_ = encoding.I2OSP(negative, 4)
-	}); !hasPanic {
-		t.Fatalf("expected panic with negative input: %v", err)
-	}
-
-	tooLarge := 1 << 32
-	length = 1
-	if hasPanic, err := expectPanic(nil, func() {
-		_ = encoding.I2OSP(tooLarge, length)
-	}); !hasPanic {
-		t.Fatalf("expected panic with exceeding value for the length: %v", err)
-	}
-
 	lengths := map[int]uint16{
 		100:           1,
 		1 << 8:        2,
@@ -149,27 +135,81 @@ func TestI2OSP(t *testing.T) {
 	}
 }
 
-func TestOS2IP(t *testing.T) {
-	// No input
-	if hasPanic, _ := expectPanic(nil, func() {
-		_ = encoding.OS2IP(nil)
-	}); !hasPanic {
-		t.Fatal("expected panic with nil input")
+func TestI2OSP_Failures(t *testing.T) {
+	tests := []struct {
+		expectedError error
+		name          string
+		value         int
+		length        uint16
+	}{
+		{
+			name:          "0 length",
+			value:         1,
+			length:        0,
+			expectedError: encoding.ErrLengthNegative,
+		},
+		{
+			name:          "length too big",
+			value:         1,
+			length:        5,
+			expectedError: encoding.ErrLengthTooBig,
+		},
+		{
+			name:          "negative input",
+			value:         -1,
+			length:        4,
+			expectedError: encoding.ErrInputNegative,
+		},
+		{
+			name:          "exceeding value for the length",
+			value:         1 << 32,
+			length:        1,
+			expectedError: encoding.ErrInputLarge,
+		},
 	}
 
-	// Empty input
-	if hasPanic, _ := expectPanic(nil, func() {
-		_ = encoding.OS2IP([]byte(""))
-	}); !hasPanic {
-		t.Fatal("expected panic with empty input")
+	for _, te := range tests {
+		t.Run(fmt.Sprintf("%s", te.name), func(t *testing.T) {
+			if hasPanic, err := expectPanic(te.expectedError, func() {
+				_ = encoding.I2OSP(te.value, te.length)
+			}); !hasPanic {
+				t.Fatalf("expected panic with with 0 length: %v", err)
+			}
+		})
+	}
+}
+
+func TestOS2IP_Failures(t *testing.T) {
+	tests := []struct {
+		expectedError error
+		name          string
+		input         []byte
+	}{
+		{
+			name:          "nil input",
+			input:         nil,
+			expectedError: encoding.ErrInputEmpty,
+		},
+		{
+			name:          "empty input",
+			input:         []byte{},
+			expectedError: encoding.ErrInputEmpty,
+		},
+		{
+			name:          "too long",
+			input:         []byte{1, 2, 3, 4, 5},
+			expectedError: encoding.ErrInputTooLarge,
+		},
 	}
 
-	// Exceeding input
-	input := "12345"
-	if hasPanic, _ := expectPanic(nil, func() {
-		_ = encoding.OS2IP([]byte(input))
-	}); !hasPanic {
-		t.Fatal("expected panic with big input")
+	for _, te := range tests {
+		t.Run(fmt.Sprintf("%s", te.name), func(t *testing.T) {
+			if hasPanic, err := expectPanic(te.expectedError, func() {
+				_ = encoding.OS2IP(te.input)
+			}); !hasPanic {
+				t.Fatalf("expected panic with with 0 length: %v", err)
+			}
+		})
 	}
 }
 
@@ -213,4 +253,119 @@ func expectPanic(expectedError error, f func()) (bool, string) {
 	}
 
 	return true, ""
+}
+
+func TestDecodeLongVector(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+	g := conf.AKE.Group()
+	id := internal.RandomBytes(10)
+	sk := g.NewScalar().Random()
+	pk := g.NewElement().Multiply(sk)
+
+	encoded := encoding.Concatenate(
+		encoding.EncodeVector(id),
+		encoding.EncodeVector(sk.Encode()),
+		encoding.EncodeVector(pk.Encode()),
+	)
+
+	var decodedID, decodedSK, decodedPK []byte
+	if err := encoding.DecodeLongVector(encoded, &decodedID, &decodedSK, &decodedPK); err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(id, decodedID) {
+		t.Fatalf("invalid ID. Expected %s, got %s", hex.EncodeToString(id), hex.EncodeToString(decodedID))
+	}
+
+	dsk := g.NewScalar()
+	if err := dsk.Decode(decodedSK); err != nil {
+		t.Fatal(err)
+	}
+
+	if !dsk.Equal(sk) {
+		t.Fatalf("invalid scalar. Expected %s, got %s", sk.Hex(), dsk.Hex())
+	}
+
+	dpk := g.NewElement()
+	if err := dpk.Decode(decodedPK); err != nil {
+		t.Fatal(err)
+	}
+
+	if !dpk.Equal(pk) {
+		t.Fatalf("invalid element. Expected %s, got %s", pk.Hex(), dpk.Hex())
+	}
+}
+
+func TestDecodeLongVector_TooShort(t *testing.T) {
+	type testType struct {
+		name          string
+		input         []byte
+		output        []*[]byte
+		expectedError []error
+	}
+
+	tests := []testType{
+		{
+			name:          "short input",
+			input:         []byte{2},
+			output:        nil,
+			expectedError: []error{encoding.ErrDecoding, encoding.ErrHeaderLength},
+		},
+		{
+			name:          "missing output vectors",
+			input:         encoding.EncodeVector([]byte{1, 2, 3}),
+			output:        nil,
+			expectedError: []error{encoding.ErrDecoding, encoding.ErrMissingOutput},
+		},
+		{
+			name:          "nil output vector",
+			input:         encoding.EncodeVector([]byte{1, 2, 3}),
+			output:        []*[]byte{{}, nil},
+			expectedError: []error{encoding.ErrDecoding, encoding.ErrNilOutput},
+		},
+		{
+			name:          "nil output vector in slice",
+			input:         encoding.EncodeVector([]byte{1, 2, 3}),
+			output:        []*[]byte{nil},
+			expectedError: []error{encoding.ErrDecoding, encoding.ErrNilOutput},
+		},
+		{
+			name:          "empty encoded slice",
+			input:         []byte{},
+			output:        []*[]byte{{}},
+			expectedError: []error{encoding.ErrDecoding, encoding.ErrHeaderLength},
+		},
+		{
+			name:          "incomplete payload",
+			input:         encoding.EncodeVector([]byte{1, 2, 3})[:3],
+			output:        []*[]byte{{}},
+			expectedError: []error{encoding.ErrDecoding, encoding.ErrTotalLength},
+		},
+		{
+			name:          "bad payload header",
+			input:         []byte{0},
+			output:        []*[]byte{{}},
+			expectedError: []error{encoding.ErrDecoding, encoding.ErrHeaderLength},
+		},
+		{
+			name:          "bad payload length",
+			input:         []byte{0, 3, 0},
+			output:        []*[]byte{{}},
+			expectedError: []error{encoding.ErrDecoding, encoding.ErrTotalLength},
+		},
+		{
+			name:          "empty payload",
+			input:         []byte{0, 0},
+			output:        []*[]byte{{}},
+			expectedError: []error{encoding.ErrDecoding, encoding.ErrEmptyEncoded},
+		},
+	}
+
+	for _, te := range tests {
+		t.Run(te.name, func(t *testing.T) {
+			expectErrors(t, func() error {
+				return encoding.DecodeLongVector(te.input, te.output...)
+			}, te.expectedError...)
+		})
+	}
 }

@@ -24,7 +24,6 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	internalKSF "github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
-	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -302,26 +301,14 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 }
 
 // getSecretKeyShare assumes either SecretKeyShare is set or SecretKeyShareSeed is != 0.
-func (o *AKEOptions) getSecretKeyShare(g ecc.Group) (*ecc.Scalar, error) {
+func (o *AKEOptions) getSecretKeyShare(c *internal.Configuration) (*ecc.Scalar, error) {
 	if o.SecretKeyShare != nil {
-		if err := IsValidScalar(g, o.SecretKeyShare); err != nil {
+		if err := IsValidScalar(c.Group, o.SecretKeyShare); err != nil {
 			return nil, errors.Join(internal.ErrSecretShareInvalid, err)
 		}
 
-		return g.NewScalar().Set(o.SecretKeyShare), nil
+		return c.Group.NewScalar().Set(o.SecretKeyShare), nil
 	}
 
-	return makeESK(g, o.SecretKeyShareSeed), nil
-}
-
-func makeESK(g ecc.Group, seed []byte) *ecc.Scalar {
-	if len(seed) == 0 {
-		seed = internal.RandomBytes(internal.SeedLength)
-	}
-
-	return oprf.IDFromGroup(g).DeriveKey(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
-}
-
-func makeEskAndNonce(g ecc.Group) (*ecc.Scalar, []byte) {
-	return makeESK(g, nil), internal.RandomBytes(internal.NonceLength)
+	return c.MakeSecretKeyShare(o.SecretKeyShareSeed), nil
 }

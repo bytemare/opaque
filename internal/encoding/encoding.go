@@ -9,12 +9,16 @@
 // Package encoding provides encoding utilities.
 package encoding
 
-import "errors"
+import (
+	"errors"
+	"log/slog"
+)
 
 var (
 	// ErrDecoding indicates a decoding error.
 	ErrDecoding = errors.New("decoding error")
 
+	// todo: comments
 	ErrHeaderLength  = errors.New("insufficient header length for decoding")
 	ErrTotalLength   = errors.New("insufficient total length for decoding")
 	ErrMissingOutput = errors.New("missing output slice for decoding")
@@ -55,6 +59,7 @@ func DecodeVector(in []byte) (data []byte, offset int, err error) {
 // DecodeLongVector decodes a vector of concatenated 2-byte length-prefixed byte slices, and stores the encoded slices
 // in the provided output slice.
 func DecodeLongVector(in []byte, out ...*[]byte) error {
+	// todo: test this function
 	if len(in) < 2 {
 		return errors.Join(ErrDecoding, ErrHeaderLength)
 	}
@@ -64,9 +69,9 @@ func DecodeLongVector(in []byte, out ...*[]byte) error {
 	}
 
 	var (
-		d      []byte
-		offset int
-		err    error
+		d             []byte
+		index, offset int
+		err           error
 	)
 
 	for _, target := range out {
@@ -74,7 +79,7 @@ func DecodeLongVector(in []byte, out ...*[]byte) error {
 			return errors.Join(ErrDecoding, ErrNilOutput)
 		}
 
-		d, offset, err = decodeVectorLen(in[offset:], 2)
+		d, offset, err = DecodeVector(in[index:])
 		if err != nil {
 			return err
 		}
@@ -84,7 +89,10 @@ func DecodeLongVector(in []byte, out ...*[]byte) error {
 		}
 
 		*target = d
+		index += offset
 	}
+
+	slog.Info("huh", "result", out[0])
 
 	return nil
 }
