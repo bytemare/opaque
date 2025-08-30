@@ -227,9 +227,6 @@ var (
 	// ErrElementNil indicates the provided element is nil.
 	ErrElementNil = errors.New("element is nil")
 
-	// ErrElementGroupMismatch indicates the provided element does not match the group.
-	ErrElementGroupMismatch = fmt.Errorf("element: %w", ErrWrongGroup)
-
 	// ErrElementIdentity indicates the provided element is the identity element (point at infinity).
 	ErrElementIdentity = errors.New("element is the identity element")
 
@@ -239,9 +236,14 @@ var (
 	// ErrPrivateKeyZero indicates the provided private key is zero.
 	ErrPrivateKeyZero = errors.New("private key is zero")
 
+	// ErrSecretShareInvalid indicates the provided secret share is invalid.
 	ErrSecretShareInvalid = errors.New("invalid secret share")
 
+	// ErrWrongGroup indicates that the provided group does not match the expected group.
 	ErrWrongGroup = errors.New("does not match the group")
+
+	// ErrElementGroupMismatch indicates the provided element does not match the group.
+	ErrElementGroupMismatch = fmt.Errorf("element: %w", ErrWrongGroup)
 
 	// ErrInvalidClientPublicKey indicates the provided client public key is invalid.
 	ErrInvalidClientPublicKey = errors.New("invalid client public key")
@@ -250,7 +252,7 @@ var (
 	ErrSliceIsAllZeros = errors.New("slice is all zeros")
 )
 
-// KE1 related errors
+// KE1 related errors.
 var (
 	// ErrKE1Nil indicates that the KE1 message is nil.
 	ErrKE1Nil = errors.New("KE1 is nil")

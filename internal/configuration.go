@@ -113,6 +113,7 @@ func ClearScalar(s **ecc.Scalar) {
 			(*s).Zero()
 			*s = nil
 		}
+
 		*s = nil             // clear the scalar reference
 		runtime.KeepAlive(s) // prevent early GC and abstracting this call away
 	}

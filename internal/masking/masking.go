@@ -63,7 +63,8 @@ func Unmask(
 
 	serverPublicKey = conf.Group.NewElement()
 	if err = serverPublicKey.Decode(serverPublicKeyBytes); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil,
+			errors.Join(internal.ErrAuthenticationInvalidServerPublicKey, err)
 	}
 
 	return serverPublicKey, serverPublicKeyBytes, envelope, nil

@@ -11,7 +11,6 @@ package opaque
 import (
 	"encoding/hex"
 	"errors"
-	"log/slog"
 	"slices"
 
 	"github.com/bytemare/ecc"
@@ -163,7 +162,6 @@ func (c *Configuration) skmStructureCheck(data []byte) error {
 		}
 
 		if len(data) < offset+4+sh {
-			slog.Info("6")
 			return internal.ErrInvalidOPRFSeedLength
 		}
 	}
@@ -173,7 +171,6 @@ func (c *Configuration) skmStructureCheck(data []byte) error {
 	maxLength := offset + 2 + idh
 
 	if maxLength != len(data) {
-		slog.Info("7")
 		return errors.Join(internal.ErrInvalidEncodingLength)
 	}
 

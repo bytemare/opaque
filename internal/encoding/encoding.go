@@ -11,19 +11,27 @@ package encoding
 
 import (
 	"errors"
-	"log/slog"
 )
 
+// Encoding/decoding errors.
 var (
 	// ErrDecoding indicates a decoding error.
 	ErrDecoding = errors.New("decoding error")
 
-	// todo: comments
-	ErrHeaderLength  = errors.New("insufficient header length for decoding")
-	ErrTotalLength   = errors.New("insufficient total length for decoding")
+	// ErrHeaderLength indicates that the header length is insufficient for decoding.
+	ErrHeaderLength = errors.New("insufficient header length for decoding")
+
+	// ErrTotalLength indicates that the total length is insufficient for decoding.
+	ErrTotalLength = errors.New("insufficient total length for decoding")
+
+	// ErrMissingOutput indicates that no output slice was provided for decoding.
 	ErrMissingOutput = errors.New("missing output slice for decoding")
-	ErrNilOutput     = errors.New("nil output slice for decoding")
-	ErrEmptyEncoded  = errors.New("decoding yielded empty data")
+
+	// ErrNilOutput indicates that a nil output slice was provided for decoding.
+	ErrNilOutput = errors.New("nil output slice for decoding")
+
+	// ErrEmptyEncoded indicates that the decoding returned empty data.
+	ErrEmptyEncoded = errors.New("decoding yielded empty data")
 )
 
 // EncodeVectorLen returns the input prepended with a byte encoding of its length.
@@ -59,7 +67,6 @@ func DecodeVector(in []byte) (data []byte, offset int, err error) {
 // DecodeLongVector decodes a vector of concatenated 2-byte length-prefixed byte slices, and stores the encoded slices
 // in the provided output slice.
 func DecodeLongVector(in []byte, out ...*[]byte) error {
-	// todo: test this function
 	if len(in) < 2 {
 		return errors.Join(ErrDecoding, ErrHeaderLength)
 	}
@@ -91,8 +98,6 @@ func DecodeLongVector(in []byte, out ...*[]byte) error {
 		*target = d
 		index += offset
 	}
-
-	slog.Info("huh", "result", out[0])
 
 	return nil
 }

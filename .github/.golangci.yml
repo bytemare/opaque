@@ -148,12 +148,12 @@ linters:
         - '3'
         - '4'
         - '8'
+        - '9'
     nlreturn:
       block-size: 2
     prealloc:
       simple: false
       for-loops: true
-
   exclusions:
     rules:
       - path: internal/hash.go

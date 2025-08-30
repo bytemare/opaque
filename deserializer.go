@@ -115,6 +115,7 @@ func (d *Deserializer) KE1(ke1 []byte) (*message.KE1, error) {
 	}
 
 	offset := d.conf.OPRF.Group().ElementLength() + d.conf.NonceLen
+
 	epku, err := DeserializeElement(d.conf.Group, ke1[offset:offset+d.conf.Group.ElementLength()])
 	if err != nil {
 		return nil, ErrKE1.Join(internal.ErrInvalidClientKeyShare, err)

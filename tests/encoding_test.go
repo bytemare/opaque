@@ -146,7 +146,7 @@ func TestI2OSP_Failures(t *testing.T) {
 			name:          "0 length",
 			value:         1,
 			length:        0,
-			expectedError: encoding.ErrLengthNegative,
+			expectedError: encoding.ErrLengthNegativeOrZero,
 		},
 		{
 			name:          "length too big",
@@ -260,7 +260,7 @@ func TestDecodeLongVector(t *testing.T) {
 	g := conf.AKE.Group()
 	id := internal.RandomBytes(10)
 	sk := g.NewScalar().Random()
-	pk := g.NewElement().Multiply(sk)
+	pk := g.Base().Multiply(sk)
 
 	encoded := encoding.Concatenate(
 		encoding.EncodeVector(id),

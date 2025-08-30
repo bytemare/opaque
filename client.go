@@ -70,7 +70,7 @@ func NewClient(c *Configuration) (*Client, error) {
 
 // RegistrationInit returns a RegistrationRequest message blinding the given password.
 // This will initiate a state, so the same client instance should be used to call RegistrationFinalize() later on.
-// Optionally, that value can be overridden by providing a ClientOptions with an OPRF Blind value, but at your own risks.
+// Optionally, that value can be overridden by providing a ClientOptions with an OPRF Blind value, at your own risks.
 func (c *Client) RegistrationInit(
 	password []byte,
 	options ...*ClientOptions,
@@ -79,8 +79,10 @@ func (c *Client) RegistrationInit(
 		return nil, ErrClientState.Join(internal.ErrClientPreviousBlind)
 	}
 
-	var blind *ecc.Scalar
-	var err error
+	var (
+		blind *ecc.Scalar
+		err   error
+	)
 
 	if len(options) != 0 {
 		blind, err = c.verifyOptionBlind(options...)
@@ -157,7 +159,7 @@ func (c *Client) GenerateKE1(password []byte, options ...*ClientOptions) (*messa
 	c.oprf.blind, m = c.conf.OPRF.Blind(password, o.OPRFBlind)
 	c.oprf.password = slices.Clone(password)
 	ke1 := ake.Start(c.conf.Group, c.ake.SecretKeyShare, o.AKENonce)
-	ke1.CredentialRequest.BlindedMessage = m
+	ke1.BlindedMessage = m
 	c.ake.ke1 = ke1.Serialize()
 
 	return ke1, nil
@@ -187,7 +189,7 @@ func (c *Client) GenerateKE3(
 	serverPublicKey, serverPublicKeyBytes,
 		envelope, err := masking.Unmask(c.conf, randomizedPassword, ke2.MaskingNonce, ke2.MaskedResponse)
 	if err != nil {
-		return nil, nil, nil, ErrAuthentication.Join(internal.ErrAuthenticationInvalidServerPublicKey, err)
+		return nil, nil, nil, ErrAuthentication.Join(err)
 	}
 
 	var clientSecretKey *ecc.Scalar

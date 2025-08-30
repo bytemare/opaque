@@ -13,21 +13,31 @@ import (
 	"errors"
 )
 
+// I2OSP/OS2IP errors.
 var (
-	// todo: export and comment
-	ErrInputNegative  = errors.New("negative input")
-	ErrInputLarge     = errors.New("input is too high for length")
-	ErrLengthNegative = errors.New("length is negative or 0")
-	ErrLengthTooBig   = errors.New("requested length is > 4")
+	// ErrInputNegative happens when the provider integer is negative.
+	ErrInputNegative = errors.New("negative input")
 
-	ErrInputEmpty    = errors.New("nil or empty input")
+	// ErrInputLarge happens when the provider value is too large for the specified length.
+	ErrInputLarge = errors.New("input value is too high for length")
+
+	// ErrLengthNegativeOrZero happens when the specified length is negative or 0.
+	ErrLengthNegativeOrZero = errors.New("length is negative or 0")
+
+	// ErrLengthTooBig happens when the specified length is > 4.
+	ErrLengthTooBig = errors.New("requested length is > 4")
+
+	// ErrInputEmpty happens when the input is nil or empty.
+	ErrInputEmpty = errors.New("nil or empty input")
+
+	// ErrInputTooLarge happens when the input is longer than 4 bytes.
 	ErrInputTooLarge = errors.New("input too large for integer")
 )
 
 // I2OSP 32-bit Integer to Octet Stream Primitive on maximum 4 bytes.
 func I2OSP(value int, length uint16) []byte {
 	if length <= 0 {
-		panic(ErrLengthNegative)
+		panic(ErrLengthNegativeOrZero)
 	}
 
 	if length > 4 {
@@ -36,22 +46,22 @@ func I2OSP(value int, length uint16) []byte {
 
 	out := make([]byte, 4)
 
-	switch v := value; {
-	case v < 0:
+	switch {
+	case value < 0:
 		panic(ErrInputNegative)
-	case v >= 1<<(8*length):
+	case value >= 1<<(8*length):
 		panic(ErrInputLarge)
 	case length == 1:
-		binary.BigEndian.PutUint16(out, uint16(v)) //nolint:gosec // overflow is checked beforehand.
+		binary.BigEndian.PutUint16(out, uint16(value)) //nolint:gosec // overflow is checked beforehand.
 		return out[1:2]
 	case length == 2:
-		binary.BigEndian.PutUint16(out, uint16(v)) //nolint:gosec // overflow is checked beforehand.
+		binary.BigEndian.PutUint16(out, uint16(value)) //nolint:gosec // overflow is checked beforehand.
 		return out[:2]
 	case length == 3:
-		binary.BigEndian.PutUint32(out, uint32(v)) //nolint:gosec // overflow is checked beforehand.
+		binary.BigEndian.PutUint32(out, uint32(value)) //nolint:gosec // overflow is checked beforehand.
 		return out[1:]
 	default: // length == 4
-		binary.BigEndian.PutUint32(out, uint32(v)) //nolint:gosec // overflow is checked beforehand.
+		binary.BigEndian.PutUint32(out, uint32(value)) //nolint:gosec // overflow is checked beforehand.
 		return out
 	}
 }

@@ -78,14 +78,14 @@ func TestClient_GenerateKE3_BadMaskedResponse(t *testing.T) {
 		expectErrors(t, func() error {
 			_, _, _, err = client.GenerateKE3(ke2, nil, nil)
 			return err
-		}, opaque.ErrKE3, internal.ErrCredentialResponseInvalidMaskedResponse, internal.ErrInvalidEncodingLength)
+		}, opaque.ErrKE2, internal.ErrCredentialResponseInvalidMaskedResponse, internal.ErrInvalidEncodingLength)
 
 		// too long
 		ke2.MaskedResponse = internal.RandomBytes(goodLength + 1)
 		expectErrors(t, func() error {
 			_, _, _, err = client.GenerateKE3(ke2, nil, nil)
 			return err
-		}, opaque.ErrKE3, internal.ErrCredentialResponseInvalidMaskedResponse, internal.ErrInvalidEncodingLength)
+		}, opaque.ErrKE2, internal.ErrCredentialResponseInvalidMaskedResponse, internal.ErrInvalidEncodingLength)
 	})
 }
 
