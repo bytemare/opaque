@@ -18,8 +18,9 @@ import (
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
-	ksf2 "github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/tag"
+
+	ksf2 "github.com/bytemare/opaque/internal/ksf"
 )
 
 // todo: identify whether we can use table tests

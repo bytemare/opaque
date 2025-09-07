@@ -22,9 +22,10 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
-	internalKSF "github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
+
+	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
 // Group identifies the prime-order group with hash-to-curve capability to use in OPRF and AKE.

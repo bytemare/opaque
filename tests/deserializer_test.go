@@ -12,11 +12,11 @@ import (
 	"fmt"
 	"testing"
 
-	group "github.com/bytemare/ecc"
-
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
+
+	group "github.com/bytemare/ecc"
 )
 
 const testErrValidConf = "unexpected error on valid configuration: %v"

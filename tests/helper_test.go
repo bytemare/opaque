@@ -18,16 +18,17 @@ import (
 	"math/big"
 	"testing"
 
-	group "github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/keyrecovery"
-	internalKSF "github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
+
+	group "github.com/bytemare/ecc"
+	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
 func init() {

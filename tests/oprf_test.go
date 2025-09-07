@@ -17,11 +17,11 @@ import (
 	"strings"
 	"testing"
 
-	group "github.com/bytemare/ecc"
-
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
+
+	group "github.com/bytemare/ecc"
 )
 
 type oprfVector struct {
