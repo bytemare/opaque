@@ -237,8 +237,7 @@ func (e *Error) Format(f fmt.State, verb rune) {
 
 // Is implements the errors.Is method for the Error type. It allows checking if the error is of a specific ErrorCode.
 func (e *Error) Is(target error) bool {
-	// todo: test this case + not sure this actually makes sense
-	return e.Code.Is(target) && strings.EqualFold(e.Message, target.Error())
+	return e.Code.Is(target)
 }
 
 // As implements the errors.As method for the Error type. It allows type assertion to specific error types.
