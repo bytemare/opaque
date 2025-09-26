@@ -20,9 +20,6 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 )
 
-// ErrPublicKeyIdentity happens when the public key is the identity element (point at infinity).
-var ErrPublicKeyIdentity = errors.New("public key is identity element")
-
 // Keys contains all the output keys from the masking mechanism.
 type Keys struct {
 	ClientSecretKey                  *ecc.Scalar

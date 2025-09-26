@@ -12,8 +12,8 @@ update-linters:
 	@go install github.com/segmentio/golines@latest
 	@go install github.com/google/addlicense@latest
 	@go install golang.org/x/tools/cmd/goimports@latest
+	@go install golang.org/x/vuln/cmd/govulncheck@latest
 	@go install golang.org/x/tools/go/analysis/passes/fieldalignment/cmd/fieldalignment@latest
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
 
 .PHONY: fmt
 fmt:
@@ -35,6 +35,11 @@ lint: fmt license
 	@echo "Linting ..."
 	@if golangci-lint config verify -v --config=.golangci.yml; then echo "Config OK"; else return 1; fi;
 	@if golangci-lint run --config=.golangci.yml ../...; then echo "Linting OK"; else return 1; fi;
+
+.PHONY: vulncheck
+vulncheck:
+	@echo "Running govulncheck ..."
+	@govulncheck -show verbose ../...
 
 .PHONY: test
 test:
@@ -77,3 +82,10 @@ fuzz:
     	done; \
     done; \
     exit $$failed
+
+.PHONY: bench
+bench:
+	@echo "Running benchmarks ..."
+	@bench_regex=$${BENCH:-'.*Suites'}; \
+	 bench_time=$${BENCHTIME:-5s}; \
+	 go test -run '^$$' -bench "$$bench_regex" -benchmem -benchtime "$$bench_time" ../tests

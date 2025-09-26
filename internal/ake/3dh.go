@@ -20,15 +20,12 @@ import (
 )
 
 // KeyGen returns private and public keys in the ecc.
-func KeyGen(g ecc.Group, seed ...[]byte) (*ecc.Scalar, *ecc.Element) {
-	var s []byte
-	if len(seed) != 0 && len(seed[0]) > 0 {
-		s = seed[0]
-	} else {
-		s = internal.RandomBytes(internal.SeedLength)
+func KeyGen(g ecc.Group, seed []byte) (*ecc.Scalar, *ecc.Element) {
+	if len(seed) == 0 {
+		seed = internal.RandomBytes(internal.SeedLength)
 	}
 
-	return oprf.IDFromGroup(g).DeriveKeyPair(s, []byte(tag.DeriveDiffieHellmanKeyPair))
+	return oprf.IDFromGroup(g).DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
 }
 
 func diffieHellman(s *ecc.Scalar, e *ecc.Element) *ecc.Element {

@@ -1,6 +1,6 @@
 module github.com/bytemare/opaque
 
-go 1.24.2
+go 1.25
 
 require (
 	github.com/bytemare/ecc v0.9.0

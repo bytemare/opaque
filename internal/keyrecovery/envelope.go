@@ -13,8 +13,8 @@ import (
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
-	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 )
 
@@ -65,7 +65,7 @@ func deriveDiffieHellmanKeyPair(
 	randomizedPassword, nonce []byte,
 ) (*ecc.Scalar, *ecc.Element) {
 	seed := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
-	return oprf.IDFromGroup(conf.Group).DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
+	return ake.KeyGen(conf.Group, seed)
 }
 
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.

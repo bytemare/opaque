@@ -74,39 +74,9 @@ var (
 	ErrProvidedLengthNegative = errors.New("provided length is negative")
 )
 
-// ValidateOptionsLength returns an error if the input slice does not match the provided length (if != 0) or is shorter
-// than the reference length.
-func ValidateOptionsLength(input []byte, length int, referenceLength uint32) error {
-	if input == nil {
-		return nil
-	}
-
-	if length < 0 {
-		return ErrProvidedLengthNegative
-	}
-
-	// If the length is 0, it means the required length is not overridden, and the input slice must be at least the
-	// reference length.
-	if length == 0 {
-		if len(input) < int(referenceLength) {
-			return fmt.Errorf("%w: want %d, got %d", ErrSliceShorterLength, referenceLength, len(input))
-		}
-
-		return nil
-	}
-
-	// If a length is provided, the input slice must match it.
-	if length != len(input) {
-		return fmt.Errorf("%w: want %d, got %d", ErrSliceDifferentLength, length, len(input))
-	}
-
-	return nil
-}
-
 // ClearScalar attempts to safely clearing the internal secret value of the scalar, by first setting its bytes to a
 // random value and then zeroes it out.
 func ClearScalar(s **ecc.Scalar) {
-	// todo: add a test and fuzz this function to ensure it works as expected
 	if s != nil {
 		if *s != nil {
 			(*s).Random()
@@ -121,7 +91,6 @@ func ClearScalar(s **ecc.Scalar) {
 
 // ClearSlice attempts to safely clear the internal values (i.e. set to zero) of the slice and sets the pointer to nil.
 func ClearSlice(b *[]byte) {
-	// todo: add a test and fuzz this function to ensure it works as expected
 	if b != nil {
 		clear(*b)
 		*b = nil             // clear the slice reference

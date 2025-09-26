@@ -12,6 +12,7 @@ package oprf
 
 import (
 	"crypto"
+	"errors"
 
 	"github.com/bytemare/ecc"
 
@@ -41,6 +42,9 @@ const (
 	nbIDs                 = 4
 	maxDeriveKeyPairTries = 255
 )
+
+// ErrDeriveKeyPairError is thrown in a panic if DeriveKeyPair fails to produce a valid keypair.
+var ErrDeriveKeyPairError = errors.New("DeriveKeyPairError")
 
 // Available returns whether the Identifier has been registered of not.
 func (i Identifier) Available() bool {
@@ -83,7 +87,7 @@ func (i Identifier) DeriveKey(seed, info []byte) *ecc.Scalar {
 
 	for s == nil || s.IsZero() {
 		if counter > maxDeriveKeyPairTries {
-			panic("DeriveKeyPairError")
+			panic(ErrDeriveKeyPairError)
 		}
 
 		s = i.Group().HashToScalar(encoding.Concat(deriveInput, []byte{counter}), dst)

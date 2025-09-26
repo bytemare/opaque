@@ -58,29 +58,33 @@ func (s *Server) SetKeyMaterial(skm *ServerKeyMaterial) error {
 	return nil
 }
 
-// RegistrationResponse returns a RegistrationResponse message to the input RegistrationRequest message and given
-// identifiers. This needs a dedicated key for the client throughout the credential lifecycle. This key can either be:
-// - derived from the client specific clientCredentialIdentifier and oprfGlobalSeed, set through SetKeyMaterial
-// - provided directly as clientOPRFKey. Note that in that case no previous SetKeyMaterial setting is required.
+// RegistrationResponse computes the server’s response to a client’s RegistrationRequest.
 //
-// If both the clientCredentialIdentifier and clientOPRFKey are provided, the clientOPRFKey will be used directly.
+// It client-specific OPRF key on the client input and returns a RegistrationResponse message in response to the
+// client's RegistrationRequest message req.
 //
-// Refer to the documentation to understand the implications and discussions on the tradeoffs. TODO: mention it
-// TODO: clean up this doc
-// - The oprfGlobalSeed (set through SetKeyMaterial) SHOULD be used with the same value for all clients to prevent
-// client enumeration attacks, but may be chosen not to be if the functionality is not necessary. Using a nil OPRF seed
-// is not secure, because it makes guessing the servers OPRF key trivial given the credential identifiers.
-// Using the credentialIdentifier, oprfGlobalSeed is then internally used to derive a unique OPRF key for the client.
-// - Alternatively, the oprfGlobalSeed can be set to nil and no credentialIdentifier provided, if the clientOPRFSeed is
-// provided directly, avoiding the internal derivation. This is useful should the oprfGlobalSeed be used on another
-// instance to protect it.
+// Parameters:
+//   - clientCredentialIdentifier: application-defined, stable identifier for this client. If clientOPRFKey is nil,
+//     the OPRF key is derived from this identifier and the server’s global OPRF seed provided in the server key
+//     material. The identifier MUST be unique per client and stable for the credential’s lifetime from registration to
+//     all subsequent logins. It MUST NOT be empty if clientOPRFKey is nil.
+//   - clientOPRFKey: optional explicit client OPRF secret key. If non-nil, it is used directly instead
+//     of deriving it from the credentialIdentifier and globalOPRFSeed.
+//
+// Preconditions:
+//   - s.SetKeyMaterial has been called. The server’s AKE public key (ServerKeyMaterial.PublicKeyBytes) is required
+//     to populate the response.
+//   - If clientOPRFKey is nil, the global OPRF seed (ServerKeyMaterial.OPRFGlobalSeed) MUST be set and have length
+//     equal to Hash.Size().
+//
+// Security and usage notes:
+//   - Using a single global OPRF seed together with unique clientCredentialIdentifier values prevents client
+//     enumeration by deriving per-client OPRF keys.
+//   - The clientCredentialIdentifier MUST be consistent across registration and subsequent logins for a given client.
+//   - When the OPRF key is derived internally, it is zeroed after use.
 func (s *Server) RegistrationResponse(
 	req *message.RegistrationRequest,
-	clientCredentialIdentifier []byte, // The credentialIdentifier and global OPRF seed derive the client
-	// specific OPRF key. If nil, this yields the same OPRF key for all clients. The same credentialIdentifier should
-	// be used for the same client across registration and login, and be different for each client. The globalOPRFSeed
-	// can be the same for all clients to prevent client enumeration attacks, but can also be set to nil if the
-	// clientOPRFSeed is provided directly.
+	clientCredentialIdentifier []byte,
 	clientOPRFKey *ecc.Scalar, // If set, this will be used as the client OPRF key directly instead
 	// of deriving it from the credentialIdentifier and globalOPRFSeed.
 ) (*message.RegistrationResponse, error) {
@@ -146,6 +150,10 @@ func (s *Server) GenerateKE2(
 	err := s.parseOptions(o, options)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	if len(o.AKENonce) == 0 {
+		o.AKENonce = internal.RandomBytes(internal.NonceLength)
 	}
 
 	ku, err := s.chooseOPRFKey(record.CredentialIdentifier, o.ClientOPRFKey)

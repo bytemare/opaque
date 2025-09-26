@@ -111,7 +111,7 @@ func (c *Configuration) GenerateOPRFSeed() []byte {
 
 // KeyGen returns a key pair in the AKE ecc.
 func (c *Configuration) KeyGen() (secretKey *ecc.Scalar, publicKey *ecc.Element) {
-	return ake.KeyGen(ecc.Group(c.AKE))
+	return ake.KeyGen(ecc.Group(c.AKE), nil)
 }
 
 // Deserializer returns a pointer to a Deserializer structure allowing deserialization of messages in the given

@@ -7,6 +7,7 @@ linters:
     - nonamedreturns
     - varnamelen
   enable:
+    - arangolint
     - asasalint
     - asciicheck
     - bidichk
@@ -44,6 +45,7 @@ linters:
     - goconst
     - gocritic
     - gocyclo
+    - godoclint
     - godot
     - godox
     - goheader
@@ -60,6 +62,7 @@ linters:
     - ineffassign
     - interfacebloat
     - intrange
+    - iotamixing
     - ireturn
     - lll
     - loggercheck
@@ -102,6 +105,7 @@ linters:
     - tparallel
     - unconvert
     - unparam
+    - unqueryvet
     - unused
     - usestdlibvars
     - usetesting
@@ -153,6 +157,7 @@ linters:
       block-size: 2
     prealloc:
       simple: false
+      range-loops: true
       for-loops: true
   exclusions:
     rules:

@@ -9,6 +9,8 @@
 package opaque
 
 import (
+	"fmt"
+
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
@@ -26,10 +28,7 @@ type ServerOptions struct {
 
 func (s *Server) parseOptions(o *serverOptions, options []*ServerOptions) error {
 	if len(options) == 0 || options[0] == nil {
-		o.MaskingNonce = internal.RandomBytes(s.conf.NonceLen)
 		o.SecretKeyShare = s.conf.MakeSecretKeyShare(nil)
-		o.AKENonce = internal.RandomBytes(internal.NonceLength)
-
 		return nil
 	}
 
@@ -50,22 +49,16 @@ func (s *Server) parseOptions(o *serverOptions, options []*ServerOptions) error 
 
 		o.MaskingNonce = make([]byte, len(options[0].MaskingNonce))
 		copy(o.MaskingNonce, options[0].MaskingNonce)
-	} else {
-		o.MaskingNonce = internal.RandomBytes(s.conf.NonceLen)
 	}
 
 	// AKE options.
 	if options[0].AKE == nil {
 		o.SecretKeyShare = s.conf.MakeSecretKeyShare(nil)
-		o.AKENonce = internal.RandomBytes(internal.NonceLength)
-
 		return nil
 	}
 
 	// AKE nonce.
-	if len(options[0].AKE.Nonce) == 0 {
-		o.AKENonce = internal.RandomBytes(internal.NonceLength)
-	} else {
+	if len(options[0].AKE.Nonce) != 0 {
 		o.AKENonce = make([]byte, len(options[0].AKE.Nonce))
 		copy(o.AKENonce, options[0].AKE.Nonce)
 	}
@@ -114,7 +107,7 @@ func getEnvelopeNonce(clientOptions ...*ClientOptions) ([]byte, error) {
 	nonce := clientOptions[0].EnvelopeNonce
 	nonceLength := clientOptions[0].EnvelopeNonceLength
 
-	if err := internal.ValidateOptionsLength(nonce, nonceLength, internal.NonceLength); err != nil {
+	if err := validateOptionsLength(nonce, nonceLength, internal.NonceLength); err != nil {
 		return nil, ErrClientOptions.Join(internal.ErrEnvelopeNonceOptions, err)
 	}
 
@@ -273,6 +266,22 @@ func (c *Client) parseOptionsKE1(options []*ClientOptions) (*clientOptions, erro
 	return o, nil
 }
 
+func (c *Client) ke3NoOptions(o *clientOptions) (*clientOptions, error) {
+	if c.oprf.blind == nil {
+		return nil, ErrClientOptions.Join(internal.ErrNoOPRFBlind)
+	}
+
+	if c.ake.SecretKeyShare == nil {
+		return nil, ErrClientOptions.Join(internal.ErrClientNoKeyShare)
+	}
+
+	if len(c.ake.ke1) == 0 {
+		return nil, ErrClientOptions.Join(internal.ErrKE1Missing)
+	}
+
+	return o, nil
+}
+
 func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, error) {
 	o := &clientOptions{
 		OPRFBlind:     nil,
@@ -283,19 +292,7 @@ func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, erro
 	}
 
 	if len(options) == 0 || options[0] == nil {
-		if c.oprf.blind == nil {
-			return nil, ErrClientOptions.Join(internal.ErrNoOPRFBlind)
-		}
-
-		if c.ake.SecretKeyShare == nil {
-			return nil, ErrClientOptions.Join(internal.ErrClientNoKeyShare)
-		}
-
-		if len(c.ake.ke1) == 0 {
-			return nil, ErrClientOptions.Join(internal.ErrKE1Missing)
-		}
-
-		return o, nil
+		return c.ke3NoOptions(o)
 	}
 
 	// OPRF Blind.
@@ -353,4 +350,33 @@ func (c *Client) parseOptionsKE3ESK(options *AKEOptions) (*ecc.Scalar, error) {
 	}
 
 	return options.getSecretKeyShare(c.conf)
+}
+
+// validateOptionsLength returns an error if the input slice does not match the provided length (if != 0) or is shorter
+// than the reference length.
+func validateOptionsLength(input []byte, length int, referenceLength uint32) error {
+	if input == nil {
+		return nil
+	}
+
+	if length < 0 {
+		return internal.ErrProvidedLengthNegative
+	}
+
+	// If the length is 0, it means the required length is not overridden, and the input slice must be at least the
+	// reference length.
+	if length == 0 {
+		if len(input) < int(referenceLength) {
+			return fmt.Errorf("%w: want %d, got %d", internal.ErrSliceShorterLength, referenceLength, len(input))
+		}
+
+		return nil
+	}
+
+	// If a length is provided, the input slice must match it.
+	if length != len(input) {
+		return fmt.Errorf("%w: want %d, got %d", internal.ErrSliceDifferentLength, length, len(input))
+	}
+
+	return nil
 }

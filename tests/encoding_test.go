@@ -230,7 +230,7 @@ func hasPanic(f func()) (has bool, err error) {
 		err = fmt.Errorf("%v", report)
 	}
 
-	return
+	return has, err
 }
 
 func expectPanic(expectedError error, f func()) (bool, string) {

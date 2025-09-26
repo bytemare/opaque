@@ -23,6 +23,8 @@ import (
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/oprf"
+
+	group "github.com/bytemare/ecc"
 )
 
 const fmtGotValidInput = "got %q but input is valid"
@@ -453,6 +455,53 @@ func FuzzDeserializeKE3(f *testing.F) {
 			if errors.Is(err, errInvalidMessageLength) && len(ke3) == maxMessageLength {
 				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
+		}
+	})
+}
+
+func FuzzClearScalar(f *testing.F) {
+	f.Add(uint64(0))
+	f.Add(uint64(1))
+	f.Add(uint64(42))
+	f.Fuzz(func(t *testing.T, _ uint64) {
+		g := group.Ristretto255Sha512
+		s := g.NewScalar().Random()
+		internal.ClearScalar(&s)
+		if s != nil {
+			t.Fatalf("scalar pointer not nil after ClearScalar: %v", s)
+		}
+	})
+}
+
+func FuzzClearSlice(f *testing.F) {
+	f.Add([]byte("a"))
+	f.Add([]byte("0123456789abcdef"))
+	f.Add(make([]byte, 0))
+	f.Fuzz(func(t *testing.T, data []byte) {
+		// make a copy to avoid mutating the fuzzer buffer
+		b := append([]byte(nil), data...)
+		internal.ClearSlice(&b)
+		if b != nil {
+			t.Fatalf("slice pointer not nil after ClearSlice: %v", b)
+		}
+	})
+}
+
+// FuzzDecodeServerKeyMaterial fuzzes decoding of server key material encodings.
+// It is acceptable for the decoder to return an error for malformed inputs. This fuzzer
+// primarily guards against panics and ensures stable error handling across configurations.
+func FuzzDecodeServerKeyMaterial(f *testing.F) {
+	// Seed with a few malformed patterns similar to unit tests
+	f.Add([]byte{0})
+	f.Add([]byte{0, 0, 0, 0, 0, 0, 0, 0})
+	f.Add([]byte{2, 0, 0, 0, 0, 0, 0, 0, 0})
+	f.Add(internal.RandomBytes(5))
+	f.Add(internal.RandomBytes(64))
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		for _, cfg := range configurationTable {
+			// Just attempt to decode. Any error is fine. We only ensure no panic occurs.
+			_, _ = cfg.conf.DecodeServerKeyMaterial(data)
 		}
 	})
 }

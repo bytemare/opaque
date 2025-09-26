@@ -16,15 +16,6 @@ import (
 	"strings"
 )
 
-/*
-TODO:
-	- verify all errors have been tested against: maybe add a lint or check?
-	- verify that test verify full error chains
-	- provide examples for error codes to test against for users:
-	    - if Err1, do this
-		- if Err2, do that
-*/
-
 var (
 	// ErrConfiguration indicates that the configuration is invalid.
 	ErrConfiguration = ErrCodeConfiguration.New("")

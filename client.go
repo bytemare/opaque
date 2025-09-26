@@ -128,7 +128,6 @@ func (c *Client) RegistrationFinalize(
 		o.EnvelopeNonce,
 	)
 
-	// todo: note that this needs a confidential channel
 	return &message.RegistrationRecord{
 		ClientPublicKey: clientPublicKey,
 		MaskingKey:      maskingKey,
@@ -257,7 +256,7 @@ func (c *Client) ClearState() {
 func (c *Client) buildPRK(evaluation *ecc.Element, kdfSalt, ksfSalt []byte, ksfLength int) []byte {
 	output := c.conf.OPRF.Finalize(c.oprf.blind, c.oprf.password, evaluation)
 	stretched := c.conf.KSF.Harden(output, ksfSalt, ksfLength)
-	// todo: what happens if the unblinded output is all zeroes? (it will get hashed, but still?)
+
 	return c.conf.KDF.Extract(kdfSalt, encoding.Concat(output, stretched))
 }
 
@@ -300,7 +299,6 @@ func (c *Client) validateCredentialResponse(cr *message.CredentialResponse) erro
 	}
 
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
-	// todo: is this tested against?
 	if len(cr.MaskedResponse) != c.conf.Group.ElementLength()+c.conf.EnvelopeSize {
 		return errors.Join(
 			internal.ErrCredentialResponseInvalid,
