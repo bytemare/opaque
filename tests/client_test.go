@@ -152,6 +152,13 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 			return err
 		}, opaque.ErrClientOptions, internal.ErrNoOPRFBlind)
 
+		// e) Options provided without blind
+		client3 := getClient(t2, conf)
+		expectErrors(t2, func() error {
+			_, _, err := client3.RegistrationFinalize(nil, nil, nil, &opaque.ClientOptions{})
+			return err
+		}, opaque.ErrClientOptions, internal.ErrNoOPRFBlind)
+
 		// f) KSF options: wrong parameter count
 		// Use a valid blind from state to pass blind checks.
 		client4 := getClient(t2, conf)
@@ -242,6 +249,29 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 			)
 			return err
 		}, opaque.ErrClientOptions, internal.ErrEnvelopeNonceOptions, internal.ErrProvidedLengthNegative)
+	})
+}
+
+func TestClient_RegistrationFinalize_InvalidEvaluatedMessage(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		client, server := setup(t2, conf)
+
+		req, err := client.RegistrationInit(password)
+		if err != nil {
+			t2.Fatal(err)
+		}
+
+		resp, err := server.RegistrationResponse(req, credentialIdentifier, nil)
+		if err != nil {
+			t2.Fatal(err)
+		}
+
+		resp.EvaluatedMessage = getOtherGroup(conf).Base().Multiply(getOtherGroup(conf).NewScalar().Random())
+
+		expectErrors(t2, func() error {
+			_, _, err := client.RegistrationFinalize(resp, nil, nil)
+			return err
+		}, opaque.ErrRegistration, internal.ErrInvalidEvaluatedMessage)
 	})
 }
 

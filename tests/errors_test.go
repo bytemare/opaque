@@ -11,6 +11,7 @@ package opaque_test
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/bytemare/opaque"
@@ -47,6 +48,54 @@ func TestErrorJoin_IsAndAs(t *testing.T) {
 	}
 	if !errors.Is(oe.Code, opaque.ErrCodeMessage) {
 		t.Fatalf("expected *Error.Code %v, got %v", opaque.ErrCodeMessage, oe.Code)
+	}
+}
+
+type opaqueErrorWrapper struct {
+	err *opaque.Error
+}
+
+func (w opaqueErrorWrapper) Error() string { return w.err.Error() }
+
+func (w opaqueErrorWrapper) As(target any) bool {
+	switch t := target.(type) {
+	case **opaque.Error:
+		*t = w.err
+		return true
+	default:
+		return false
+	}
+}
+
+func TestErrorCodeIsOpaqueError(t *testing.T) {
+	t.Parallel()
+
+	target := opaqueErrorWrapper{err: opaque.ErrCodeRegistration.New("wrapped")}
+	if !opaque.ErrCodeRegistration.Is(target) {
+		t.Fatal("expected ErrorCode.Is to match *opaque.Error")
+	}
+	if opaque.ErrCodeRegistration.Is(opaque.ErrCodeAuthentication) {
+		t.Fatal("expected different codes not to match")
+	}
+}
+
+type nilUnwrapper struct{}
+
+func (nilUnwrapper) Error() string { return "nil unwrap" }
+func (nilUnwrapper) Unwrap() error { return nil }
+
+func TestErrorFormatHandlesNilUnwrap(t *testing.T) {
+	t.Parallel()
+
+	err := &opaque.Error{
+		Code:    opaque.ErrCodeAuthentication,
+		Message: "auth failed",
+		Err:     nilUnwrapper{},
+	}
+
+	formatted := fmt.Sprintf("%+v", err)
+	if !strings.Contains(formatted, "auth failed") {
+		t.Fatalf("expected formatted error to include message, got %q", formatted)
 	}
 }
 

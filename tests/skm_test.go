@@ -518,6 +518,17 @@ func TestServerKeyMaterial_Decode_Failure(t *testing.T) {
 				expectedErrors: []error{opaque.ErrServerKeyMaterial, internal.ErrInvalidServerPublicKey},
 			},
 			{
+				name: "seed is empty",
+				input: encoding.Concatenate(
+					[]byte{byte(g)},
+					encodedSkBytes,
+					encodedPkBytes,
+					encoding.EncodeVector(nil),
+					encodedServerIdentity,
+				),
+				expectedErrors: []error{opaque.ErrServerKeyMaterial, encoding.ErrEmptyEncoded},
+			},
+			{
 				name: "seed is too short",
 				input: encoding.Concatenate(
 					[]byte{byte(g)},
