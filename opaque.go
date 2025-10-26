@@ -13,8 +13,10 @@
 package opaque
 
 import (
+	"bytes"
 	"crypto"
 	"errors"
+	"fmt"
 
 	"github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
@@ -92,6 +94,43 @@ func DefaultConfiguration() *Configuration {
 		Hash:    crypto.SHA512,
 		Context: nil,
 	}
+}
+
+// Equals compares two configurations and returns nil if they are equal, or an error otherwise.
+func (c *Configuration) Equals(other *Configuration) error {
+	if other == nil {
+		return fmt.Errorf("%w: nil configuration ", ErrCodeConfiguration)
+	}
+
+	if c.KDF != other.KDF {
+		return fmt.Errorf("%w: KDF mismatch", ErrCodeConfiguration)
+	}
+
+	if c.MAC != other.MAC {
+		return fmt.Errorf("%w: MAC mismatch", ErrCodeConfiguration)
+	}
+
+	if c.Hash != other.Hash {
+		return fmt.Errorf("%w: Hash mismatch", ErrCodeConfiguration)
+	}
+
+	if c.KSF != other.KSF {
+		return fmt.Errorf("%w: KSF mismatch", ErrCodeConfiguration)
+	}
+
+	if c.OPRF != other.OPRF {
+		return fmt.Errorf("%w: OPRF mismatch", ErrCodeConfiguration)
+	}
+
+	if c.AKE != other.AKE {
+		return fmt.Errorf("%w: AKE mismatch", ErrCodeConfiguration)
+	}
+
+	if !bytes.Equal(c.Context, other.Context) {
+		return fmt.Errorf("%w: context mismatch", ErrCodeConfiguration)
+	}
+
+	return nil
 }
 
 // Client returns a newly instantiated Client from the Configuration.
@@ -204,7 +243,11 @@ func RandomBytes(length int) []byte {
 	return internal.RandomBytes(length)
 }
 
-// IsValidScalar checks if the provided scalar is valid for the given group.
+// IsValidScalar checks if the provided scalar is valid.
+// It must be:
+// - non-nil
+// - non-zero
+// - part of the correct group.
 func IsValidScalar(g ecc.Group, s *ecc.Scalar) error {
 	if s == nil {
 		return internal.ErrScalarNil
@@ -222,7 +265,11 @@ func IsValidScalar(g ecc.Group, s *ecc.Scalar) error {
 	return nil
 }
 
-// IsValidElement checks if the provided element is valid for the given group.
+// IsValidElement checks if the provided element is valid.
+// It must be:
+// - non-nil
+// - non-identity (point at infinity)
+// - part of the correct group.
 func IsValidElement(g ecc.Group, e *ecc.Element) error {
 	if e == nil {
 		return internal.ErrElementNil

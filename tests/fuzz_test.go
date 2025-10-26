@@ -18,13 +18,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/oprf"
-
-	group "github.com/bytemare/ecc"
 )
 
 const fmtGotValidInput = "got %q but input is valid"
@@ -464,7 +463,7 @@ func FuzzClearScalar(f *testing.F) {
 	f.Add(uint64(1))
 	f.Add(uint64(42))
 	f.Fuzz(func(t *testing.T, _ uint64) {
-		g := group.Ristretto255Sha512
+		g := ecc.Ristretto255Sha512
 		s := g.NewScalar().Random()
 		internal.ClearScalar(&s)
 		if s != nil {

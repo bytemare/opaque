@@ -30,19 +30,6 @@ var (
 	serverPublicKey      *ecc.Element
 )
 
-func isSameConf(a, b *opaque.Configuration) bool {
-	if a.OPRF != b.OPRF ||
-		a.KDF != b.KDF ||
-		a.MAC != b.MAC ||
-		a.Hash != b.Hash ||
-		!reflect.DeepEqual(a.KSF, b.KSF) ||
-		a.AKE != b.AKE {
-		return false
-	}
-
-	return bytes.Equal(a.Context, b.Context)
-}
-
 // Example_Configuration shows how to instantiate a configuration, which is used to initialize clients and servers from.
 // Configurations MUST remain the same for a given client between sessions, or the client won't be able to execute the
 // protocol. Configurations can be serialized and deserialized, if you need to save, hardcode, or transmit it.
@@ -61,8 +48,10 @@ func Example_configuration() {
 		Context: nil,
 	}
 
-	if !isSameConf(defaultConf, customConf) {
-		// isSameConf() this is just a demo function to check equality.
+	if err := defaultConf.Equals(customConf); err != nil {
+		// This is just a demo to show that the two configurations are the same.
+		// In practice, you would just pick one way to create a configuration.
+		// Recommended is to use DefaultConfiguration() or one of the other defaults.
 		log.Fatalln("Oh no! Configurations differ!")
 	}
 
@@ -77,7 +66,7 @@ func Example_configuration() {
 		log.Fatalf("Oh no! Decoding the configurations failed! %v", err)
 	}
 
-	if !isSameConf(defaultConf, conf) {
+	if err = defaultConf.Equals(conf); err != nil {
 		log.Fatalln("Oh no! Something went wrong in decoding the configuration!")
 	}
 
@@ -306,10 +295,10 @@ func Example_registration() {
 	// Output: OPAQUE registration is easy!
 }
 
-// Example_LoginKeyExchange demonstrates in a single function the interactions between a client and a server for the
+// Example_authentication demonstrates in a single function the interactions between a client and a server for the
 // login phase.
 // This is of course a proof-of-concept demonstration, as client and server execute separately.
-func Example_loginKeyExchange() {
+func Example_authentication() {
 	// For the purpose of this demo, we consider the following registration has already happened.
 	{
 		Example_registration()

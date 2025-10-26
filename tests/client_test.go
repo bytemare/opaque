@@ -13,6 +13,7 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque"
@@ -21,7 +22,6 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 
-	group "github.com/bytemare/ecc"
 	ksf2 "github.com/bytemare/opaque/internal/ksf"
 )
 
@@ -32,7 +32,7 @@ func TestNewClient_DefaultConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Generating KE1 should reflect the default configuration's AKE group.
+	// Generating KE1 should reflect the default configuration's AKE ecc.
 	ke1, err := client.GenerateKE1(password)
 	if err != nil {
 		t.Fatal(err)
@@ -69,11 +69,11 @@ func TestClient_RegistrationInit_InvalidOptions_OPRFBlind(t *testing.T) {
 		client := getClient(t2, conf)
 
 		// Build an OPRF blind from a different group than the configuration requires.
-		var otherGroup group.Group
-		if conf.internal.Group == group.Ristretto255Sha512 {
-			otherGroup = group.P256Sha256
+		var otherGroup ecc.Group
+		if conf.internal.Group == ecc.Ristretto255Sha512 {
+			otherGroup = ecc.P256Sha256
 		} else {
-			otherGroup = group.Ristretto255Sha512
+			otherGroup = ecc.Ristretto255Sha512
 		}
 		badBlind := otherGroup.NewScalar().Random()
 
@@ -81,6 +81,28 @@ func TestClient_RegistrationInit_InvalidOptions_OPRFBlind(t *testing.T) {
 			_, err := client.RegistrationInit(password, &opaque.ClientOptions{OPRFBlind: badBlind})
 			return err
 		}, opaque.ErrClientOptions, internal.ErrInvalidOPRFBlind)
+	})
+}
+
+func TestClient_RegistrationFinalize_InvalidServerKeyLength(t *testing.T) {
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		req, err := client.RegistrationInit(password)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp, err := server.RegistrationResponse(req, credentialIdentifier, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp.ServerPublicKey = resp.ServerPublicKey[:len(resp.ServerPublicKey)-1]
+
+		expectErrors(t, func() error {
+			_, _, err := client.RegistrationFinalize(resp, nil, nil)
+			return err
+		}, opaque.ErrRegistration, internal.ErrInvalidServerPublicKey, internal.ErrInvalidEncodingLength)
 	})
 }
 
@@ -223,6 +245,40 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 	})
 }
 
+func TestClient_RegistrationFinalize_KSFCustomization(t *testing.T) {
+	testAll(t, func(t *testing.T, conf *configuration) {
+		params := conf.internal.KSF.Parameters()
+		if len(params) == 0 {
+			t.Skip("KSF has no tunable parameters")
+		}
+
+		client, server := setup(t, conf)
+		req, err := client.RegistrationInit(password)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp, err := server.RegistrationResponse(req, credentialIdentifier, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		custom := append([]int(nil), params...)
+		options := &opaque.ClientOptions{
+			KSFParameters: custom,
+			KSFLength:     conf.internal.KDF.Size(),
+		}
+
+		record, _, err := client.RegistrationFinalize(resp, nil, nil, options)
+		if err != nil {
+			t.Fatalf("unexpected error with custom KSF options: %v", err)
+		}
+		if record == nil {
+			t.Fatal("expected non-nil registration record")
+		}
+	})
+}
+
 // T15.7 — GenerateKE1 with blind already set.
 func TestClient_GenerateKE1_PreviousBlind(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -241,13 +297,13 @@ func TestClient_GenerateKE1_PreviousBlind(t *testing.T) {
 // T15.9 — GenerateKE1 with invalid options (bad OPRF blind and bad AKE secret share).
 func TestClient_GenerateKE1_InvalidOptions(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
-		// Bad OPRF blind group.
+		// Bad OPRF blind ecc.
 		client := getClient(t2, conf)
-		var otherGroup group.Group
-		if conf.internal.Group == group.Ristretto255Sha512 {
-			otherGroup = group.P256Sha256
+		var otherGroup ecc.Group
+		if conf.internal.Group == ecc.Ristretto255Sha512 {
+			otherGroup = ecc.P256Sha256
 		} else {
-			otherGroup = group.Ristretto255Sha512
+			otherGroup = ecc.Ristretto255Sha512
 		}
 		badBlind := otherGroup.NewScalar().Random()
 		testForErrors(t2, &testError{
@@ -259,7 +315,7 @@ func TestClient_GenerateKE1_InvalidOptions(t *testing.T) {
 			errors: []error{opaque.ErrClientOptions, internal.ErrInvalidOPRFBlind},
 		})
 
-		// Bad AKE secret share group.
+		// Bad AKE secret share ecc.
 		client = getClient(t2, conf)
 		badSK := otherGroup.NewScalar().Random()
 		testForErrors(t2, &testError{
@@ -273,6 +329,65 @@ func TestClient_GenerateKE1_InvalidOptions(t *testing.T) {
 			},
 			errors: []error{opaque.ErrClientOptions, internal.ErrSecretShareInvalid},
 		})
+	})
+}
+
+func TestClient_GenerateKE3_InvalidMaskingNonce(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		baseline := func() (*opaque.Client, *message.KE2, *opaque.ClientRecord) {
+			client, server := setup(t2, conf)
+			rec := registration(t2, client, server, password, credentialIdentifier, nil, nil)
+			client.ClearState()
+			ke1, err := client.GenerateKE1(password)
+			if err != nil {
+				t2.Fatal(err)
+			}
+			ke2, _, err := server.GenerateKE2(ke1, rec)
+			if err != nil {
+				t2.Fatal(err)
+			}
+			return client, ke2, rec
+		}
+
+		// Missing masking nonce
+		clientA, ke2A, _ := baseline()
+		bad := *ke2A
+		bad.CredentialResponse = &message.CredentialResponse{
+			EvaluatedMessage: ke2A.CredentialResponse.EvaluatedMessage,
+			MaskingNonce:     nil,
+			MaskedResponse:   ke2A.CredentialResponse.MaskedResponse,
+		}
+		expectErrors(t2, func() error {
+			_, _, _, err := clientA.GenerateKE3(&bad, nil, nil)
+			return err
+		}, opaque.ErrKE2, internal.ErrCredentialResponseNoMaskingNonce)
+
+		// Zero masking nonce
+		clientB, ke2B, _ := baseline()
+		zeros := make([]byte, len(ke2B.CredentialResponse.MaskingNonce))
+		bad2 := *ke2B
+		bad2.CredentialResponse = &message.CredentialResponse{
+			EvaluatedMessage: ke2B.CredentialResponse.EvaluatedMessage,
+			MaskingNonce:     zeros,
+			MaskedResponse:   ke2B.CredentialResponse.MaskedResponse,
+		}
+		expectErrors(t2, func() error {
+			_, _, _, err := clientB.GenerateKE3(&bad2, nil, nil)
+			return err
+		}, opaque.ErrKE2, internal.ErrCredentialResponseInvalidMaskingNonce, internal.ErrSliceIsAllZeros)
+
+		// Masked response wrong length
+		clientC, ke2C, _ := baseline()
+		bad3 := *ke2C
+		bad3.CredentialResponse = &message.CredentialResponse{
+			EvaluatedMessage: ke2C.CredentialResponse.EvaluatedMessage,
+			MaskingNonce:     ke2C.CredentialResponse.MaskingNonce,
+			MaskedResponse:   internal.RandomBytes(conf.internal.Group.ElementLength()),
+		}
+		expectErrors(t2, func() error {
+			_, _, _, err := clientC.GenerateKE3(&bad3, nil, nil)
+			return err
+		}, opaque.ErrKE2, internal.ErrCredentialResponseInvalidMaskedResponse, internal.ErrInvalidEncodingLength)
 	})
 }
 
@@ -497,11 +612,11 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 		})
 
 		// f) Invalid OPRF blind group in options
-		var other group.Group
-		if conf.internal.Group == group.Ristretto255Sha512 {
-			other = group.P256Sha256
+		var other ecc.Group
+		if conf.internal.Group == ecc.Ristretto255Sha512 {
+			other = ecc.P256Sha256
 		} else {
-			other = group.Ristretto255Sha512
+			other = ecc.Ristretto255Sha512
 		}
 		badBlind := other.NewScalar().Random()
 		clientE := getClient(t2, conf)
@@ -555,12 +670,12 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 	})
 }
 
-// getOtherGroup returns a different group than the current configuration's group.
-func getOtherGroup(conf *configuration) group.Group {
-	if conf.internal.Group == group.Ristretto255Sha512 {
-		return group.P256Sha256
+// getOtherGroup returns a different group than the current configuration's ecc.
+func getOtherGroup(conf *configuration) ecc.Group {
+	if conf.internal.Group == ecc.Ristretto255Sha512 {
+		return ecc.P256Sha256
 	}
-	return group.Ristretto255Sha512
+	return ecc.Ristretto255Sha512
 }
 
 /*

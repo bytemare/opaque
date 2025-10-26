@@ -12,7 +12,10 @@ import (
 	"bytes"
 	"crypto"
 	"encoding/hex"
-	"reflect"
+	"errors"
+	"fmt"
+	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/bytemare/ecc"
@@ -77,7 +80,10 @@ func TestFull(t *testing.T) {
 
 func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Server, *opaque.ClientRecord, []byte) {
 	// Client
-	client, _ := p.Client()
+	client, err := p.Client()
+	if err != nil {
+		t.Fatalf(dbgErr, err)
+	}
 
 	var m1s []byte
 	{
@@ -247,29 +253,6 @@ func testAuthentication(
 	return client, server, exportKeyLogin
 }
 
-func isSameConf(a, b *opaque.Configuration) bool {
-	if a.OPRF != b.OPRF {
-		return false
-	}
-	if a.KDF != b.KDF {
-		return false
-	}
-	if a.MAC != b.MAC {
-		return false
-	}
-	if a.Hash != b.Hash {
-		return false
-	}
-	if !reflect.DeepEqual(a.KSF, b.KSF) {
-		return false
-	}
-	if a.AKE != b.AKE {
-		return false
-	}
-
-	return bytes.Equal(a.Context, b.Context)
-}
-
 func TestConfiguration_Deserialization(t *testing.T) {
 	conf := opaque.DefaultConfiguration()
 	ser := conf.Serialize()
@@ -279,8 +262,8 @@ func TestConfiguration_Deserialization(t *testing.T) {
 		t.Fatalf("unexpected error on valid configuration: %v", err)
 	}
 
-	if !isSameConf(conf, conf2) {
-		t.Fatalf("Unexpected inequality:\n\t%v\n\t%v", conf, conf2)
+	if err := conf.Equals(conf2); err != nil {
+		t.Fatalf("Unexpected inequality: %s\n\t%v\n\t%v", err, conf, conf2)
 	}
 }
 
@@ -318,6 +301,125 @@ func TestFlush(t *testing.T) {
 /*
 	The following tests look for failing conditions.
 */
+
+func TestConfiguration_NotEqual(t *testing.T) {
+	type tester struct {
+		name            string
+		mod             func(c opaque.Configuration) *opaque.Configuration
+		expectedMessage string
+	}
+
+	tests := []tester{
+		{
+			name: "Nil configuration",
+			mod: func(c opaque.Configuration) *opaque.Configuration {
+				return nil
+			},
+			expectedMessage: "nil configuration",
+		},
+		{
+			name: "Different KDF",
+			mod: func(c opaque.Configuration) *opaque.Configuration {
+				if c.KDF == crypto.SHA256 {
+					c.KDF = crypto.SHA512
+				} else {
+					c.KDF = crypto.SHA256
+				}
+				return &c
+			},
+			expectedMessage: "KDF mismatch",
+		},
+		{
+			name: "Different MAC",
+			mod: func(c opaque.Configuration) *opaque.Configuration {
+				if c.MAC == crypto.SHA256 {
+					c.MAC = crypto.SHA512
+				} else {
+					c.MAC = crypto.SHA256
+				}
+				return &c
+			},
+			expectedMessage: "MAC mismatch",
+		},
+		{
+			name: "Different Hash",
+			mod: func(c opaque.Configuration) *opaque.Configuration {
+				if c.Hash == crypto.SHA256 {
+					c.Hash = crypto.SHA512
+				} else {
+					c.Hash = crypto.SHA256
+				}
+				return &c
+			},
+			expectedMessage: "Hash mismatch",
+		},
+		{
+			name: "Different KSF",
+			mod: func(c opaque.Configuration) *opaque.Configuration {
+				if c.KSF == ksf.Argon2id {
+					c.KSF = ksf.Scrypt
+				} else {
+					c.KSF = ksf.Argon2id
+				}
+				return &c
+			},
+			expectedMessage: "KSF mismatch",
+		},
+		{
+			name: "Different OPRF",
+			mod: func(c opaque.Configuration) *opaque.Configuration {
+				if c.OPRF == opaque.RistrettoSha512 {
+					c.OPRF = opaque.P256Sha256
+				} else {
+					c.OPRF = opaque.RistrettoSha512
+				}
+				return &c
+			},
+			expectedMessage: "OPRF mismatch",
+		},
+		{
+			name: "Different AKE",
+			mod: func(c opaque.Configuration) *opaque.Configuration {
+				if c.AKE == opaque.RistrettoSha512 {
+					c.AKE = opaque.P256Sha256
+				} else {
+					c.AKE = opaque.RistrettoSha512
+				}
+				return &c
+			},
+			expectedMessage: "AKE mismatch",
+		},
+		{
+			name: "Different Context",
+			mod: func(c opaque.Configuration) *opaque.Configuration {
+				c.Context = []byte("different context")
+				return &c
+			},
+			expectedMessage: "context mismatch",
+		},
+	}
+
+	conf := opaque.DefaultConfiguration()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bad := tt.mod(*conf)
+
+			err := conf.Equals(bad)
+			if err == nil {
+				t.Fatalf("expected inequality error, got nil")
+			}
+
+			if !errors.Is(err, opaque.ErrConfiguration) {
+				t.Fatalf("expected ErrConfiguration, got %v", err)
+			}
+
+			if !strings.Contains(err.Error(), tt.expectedMessage) {
+				t.Fatalf("error message %q does not contain expected substring: %q", err.Error(), tt.expectedMessage)
+			}
+		})
+	}
+}
 
 func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
 	d := opaque.DefaultConfiguration().Serialize()
@@ -458,5 +560,217 @@ func TestGetFakeRecord(t *testing.T) {
 
 	if _, err := conf.GetFakeRecord(nil); err == nil {
 		t.Fatal("expected error on invalid configuration")
+	}
+}
+
+func TestErrorFormattingAndLogging(t *testing.T) {
+	base := errors.New("root cause")
+	wrapped := fmt.Errorf("wrap: %w", base)
+	sibling := errors.New("peer issue")
+	err := opaque.ErrCodeAuthentication.New("handshake failed", errors.Join(wrapped, sibling))
+
+	if got := err.Error(); got != "handshake failed" {
+		t.Fatalf("unexpected error string: %q", got)
+	}
+
+	if got := fmt.Sprintf("%s", err); got != "handshake failed" {
+		t.Fatalf("expected %%s to print message, got %q", got)
+	}
+	if got := fmt.Sprintf("%v", err); got != "handshake failed" {
+		t.Fatalf("expected %%v to print message, got %q", got)
+	}
+	if got := fmt.Sprintf("%q", err); got != "\"handshake failed\"" {
+		t.Fatalf("expected quoted output, got %q", got)
+	}
+
+	verbose := fmt.Sprintf("%+v", err)
+	if !strings.Contains(verbose, "handshake failed") {
+		t.Fatalf("verbose format missing message: %q", verbose)
+	}
+	if !strings.Contains(verbose, "wrap: root cause") {
+		t.Fatalf("verbose format missing wrapped cause: %q", verbose)
+	}
+	if !strings.Contains(verbose, "peer issue") {
+		t.Fatalf("verbose format missing sibling cause: %q", verbose)
+	}
+	if !strings.Contains(verbose, "\u21b3") {
+		t.Fatalf("verbose format should include arrow prefix: %q", verbose)
+	}
+
+	value := err.LogValue()
+	if value.Kind() != slog.KindGroup {
+		t.Fatalf("expected slog group value, got kind %v", value.Kind())
+	}
+
+	attrs := value.Group()
+	got := make(map[string]slog.Value, len(attrs))
+	for _, attr := range attrs {
+		got[attr.Key] = attr.Value
+	}
+
+	if attr, ok := got["code"]; !ok || attr.Int64() != int64(err.Code) {
+		t.Fatalf("missing or invalid code attribute: %+v", attrs)
+	}
+	if attr, ok := got["code_name"]; !ok || attr.String() != err.Code.String() {
+		t.Fatalf("missing or invalid code_name attribute: %+v", attrs)
+	}
+	if attr, ok := got["message"]; !ok || attr.String() != err.Message {
+		t.Fatalf("missing or invalid message attribute: %+v", attrs)
+	}
+	if _, ok := got["error"]; !ok {
+		t.Fatalf("missing nested error attribute: %+v", attrs)
+	}
+}
+
+func TestErrorAsVariants(t *testing.T) {
+	cause := errors.New("registration failed")
+	err := opaque.ErrCodeRegistration.New("state invalid", cause)
+
+	var code opaque.ErrorCode
+	if !err.As(&code) {
+		t.Fatal("expected As to populate ErrorCode")
+	}
+	if !code.Is(err) {
+		t.Fatalf("unexpected ErrorCode: %v", code)
+	}
+
+	var target *opaque.Error
+	if !err.As(&target) {
+		t.Fatal("expected As to populate *Error")
+	}
+	if !target.Is(err) {
+		t.Fatalf("expected target to reference original error, got %p != %p", target, err)
+	}
+
+	var nope string
+	if err.As(&nope) {
+		t.Fatal("unexpected As success for incompatible target")
+	}
+
+	if !opaque.ErrCodeAuthentication.As(opaque.ErrCodeAuthentication) {
+		t.Fatal("expected direct ErrorCode target to succeed")
+	}
+
+	var stored opaque.ErrorCode
+	if !opaque.ErrCodeAuthentication.As(&stored) {
+		t.Fatal("expected pointer ErrorCode target to succeed")
+	}
+	if !stored.Is(opaque.ErrCodeAuthentication) {
+		t.Fatalf("unexpected stored ErrorCode: %v", stored)
+	}
+
+	var unsupported bool
+	if opaque.ErrCodeAuthentication.As(&unsupported) {
+		t.Fatal("unexpected As success for unsupported type")
+	}
+
+	unknown := opaque.ErrorCode(255)
+	if unknown.String() != "unknown_error" {
+		t.Fatalf("unexpected string for unknown code: %q", unknown.String())
+	}
+
+	if unknown.Error() != "unknown_error" {
+		t.Fatalf("unexpected error() output for unknown code: %q", unknown.Error())
+	}
+}
+
+func TestErrorCodeStringCoverage(t *testing.T) {
+	cases := map[opaque.ErrorCode]string{
+		opaque.ErrCodeUnknown:           "unknown_error",
+		opaque.ErrCodeConfiguration:     "configuration_error",
+		opaque.ErrCodeRegistration:      "registration_error",
+		opaque.ErrCodeAuthentication:    "authentication_error",
+		opaque.ErrCodeMessage:           "message_error",
+		opaque.ErrCodeServerKeyMaterial: "server_key_material_error",
+		opaque.ErrCodeServerOptions:     "server_options_error",
+		opaque.ErrCodeClientRecord:      "client_record_error",
+		opaque.ErrCodeClientState:       "client_state_error",
+		opaque.ErrCodeClientOptions:     "client_options_error",
+	}
+
+	for code, want := range cases {
+		if got := code.String(); got != want {
+			t.Fatalf("code %d: want %q got %q", code, want, got)
+		}
+		if got := code.Error(); got != want {
+			t.Fatalf("code %d: unexpected error() output %q", code, got)
+		}
+	}
+}
+
+func TestErrorCodeIsBranches(t *testing.T) {
+	target := opaque.ErrCodeRegistration.New("wrapped", errors.New("inner"))
+
+	if !opaque.ErrCodeRegistration.Is(target) {
+		t.Fatal("expected ErrorCode to match wrapped *Error")
+	}
+
+	if !opaque.ErrCodeRegistration.Is(opaque.ErrRegistration) {
+		t.Fatal("expected ErrorCode to match exported sentinel")
+	}
+
+	if opaque.ErrCodeRegistration.Is(internal.ErrInvalidAKEid) {
+		t.Fatal("unexpected ErrorCode match for unrelated error")
+	}
+
+	bogus := fmt.Errorf("%w", opaque.ErrRegistration)
+	if !opaque.ErrCodeRegistration.Is(bogus) {
+		t.Fatal("expected ErrorCode to match via errors.As chain")
+	}
+}
+
+func TestErrorFormatDefaultVerb(t *testing.T) {
+	err := opaque.ErrCodeClientOptions.New("format me", fmt.Errorf("%w", opaque.ErrClientOptions))
+	if got := fmt.Sprintf("%x", err); !strings.Contains(got, "format me") {
+		t.Fatalf("expected hex verb to fall back to message, got %q", got)
+	}
+}
+
+func TestValidScalar(t *testing.T) {
+	group := ecc.Ristretto255Sha512
+
+	scalar := group.NewScalar().Random()
+	if err := opaque.IsValidScalar(group, scalar); err != nil {
+		t.Fatalf("unexpected error on valid scalar: %v", err)
+	}
+
+	if err := opaque.IsValidScalar(group, nil); !errors.Is(err, internal.ErrScalarNil) {
+		t.Fatalf("expected ErrScalarNil, got %v", err)
+	}
+
+	wrong := ecc.P256Sha256.NewScalar().Random()
+	if err := opaque.IsValidScalar(group, wrong); !errors.Is(err, internal.ErrScalarGroupMismatch) {
+		t.Fatalf("expected ErrScalarGroupMismatch, got %v", err)
+	}
+
+	zero := group.NewScalar()
+	zero.Zero()
+	if err := opaque.IsValidScalar(group, zero); !errors.Is(err, internal.ErrScalarZero) {
+		t.Fatalf("expected ErrScalarZero, got %v", err)
+	}
+}
+
+func TestValidElement(t *testing.T) {
+	group := ecc.Ristretto255Sha512
+
+	element := group.NewElement().Base()
+	if err := opaque.IsValidElement(group, element); err != nil {
+		t.Fatalf("unexpected error on valid element: %v", err)
+	}
+
+	if err := opaque.IsValidElement(group, nil); !errors.Is(err, internal.ErrElementNil) {
+		t.Fatalf("expected ErrElementNil, got %v", err)
+	}
+
+	wrong := ecc.P256Sha256.NewElement().Base()
+	if err := opaque.IsValidElement(group, wrong); !errors.Is(err, internal.ErrElementGroupMismatch) {
+		t.Fatalf("expected ErrElementGroupMismatch, got %v", err)
+	}
+
+	// Identity point check
+	identity := group.NewElement()
+	identity.Identity()
+	if err := opaque.IsValidElement(group, identity); !errors.Is(err, internal.ErrElementIdentity) {
+		t.Fatalf("expected ErrElementIdentity, got %v", err)
 	}
 }

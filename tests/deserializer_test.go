@@ -9,14 +9,15 @@
 package opaque_test
 
 import (
+	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
-
-	group "github.com/bytemare/ecc"
 )
 
 const testErrValidConf = "unexpected error on valid configuration: %v"
@@ -322,21 +323,6 @@ func TestDeserializer_KE1_Errors(t *testing.T) {
 	})
 }
 
-func TestPointer(t *testing.T) {
-	type p struct {
-		pointer *group.Scalar
-	}
-
-	tester := &p{
-		//	pointer: group.Ristretto255Sha512.NewScalar().Random(),
-	}
-
-	// t.Log(tester.pointer.Hex())
-	t.Log(tester.pointer)
-	internal.ClearScalar(&tester.pointer)
-	t.Log(tester.pointer)
-}
-
 //func TestScalar(t *testing.T) {
 //	h := "25e852079d01b412ca9df1a8dcaefa99f52c757d69242d2edde02317a2d8760f02"
 //
@@ -517,6 +503,50 @@ func TestDeserializer_KE3_Errors(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestDeserializeElementScenarios(t *testing.T) {
+	group := ecc.Ristretto255Sha512
+	scalar := group.NewScalar().Random()
+	valid := group.Base().Multiply(scalar).Encode()
+
+	if _, err := opaque.DeserializeElement(group, valid); err != nil {
+		t.Fatalf("unexpected error decoding valid element: %v", err)
+	}
+
+	short := valid[:len(valid)-1]
+	if _, err := opaque.DeserializeElement(group, short); !errors.Is(err, internal.ErrInvalidEncodingLength) {
+		t.Fatalf("expected encoding length error, got %v", err)
+	}
+
+	bad := getBadRistrettoElement()
+	if _, err := opaque.DeserializeElement(group, bad); !errors.Is(err, internal.ErrInvalidElement) {
+		t.Fatalf("expected invalid element error, got %v", err)
+	}
+}
+
+func TestDeserializeScalarScenarios(t *testing.T) {
+	group := ecc.Ristretto255Sha512
+	valid := group.NewScalar().Random().Encode()
+
+	if _, err := opaque.DeserializeScalar(group, valid); err != nil {
+		t.Fatalf("unexpected error decoding valid scalar: %v", err)
+	}
+
+	short := valid[:len(valid)-1]
+	if _, err := opaque.DeserializeScalar(group, short); !errors.Is(err, internal.ErrInvalidEncodingLength) {
+		t.Fatalf("expected invalid length error, got %v", err)
+	}
+
+	zero := group.NewScalar()
+	if _, err := opaque.DeserializeScalar(group, zero.Encode()); !errors.Is(err, internal.ErrScalarZero) {
+		t.Fatalf("expected scalar zero error, got %v", err)
+	}
+
+	bad := getBadRistrettoScalar()
+	if _, err := opaque.DeserializeScalar(group, bad); !errors.Is(err, internal.ErrInvalidScalar) {
+		t.Fatalf("expected invalid scalar error, got %v", err)
+	}
 }
 
 /*

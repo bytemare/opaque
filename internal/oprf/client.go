@@ -27,6 +27,11 @@ func (i Identifier) Blind(input []byte, blind *ecc.Scalar) (*ecc.Scalar, *ecc.El
 
 	p := i.Group().HashToGroup(input, i.dst(tag.OPRFPointPrefix))
 	if p.IsIdentity() {
+		// NOTE: HashToGroup returning the identity would violate the OPRF security
+		// assumptions and is not expected to happen in practice; we panic rather
+		// than attempt recovery. This branch is effectively unreachable in unit
+		// tests because the standardized hash-to-curve map never yields the base
+		// point.
 		panic(errInvalidInput)
 	}
 

@@ -18,6 +18,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/bytemare/ecc"
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque"
@@ -27,7 +28,6 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 
-	group "github.com/bytemare/ecc"
 	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
@@ -205,10 +205,10 @@ func setup(t *testing.T, c *configuration) (*opaque.Client, *opaque.Server) {
 	server := getServer(t, c)
 	sks, pks := c.conf.KeyGen()
 	skm := &opaque.ServerKeyMaterial{
-		Identity:       nil,
+		Identity:       serverIdentity,
 		PrivateKey:     sks,
 		PublicKeyBytes: pks.Encode(),
-		OPRFGlobalSeed: internal.RandomBytes(c.conf.Hash.Size()),
+		OPRFGlobalSeed: c.conf.GenerateOPRFSeed(),
 	}
 
 	if err := server.SetKeyMaterial(skm); err != nil {
@@ -347,7 +347,7 @@ func (c *configuration) getBadElement() []byte {
 	}
 }
 
-func (c *configuration) getValidScalar() *group.Scalar {
+func (c *configuration) getValidScalar() *ecc.Scalar {
 	return c.internal.Group.NewScalar().Random()
 }
 
@@ -355,7 +355,7 @@ func (c *configuration) getValidScalarBytes() []byte {
 	return c.getValidScalar().Encode()
 }
 
-func (c *configuration) getValidElement() *group.Element {
+func (c *configuration) getValidElement() *ecc.Element {
 	s := c.internal.Group.NewScalar().Random()
 	return c.internal.Group.Base().Multiply(s)
 }
@@ -411,9 +411,9 @@ func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
 
 func buildPRK(
 	conf *internal.Configuration,
-	blind *group.Scalar,
+	blind *ecc.Scalar,
 	password []byte,
-	evaluation *group.Element,
+	evaluation *ecc.Element,
 ) ([]byte, error) {
 	unblinded := conf.OPRF.Finalize(blind, password, evaluation)
 	hardened := conf.KSF.Harden(unblinded, nil, conf.OPRF.Group().ElementLength())
@@ -423,7 +423,7 @@ func buildPRK(
 
 func getEnvelope(
 	conf *internal.Configuration,
-	blind *group.Scalar,
+	blind *ecc.Scalar,
 	password []byte,
 	ke2 *message.KE2,
 ) (*keyrecovery.Envelope, []byte, error) {

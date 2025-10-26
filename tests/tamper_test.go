@@ -127,7 +127,7 @@ func TestTamper_IdentityBindingMismatch(t *testing.T) {
 func TestTamper_KE2MismatchWithClientState(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, nil)
+		rec := registration(t2, client, server, password, credentialIdentifier, nil, serverIdentity)
 		client.ClearState()
 
 		// Build two different KE1 messages with two clients
@@ -153,12 +153,12 @@ func TestTamper_KE2MismatchWithClientState(t *testing.T) {
 		// Use KE2b against client1 state (which holds KE1a) → should fail transcript MAC
 		expectErrors(
 			t2,
-			func() error { _, _, _, err := client.GenerateKE3(ke2b, nil, nil); return err },
+			func() error { _, _, _, err := client.GenerateKE3(ke2b, nil, serverIdentity); return err },
 			opaque.ErrAuthentication,
 		)
 
 		// Complete with ke2a then try to reuse ke3 against a different server output
-		ke3, _, _, err := client.GenerateKE3(ke2a, nil, nil)
+		ke3, _, _, err := client.GenerateKE3(ke2a, nil, serverIdentity)
 		if err != nil {
 			t2.Fatal(err)
 		}
@@ -176,7 +176,7 @@ func TestTamper_KE2MismatchWithClientState(t *testing.T) {
 		expectErrors(t2, func() error { return server.LoginFinish(ke3, outC.ClientMAC) }, opaque.ErrAuthentication)
 
 		// Ensure ke2c can still be used legitimately
-		_, _, _, err = client.GenerateKE3(ke2c, nil, nil)
+		_, _, _, err = client.GenerateKE3(ke2c, nil, serverIdentity)
 		if err != nil {
 			t2.Fatal(err)
 		}
@@ -241,7 +241,7 @@ func TestTamper_MaskedResponseBitflip(t *testing.T) {
 func TestTamper_KE3Replay_AcceptedWithoutAppTracking(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, nil)
+		rec := registration(t2, client, server, password, credentialIdentifier, nil, serverIdentity)
 		client.ClearState()
 
 		ke1, err := client.GenerateKE1(password)
@@ -252,7 +252,7 @@ func TestTamper_KE3Replay_AcceptedWithoutAppTracking(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
-		ke3, _, _, err := client.GenerateKE3(ke2, nil, nil)
+		ke3, _, _, err := client.GenerateKE3(ke2, nil, serverIdentity)
 		if err != nil {
 			t2.Fatal(err)
 		}

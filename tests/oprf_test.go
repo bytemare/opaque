@@ -17,11 +17,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/bytemare/ecc"
+
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
-
-	group "github.com/bytemare/ecc"
 )
 
 type oprfVector struct {
@@ -130,7 +130,7 @@ func testBlind(t *testing.T, c oprf.Identifier, test *test) {
 	}
 }
 
-func testEvaluation(t *testing.T, c oprf.Identifier, privKey *group.Scalar, test *test) {
+func testEvaluation(t *testing.T, c oprf.Identifier, privKey *ecc.Scalar, test *test) {
 	for i := 0; i < len(test.BlindedElement); i++ {
 		b := c.Group().NewElement()
 		if err := b.Decode(test.BlindedElement[i]); err != nil {
