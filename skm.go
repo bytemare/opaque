@@ -95,6 +95,7 @@ func (c *Configuration) DecodeServerKeyMaterial(data []byte) (*ServerKeyMaterial
 		return nil, ErrServerKeyMaterial.Join(internal.ErrInvalidServerPublicKey)
 	}
 
+	// The following is never triggered due to the structure check and failsafe above, but is kept for safety.
 	// If the seed is empty, we set it to nil to avoid confusion.
 	// This is useful for cases where the seed is not used, and the OPRF client key is provided directly.
 	if len(seed) != c.Hash.Size() {

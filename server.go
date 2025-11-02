@@ -74,8 +74,7 @@ func (s *Server) SetKeyMaterial(skm *ServerKeyMaterial) error {
 // Preconditions:
 //   - s.SetKeyMaterial has been called. The server’s AKE public key (ServerKeyMaterial.PublicKeyBytes) is required
 //     to populate the response.
-//   - If clientOPRFKey is nil, the global OPRF seed (ServerKeyMaterial.OPRFGlobalSeed) MUST be set and have length
-//     equal to Hash.Size().
+//   - If clientOPRFKey is nil, the global OPRF seed (ServerKeyMaterial.OPRFGlobalSeed) MUST be set.
 //
 // Security and usage notes:
 //   - Using a single global OPRF seed together with unique clientCredentialIdentifier values prevents client
@@ -245,7 +244,7 @@ func (s *Server) chooseOPRFKey(clientCredentialIdentifier []byte, clientOPRFKey 
 
 // deriveOPRFKey derives the client OPRF key from the credentialIdentifier and global OPRF seed.
 func (s *Server) deriveOPRFKey(clientCredentialIdentifier []byte) (*ecc.Scalar, error) {
-	if s.ServerKeyMaterial == nil {
+	if s.ServerKeyMaterial == nil { // sanity check, but never reached, as it would have failed earlier.
 		return nil, ErrServerKeyMaterial.Join(internal.ErrServerKeyMaterialNil)
 	}
 

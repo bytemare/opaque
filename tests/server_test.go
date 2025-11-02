@@ -20,6 +20,7 @@ import (
 	The following tests look for failing conditions.
 */
 
+// TestServerInit_InvalidOPRFSeedLength validates that invalid or missing OPRF seeds prevent both registration and authentication, guarding against misconfigured server key material.
 func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 	/*
 		Nil and invalid server public key
@@ -99,6 +100,7 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 	})
 }
 
+// TestNewServer_DefaultConfiguration confirms that spinning up a server with nil configuration yields a working setup, exercising the end-to-end happy path for the default suite.
 func TestNewServer_DefaultConfiguration(t *testing.T) {
 	server, err := opaque.NewServer(nil)
 	if err != nil {
@@ -153,6 +155,7 @@ func TestNewServer_DefaultConfiguration(t *testing.T) {
 	}
 }
 
+// TestServer_RegistrationResponse_InvalidServerPublicKey ensures the server refuses to operate when its own key bytes are corrupted, preventing malicious serialization changes.
 func TestServer_RegistrationResponse_InvalidServerPublicKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		server := getServer(t2, conf)
@@ -183,6 +186,7 @@ func TestServer_RegistrationResponse_InvalidServerPublicKey(t *testing.T) {
 	})
 }
 
+// TestServer_RegistrationResponse_InvalidRequest covers malformed registration requests so the server never signs arbitrary inputs or processes empty blinds.
 func TestServer_RegistrationResponse_InvalidRequest(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		server := getServer(t2, conf)
@@ -231,6 +235,7 @@ func TestServer_RegistrationResponse_InvalidRequest(t *testing.T) {
 	})
 }
 
+// TestServer_RegistrationResponse_ExplicitOPRFKey demonstrates that supplying an explicit OPRF key yields valid responses, which is necessary for deterministic provisioning flows.
 func TestServer_RegistrationResponse_ExplicitOPRFKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -251,6 +256,7 @@ func TestServer_RegistrationResponse_ExplicitOPRFKey(t *testing.T) {
 	})
 }
 
+// TestServer_RegistrationResponse_ExplicitOPRFKeyErrors ensures the server rejects explicit client keys from the wrong group or missing identifiers, preventing cross-group misuse.
 func TestServer_RegistrationResponse_ExplicitOPRFKeyErrors(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -273,6 +279,7 @@ func TestServer_RegistrationResponse_ExplicitOPRFKeyErrors(t *testing.T) {
 	})
 }
 
+// TestServer_GenerateKE2_InvalidKE1 checks that the server validates every field of the incoming KE1, blocking bad points, missing nonces, and nil messages before secrets are derived.
 func TestServer_GenerateKE2_InvalidKE1(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -318,6 +325,7 @@ func TestServer_GenerateKE2_InvalidKE1(t *testing.T) {
 	})
 }
 
+// TestServer_GenerateKE2_InvalidOptions verifies that unsafe server overrides (bad client key, nonce, or key share) are rejected, preserving protocol invariants even when advanced options are used.
 func TestServer_GenerateKE2_InvalidOptions(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -359,6 +367,7 @@ func TestServer_GenerateKE2_InvalidOptions(t *testing.T) {
 	})
 }
 
+// TestServer_GenerateKE2_InvalidRecord exercises every validation on stored client records so corrupted envelopes or masking keys cannot progress through authentication.
 func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		_, server := setup(t2, conf)
@@ -452,6 +461,7 @@ func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
 	})
 }
 
+// TestServer_LoginFinish_InvalidInputs ensures the final login step rejects missing KE3 messages and tampered MACs, safeguarding session key confirmation on the server side.
 func TestServer_LoginFinish_InvalidInputs(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -488,59 +498,7 @@ func TestServer_LoginFinish_InvalidInputs(t *testing.T) {
 	})
 }
 
-//func TestServerInit_NilSecretKey(t *testing.T) {
-//	/*
-//		Nil server secret key
-//		verify that calling SetKeyMaterial with a nil secret key produces an error
-//	whose message begins with the expected prefix. The core assertion was that providing nil secret material
-//	must never succeed and must return a descriptive error.
-//	*/
-//	testAll(t, func(t2 *testing.T, conf *configuration) {
-//		server, err := conf.conf.Server()
-//		if err != nil {
-//			t.Fatal(err)
-//		}
-//		_, pk := conf.conf.KeyGen()
-//		expected := "invalid server AKE secret key: "
-//
-//		if err := server.SetKeyMaterial(nil, nil, pk, nil); err == nil ||
-//			!strings.HasPrefix(err.Error(), expected) {
-//			t.Fatalf("expected error on nil secret key - got %s", err)
-//		}
-//	})
-//}
-
-//func TestServerInit_ZeroSecretKey(t *testing.T) {
-//	/*
-//		Nil server secret key
-//      verify that a zero-valued secret key is rejected. Depending on the group
-//	selected, the error either indicates a zero private key or an invalid scalar decoding. These tests are
-//	commented out because their conditions are now covered by more granular unit tests elsewhere or were
-//	superseded by fuzzing and input validation logic.
-//	*/
-//	testAll(t, func(t2 *testing.T, conf *configuration) {
-//		server, err := conf.conf.Server()
-//		if err != nil {
-//			t.Fatal(err)
-//		}
-//		sk := [32]byte{}
-//
-//		var expected string
-//
-//		switch conf.conf.AKE.Group() {
-//		case group.Ristretto255Sha512, group.P256Sha256:
-//			expected = "server private key is zero"
-//		default:
-//			expected = "invalid server AKE secret key: scalar Decode: invalid scalar length"
-//		}
-//
-//		if err := server.SetKeyMaterial(nil, sk[:], nil, nil); err == nil ||
-//			!strings.HasPrefix(err.Error(), expected) {
-//			t.Fatalf("expected error on nil secret key - got %s", err)
-//		}
-//	})
-//}
-
+// TestServerInit_InvalidEnvelope checks that malformed registration envelopes are caught before being used, preserving the integrity of stored client records.
 func TestServerInit_InvalidEnvelope(t *testing.T) {
 	/*
 		Record envelope of invalid length
@@ -563,6 +521,7 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 	})
 }
 
+// TestServerFinish_InvalidKE3Mac verifies the server aborts when the client's MAC is modified, ensuring mutual authentication terminates on integrity failures.
 func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	/*
 		ke3 mac is invalid

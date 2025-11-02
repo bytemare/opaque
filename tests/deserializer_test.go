@@ -39,6 +39,7 @@ func getDeserializer(t *testing.T, c *opaque.Configuration) *opaque.Deserializer
 	Message Deserialization
 */
 
+// TestDeserializer_New ensures constructing a deserializer with a configuration succeeds and protects against unsupported suites, forming the base for all parsing helpers.
 func TestDeserializer_New(t *testing.T) {
 	// Test valid configurations
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -153,6 +154,7 @@ func generateDeserializerErrorTest(method, name string, input []byte, errors ...
 	}
 }
 
+// TestDeserializer_RegistrationRequest_Errors validates that malformed registration requests are rejected during decoding, preventing bogus client material from entering the protocol.
 func TestDeserializer_RegistrationRequest_Errors(t *testing.T) {
 	method := "RegistrationRequest"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -184,6 +186,7 @@ func TestDeserializer_RegistrationRequest_Errors(t *testing.T) {
 	})
 }
 
+// TestDeserializer_RegistrationResponse_Errors checks that invalid registration responses fail early, helping clients avoid using corrupted server outputs.
 func TestDeserializer_RegistrationResponse_Errors(t *testing.T) {
 	method := "RegistrationResponse"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -225,6 +228,7 @@ func TestDeserializer_RegistrationResponse_Errors(t *testing.T) {
 	})
 }
 
+// TestDeserializer_RegistrationRecord_Errors confirms storage records are thoroughly validated before use, preserving envelope integrity and key consistency.
 func TestDeserializer_RegistrationRecord_Errors(t *testing.T) {
 	method := "RegistrationRecord"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -272,6 +276,7 @@ func TestDeserializer_RegistrationRecord_Errors(t *testing.T) {
 	})
 }
 
+// TestDeserializer_KE1_Errors ensures malformed KE1 messages are caught during parsing, so servers never operate on invalid key shares or nonces.
 func TestDeserializer_KE1_Errors(t *testing.T) {
 	method := "KE1"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -340,6 +345,7 @@ func TestDeserializer_KE1_Errors(t *testing.T) {
 //	t.Logf("Scalar: %s", s.Hex())
 //}
 
+// TestDeserializer_KE2_Errors enumerates bad KE2 payloads, reinforcing that clients decline tampered server responses before decrypting envelopes.
 func TestDeserializer_KE2_Errors(t *testing.T) {
 	method := "KE2"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -477,6 +483,7 @@ func TestDeserializer_KE2_Errors(t *testing.T) {
 	})
 }
 
+// TestDeserializer_KE3_Errors verifies that final client messages are validated before server processing, preventing acceptance of truncated MACs or missing key shares.
 func TestDeserializer_KE3_Errors(t *testing.T) {
 	method := "KE3"
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -505,6 +512,7 @@ func TestDeserializer_KE3_Errors(t *testing.T) {
 	})
 }
 
+// TestDeserializeElementScenarios covers element decoding across groups and error cases, which is important for handling externally provided public keys.
 func TestDeserializeElementScenarios(t *testing.T) {
 	group := ecc.Ristretto255Sha512
 	scalar := group.NewScalar().Random()
@@ -525,6 +533,7 @@ func TestDeserializeElementScenarios(t *testing.T) {
 	}
 }
 
+// TestDeserializeScalarScenarios exercises scalar decoding, making sure invalid encodings are surfaced with precise errors.
 func TestDeserializeScalarScenarios(t *testing.T) {
 	group := ecc.Ristretto255Sha512
 	valid := group.NewScalar().Random().Encode()
@@ -553,6 +562,7 @@ func TestDeserializeScalarScenarios(t *testing.T) {
 	Decode Keys
 */
 
+// TestDecodeAkePrivateKey demonstrates that valid private keys survive the dedicated decoder, ensuring serialized material can reboot servers.
 func TestDecodeAkePrivateKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		key := conf.conf.AKE.Group().NewScalar().Random()
@@ -568,6 +578,7 @@ func TestDecodeAkePrivateKey(t *testing.T) {
 	})
 }
 
+// TestDecodeBadAkePrivateKey ensures the decoder spots corrupted AKE private keys, a critical guard against tampering.
 func TestDecodeBadAkePrivateKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		badKey := conf.getBadScalar()
@@ -580,6 +591,7 @@ func TestDecodeBadAkePrivateKey(t *testing.T) {
 	})
 }
 
+// TestDecodeAkePublicKey verifies successful decoding for well-formed public keys, proving the API works for backups and migrations.
 func TestDecodeAkePublicKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		s := conf.conf.AKE.Group().NewScalar().Random()
@@ -596,6 +608,7 @@ func TestDecodeAkePublicKey(t *testing.T) {
 	})
 }
 
+// TestDecodeBadAkePublicKey ensures invalid public key encodings trigger errors, defending against inconsistent curve points.
 func TestDecodeBadAkePublicKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		badKey := conf.getBadElement()

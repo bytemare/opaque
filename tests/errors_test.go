@@ -18,17 +18,19 @@ import (
 	"github.com/bytemare/opaque/internal"
 )
 
+// TestErrorJoin_IsAndAs confirms joined high-level errors preserve discoverability of both protocol codes and root causes so applications can react safely.
 func TestErrorJoin_IsAndAs(t *testing.T) {
-	// Compose a typical error chain from a high-level code with internal causes
 	err := opaque.ErrKE2.Join(internal.ErrMissingMAC, internal.ErrSliceIsAllZeros)
 
 	// Verify top-level code and internal causes are discoverable via errors.Is
 	if !errors.Is(err, opaque.ErrKE2) {
 		t.Fatal("expected errors.Is(err, ErrKE2) to be true")
 	}
+
 	if !errors.Is(err, internal.ErrMissingMAC) {
 		t.Fatal("expected errors.Is(err, internal.ErrMissingMAC) to be true")
 	}
+
 	if !errors.Is(err, internal.ErrSliceIsAllZeros) {
 		t.Fatal("expected errors.Is(err, internal.ErrSliceIsAllZeros) to be true")
 	}
@@ -67,6 +69,7 @@ func (w opaqueErrorWrapper) As(target any) bool {
 	}
 }
 
+// TestErrorCodeIsOpaqueError demonstrates that ErrorCode.Is recognizes wrapped *opaque.Error values, ensuring the convenience helpers integrate cleanly with Go's errors APIs.
 func TestErrorCodeIsOpaqueError(t *testing.T) {
 	t.Parallel()
 
@@ -84,6 +87,7 @@ type nilUnwrapper struct{}
 func (nilUnwrapper) Error() string { return "nil unwrap" }
 func (nilUnwrapper) Unwrap() error { return nil }
 
+// TestErrorFormatHandlesNilUnwrap verifies the verbose formatter tolerates custom error types whose Unwrap returns nil so logging never panics when exotic wrappers are encountered.
 func TestErrorFormatHandlesNilUnwrap(t *testing.T) {
 	t.Parallel()
 
@@ -97,27 +101,4 @@ func TestErrorFormatHandlesNilUnwrap(t *testing.T) {
 	if !strings.Contains(formatted, "auth failed") {
 		t.Fatalf("expected formatted error to include message, got %q", formatted)
 	}
-}
-
-// Example: handling high-level errors and specific causes.
-func Example_errorHandling() {
-	// Simulate an error chain
-	err := opaque.ErrAuthentication.Join(internal.ErrServerAuthentication, internal.ErrInvalidServerMac)
-
-	switch {
-	case errors.Is(err, opaque.ErrAuthentication):
-		// top-level class
-		fmt.Println("auth error: abort and do not use keys")
-		// handle specific cause
-		if errors.Is(err, internal.ErrInvalidServerMac) {
-			fmt.Println("server MAC invalid: report generic failure")
-		}
-	case errors.Is(err, opaque.ErrRegistration):
-		fmt.Println("registration error: notify client")
-	default:
-		fmt.Println("unexpected error")
-	}
-	// Output:
-	// auth error: abort and do not use keys
-	// server MAC invalid: report generic failure
 }

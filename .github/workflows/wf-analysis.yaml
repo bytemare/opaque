@@ -1,3 +1,15 @@
+#
+# SPDX-License-Identifier: MIT
+#
+# Copyright (C) 2025 Daniel Bourdrez. All Rights Reserved.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree or at
+# https://spdx.org/licenses/MIT.html
+#
+
+---
+
 name: Analysis
 
 on:
@@ -11,52 +23,34 @@ on:
     # Every 3 days at 7 a.m.
     - cron: '0 7 */3 * *'
 
-permissions: {}
+permissions: { }
 
 jobs:
   Lint:
+    uses: bytemare/workflows/.github/workflows/lint.yaml@8abce840140ebad3f8b6f16fb4cc8838e64a476a
     permissions:
       contents: read
-    uses: bytemare/workflows/.github/workflows/golangci-lint.yaml@696fab4908e73675d0c90d77637ecaed7e93e978
+      packages: read
+      statuses: write
     with:
-      config-path: ./.github/.golangci.yml
-      scope: ./...
+      # gofmt
+      gofmt: true
+      # Super-Linter
+      super-linter: true
+      super-linter-validate-all-codebase: true
+      super-linter-enabled-linters: |
+        BASH,BASH_EXEC,VALIDATE_EDITORCONFIG,ENV,GITHUB_ACTIONS,GO_MODULES,MARKDOWN,YAML
+      super-linter-rules-path: .github
 
-  CodeQL:
+  Governance:
+    uses: bytemare/workflows/.github/workflows/governance.yaml@8abce840140ebad3f8b6f16fb4cc8838e64a476a
     permissions:
-      actions: read
       contents: read
       security-events: write
-    uses: bytemare/workflows/.github/workflows/codeql.yaml@696fab4908e73675d0c90d77637ecaed7e93e978
-    with:
-      language: go
-
-  CodeScans:
-    permissions:
-      contents: read
-      # Needed to upload the results to code-scanning dashboard.
-      security-events: write
-    uses: bytemare/workflows/.github/workflows/scan-go.yaml@696fab4908e73675d0c90d77637ecaed7e93e978
-    with:
-      sonar-configuration: .github/sonar-project.properties
-    secrets:
-      github: ${{ secrets.GITHUB_TOKEN }}
-      sonar: ${{ secrets.SONAR_TOKEN }}
-      codecov: ${{ secrets.CODECOV_TOKEN }}
-      semgrep: ${{ secrets.SEMGREP_APP_TOKEN }}
-
-  Scorecard:
-    permissions:
-      # Needed to upload the results to code-scanning dashboard.
-      security-events: write
-      # Needed for GitHub OIDC token if publish_results is true.
       id-token: write
-      # Needed for nested workflow
       actions: read
-      # To detect SAST tools
       checks: read
       attestations: read
-      contents: read
       deployments: read
       issues: read
       discussions: read
@@ -65,8 +59,45 @@ jobs:
       pull-requests: read
       repository-projects: read
       statuses: read
-      models: read
-
-    uses: bytemare/workflows/.github/workflows/scorecard.yaml@696fab4908e73675d0c90d77637ecaed7e93e978
+      models: read # permissions:disable-line
+    with:
+      # Dependency Review
+      dependency-review: true
+      # License Check
+      license-check: true
+      # Do Not Submit
+      do-not-submit: true
+      # OpenSSF Scorecard
+      scorecard: true
+      # Codecov upload
+      codecov: true
     secrets:
-      token: ${{ secrets.SCORECARD_TOKEN }}
+      # OpenSSF Scorecard token
+      scorecard: ${{ secrets.SCORECARD_TOKEN }}
+      # Codecov token
+      codecov: ${{ secrets.CODECOV_TOKEN }}
+
+  SAST:
+    uses: bytemare/workflows/.github/workflows/sast.yaml@8abce840140ebad3f8b6f16fb4cc8838e64a476a
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    with:
+      # Semgrep
+      semgrep: true
+      # CodeQL
+      codeql: true
+      codeql-language: go
+      # SonarQube
+      sonarqube: true
+      sonarqube-configuration: .github/sonar-project.properties
+      # Govulncheck
+      govulncheck: true
+      # Gitleaks
+      gitleaks: true
+    secrets:
+      # Semgrep token
+      semgrep: ${{ secrets.SEMGREP_APP_TOKEN }}
+      # SonarQube token
+      sonarqube: ${{ secrets.SONAR_TOKEN }}

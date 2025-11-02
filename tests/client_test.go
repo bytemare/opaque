@@ -25,7 +25,7 @@ import (
 	ksf2 "github.com/bytemare/opaque/internal/ksf"
 )
 
-// T15.2 — NewClient without configuration uses defaults.
+// TestNewClient_DefaultConfiguration guarantees that passing nil configuration falls back to the hardened defaults, which is essential so applications relying on the safe baseline do not accidentally run with zeroed parameters.
 func TestNewClient_DefaultConfiguration(t *testing.T) {
 	client, err := opaque.NewClient(nil)
 	if err != nil {
@@ -47,7 +47,7 @@ func TestNewClient_DefaultConfiguration(t *testing.T) {
 	}
 }
 
-// T15.3 — RegistrationInit with blind already set.
+// TestClient_RegistrationInit_PreviousBlind ensures the client rejects attempts to start a second registration while a previous OPRF blind is still cached, preventing state reuse that could leak correlation information.
 func TestClient_RegistrationInit_PreviousBlind(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client := getClient(t2, conf)
@@ -63,7 +63,7 @@ func TestClient_RegistrationInit_PreviousBlind(t *testing.T) {
 	})
 }
 
-// T15.4 — RegistrationInit with invalid options (bad OPRF blind).
+// TestClient_RegistrationInit_InvalidOptions_OPRFBlind checks that supplying an OPRF blind from the wrong group is caught, preserving group separation guarantees required by the protocol.
 func TestClient_RegistrationInit_InvalidOptions_OPRFBlind(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client := getClient(t2, conf)
@@ -84,6 +84,7 @@ func TestClient_RegistrationInit_InvalidOptions_OPRFBlind(t *testing.T) {
 	})
 }
 
+// TestClient_RegistrationFinalize_InvalidServerKeyLength verifies that truncated server public keys are rejected before envelope processing, protecting the registration flow from malformed key material.
 func TestClient_RegistrationFinalize_InvalidServerKeyLength(t *testing.T) {
 	testAll(t, func(t *testing.T, conf *configuration) {
 		client, server := setup(t, conf)
@@ -106,7 +107,7 @@ func TestClient_RegistrationFinalize_InvalidServerKeyLength(t *testing.T) {
 	})
 }
 
-// T15.5 — RegistrationFinalize with invalid options and responses.
+// TestClient_RegistrationFinalize_InvalidOptionsAndResponses exercises the full matrix of bad inputs and option combinations so the registration finalization code cannot proceed with inconsistent or attacker-chosen state.
 func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -252,6 +253,7 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 	})
 }
 
+// TestClient_RegistrationFinalize_InvalidEvaluatedMessage proves that an evaluated OPRF element from a foreign group is rejected, maintaining the curve membership guarantees required for OPAQUE security proofs.
 func TestClient_RegistrationFinalize_InvalidEvaluatedMessage(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -275,6 +277,7 @@ func TestClient_RegistrationFinalize_InvalidEvaluatedMessage(t *testing.T) {
 	})
 }
 
+// TestClient_RegistrationFinalize_KSFCustomization demonstrates that callers can tune KSF parameters without breaking record derivation, which is important for deployments that increase work factors over time.
 func TestClient_RegistrationFinalize_KSFCustomization(t *testing.T) {
 	testAll(t, func(t *testing.T, conf *configuration) {
 		params := conf.internal.KSF.Parameters()
@@ -309,7 +312,7 @@ func TestClient_RegistrationFinalize_KSFCustomization(t *testing.T) {
 	})
 }
 
-// T15.7 — GenerateKE1 with blind already set.
+// TestClient_GenerateKE1_PreviousBlind confirms the client will not reuse a cached blind, protecting unlinkability across authentication attempts.
 func TestClient_GenerateKE1_PreviousBlind(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client := getClient(t2, conf)
@@ -324,7 +327,7 @@ func TestClient_GenerateKE1_PreviousBlind(t *testing.T) {
 	})
 }
 
-// T15.9 — GenerateKE1 with invalid options (bad OPRF blind and bad AKE secret share).
+// TestClient_GenerateKE1_InvalidOptions validates that the client catches malformed blinding and bad secret-key-share inputs, preventing attackers from pushing the state machine onto an unsafe curve.
 func TestClient_GenerateKE1_InvalidOptions(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		// Bad OPRF blind ecc.
@@ -362,6 +365,7 @@ func TestClient_GenerateKE1_InvalidOptions(t *testing.T) {
 	})
 }
 
+// TestClient_GenerateKE3_InvalidMaskingNonce ensures malformed masking nonces and responses are caught, which blocks attackers from tampering with the envelope while keeping MACs intact.
 func TestClient_GenerateKE3_InvalidMaskingNonce(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		baseline := func() (*opaque.Client, *message.KE2, *opaque.ClientRecord) {
@@ -421,7 +425,7 @@ func TestClient_GenerateKE3_InvalidMaskingNonce(t *testing.T) {
 	})
 }
 
-// T15.10 — GenerateKE3 with invalid KE2 fields.
+// TestClient_GenerateKE3_InvalidKE2Fields walks through the KE2 validation ladder so any malformed response from the server fails fast before secrets are derived.
 func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		// a) nil KE2
@@ -548,7 +552,7 @@ func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 	})
 }
 
-// T15.11 — GenerateKE3 with invalid options.
+// TestClient_GenerateKE3_InvalidOptions stresses every invalid client option combination so the KE3 generator stays robust against misconfiguration or malicious overrides.
 func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		// Build a valid KE2 as a baseline.
@@ -700,7 +704,7 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 	})
 }
 
-// getOtherGroup returns a different group than the current configuration's ecc.
+// getOtherGroup returns a different group than the current configuration's.
 func getOtherGroup(conf *configuration) ecc.Group {
 	if conf.internal.Group == ecc.Ristretto255Sha512 {
 		return ecc.P256Sha256
@@ -708,15 +712,8 @@ func getOtherGroup(conf *configuration) ecc.Group {
 	return ecc.Ristretto255Sha512
 }
 
-/*
-	The following tests look for failing conditions.
-*/
-
+// TestClient_GenerateKE3_BadMaskedResponse verifies the client aborts when the masked envelope response length is inconsistent, preventing accidental truncation or padding oracle issues.
 func TestClient_GenerateKE3_BadMaskedResponse(t *testing.T) {
-	/*
-		The masked response is of invalid length.
-	*/
-
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, err := conf.conf.Client()
 		if err != nil {
@@ -773,11 +770,8 @@ func TestClient_GenerateKE3_BadMaskedResponse(t *testing.T) {
 	})
 }
 
+// TestClient_GenerateKE3_InvalidEnvelopeTag shows that tampering with the envelope authentication tag results in an authentication failure, reinforcing the MAC’s role in key confirmation.
 func TestClient_GenerateKE3_InvalidEnvelopeTag(t *testing.T) {
-	/*
-		Invalid envelope tag
-	*/
-
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t, conf)
 		rec := registration(t, client, server, password, credentialIdentifier, nil, nil)
@@ -824,6 +818,7 @@ func cleartextCredentials(clientPublicKey, serverPublicKey, idc, ids []byte) []b
 	return encoding.Concat3(serverPublicKey, encoding.EncodeVector(ids), encoding.EncodeVector(idc))
 }
 
+// TestClient_GenerateKE3_ErrEnvelopeInvalidMac_WrongServerPublicKey ensures any mismatch between the stored masking key and the reconstructed server key trips the MAC check, preventing swap attacks.
 func TestClient_GenerateKE3_ErrEnvelopeInvalidMac_WrongServerPublicKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t, conf)
@@ -853,6 +848,7 @@ func TestClient_GenerateKE3_ErrEnvelopeInvalidMac_WrongServerPublicKey(t *testin
 	})
 }
 
+// TestClient_GenerateKE3_InvalidServerPublicKey verifies that malformed server public key encodings are rejected even after envelope decryption, closing a gap where fake keys could be smuggled in.
 func TestClient_GenerateKE3_InvalidServerPublicKey(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t, conf)
@@ -904,11 +900,8 @@ func TestClient_GenerateKE3_InvalidServerPublicKey(t *testing.T) {
 	})
 }
 
+// TestClient_GenerateKE3_InvalidKE2Mac confirms that manipulating the server MAC leads to an authentication error, proving the server’s keystream integrity protection works.
 func TestClient_GenerateKE3_InvalidKE2Mac(t *testing.T) {
-	/*
-		Invalid server ke2 mac
-	*/
-
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t, conf)
 		record := registration(t, client, server, password, credentialIdentifier, nil, nil)
@@ -932,61 +925,7 @@ func TestClient_GenerateKE3_InvalidKE2Mac(t *testing.T) {
 	})
 }
 
-/*
-func TestClientFinish_MissingKe1(t *testing.T) {
-	expectedError := "client state: missing KE1 message - call GenerateKE1 first"
-	conf := opaque.DefaultConfiguration()
-	client, err := conf.Client()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	server, err := conf.Server()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	sks, pks := conf.KeyGen()
-	skm := &opaque.ServerKeyMaterial{
-		Identity:       nil,
-		PrivateKey:      sks,
-		OPRFGlobalSeed: internal.RandomBytes(conf.Hash.Size()),
-	}
-	if err := server.SetKeyMaterial(skm); err != nil {
-		log.Fatal(err)
-	}
-
-	rec, err := buildRecord(pks.Encode(), []byte("id"), password, client, server)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ke1, err := client.GenerateKE1(password)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ke2, _, err := server.GenerateKE2(ke1, rec)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	client, err = conf.Client()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, _, _, err := client.GenerateKE3(ke2, nil, nil); err == nil || !strings.EqualFold(err.Error(), expectedError) {
-		t.Fatalf(
-			"expected error when calling GenerateKE3 without pre-existing KE1, want %q, got %q",
-			expectedError,
-			err,
-		)
-	}
-}
-
-*/
-
+// TestClientPRK validates the PRK derivation pipeline across KSF backends, ensuring deterministic outputs used in test vectors remain stable and interoperable.
 func TestClientPRK(t *testing.T) {
 	type prkTest struct {
 		name          string

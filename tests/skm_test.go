@@ -22,6 +22,7 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 )
 
+// TestServerInit_NoKeyMaterial confirms that servers without provisioned key material refuse both SetKeyMaterial calls and key exchange, preventing uninitialized deployments from servicing requests.
 func TestServerInit_NoKeyMaterial(t *testing.T) {
 	/*
 		SetKeyMaterial has not been called or was not successful
@@ -54,6 +55,7 @@ func TestServerInit_NoKeyMaterial(t *testing.T) {
 	})
 }
 
+// TestServer_SetKeyMaterial_Invalid enumerates failure cases for server key material — wrong group, bad encoding, and mismatched pairs — ensuring only consistent long-term keys are accepted.
 func TestServer_SetKeyMaterial_Invalid(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		server := getServer(t2, conf)
@@ -107,6 +109,7 @@ func TestServer_SetKeyMaterial_Invalid(t *testing.T) {
 	})
 }
 
+// TestServerKeyMaterial_Decode_Success round-trips various SKM encodings to guarantee serialization stability across optional fields like identity and seed.
 func TestServerKeyMaterial_Decode_Success(t *testing.T) {
 	// encode -> decode -> check equality
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -267,6 +270,7 @@ func validateServerKeyMaterial(t *testing.T, decoded, reference *opaque.ServerKe
 	}
 }
 
+// TestServerKeyMaterial_Decode_Failure enumerates malformed encodings so the decoder fails fast on truncated headers, wrong groups, and inconsistent lengths.
 func TestServerKeyMaterial_Decode_Failure(t *testing.T) {
 	// todo: add fuzz target
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -577,6 +581,7 @@ func TestServerKeyMaterial_Decode_Failure(t *testing.T) {
 	})
 }
 
+// TestServerKeyMaterial_DecodeHexCases validates hex decoding for both error reporting and round-tripping, supporting administrators that store SKM in textual form.
 func TestServerKeyMaterial_DecodeHexCases(t *testing.T) {
 	conf := opaque.DefaultConfiguration()
 	sk, pk := conf.KeyGen()
@@ -606,6 +611,7 @@ func TestServerKeyMaterial_DecodeHexCases(t *testing.T) {
 	}
 }
 
+// TestServerKeyMaterial_Flush ensures flushing wipes sensitive material, reducing the window in which secrets linger in memory after use.
 func TestServerKeyMaterial_Flush(t *testing.T) {
 	conf := opaque.DefaultConfiguration()
 	sk, pk := conf.KeyGen()

@@ -17,6 +17,7 @@ import (
 
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
+
 	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
@@ -58,6 +59,7 @@ func setClientUnexported[T any](t *testing.T, client *opaque.Client, structName,
 	reflect.NewAt(field.Type(), unsafe.Pointer(field.UnsafeAddr())).Elem().Set(reflect.ValueOf(value))
 }
 
+// TestClient_GenerateKE1_PreExistingSecretShare ensures the client refuses to reuse an ephemeral secret share, preserving forward secrecy guarantees for subsequent login attempts.
 func TestClient_GenerateKE1_PreExistingSecretShare(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client := getClient(t2, conf)
@@ -70,6 +72,7 @@ func TestClient_GenerateKE1_PreExistingSecretShare(t *testing.T) {
 	})
 }
 
+// TestClient_GenerateKE3_StateChecks covers the defensive guards that demand blind, key share, and KE1 state before KE3 generation, preventing misuse of the authenticated key exchange flow.
 func TestClient_GenerateKE3_StateChecks(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		type testCase struct {
@@ -114,7 +117,15 @@ func TestClient_GenerateKE3_StateChecks(t *testing.T) {
 		for _, tc := range cases {
 			t2.Run(tc.name, func(t3 *testing.T) {
 				client, server := setup(t3, conf)
-				record := registration(t3, client, server, password, credentialIdentifier, clientIdentity, serverIdentity)
+				record := registration(
+					t3,
+					client,
+					server,
+					password,
+					credentialIdentifier,
+					clientIdentity,
+					serverIdentity,
+				)
 
 				client.ClearState()
 				ke1, err := client.GenerateKE1(password)
@@ -138,6 +149,7 @@ func TestClient_GenerateKE3_StateChecks(t *testing.T) {
 	})
 }
 
+// TestClient_GenerateKE3_ParseOptionsErrors ensures option parsing rejects missing blind overrides and invalid KSF parameters, keeping tunable knobs from undermining the protocol.
 func TestClient_GenerateKE3_ParseOptionsErrors(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		type testCase struct {
@@ -174,7 +186,15 @@ func TestClient_GenerateKE3_ParseOptionsErrors(t *testing.T) {
 		for _, tc := range cases {
 			t2.Run(tc.name, func(t3 *testing.T) {
 				client, server := setup(t3, conf)
-				record := registration(t3, client, server, password, credentialIdentifier, clientIdentity, serverIdentity)
+				record := registration(
+					t3,
+					client,
+					server,
+					password,
+					credentialIdentifier,
+					clientIdentity,
+					serverIdentity,
+				)
 
 				client.ClearState()
 				ke1, err := client.GenerateKE1(password)
@@ -198,6 +218,7 @@ func TestClient_GenerateKE3_ParseOptionsErrors(t *testing.T) {
 	})
 }
 
+// TestClient_GenerateKE3_CustomSecretShareOption documents that injecting a custom secret share without matching MAC material fails closed, demonstrating the envelope MAC gate still protects the session.
 func TestClient_GenerateKE3_CustomSecretShareOption(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -231,6 +252,7 @@ func TestClient_GenerateKE3_CustomSecretShareOption(t *testing.T) {
 	})
 }
 
+// TestServer_GenerateKE2_ServerOptions verifies the server accepts safe option overrides, such as explicit client OPRF keys or pre-chosen shares, which is important for controlled testing and deterministic deployments.
 func TestServer_GenerateKE2_ServerOptions(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		recordBuilder := func() (*opaque.Client, *opaque.Server, *opaque.ClientRecord) {
@@ -290,6 +312,7 @@ func TestServer_GenerateKE2_ServerOptions(t *testing.T) {
 	})
 }
 
+// TestClient_RegistrationFinalize_EnvelopeLength confirms that providing explicit envelope nonce lengths behaves as expected, protecting customization paths from silently downgrading randomness.
 func TestClient_RegistrationFinalize_EnvelopeLength(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -315,6 +338,7 @@ func TestClient_RegistrationFinalize_EnvelopeLength(t *testing.T) {
 	})
 }
 
+// TestIdentityKSFParameterizeNoOp asserts that the Identity KSF ignores parameter changes, which matters because some flows rely on the no-op mode to avoid accidental stretching.
 func TestIdentityKSFParameterizeNoOp(t *testing.T) {
 	internalKSF.IdentityKSF{}.Parameterize(1, 2, 3)
 }

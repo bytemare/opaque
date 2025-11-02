@@ -38,6 +38,7 @@ type testParams struct {
 	ksfLength, nonceLength                                           int
 }
 
+// TestFull runs an end-to-end registration plus authentication flow across all configurations, ensuring the exported API yields matching session keys for client and server.
 func TestFull(t *testing.T) {
 	ids := []byte("server")
 	username := []byte("client")
@@ -253,6 +254,7 @@ func testAuthentication(
 	return client, server, exportKeyLogin
 }
 
+// TestConfiguration_Deserialization confirms serialized configurations can be restored without loss, which is crucial for persistence and upgrades.
 func TestConfiguration_Deserialization(t *testing.T) {
 	conf := opaque.DefaultConfiguration()
 	ser := conf.Serialize()
@@ -267,6 +269,7 @@ func TestConfiguration_Deserialization(t *testing.T) {
 	}
 }
 
+// TestFlush guarantees sensitive configuration fields are cleared when requested, reducing the risk of key retention.
 func TestFlush(t *testing.T) {
 	ids := []byte("server")
 	username := []byte("client")
@@ -302,6 +305,7 @@ func TestFlush(t *testing.T) {
 	The following tests look for failing conditions.
 */
 
+// TestConfiguration_NotEqual checks that mismatched configurations are detected, ensuring equality comparisons remain dependable during validation.
 func TestConfiguration_NotEqual(t *testing.T) {
 	type tester struct {
 		name            string
@@ -421,6 +425,7 @@ func TestConfiguration_NotEqual(t *testing.T) {
 	}
 }
 
+// TestDeserializeConfiguration_InvalidContextHeader ensures corrupted context length headers are rejected on load, preventing truncated metadata from being accepted.
 func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
 	d := opaque.DefaultConfiguration().Serialize()
 	d[7] = 20
@@ -431,6 +436,7 @@ func TestDeserializeConfiguration_InvalidContextHeader(t *testing.T) {
 	}, opaque.ErrConfiguration, internal.ErrInvalidContextEncoding, encoding.ErrTotalLength)
 }
 
+// TestDeserializeConfiguration_Short verifies the decoder refuses undersized payloads, protecting against partially written configuration blobs.
 func TestDeserializeConfiguration_Short(t *testing.T) {
 	r7 := internal.RandomBytes(7)
 
@@ -440,6 +446,7 @@ func TestDeserializeConfiguration_Short(t *testing.T) {
 	}, opaque.ErrConfiguration, internal.ErrInvalidEncodingLength)
 }
 
+// TestBadConfiguration enumerates invalid algorithm identifiers to ensure misconfigured deployments fail during setup instead of misbehaving later.
 func TestBadConfiguration(t *testing.T) {
 	setBadValue := func(pos, val int) []byte {
 		b := opaque.DefaultConfiguration().Serialize()
@@ -539,6 +546,7 @@ func TestBadConfiguration(t *testing.T) {
 	}
 }
 
+// TestGetFakeRecord confirms fake records are generated deterministically with valid masking keys, which underpins the protocol's defense against credential enumeration.
 func TestGetFakeRecord(t *testing.T) {
 	// Test valid configurations
 	testAll(t, func(t2 *testing.T, conf *configuration) {
@@ -563,6 +571,7 @@ func TestGetFakeRecord(t *testing.T) {
 	}
 }
 
+// TestErrorFormattingAndLogging exercises slog and fmt integration so structured logs capture error codes and messages without additional plumbing.
 func TestErrorFormattingAndLogging(t *testing.T) {
 	base := errors.New("root cause")
 	wrapped := fmt.Errorf("wrap: %w", base)
@@ -622,6 +631,7 @@ func TestErrorFormattingAndLogging(t *testing.T) {
 	}
 }
 
+// TestErrorAsVariants shows that different target types can be extracted via errors.As, simplifying downstream error inspection.
 func TestErrorAsVariants(t *testing.T) {
 	cause := errors.New("registration failed")
 	err := opaque.ErrCodeRegistration.New("state invalid", cause)
@@ -674,6 +684,7 @@ func TestErrorAsVariants(t *testing.T) {
 	}
 }
 
+// TestErrorCodeStringCoverage iterates all error codes to ensure their string forms remain stable for documentation and telemetry.
 func TestErrorCodeStringCoverage(t *testing.T) {
 	cases := map[opaque.ErrorCode]string{
 		opaque.ErrCodeUnknown:           "unknown_error",
@@ -698,6 +709,7 @@ func TestErrorCodeStringCoverage(t *testing.T) {
 	}
 }
 
+// TestErrorCodeIsBranches verifies that ErrorCode.Is handles both ErrorCode and *Error targets, keeping compatibility with the standard errors helper.
 func TestErrorCodeIsBranches(t *testing.T) {
 	target := opaque.ErrCodeRegistration.New("wrapped", errors.New("inner"))
 
@@ -719,6 +731,7 @@ func TestErrorCodeIsBranches(t *testing.T) {
 	}
 }
 
+// TestErrorFormatDefaultVerb ensures the default fmt verbs return the concise message form, which is what applications expect when reporting errors.
 func TestErrorFormatDefaultVerb(t *testing.T) {
 	err := opaque.ErrCodeClientOptions.New("format me", fmt.Errorf("%w", opaque.ErrClientOptions))
 	if got := fmt.Sprintf("%x", err); !strings.Contains(got, "format me") {
@@ -726,6 +739,7 @@ func TestErrorFormatDefaultVerb(t *testing.T) {
 	}
 }
 
+// TestValidScalar ensures scalar validation rejects nil, wrong-group, and zero values, maintaining protocol safety when importing external secrets.
 func TestValidScalar(t *testing.T) {
 	group := ecc.Ristretto255Sha512
 
@@ -750,6 +764,7 @@ func TestValidScalar(t *testing.T) {
 	}
 }
 
+// TestValidElement ensures element validation detects nil, identity, and wrong-group points, safeguarding against invalid public keys.
 func TestValidElement(t *testing.T) {
 	group := ecc.Ristretto255Sha512
 

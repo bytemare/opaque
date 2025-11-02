@@ -19,6 +19,7 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 )
 
+// TestEncodeVectorLenPanic ensures the helper panics when asked to encode lengths beyond the supported width, guarding against silent truncation of variable-length fields.
 func TestEncodeVectorLenPanic(t *testing.T) {
 	/*
 		EncodeVectorLen with size > 2
@@ -31,6 +32,7 @@ func TestEncodeVectorLenPanic(t *testing.T) {
 	t.Fatal("no panic with exceeding encoding length")
 }
 
+// TestDecodeVector checks the decoder rejects short headers and truncated payloads, preventing out-of-bounds reads in message parsing.
 func TestDecodeVector(t *testing.T) {
 	/*
 		DecodeVector with invalid header and payload
@@ -98,6 +100,7 @@ expectErrors(t, func() error {
 		}, internal.ErrServerKeyMaterialNil)
 */
 
+// TestI2OSP covers known-good integer encodings and the reverse OS2IP path, ensuring canonical big-endian conversion for protocol constants.
 func TestI2OSP(t *testing.T) {
 	for i, v := range I2OSPVectors {
 		t.Run(fmt.Sprintf("%d - %d - %v", v.value, v.size, v.encoded), func(t *testing.T) {
@@ -135,6 +138,7 @@ func TestI2OSP(t *testing.T) {
 	}
 }
 
+// TestI2OSP_Failures verifies the encoder panics on invalid inputs, so callers cannot accidentally produce truncated or negative encodings.
 func TestI2OSP_Failures(t *testing.T) {
 	tests := []struct {
 		expectedError error
@@ -179,6 +183,7 @@ func TestI2OSP_Failures(t *testing.T) {
 	}
 }
 
+// TestOS2IP_Failures confirms decoding out-of-range or empty byte slices results in panics with descriptive errors, making length validation explicit for upstream callers.
 func TestOS2IP_Failures(t *testing.T) {
 	tests := []struct {
 		expectedError error
@@ -255,6 +260,7 @@ func expectPanic(expectedError error, f func()) (bool, string) {
 	return true, ""
 }
 
+// TestDecodeLongVector exercises the long-vector decoder on a valid payload, guaranteeing structured server material can be decoded across vectors.
 func TestDecodeLongVector(t *testing.T) {
 	conf := opaque.DefaultConfiguration()
 	g := conf.AKE.Group()
@@ -296,6 +302,7 @@ func TestDecodeLongVector(t *testing.T) {
 	}
 }
 
+// TestDecodeLongVector_TooShort enumerates malformed long-vector encodings so each error path is covered, ensuring edge cases surface useful diagnostics.
 func TestDecodeLongVector_TooShort(t *testing.T) {
 	type testType struct {
 		name          string

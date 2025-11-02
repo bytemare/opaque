@@ -14,6 +14,7 @@ import (
 	"github.com/bytemare/opaque/internal"
 )
 
+// TestClearScalar_Basic verifies that secret scalars are wiped and pointer cleared, which is vital to avoid lingering key material after use.
 func TestClearScalar_Basic(t *testing.T) {
 	testAll(t, func(t *testing.T, conf *configuration) {
 		g := conf.conf.AKE.Group()
@@ -30,6 +31,7 @@ func TestClearScalar_Basic(t *testing.T) {
 	})
 }
 
+// TestClearSlice_Basic confirms byte slices are zeroed and cleared, ensuring passwords or session keys are not left in memory.
 func TestClearSlice_Basic(t *testing.T) {
 	b := make([]byte, 32)
 	for i := range b {

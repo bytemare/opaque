@@ -242,6 +242,7 @@ func loadVOPRFVectors(filepath string) (testVectors, error) {
 	return v, nil
 }
 
+// TestVOPRFVectors validates the VOPRF implementation against published vectors, ensuring compatibility with the reference draft.
 func TestVOPRFVectors(t *testing.T) {
 	vectorFile := "oprfVectors.json"
 

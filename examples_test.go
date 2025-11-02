@@ -12,7 +12,9 @@ import (
 	"bytes"
 	"crypto"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"github.com/bytemare/opaque/internal"
 	"log"
 	"reflect"
 
@@ -495,4 +497,27 @@ func Example_fakeResponse() {
 
 	// Output: OPAQUE server initialized.
 	// Thwarting OPAQUE client enumeration is easy!
+}
+
+// Example: handling high-level errors and specific causes.
+func Example_errorHandling() {
+	// Simulate an error chain
+	err := opaque.ErrAuthentication.Join(internal.ErrServerAuthentication, internal.ErrInvalidServerMac)
+
+	switch {
+	case errors.Is(err, opaque.ErrAuthentication):
+		// top-level class
+		fmt.Println("auth error: abort and do not use keys")
+		// handle specific cause
+		if errors.Is(err, internal.ErrInvalidServerMac) {
+			fmt.Println("server MAC invalid: report generic failure")
+		}
+	case errors.Is(err, opaque.ErrRegistration):
+		fmt.Println("registration error: notify client")
+	default:
+		fmt.Println("unexpected error")
+	}
+	// Output:
+	// auth error: abort and do not use keys
+	// server MAC invalid: report generic failure
 }

@@ -100,7 +100,7 @@ func (c *Client) verifyOptionBlind(clientOptions ...*ClientOptions) (*ecc.Scalar
 }
 
 func getEnvelopeNonce(clientOptions ...*ClientOptions) ([]byte, error) {
-	if len(clientOptions) == 0 {
+	if len(clientOptions) == 0 { // sanity check, but never triggered since we check before calling.
 		return internal.RandomBytes(internal.NonceLength), nil
 	}
 

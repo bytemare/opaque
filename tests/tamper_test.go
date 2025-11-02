@@ -28,6 +28,7 @@ import (
 	"github.com/bytemare/opaque/internal"
 )
 
+// TestTamper_ContextMismatch proves that mismatched configuration contexts cause authentication failure, ensuring domain separation is enforced.
 func TestTamper_ContextMismatch(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		// Client uses base configuration
@@ -58,14 +59,17 @@ func TestTamper_ContextMismatch(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		r2, err := server.RegistrationResponse(r1, credentialIdentifier, nil)
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		rec, _, err := client.RegistrationFinalize(r2, nil, nil)
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		record := &opaque.ClientRecord{RegistrationRecord: rec, CredentialIdentifier: credentialIdentifier}
 
 		client.ClearState()
@@ -73,6 +77,7 @@ func TestTamper_ContextMismatch(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		ke2, _, err := server.GenerateKE2(ke1, record)
 		if err != nil {
 			t2.Fatal(err)
@@ -85,6 +90,7 @@ func TestTamper_ContextMismatch(t *testing.T) {
 	})
 }
 
+// TestTamper_IdentityBindingMismatch confirms swapping identities in the envelope results in failure, protecting channel binding semantics.
 func TestTamper_IdentityBindingMismatch(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -95,6 +101,7 @@ func TestTamper_IdentityBindingMismatch(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		ke2, _, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
 			t2.Fatal(err)
@@ -124,6 +131,7 @@ func TestTamper_IdentityBindingMismatch(t *testing.T) {
 	})
 }
 
+// TestTamper_KE2MismatchWithClientState ensures replaying a KE2 against a different client state fails, preventing cross-session key reuse.
 func TestTamper_KE2MismatchWithClientState(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -135,6 +143,7 @@ func TestTamper_KE2MismatchWithClientState(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		ke2a, _, err := server.GenerateKE2(ke1a, rec)
 		if err != nil {
 			t2.Fatal(err)
@@ -145,6 +154,7 @@ func TestTamper_KE2MismatchWithClientState(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		ke2b, _, err := server.GenerateKE2(ke1b, rec)
 		if err != nil {
 			t2.Fatal(err)
@@ -162,16 +172,20 @@ func TestTamper_KE2MismatchWithClientState(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		// Produce new server output to mismatch
 		client.ClearState()
+
 		ke1c, err := client.GenerateKE1(password)
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		ke2c, outC, err := server.GenerateKE2(ke1c, rec)
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		// Now verify with mismatched output
 		expectErrors(t2, func() error { return server.LoginFinish(ke3, outC.ClientMAC) }, opaque.ErrAuthentication)
 
@@ -183,6 +197,7 @@ func TestTamper_KE2MismatchWithClientState(t *testing.T) {
 	})
 }
 
+// TestTamper_MaskingNonceBitflip demonstrates that bitflipping the masking nonce is detected, highlighting the sensitivity of envelope integrity.
 func TestTamper_MaskingNonceBitflip(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -193,6 +208,7 @@ func TestTamper_MaskingNonceBitflip(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		ke2, _, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
 			t2.Fatal(err)
@@ -210,6 +226,7 @@ func TestTamper_MaskingNonceBitflip(t *testing.T) {
 	})
 }
 
+// TestTamper_MaskedResponseBitflip shows that corrupting the ciphertext envelope yields an authentication failure, preventing undetected tampering with stored keys.
 func TestTamper_MaskedResponseBitflip(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -220,6 +237,7 @@ func TestTamper_MaskedResponseBitflip(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		ke2, _, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
 			t2.Fatal(err)
@@ -238,6 +256,7 @@ func TestTamper_MaskedResponseBitflip(t *testing.T) {
 
 // Note: KE3 replay is accepted at the protocol layer because the MAC verifies. Preventing replays
 // is the responsibility of the application layer (session tracking). This test documents that behavior.
+// TestTamper_KE3Replay_AcceptedWithoutAppTracking captures that replaying KE3 succeeds without application-level state, documenting the requirement for anti-replay tracking.
 func TestTamper_KE3Replay_AcceptedWithoutAppTracking(t *testing.T) {
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		client, server := setup(t2, conf)
@@ -248,10 +267,12 @@ func TestTamper_KE3Replay_AcceptedWithoutAppTracking(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		ke2, out, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
 			t2.Fatal(err)
 		}
+
 		ke3, _, _, err := client.GenerateKE3(ke2, nil, serverIdentity)
 		if err != nil {
 			t2.Fatal(err)

@@ -30,8 +30,8 @@ import (
 
 type ByteToHex []byte
 
-func (j ByteToHex) MarshalJSON() ([]byte, error) {
-	return json.Marshal(hex.EncodeToString(j))
+func (j *ByteToHex) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(*j))
 }
 
 func (j *ByteToHex) UnmarshalJSON(b []byte) error {
@@ -84,26 +84,26 @@ type inputs struct {
 }
 
 type intermediates struct {
-	AuthKey            ByteToHex `json:"auth_key"`       //
-	ClientMacKey       ByteToHex `json:"client_mac_key"` //
+	AuthKey            ByteToHex `json:"auth_key"`
+	ClientMacKey       ByteToHex `json:"client_mac_key"`
 	ClientPublicKey    ByteToHex `json:"client_public_key"`
-	Envelope           ByteToHex `json:"envelope"`         //
-	HandshakeSecret    ByteToHex `json:"handshake_secret"` //
+	Envelope           ByteToHex `json:"envelope"`
+	HandshakeSecret    ByteToHex `json:"handshake_secret"`
 	MaskingKey         ByteToHex `json:"masking_key"`
 	OprfKey            ByteToHex `json:"oprf_key"`
-	RandomizedPassword ByteToHex `json:"randomized_password"` //
-	ServerMacKey       ByteToHex `json:"server_mac_key"`      //
+	RandomizedPassword ByteToHex `json:"randomized_password"`
+	ServerMacKey       ByteToHex `json:"server_mac_key"`
 }
 
 type outputs struct {
-	KE1                  ByteToHex `json:"KE1"`                   //
-	KE2                  ByteToHex `json:"KE2"`                   //
-	KE3                  ByteToHex `json:"KE3"`                   //
-	ExportKey            ByteToHex `json:"export_key"`            //
-	RegistrationRequest  ByteToHex `json:"registration_request"`  //
-	RegistrationResponse ByteToHex `json:"registration_response"` //
-	RegistrationRecord   ByteToHex `json:"registration_upload"`   //
-	SessionKey           ByteToHex `json:"session_key"`           //
+	KE1                  ByteToHex `json:"KE1"`
+	KE2                  ByteToHex `json:"KE2"`
+	KE3                  ByteToHex `json:"KE3"`
+	ExportKey            ByteToHex `json:"export_key"`
+	RegistrationRequest  ByteToHex `json:"registration_request"`
+	RegistrationResponse ByteToHex `json:"registration_response"`
+	RegistrationRecord   ByteToHex `json:"registration_upload"`
+	SessionKey           ByteToHex `json:"session_key"`
 }
 
 type vector struct {
@@ -552,6 +552,7 @@ func loadOpaqueVectors(filepath string) ([]*vector, error) {
 	return v, nil
 }
 
+// TestOpaqueVectors executes the official OPAQUE test vectors, guaranteeing interoperability with external implementations.
 func TestOpaqueVectors(t *testing.T) {
 	vectorFile := "vectors.json"
 
