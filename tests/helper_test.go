@@ -105,14 +105,13 @@ func toInternal(c *opaque.Configuration) (*internal.Configuration, error) {
 	}, nil
 }
 
-// todo Add test that catches if a suite has been added without being added to the configuration table.
-var configurationTable = []*configuration{
-	{
+var configurationTable = map[opaque.Group]*configuration{
+	opaque.RistrettoSha512: {
 		name:  "Ristretto255",
 		conf:  opaque.DefaultConfiguration(),
 		curve: nil,
 	},
-	{
+	opaque.P256Sha256: {
 		name: "P256Sha256",
 		conf: &opaque.Configuration{
 			OPRF: opaque.P256Sha256,
@@ -124,7 +123,7 @@ var configurationTable = []*configuration{
 		},
 		curve: elliptic.P256(),
 	},
-	{
+	opaque.P384Sha512: {
 		name: "P384Sha512",
 		conf: &opaque.Configuration{
 			OPRF: opaque.P384Sha512,
@@ -136,7 +135,7 @@ var configurationTable = []*configuration{
 		},
 		curve: elliptic.P384(),
 	},
-	{
+	opaque.P521Sha512: {
 		name: "P521Sha512",
 		conf: &opaque.Configuration{
 			OPRF: opaque.P521Sha512,
@@ -196,6 +195,28 @@ func getServer(t *testing.T, c *configuration) *opaque.Server {
 	}
 
 	return server
+}
+
+func TestConfigurationTableIncludesAllAvailableGroups(t *testing.T) {
+	available := make(map[opaque.Group]struct{})
+
+	for g := opaque.Group(0); g < 255; g++ {
+		if g.Available() {
+			available[g] = struct{}{}
+		}
+	}
+
+	for _, entry := range configurationTable {
+		delete(available, entry.conf.OPRF)
+	}
+
+	if len(available) != 0 {
+		missing := make([]string, 0, len(available))
+		for g := range available {
+			missing = append(missing, fmt.Sprintf("%d", g))
+		}
+		t.Fatalf("configurationTable missing entries for groups: %v", missing)
+	}
 }
 
 func setup(t *testing.T, c *configuration) (*opaque.Client, *opaque.Server) {

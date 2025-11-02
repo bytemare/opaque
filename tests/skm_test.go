@@ -272,7 +272,6 @@ func validateServerKeyMaterial(t *testing.T, decoded, reference *opaque.ServerKe
 
 // TestServerKeyMaterial_Decode_Failure enumerates malformed encodings so the decoder fails fast on truncated headers, wrong groups, and inconsistent lengths.
 func TestServerKeyMaterial_Decode_Failure(t *testing.T) {
-	// todo: add fuzz target
 	testAll(t, func(t2 *testing.T, conf *configuration) {
 		c := conf.conf
 		g := c.AKE.Group()

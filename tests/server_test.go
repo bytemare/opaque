@@ -526,7 +526,7 @@ func TestServerFinish_InvalidKE3Mac(t *testing.T) {
 	/*
 		ke3 mac is invalid
 	*/
-	conf := configurationTable[0]
+	conf := configurationTable[opaque.RistrettoSha512]
 	client, server := setup(t, conf)
 
 	record := registration(t, client, server, password, credentialIdentifier, nil, serverIdentity)

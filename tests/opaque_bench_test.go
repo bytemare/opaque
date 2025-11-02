@@ -17,7 +17,7 @@ import (
 
 // BenchmarkRegistration measures client/server registration flow.
 func BenchmarkRegistration(b *testing.B) {
-	conf := configurationTable[0]
+	conf := configurationTable[opaque.RistrettoSha512]
 	server, err := conf.conf.Server()
 	if err != nil {
 		b.Fatal(err)
@@ -57,7 +57,7 @@ func BenchmarkRegistration(b *testing.B) {
 
 // BenchmarkLogin measures end-to-end login flow.
 func BenchmarkLogin(b *testing.B) {
-	conf := configurationTable[0]
+	conf := configurationTable[opaque.RistrettoSha512]
 	client, err := conf.conf.Client()
 	if err != nil {
 		b.Fatal(err)

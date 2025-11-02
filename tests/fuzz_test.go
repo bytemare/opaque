@@ -504,3 +504,18 @@ func FuzzDecodeServerKeyMaterial(f *testing.F) {
 		}
 	})
 }
+
+// FuzzDecodeServerKeyMaterialHex fuzzes the hexadecimal decoder for server key material to ensure robust handling of
+// both valid and invalid encodings.
+func FuzzDecodeServerKeyMaterialHex(f *testing.F) {
+	f.Add("")
+	f.Add("00")
+	f.Add("zz")
+
+	f.Fuzz(func(t *testing.T, s string) {
+		for _, cfg := range configurationTable {
+			// We only care that the decoder never panics, because errors are expected for malformed inputs.
+			_, _ = cfg.conf.DecodeServerKeyMaterialHex(s)
+		}
+	})
+}
