@@ -14,6 +14,6 @@ require (
 	github.com/bytemare/hash2curve v0.5.4 // indirect
 	github.com/bytemare/secp256k1 v0.3.0 // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect
-	golang.org/x/crypto v0.38.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 )
