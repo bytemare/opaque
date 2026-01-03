@@ -1,0 +1,41 @@
+name: nightly-fuzz
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  fuzz:
+    if: github.event_name != 'schedule' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@92c522aaa6f53af082553dedc1596c80b71aba33
+        with:
+          disable-sudo: true
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            go.dev:443
+            golang.org:443
+            proxy.golang.org:443
+            release-assets.githubusercontent.com:443
+
+      - name: Checkout repo
+        uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+        with:
+          fetch-depth: 0
+
+      - name: Init go
+        uses: bytemare/actions/init-go@5e1f07171089dbf83698c3b4ac12d3d7dd46d192
+        with:
+          go-version: ${{ inputs.version }}
+
+      - name: Run Tests
+        run: make -C .github test
+
+      - name: Fuzz DecodeServerKeyMaterial
+        run: make -C .github fuzz -FUZZTIME=1m

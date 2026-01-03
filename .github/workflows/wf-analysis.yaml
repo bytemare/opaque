@@ -27,7 +27,7 @@ permissions: { }
 
 jobs:
   Lint:
-    uses: bytemare/workflows/.github/workflows/lint.yaml@8abce840140ebad3f8b6f16fb4cc8838e64a476a
+    uses: bytemare/workflows/.github/workflows/lint.yaml@91e1deebc87bc9f65fd4ef726564b38501f0901c
     permissions:
       contents: read
       packages: read
@@ -43,7 +43,7 @@ jobs:
       super-linter-rules-path: .github
 
   Governance:
-    uses: bytemare/workflows/.github/workflows/governance.yaml@8abce840140ebad3f8b6f16fb4cc8838e64a476a
+    uses: bytemare/workflows/.github/workflows/governance.yaml@91e1deebc87bc9f65fd4ef726564b38501f0901c
     permissions:
       contents: read
       security-events: write
@@ -78,7 +78,7 @@ jobs:
       codecov: ${{ secrets.CODECOV_TOKEN }}
 
   SAST:
-    uses: bytemare/workflows/.github/workflows/sast.yaml@8abce840140ebad3f8b6f16fb4cc8838e64a476a
+    uses: bytemare/workflows/.github/workflows/sast.yaml@91e1deebc87bc9f65fd4ef726564b38501f0901c
     permissions:
       contents: read
       security-events: write

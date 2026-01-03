@@ -59,29 +59,31 @@ cover:
 .PHONY: fuzz
 fuzz:
 	@echo "Running fuzz tests ..."
-	@fuzzTime=$${FUZZTIME:-2}; \
-    failed=0; \
-    find .. -name '*_test.go' -exec grep -l '^func Fuzz' {} \; | while read -r file; do \
-    	grep '^func Fuzz' "$$file" | sed -E 's/^func ([^(]+).*/\1/' | while read -r func; do \
-    		echo "Fuzzing $$func in $$file"; \
-    		if ! go test "$$(dirname "$$file")" -run="$$func" -fuzz="$$func" -fuzztime="$${fuzzTime}s"; then \
-    			failed=1; \
-    			echo "Crasher found for $$func. Crashing input:"; \
-    			testdata_dir="$$(dirname "$$file")/testdata/fuzz/$$func"; \
-    			if [ -d "$$testdata_dir" ]; then \
-    				latest_crasher=$$(ls -t "$$testdata_dir" | head -n 1); \
-    				if [ -n "$$latest_crasher" ]; then \
-    					cat "$$testdata_dir/$$latest_crasher"; \
-    				else \
-    					echo "Could not find crasher file in $$testdata_dir"; \
-    				fi; \
-    			else \
-    				echo "Could not find testdata directory: $$testdata_dir"; \
-    			fi; \
-    		fi; \
-    	done; \
-    done; \
-    exit $$failed
+	@fuzzTime=$${FUZZTIME:-5m}; \
+	 repo_root=$$(cd .. && pwd); \
+	 gocache_dir="$$repo_root/.gocache"; \
+	 gomodcache_dir=$$(go env GOMODCACHE); \
+	 mkdir -p "$$gocache_dir"; \
+	 failed=0; \
+	 cd "$$repo_root" && GOCACHE="$$gocache_dir" GOMODCACHE="$$gomodcache_dir" go test ./tests -list '^Fuzz' | grep '^Fuzz' | while read -r func; do \
+	 	 echo "Fuzzing $$func"; \
+	 	 if ! GOCACHE="$$gocache_dir" GOMODCACHE="$$gomodcache_dir" go test ./tests -run='^$$' -fuzz="^$${func}$$" -fuzztime="$$fuzzTime"; then \
+	 	 	 failed=1; \
+	 	 	 echo "Crasher found for $$func. Crashing input:"; \
+	 	 	 testdata_dir="./tests/testdata/fuzz/$$func"; \
+	 	 	 if [ -d "$$testdata_dir" ]; then \
+	 	 	 	 latest_crasher=$$(ls -t "$$testdata_dir" | head -n 1); \
+	 	 	 	 if [ -n "$$latest_crasher" ]; then \
+	 	 	 	 	 cat "$$testdata_dir/$$latest_crasher"; \
+	 	 	 	 else \
+	 	 	 	 	 echo "Could not find crasher file in $$testdata_dir"; \
+	 	 	 	 fi; \
+	 	 	 else \
+	 	 	 	 echo "Could not find testdata directory: $$testdata_dir"; \
+	 	 	 fi; \
+	 	 fi; \
+	 done; \
+	 exit $$failed
 
 .PHONY: bench
 bench:

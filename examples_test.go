@@ -14,7 +14,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/bytemare/opaque/internal"
 	"log"
 	"reflect"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque"
+	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/message"
 )
 

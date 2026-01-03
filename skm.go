@@ -143,7 +143,18 @@ func (c *Configuration) skmStructureCheck(data []byte) error {
 		return errors.Join(internal.ErrInvalidPrivateKey, internal.ErrInvalidScalar, internal.ErrInvalidEncodingLength)
 	}
 
+	// The following is never triggered due to the structure check and failsafe above, but is kept for safety.
+	// The earlier minLength check guarantees len(data) ≥ elementLen+9, and for every configured curve
+	// elementLen+9 ≥ 5+scalarLen = offset+2, so len(data) < offset+2 can never fire.
 	offset := 3 + skh
+	if len(data) < offset+2 {
+		return errors.Join(
+			internal.ErrInvalidServerPublicKey,
+			internal.ErrInvalidElement,
+			internal.ErrInvalidEncodingLength,
+		)
+	}
+
 	pkh := encoding.OS2IP(data[offset : offset+2]) // pk
 
 	if g.Group().ElementLength() != pkh {
@@ -154,25 +165,41 @@ func (c *Configuration) skmStructureCheck(data []byte) error {
 		)
 	}
 
-	offset += 2 + pkh
-	sh := encoding.OS2IP(data[offset : offset+2]) // seed
+	offset += 2
+	if len(data) < offset+pkh {
+		return errors.Join(
+			internal.ErrInvalidServerPublicKey,
+			internal.ErrInvalidElement,
+			internal.ErrInvalidEncodingLength,
+		)
+	}
 
+	offset += pkh
+	if len(data) < offset+2 {
+		return internal.ErrInvalidEncodingLength
+	}
+
+	sh := encoding.OS2IP(data[offset : offset+2]) // seed
 	if sh != 0 {
 		if c.Hash.Size() != sh {
 			return internal.ErrInvalidOPRFSeedLength
 		}
 
-		if len(data) < offset+4+sh {
+		if len(data) < offset+2+sh {
 			return internal.ErrInvalidOPRFSeedLength
 		}
 	}
 
 	offset += 2 + sh
-	idh := encoding.OS2IP(data[offset : offset+2]) // id
-	maxLength := offset + 2 + idh
+	if len(data) < offset+2 {
+		return internal.ErrInvalidEncodingLength
+	}
 
-	if maxLength != len(data) {
-		return errors.Join(internal.ErrInvalidEncodingLength)
+	idh := encoding.OS2IP(data[offset : offset+2]) // id
+	offset += 2
+
+	if len(data) != offset+idh {
+		return internal.ErrInvalidEncodingLength
 	}
 
 	return nil

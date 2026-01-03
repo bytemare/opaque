@@ -196,6 +196,9 @@ func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*cl
 	}
 
 	o.OPRFBlind, err = c.verifyOptionBlind(options...)
+	// The combination of the double-blind check and the ErrNoOPRFBlind guard means
+	// verifyOptionBlind is only invoked when options[0].OPRFBlind == nil, so its error
+	// path is structurally unreachable.
 	if err != nil {
 		return nil, err
 	}

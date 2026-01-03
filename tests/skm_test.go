@@ -402,6 +402,60 @@ func TestServerKeyMaterial_Decode_Failure(t *testing.T) {
 				},
 			},
 			{
+				name: "missing public key header",
+				input: encoding.Concatenate(
+					[]byte{byte(g)},
+					encodedSkBytes,
+				),
+				expectedErrors: []error{
+					opaque.ErrServerKeyMaterial,
+					internal.ErrInvalidEncodingLength,
+				},
+			},
+			{
+				name: "public key truncated after header",
+				input: encoding.Concatenate(
+					[]byte{byte(g)},
+					encoding.Concat(
+						encoding.I2OSP(g.ScalarLength(), 2),
+						make([]byte, g.ScalarLength()),
+					),
+					encoding.Concat(
+						encoding.I2OSP(g.ElementLength(), 2),
+						make([]byte, 4),
+					),
+				),
+				expectedErrors: []error{
+					opaque.ErrServerKeyMaterial,
+					internal.ErrInvalidEncodingLength,
+				},
+			},
+			{
+				name: "seed header missing",
+				input: encoding.Concatenate(
+					[]byte{byte(g)},
+					encodedSkBytes,
+					encodedPkBytes,
+				),
+				expectedErrors: []error{
+					opaque.ErrServerKeyMaterial,
+					internal.ErrInvalidEncodingLength,
+				},
+			},
+			{
+				name: "identity header missing",
+				input: encoding.Concatenate(
+					[]byte{byte(g)},
+					encodedSkBytes,
+					encodedPkBytes,
+					encodedSeed,
+				),
+				expectedErrors: []error{
+					opaque.ErrServerKeyMaterial,
+					internal.ErrInvalidEncodingLength,
+				},
+			},
+			{
 				name: "invalid private key (out of range)",
 				input: encoding.Concatenate(
 					[]byte{byte(g)},
