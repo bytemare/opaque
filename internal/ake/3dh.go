@@ -44,7 +44,12 @@ type Identities struct {
 }
 
 // SetIdentities sets the client and server identities to their respective public key if not set.
-func (id *Identities) SetIdentities(clientPublicKey *ecc.Element, serverPublicKey []byte) *Identities {
+func SetIdentities(clientID []byte, clientPublicKey *ecc.Element, serverID, serverPublicKey []byte) *Identities {
+	id := &Identities{
+		ClientIdentity: clientID,
+		ServerIdentity: serverID,
+	}
+
 	if id.ClientIdentity == nil {
 		id.ClientIdentity = clientPublicKey.Encode()
 	}

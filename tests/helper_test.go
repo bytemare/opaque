@@ -24,7 +24,7 @@ import (
 	"github.com/bytemare/opaque"
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
-	"github.com/bytemare/opaque/internal/keyrecovery"
+	"github.com/bytemare/opaque/internal/envelope"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 
@@ -447,7 +447,7 @@ func getEnvelope(
 	blind *ecc.Scalar,
 	password []byte,
 	ke2 *message.KE2,
-) (*keyrecovery.Envelope, []byte, error) {
+) (*envelope.Envelope, []byte, error) {
 	randomizedPassword, err := buildPRK(conf, blind, password, ke2.EvaluatedMessage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
@@ -457,7 +457,7 @@ func getEnvelope(
 	clearText := xorResponse(conf, maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
 	e := clearText[conf.Group.ElementLength():]
 
-	env := &keyrecovery.Envelope{
+	env := &envelope.Envelope{
 		Nonce:   e[:conf.NonceLen],
 		AuthTag: e[conf.NonceLen:],
 	}

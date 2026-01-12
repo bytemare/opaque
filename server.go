@@ -196,10 +196,12 @@ func (s *Server) coreGenerateKE2(
 	response := s.credentialResponse(ke1.BlindedMessage,
 		record.RegistrationRecord, o.MaskingNonce, s.ServerKeyMaterial.PublicKeyBytes, ku)
 
-	identities := (&ake.Identities{
-		ClientIdentity: record.ClientIdentity,
-		ServerIdentity: s.ServerKeyMaterial.Identity,
-	}).SetIdentities(record.ClientPublicKey, s.ServerKeyMaterial.PublicKeyBytes)
+	identities := ake.SetIdentities(
+		record.ClientIdentity,
+		record.ClientPublicKey,
+		s.ServerKeyMaterial.Identity,
+		s.ServerKeyMaterial.PublicKeyBytes,
+	)
 
 	ke2 := &message.KE2{
 		CredentialResponse: response,

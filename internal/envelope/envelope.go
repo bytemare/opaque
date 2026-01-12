@@ -6,8 +6,8 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-// Package keyrecovery provides utility functions and structures allowing credential management.
-package keyrecovery
+// Package envelope provides utility functions for the envelope credential management..
+package envelope
 
 import (
 	"github.com/bytemare/ecc"
@@ -17,11 +17,6 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
 )
-
-// Credentials structure is currently used for testing purposes.
-type Credentials struct {
-	ClientIdentity, ServerIdentity []byte
-}
 
 // Envelope represents the OPAQUE envelope.
 type Envelope struct {

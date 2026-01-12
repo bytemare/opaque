@@ -17,7 +17,7 @@ import (
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
-	"github.com/bytemare/opaque/internal/keyrecovery"
+	"github.com/bytemare/opaque/internal/envelope"
 	"github.com/bytemare/opaque/internal/masking"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
@@ -119,7 +119,7 @@ func (c *Client) RegistrationFinalize(
 
 	randomizedPassword := c.buildPRK(resp.EvaluatedMessage, o.KDFSalt, o.KSFOptions.Salt, o.KSFOptions.Length)
 	maskingKey := c.conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), c.conf.KDF.Size())
-	envelope, clientPublicKey, exportKey := keyrecovery.Store(
+	env, clientPublicKey, exportKey := envelope.Store(
 		c.conf,
 		randomizedPassword,
 		resp.ServerPublicKey,
@@ -131,7 +131,7 @@ func (c *Client) RegistrationFinalize(
 	return &message.RegistrationRecord{
 		ClientPublicKey: clientPublicKey,
 		MaskingKey:      maskingKey,
-		Envelope:        envelope.Serialize(),
+		Envelope:        env.Serialize(),
 	}, exportKey, nil
 }
 
@@ -186,7 +186,7 @@ func (c *Client) GenerateKE3(
 
 	// Decrypt the masked response.
 	serverPublicKey, serverPublicKeyBytes,
-		envelope, err := masking.Unmask(c.conf, randomizedPassword, ke2.MaskingNonce, ke2.MaskedResponse)
+		env, err := masking.Unmask(c.conf, randomizedPassword, ke2.MaskingNonce, ke2.MaskedResponse)
 	if err != nil {
 		return nil, nil, nil, ErrAuthentication.Join(err)
 	}
@@ -196,22 +196,24 @@ func (c *Client) GenerateKE3(
 
 	// Recover the client keys.
 	clientSecretKey, clientPublicKey,
-		exportKey, err := keyrecovery.Recover(
+		exportKey, err := envelope.Recover(
 		c.conf,
 		randomizedPassword,
 		serverPublicKeyBytes,
 		clientIdentity,
 		serverIdentity,
-		envelope)
+		env)
 	if err != nil {
 		return nil, nil, nil, ErrAuthentication.Join(err)
 	}
 
 	// Finalize the AKE.
-	identities := (&ake.Identities{
-		ClientIdentity: clientIdentity,
-		ServerIdentity: serverIdentity,
-	}).SetIdentities(clientPublicKey, serverPublicKeyBytes)
+	identities := ake.SetIdentities(
+		clientIdentity,
+		clientPublicKey,
+		serverIdentity,
+		serverPublicKeyBytes,
+	)
 
 	ke3, sessionKey, macOK := ake.Finalize(
 		c.conf,
