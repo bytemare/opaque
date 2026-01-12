@@ -38,4 +38,4 @@ jobs:
         run: make -C .github test
 
       - name: Fuzz DecodeServerKeyMaterial
-        run: make -C .github fuzz -FUZZTIME=1m
+        run: make -C .github fuzz
