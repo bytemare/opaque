@@ -195,8 +195,7 @@ func (c *Client) GenerateKE3(
 	defer internal.ClearScalar(&clientSecretKey)
 
 	// Recover the client keys.
-	clientSecretKey, clientPublicKey,
-		exportKey, err := envelope.Recover(
+	clientSecretKey, clientPublicKey, exportKey, err := envelope.Recover(
 		c.conf,
 		randomizedPassword,
 		serverPublicKeyBytes,

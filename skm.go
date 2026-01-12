@@ -62,7 +62,7 @@ func (s *ServerKeyMaterial) Hex() string {
 
 // DecodeServerKeyMaterial decodes the server key material from a byte slice.
 func (c *Configuration) DecodeServerKeyMaterial(data []byte) (*ServerKeyMaterial, error) {
-	if err := c.skmStructureCheck(data); err != nil {
+	if err := c.skmVerifyEncoding(data); err != nil {
 		return nil, ErrServerKeyMaterial.Join(err)
 	}
 
@@ -114,8 +114,8 @@ func (c *Configuration) DecodeServerKeyMaterial(data []byte) (*ServerKeyMaterial
 	}, nil
 }
 
-// skmStructureCheck checks the structure of the server key material data given the internal length headers.
-func (c *Configuration) skmStructureCheck(data []byte) error {
+// skmVerifyEncoding checks the structure of the server key material data given the internal length headers.
+func (c *Configuration) skmVerifyEncoding(data []byte) error {
 	if len(data) < 9 {
 		return internal.ErrInvalidEncodingLength
 	}
@@ -155,47 +155,30 @@ func (c *Configuration) skmStructureCheck(data []byte) error {
 		)
 	}
 
-	pkh := encoding.OS2IP(data[offset : offset+2]) // pk
-
-	if g.Group().ElementLength() != pkh {
-		return errors.Join(
-			internal.ErrInvalidServerPublicKey,
-			internal.ErrInvalidElement,
-			internal.ErrInvalidEncodingLength,
-		)
+	// Verify public key length
+	step, err := skmVerifyEncodingHeaderPublicKey(data[offset:], g.Group().ElementLength())
+	if err != nil {
+		return errors.Join(internal.ErrInvalidServerPublicKey, internal.ErrInvalidElement, err)
 	}
 
-	offset += 2
-	if len(data) < offset+pkh {
-		return errors.Join(
-			internal.ErrInvalidServerPublicKey,
-			internal.ErrInvalidElement,
-			internal.ErrInvalidEncodingLength,
-		)
-	}
-
-	offset += pkh
+	offset += step
 	if len(data) < offset+2 {
 		return internal.ErrInvalidEncodingLength
 	}
 
-	sh := encoding.OS2IP(data[offset : offset+2]) // seed
-	if sh != 0 {
-		if c.Hash.Size() != sh {
-			return internal.ErrInvalidOPRFSeedLength
-		}
-
-		if len(data) < offset+2+sh {
-			return internal.ErrInvalidOPRFSeedLength
-		}
+	// Verify seed length
+	step, err = skmVerifyEncodingHeaderOPRFSeed(data[offset:], c.Hash.Size())
+	if err != nil {
+		return errors.Join(internal.ErrInvalidOPRFSeedLength, err)
 	}
 
-	offset += 2 + sh
+	offset += step
 	if len(data) < offset+2 {
 		return internal.ErrInvalidEncodingLength
 	}
 
-	idh := encoding.OS2IP(data[offset : offset+2]) // id
+	// Verify id length (allowed to be 0)
+	idh := encoding.OS2IP(data[offset : offset+2])
 	offset += 2
 
 	if len(data) != offset+idh {
@@ -203,6 +186,40 @@ func (c *Configuration) skmStructureCheck(data []byte) error {
 	}
 
 	return nil
+}
+
+func skmVerifyEncodingHeaderPublicKey(data []byte, refLength int) (int, error) {
+	if len(data) < 2 {
+		return 0, internal.ErrInvalidEncodingLength
+	}
+
+	header := encoding.OS2IP(data[:2])
+	if refLength != header {
+		return 0, internal.ErrInvalidEncodingLength
+	}
+
+	offset := 2
+	if len(data) < offset+header {
+		return 0, internal.ErrInvalidEncodingLength
+	}
+
+	return offset + header, nil
+}
+
+func skmVerifyEncodingHeaderOPRFSeed(data []byte, refLength int) (int, error) {
+	// OPRF seed can be of length 0
+	sh := encoding.OS2IP(data[:2])
+	if sh != 0 {
+		if refLength != sh {
+			return 0, internal.ErrInvalidOPRFSeedLength
+		}
+
+		if len(data) < 2+sh {
+			return 0, internal.ErrInvalidOPRFSeedLength
+		}
+	}
+
+	return 2 + sh, nil
 }
 
 // DecodeServerKeyMaterialHex decodes the server key material from a hex string.
