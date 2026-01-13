@@ -27,7 +27,7 @@ permissions: { }
 
 jobs:
   Lint:
-    uses: bytemare/workflows/.github/workflows/lint.yaml@91e1deebc87bc9f65fd4ef726564b38501f0901c
+    uses: bytemare/workflows/.github/workflows/lint.yaml@c51347bd1b7065db60404508461ace977a712717
     permissions:
       contents: read
       packages: read
@@ -43,7 +43,7 @@ jobs:
       super-linter-rules-path: .github
 
   Governance:
-    uses: bytemare/workflows/.github/workflows/governance.yaml@91e1deebc87bc9f65fd4ef726564b38501f0901c
+    uses: bytemare/workflows/.github/workflows/governance.yaml@c51347bd1b7065db60404508461ace977a712717
     permissions:
       contents: read
       security-events: write
@@ -79,7 +79,7 @@ jobs:
       codecov: ${{ secrets.CODECOV_TOKEN }}
 
   SAST:
-    uses: bytemare/workflows/.github/workflows/sast.yaml@91e1deebc87bc9f65fd4ef726564b38501f0901c
+    uses: bytemare/workflows/.github/workflows/sast.yaml@c51347bd1b7065db60404508461ace977a712717
     permissions:
       contents: read
       security-events: write
@@ -93,6 +93,9 @@ jobs:
       # SonarQube
       sonarqube: true
       sonarqube-configuration: .github/sonar-project.properties
+      sonarqube-coverage: true
+      sonarqube-coverage-command: "go test -v -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./..."
+      sonarqube-coverage-setup-go: true
       # Govulncheck
       govulncheck: true
       # Gitleaks
