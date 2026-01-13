@@ -11,10 +11,10 @@ assignees: bytemare
 Please answer these questions before submitting your issue. Thanks!
 -->
 
-### Describe the bug
+## Describe the bug
 A clear and concise description of what the bug is.
 
-### Your setup
+## Your setup
 
 **What version/commit of the project are you using?**
 
@@ -32,11 +32,11 @@ $ go env
 
 **If relevant, what parameters or arguments are you using?**
 
-### Reproducing
+## Reproducing
 
 **What did you do?**
 Steps to reproduce the behavior:
-1.  '....'
+1. '....'
 
 **Expected behavior**
 A clear and concise description of what you expected to happen.
