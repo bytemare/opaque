@@ -197,6 +197,7 @@ func getServer(t *testing.T, c *configuration) *opaque.Server {
 	return server
 }
 
+// TestConfigurationTableIncludesAllAvailableGroups ensures every supported group has a test configuration so coverage keeps pace with new suites.
 func TestConfigurationTableIncludesAllAvailableGroups(t *testing.T) {
 	available := make(map[opaque.Group]struct{})
 

@@ -546,7 +546,7 @@ func TestBadConfiguration(t *testing.T) {
 	}
 }
 
-// TestGetFakeRecord confirms fake records are generated deterministically with valid masking keys, which underpins the protocol's defense against credential enumeration.
+// TestGetFakeRecord ensures GetFakeRecord succeeds for valid configurations and rejects invalid ones.
 func TestGetFakeRecord(t *testing.T) {
 	// Test valid configurations
 	testAll(t, func(t2 *testing.T, conf *configuration) {

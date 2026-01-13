@@ -109,7 +109,7 @@ func TestServer_SetKeyMaterial_Invalid(t *testing.T) {
 	})
 }
 
-// TestServerKeyMaterial_Decode_Success round-trips various SKM encodings to guarantee serialization stability across optional fields like identity and seed.
+// TestServerKeyMaterial_Decode_Success round-trips a valid SKM encoding over bytes and hex to confirm stable serialization.
 func TestServerKeyMaterial_Decode_Success(t *testing.T) {
 	// encode -> decode -> check equality
 	testAll(t, func(t2 *testing.T, conf *configuration) {

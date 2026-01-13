@@ -110,6 +110,7 @@ func fuzzLoadVectors(path string) ([]*vector, error) {
 	return v, nil
 }
 
+// FuzzConfiguration fuzzes configuration creation to ensure invalid parameter combinations fail safely and never panic.
 func FuzzConfiguration(f *testing.F) {
 	// seed corpus
 	loadVectorSeedCorpus(f, "")
@@ -208,6 +209,7 @@ func inputToConfig(context []byte, kdf, mac, h uint, o []byte, ksfID, ake byte) 
 	}
 }
 
+// FuzzDeserializeRegistrationRequest fuzzes RegistrationRequest decoding so malformed inputs are rejected without panics.
 func FuzzDeserializeRegistrationRequest(f *testing.F) {
 	// Errors tested for
 
@@ -243,6 +245,7 @@ func FuzzDeserializeRegistrationRequest(f *testing.F) {
 	})
 }
 
+// FuzzDeserializeRegistrationResponse fuzzes RegistrationResponse decoding to protect against malformed server outputs.
 func FuzzDeserializeRegistrationResponse(f *testing.F) {
 	// Errors tested for
 	var (
@@ -287,6 +290,7 @@ func FuzzDeserializeRegistrationResponse(f *testing.F) {
 	})
 }
 
+// FuzzDeserializeRegistrationRecord fuzzes RegistrationRecord decoding to ensure corrupted records are rejected safely.
 func FuzzDeserializeRegistrationRecord(f *testing.F) {
 	// Errors tested for
 
@@ -323,6 +327,7 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 	})
 }
 
+// FuzzDeserializeKE1 fuzzes KE1 decoding to ensure malformed client messages cannot crash the server.
 func FuzzDeserializeKE1(f *testing.F) {
 	// Errors tested for
 	var (
@@ -394,6 +399,7 @@ func isValidOPRFPoint(conf *internal.Configuration, input []byte, err error) err
 	return nil
 }
 
+// FuzzDeserializeKE2 fuzzes KE2 decoding to ensure invalid server responses are handled without panics.
 func FuzzDeserializeKE2(f *testing.F) {
 	loadVectorSeedCorpus(f, "KE2")
 
@@ -437,6 +443,7 @@ func FuzzDeserializeKE2(f *testing.F) {
 	})
 }
 
+// FuzzDeserializeKE3 fuzzes KE3 decoding to ensure malformed client MACs or lengths are rejected safely.
 func FuzzDeserializeKE3(f *testing.F) {
 	loadVectorSeedCorpus(f, "KE3")
 
@@ -458,6 +465,7 @@ func FuzzDeserializeKE3(f *testing.F) {
 	})
 }
 
+// FuzzClearScalar fuzzes the scalar wipe helper to ensure it always clears pointers safely.
 func FuzzClearScalar(f *testing.F) {
 	f.Add(uint64(0))
 	f.Add(uint64(1))
@@ -472,6 +480,7 @@ func FuzzClearScalar(f *testing.F) {
 	})
 }
 
+// FuzzClearSlice fuzzes the slice wipe helper to ensure it zeroes and clears buffers safely.
 func FuzzClearSlice(f *testing.F) {
 	f.Add([]byte("a"))
 	f.Add([]byte("0123456789abcdef"))
@@ -486,9 +495,7 @@ func FuzzClearSlice(f *testing.F) {
 	})
 }
 
-// FuzzDecodeServerKeyMaterial fuzzes decoding of server key material encodings.
-// It is acceptable for the decoder to return an error for malformed inputs. This fuzzer
-// primarily guards against panics and ensures stable error handling across configurations.
+// FuzzDecodeServerKeyMaterial fuzzes server key material decoding to prevent panics on malformed inputs.
 func FuzzDecodeServerKeyMaterial(f *testing.F) {
 	// Seed with a few malformed patterns similar to unit tests
 	f.Add([]byte{0})
@@ -505,8 +512,7 @@ func FuzzDecodeServerKeyMaterial(f *testing.F) {
 	})
 }
 
-// FuzzDecodeServerKeyMaterialHex fuzzes the hexadecimal decoder for server key material to ensure robust handling of
-// both valid and invalid encodings.
+// FuzzDecodeServerKeyMaterialHex fuzzes the hex decoder for server key material to ensure robust handling of invalid data.
 func FuzzDecodeServerKeyMaterialHex(f *testing.F) {
 	f.Add("")
 	f.Add("00")
