@@ -72,6 +72,8 @@ jobs:
       scorecard: true
       # Codecov upload
       codecov: true
+      codecov-coverage-command: "go test -v -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./..."
+      codecov-coverage-setup-go: true
     secrets:
       # OpenSSF Scorecard token
       scorecard: ${{ secrets.SCORECARD_READ_TOKEN }}
