@@ -17,6 +17,8 @@ on:
     - cron: '0 2 * * *'
   workflow_dispatch:
 
+permissions: { }
+
 jobs:
   fuzz:
     if: github.event_name != 'schedule' || github.ref == 'refs/heads/main'
@@ -48,4 +50,4 @@ jobs:
         run: make -C .github test
 
       - name: Fuzz
-        run: make -C .github fuzz
+        run: make -C .github fuzz FUZZTIME=80s
