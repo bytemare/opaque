@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@92c522aaa6f53af082553dedc1596c80b71aba33
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
         with:
           disable-sudo: true
           egress-policy: block
@@ -39,12 +39,12 @@ jobs:
             release-assets.githubusercontent.com:443
 
       - name: Checkout repo
-        uses: actions/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+        uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
         with:
           fetch-depth: 0
 
       - name: Init go
-        uses: bytemare/actions/init-go@5e1f07171089dbf83698c3b4ac12d3d7dd46d192
+        uses: bytemare/actions/init-go@ee74c801e5a080443ea0e98d527a3fbfcd2a7fd4
 
       - name: Run Tests
         run: make -C .github test
