@@ -18,13 +18,13 @@ import (
 
 var (
 	// ErrConfiguration indicates that the configuration is invalid.
-	ErrConfiguration = ErrCodeConfiguration.New("")
+	ErrConfiguration = ErrCodeConfiguration.New("invalid configuration")
 
 	// ErrRegistration indicates that the registration process failed.
-	ErrRegistration = ErrCodeRegistration.New("")
+	ErrRegistration = ErrCodeRegistration.New("registration failed")
 
 	// ErrAuthentication indicates that the authentication process failed.
-	ErrAuthentication = ErrCodeAuthentication.New("")
+	ErrAuthentication = ErrCodeAuthentication.New("authentication failed")
 
 	// ErrRegistrationRequest indicates an error with a registration request.
 	ErrRegistrationRequest = ErrCodeMessage.New("invalid registration request")
@@ -45,19 +45,19 @@ var (
 	ErrKE3 = ErrCodeMessage.New("invalid KE3 message")
 
 	// ErrServerKeyMaterial indicates that the server's key material is invalid.
-	ErrServerKeyMaterial = ErrCodeServerKeyMaterial.New("")
+	ErrServerKeyMaterial = ErrCodeServerKeyMaterial.New("invalid server key material")
 
 	// ErrServerOptions indicates that the provided server options are invalid.
-	ErrServerOptions = ErrCodeServerOptions.New("")
+	ErrServerOptions = ErrCodeServerOptions.New("invalid server options")
 
 	// ErrClientRecord indicates that the client record is invalid.
-	ErrClientRecord = ErrCodeClientRecord.New("")
+	ErrClientRecord = ErrCodeClientRecord.New("invalid client record")
 
 	// ErrClientState indicates that the client state is invalid.
-	ErrClientState = ErrCodeClientState.New("")
+	ErrClientState = ErrCodeClientState.New("invalid client state")
 
 	// ErrClientOptions indicates that the client options are invalid.
-	ErrClientOptions = ErrCodeClientOptions.New("")
+	ErrClientOptions = ErrCodeClientOptions.New("invalid client options")
 
 	// ErrCriticalAbort - todo: use this if tampering has been detected?
 	ErrCriticalAbort = errors.New("critical - abort protocol")
