@@ -13,17 +13,22 @@ import (
 	"crypto/hmac"
 
 	"github.com/bytemare/hash"
-	"github.com/bytemare/ksf"
 )
 
-// NewKDF returns a newly instantiated KDF.
-func NewKDF(id crypto.Hash) *KDF {
-	return &KDF{h: hash.FromCrypto(id).GetHashFunction()}
+// IsHashFunctionValid checks whether the given crypto.Hash is valid, available, and has a fixed output length.
+func IsHashFunctionValid(h crypto.Hash) bool {
+	h2 := hash.FromCrypto(h)
+	return h2 != 0 && h2.Type() == hash.FixedOutputLength
 }
 
 // KDF wraps a hash function and exposes KDF methods.
 type KDF struct {
 	h *hash.Fixed
+}
+
+// NewKDF returns a newly instantiated KDF.
+func NewKDF(id crypto.Hash) *KDF {
+	return &KDF{h: hash.FromCrypto(id).GetHashFunction()}
 }
 
 // Extract exposes an Extract only KDF method.
@@ -41,14 +46,14 @@ func (k *KDF) Size() int {
 	return k.h.Size()
 }
 
-// NewMac returns a newly instantiated Mac.
-func NewMac(id crypto.Hash) *Mac {
-	return &Mac{h: hash.FromCrypto(id).GetHashFunction()}
-}
-
 // Mac wraps a hash function and exposes Message Authentication Code methods.
 type Mac struct {
 	h *hash.Fixed
+}
+
+// NewMac returns a newly instantiated Mac.
+func NewMac(id crypto.Hash) *Mac {
+	return &Mac{h: hash.FromCrypto(id).GetHashFunction()}
 }
 
 // Equal returns a constant-time comparison of the input.
@@ -66,14 +71,14 @@ func (m *Mac) Size() int {
 	return m.h.Size()
 }
 
-// NewHash returns a newly instantiated Hash.
-func NewHash(id crypto.Hash) *Hash {
-	return &Hash{h: hash.FromCrypto(id).GetHashFunction()}
-}
-
 // Hash wraps a hash function and exposes only necessary hashing methods.
 type Hash struct {
 	h *hash.Fixed
+}
+
+// NewHash returns a newly instantiated Hash.
+func NewHash(id crypto.Hash) *Hash {
+	return &Hash{h: hash.FromCrypto(id).GetHashFunction()}
 }
 
 // Size returns the output size of the hashing function.
@@ -87,42 +92,11 @@ func (h *Hash) Sum() []byte {
 }
 
 // Write adds input to the running state.
-func (h *Hash) Write(p []byte) {
-	_, _ = h.h.Write(p)
+func (h *Hash) Write(input []byte) {
+	_, _ = h.h.Write(input)
 }
 
-// NewKSF returns a newly instantiated KSF.
-func NewKSF(id ksf.Identifier) *KSF {
-	if id == 0 {
-		return &KSF{&IdentityKSF{}}
-	}
-
-	return &KSF{id.Get()}
-}
-
-// KSF wraps a key stretching function and exposes its functions.
-type KSF struct {
-	ksfInterface
-}
-
-type ksfInterface interface {
-	// Harden uses default parameters for the key derivation function over the input password and salt.
-	Harden(password, salt []byte, length int) []byte
-
-	// Parameterize replaces the functions parameters with the new ones.
-	// Must match the amount of parameters for the KSF.
-	Parameterize(parameters ...int)
-}
-
-// IdentityKSF represents a KSF with no operations.
-type IdentityKSF struct{}
-
-// Harden returns the password as is.
-func (i IdentityKSF) Harden(password, _ []byte, _ int) []byte {
-	return password
-}
-
-// Parameterize applies KSF parameters if defined.
-func (i IdentityKSF) Parameterize(_ ...int) {
-	// no-op
+// Reset resets the hash to its initial state.
+func (h *Hash) Reset() {
+	h.h.Reset()
 }

@@ -1,0 +1,9 @@
+go test fuzz v1
+[]byte("")
+[]byte("0")
+uint(5)
+uint(22)
+uint(7)
+[]byte("ristretto255-SHA512")
+byte('\x00')
+byte('\x01')

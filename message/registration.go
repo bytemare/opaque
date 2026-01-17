@@ -27,22 +27,22 @@ func (r *RegistrationRequest) Serialize() []byte {
 // RegistrationResponse is the second message of the registration flow, created by the server and sent to the client.
 type RegistrationResponse struct {
 	EvaluatedMessage *ecc.Element `json:"evaluatedMessage"`
-	Pks              *ecc.Element `json:"serverPublicKey"`
+	ServerPublicKey  []byte       `json:"serverPublicKey"`
 }
 
 // Serialize returns the byte encoding of RegistrationResponse.
 func (r *RegistrationResponse) Serialize() []byte {
-	return encoding.Concat(r.EvaluatedMessage.Encode(), r.Pks.Encode())
+	return encoding.Concat(r.EvaluatedMessage.Encode(), r.ServerPublicKey)
 }
 
 // RegistrationRecord represents the client record sent as the last registration message by the client to the server.
 type RegistrationRecord struct {
-	PublicKey  *ecc.Element `json:"clientPublicKey"`
-	MaskingKey []byte       `json:"maskingKey"`
-	Envelope   []byte       `json:"envelope"`
+	ClientPublicKey *ecc.Element `json:"clientPublicKey"`
+	MaskingKey      []byte       `json:"maskingKey"`
+	Envelope        []byte       `json:"envelope"`
 }
 
 // Serialize returns the byte encoding of RegistrationRecord.
 func (r *RegistrationRecord) Serialize() []byte {
-	return encoding.Concat3(r.PublicKey.Encode(), r.MaskingKey, r.Envelope)
+	return encoding.Concat3(r.ClientPublicKey.Encode(), r.MaskingKey, r.Envelope)
 }

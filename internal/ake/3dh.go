@@ -20,19 +20,16 @@ import (
 )
 
 // KeyGen returns private and public keys in the ecc.
-func KeyGen(id ecc.Group) (privateKey, publicKey []byte) {
-	scalar := id.NewScalar().Random()
-	point := id.Base().Multiply(scalar)
+func KeyGen(g ecc.Group, seed []byte) (*ecc.Scalar, *ecc.Element) {
+	if len(seed) == 0 {
+		seed = internal.RandomBytes(internal.SeedLength)
+	}
 
-	return scalar.Encode(), point.Encode()
+	return oprf.IDFromGroup(g).DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
 }
 
 func diffieHellman(s *ecc.Scalar, e *ecc.Element) *ecc.Element {
 	/*
-		if id == ecc.Ristretto255Sha512 || id == ecc.P256Sha256 {
-			e.Copy().Multiply(s)
-		}
-
 		if id == ecc.Curve25519 {
 			// TODO
 		}
@@ -47,7 +44,12 @@ type Identities struct {
 }
 
 // SetIdentities sets the client and server identities to their respective public key if not set.
-func (id *Identities) SetIdentities(clientPublicKey *ecc.Element, serverPublicKey []byte) *Identities {
+func SetIdentities(clientID []byte, clientPublicKey *ecc.Element, serverID, serverPublicKey []byte) *Identities {
+	id := &Identities{
+		ClientIdentity: clientID,
+		ServerIdentity: serverID,
+	}
+
 	if id.ClientIdentity == nil {
 		id.ClientIdentity = clientPublicKey.Encode()
 	}
@@ -57,71 +59,6 @@ func (id *Identities) SetIdentities(clientPublicKey *ecc.Element, serverPublicKe
 	}
 
 	return id
-}
-
-// Options enable setting optional ephemeral values, which default to secure random values if not set.
-type Options struct {
-	// KeyShareSeed: optional.
-	KeyShareSeed []byte
-	// Nonce: optional.
-	Nonce []byte
-	// NonceLength: optional, overrides the default length of the nonce to be created if no nonce is provided.
-	NonceLength uint32
-}
-
-func (o *Options) init() {
-	if o.KeyShareSeed == nil {
-		o.KeyShareSeed = internal.RandomBytes(internal.SeedLength)
-	}
-
-	if o.NonceLength == 0 {
-		o.NonceLength = internal.NonceLength
-	}
-
-	if len(o.Nonce) == 0 {
-		o.Nonce = internal.RandomBytes(int(o.NonceLength))
-	}
-}
-
-type values struct {
-	ephemeralSecretKey *ecc.Scalar
-	nonce              []byte
-}
-
-// GetEphemeralSecretKey returns the state's ephemeral secret key.
-func (v *values) GetEphemeralSecretKey() *ecc.Scalar {
-	return v.ephemeralSecretKey
-}
-
-// GetNonce returns the secret nonce.
-func (v *values) GetNonce() []byte {
-	return v.nonce
-}
-
-func (v *values) flush() {
-	if v.ephemeralSecretKey != nil {
-		v.ephemeralSecretKey.Zero()
-		v.ephemeralSecretKey = nil
-	}
-
-	v.nonce = nil
-}
-
-// setOptions sets optional values.
-// There's no effect if ephemeralSecretKey and nonce have already been set in a previous call.
-func (v *values) setOptions(g ecc.Group, options Options) *ecc.Element {
-	options.init()
-
-	if v.ephemeralSecretKey == nil {
-		v.ephemeralSecretKey = oprf.IDFromGroup(g).
-			DeriveKey(options.KeyShareSeed, []byte(tag.DeriveDiffieHellmanKeyPair))
-	}
-
-	if v.nonce == nil {
-		v.nonce = options.Nonce
-	}
-
-	return g.Base().Multiply(v.ephemeralSecretKey)
 }
 
 func k3dh(
@@ -142,12 +79,13 @@ func k3dh(
 func core3DH(
 	conf *internal.Configuration, identities *Identities, ikm, ke1 []byte, ke2 *message.KE2,
 ) (sessionSecret, macS, macC []byte) {
+	conf.Hash.Reset()
 	initTranscript(conf, identities, ke1, ke2)
-
 	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, conf.Hash.Sum()) // preamble
 	serverMac := conf.MAC.MAC(serverMacKey, conf.Hash.Sum())                                // transcript2
 	conf.Hash.Write(serverMac)
 	transcript3 := conf.Hash.Sum()
+	conf.Hash.Reset()
 	clientMac := conf.MAC.MAC(clientMacKey, transcript3)
 
 	return sessionSecret, serverMac, clientMac
@@ -160,13 +98,9 @@ func buildLabel(length int, label, context []byte) []byte {
 		encoding.EncodeVectorLen(context, 1))
 }
 
-func expand(h *internal.KDF, secret, hkdfLabel []byte) []byte {
-	return h.Expand(secret, hkdfLabel, h.Size())
-}
-
 func expandLabel(h *internal.KDF, secret, label, context []byte) []byte {
 	hkdfLabel := buildLabel(h.Size(), label, context)
-	return expand(h, secret, hkdfLabel)
+	return h.Expand(secret, hkdfLabel, h.Size())
 }
 
 func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
@@ -174,17 +108,27 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 }
 
 func initTranscript(conf *internal.Configuration, identities *Identities, ke1 []byte, ke2 *message.KE2) {
-	encodedClientID := encoding.EncodeVector(identities.ClientIdentity)
-	encodedServerID := encoding.EncodeVector(identities.ServerIdentity)
-	conf.Hash.Write(encoding.Concatenate([]byte(tag.VersionTag), encoding.EncodeVector(conf.Context),
-		encodedClientID, ke1,
-		encodedServerID, ke2.CredentialResponse.Serialize(), ke2.ServerNonce, ke2.ServerPublicKeyshare.Encode()))
+	addToHash(conf, []byte(tag.VersionTag),
+		encoding.EncodeVector(conf.Context),
+		encoding.EncodeVector(identities.ClientIdentity),
+		ke1,
+		encoding.EncodeVector(identities.ServerIdentity),
+		ke2.CredentialResponse.Serialize(),
+		ke2.ServerNonce,
+		ke2.ServerKeyShare.Encode(),
+	)
+}
+
+func addToHash(conf *internal.Configuration, data ...[]byte) {
+	for _, d := range data {
+		conf.Hash.Write(d)
+	}
 }
 
 func deriveKeys(h *internal.KDF, ikm, context []byte) (serverMacKey, clientMacKey, sessionSecret []byte) {
 	prk := h.Extract(nil, ikm)
-	handshakeSecret := deriveSecret(h, prk, []byte(tag.Handshake), context)
 	sessionSecret = deriveSecret(h, prk, []byte(tag.SessionKey), context)
+	handshakeSecret := deriveSecret(h, prk, []byte(tag.Handshake), context)
 	serverMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacServer), nil)
 	clientMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacClient), nil)
 

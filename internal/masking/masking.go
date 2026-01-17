@@ -16,12 +16,9 @@ import (
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/encoding"
-	"github.com/bytemare/opaque/internal/keyrecovery"
+	"github.com/bytemare/opaque/internal/envelope"
 	"github.com/bytemare/opaque/internal/tag"
 )
-
-// errUnmaskInvalidPKS happens when the client reads an invalid public key while unmasking.
-var errUnmaskInvalidPKS = errors.New("invalid server public key in masked response")
 
 // Keys contains all the output keys from the masking mechanism.
 type Keys struct {
@@ -33,15 +30,14 @@ type Keys struct {
 // Mask encrypts the serverPublicKey and the envelope under nonceIn and the maskingKey.
 func Mask(
 	conf *internal.Configuration,
-	nonceIn, maskingKey, serverPublicKey, envelope []byte,
+	nonceIn, maskingKey, serverPublicKey, env []byte,
 ) (nonce, maskedResponse []byte) {
-	// testing: integrated to support testing, to force values.
 	nonce = nonceIn
 	if len(nonce) == 0 {
 		nonce = internal.RandomBytes(conf.NonceLen)
 	}
 
-	clearText := encoding.Concat(serverPublicKey, envelope)
+	clearText := encoding.Concat(serverPublicKey, env)
 	maskedResponse = xorResponse(conf, maskingKey, nonce, clearText)
 
 	return nonce, maskedResponse
@@ -52,22 +48,23 @@ func Mask(
 func Unmask(
 	conf *internal.Configuration,
 	randomizedPassword, nonce, maskedResponse []byte,
-) (serverPublicKey *ecc.Element, serverPublicKeyBytes []byte, envelope *keyrecovery.Envelope, err error) {
+) (serverPublicKey *ecc.Element, serverPublicKeyBytes []byte, env *envelope.Envelope, err error) {
 	maskingKey := conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), conf.Hash.Size())
 	clearText := xorResponse(conf, maskingKey, nonce, maskedResponse)
 	serverPublicKeyBytes = clearText[:conf.Group.ElementLength()]
-	env := clearText[conf.Group.ElementLength():]
-	envelope = &keyrecovery.Envelope{
-		Nonce:   env[:conf.NonceLen],
-		AuthTag: env[conf.NonceLen:],
+	clearTextEnvelope := clearText[conf.Group.ElementLength():]
+	env = &envelope.Envelope{
+		Nonce:   clearTextEnvelope[:conf.NonceLen],
+		AuthTag: clearTextEnvelope[conf.NonceLen:],
 	}
 
 	serverPublicKey = conf.Group.NewElement()
 	if err = serverPublicKey.Decode(serverPublicKeyBytes); err != nil {
-		return nil, nil, nil, errUnmaskInvalidPKS
+		return nil, nil, nil,
+			errors.Join(internal.ErrAuthenticationInvalidServerPublicKey, err)
 	}
 
-	return serverPublicKey, serverPublicKeyBytes, envelope, nil
+	return serverPublicKey, serverPublicKeyBytes, env, nil
 }
 
 // xorResponse is used to encrypt and decrypt the response in KE2.

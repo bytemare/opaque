@@ -1,11 +1,13 @@
 version: "2"
 linters:
-  default: all
+  default: none
   disable:
-    - funcorder
+    - embeddedstructfieldcheck
+    - noinlineerr
     - nonamedreturns
     - varnamelen
   enable:
+    - arangolint
     - asasalint
     - asciicheck
     - bidichk
@@ -43,6 +45,7 @@ linters:
     - goconst
     - gocritic
     - gocyclo
+    - godoclint
     - godot
     - godox
     - goheader
@@ -59,6 +62,7 @@ linters:
     - ineffassign
     - interfacebloat
     - intrange
+    - iotamixing
     - ireturn
     - lll
     - loggercheck
@@ -101,6 +105,7 @@ linters:
     - tparallel
     - unconvert
     - unparam
+    - unqueryvet
     - unused
     - usestdlibvars
     - usetesting
@@ -108,7 +113,7 @@ linters:
     - wastedassign
     - whitespace
     - wrapcheck
-    - wsl
+    - wsl_v5
     - zerologlint
   settings:
     cyclop:
@@ -126,6 +131,7 @@ linters:
       enable-all: true
       disabled-checks:
         - unnamedResult
+        - sloppyReassign
     govet:
       enable-all: true
       settings:
@@ -146,12 +152,13 @@ linters:
         - '3'
         - '4'
         - '8'
+        - '9'
     nlreturn:
       block-size: 2
     prealloc:
       simple: false
+      range-loops: true
       for-loops: true
-
   exclusions:
     rules:
       - path: internal/hash.go

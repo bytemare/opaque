@@ -6,27 +6,17 @@
 // LICENSE file in the root directory of this source tree or at
 // https://spdx.org/licenses/MIT.html
 
-// Package keyrecovery provides utility functions and structures allowing credential management.
-package keyrecovery
+// Package envelope provides utility functions for the envelope credential management..
+package envelope
 
 import (
-	"errors"
-
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
+	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
-	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
 )
-
-var errEnvelopeInvalidMac = errors.New("invalid envelope authentication tag")
-
-// Credentials structure is currently used for testing purposes.
-type Credentials struct {
-	ClientIdentity, ServerIdentity []byte
-	EnvelopeNonce                  []byte // testing: integrated to support testing
-}
 
 // Envelope represents the OPAQUE envelope.
 type Envelope struct {
@@ -70,28 +60,24 @@ func deriveDiffieHellmanKeyPair(
 	randomizedPassword, nonce []byte,
 ) (*ecc.Scalar, *ecc.Element) {
 	seed := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExpandPrivateKey), internal.SeedLength)
-	return oprf.IDFromGroup(conf.Group).DeriveKeyPair(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
+	return ake.KeyGen(conf.Group, seed)
 }
 
 // Store returns the client's Envelope, the masking key for the registration, and the additional export key.
 func Store(
 	conf *internal.Configuration,
-	randomizedPassword []byte, serverPublicKey *ecc.Element,
-	credentials *Credentials,
+	randomizedPassword, serverPublicKey,
+	clientIdentity, serverIdentity,
+	nonce []byte,
 ) (env *Envelope, pku *ecc.Element, export []byte) {
-	// testing: integrated to support testing with set nonce
-	nonce := credentials.EnvelopeNonce
-	if nonce == nil {
-		nonce = internal.RandomBytes(conf.NonceLen)
-	}
-
 	_, pku = deriveDiffieHellmanKeyPair(conf, randomizedPassword, nonce)
 	ctc := cleartextCredentials(
 		pku.Encode(),
-		serverPublicKey.Encode(),
-		credentials.ClientIdentity,
-		credentials.ServerIdentity,
+		serverPublicKey,
+		clientIdentity,
+		serverIdentity,
 	)
+
 	auth := authTag(conf, randomizedPassword, nonce, ctc)
 	export = exportKey(conf, randomizedPassword, nonce)
 
@@ -119,7 +105,7 @@ func Recover(
 
 	expectedTag := authTag(conf, randomizedPassword, envelope.Nonce, ctc)
 	if !conf.MAC.Equal(expectedTag, envelope.AuthTag) {
-		return nil, nil, nil, errEnvelopeInvalidMac
+		return nil, nil, nil, internal.ErrEnvelopeInvalidMac
 	}
 
 	export = exportKey(conf, randomizedPassword, envelope.Nonce)

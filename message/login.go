@@ -17,29 +17,29 @@ import (
 
 // KE1 is the first message of the login flow, created by the client and sent to the server.
 type KE1 struct {
-	*CredentialRequest
-	ClientPublicKeyshare *ecc.Element `json:"clientPublicKeyshare"`
-	ClientNonce          []byte       `json:"clientNonce"`
+	CredentialRequest
+	ClientKeyShare *ecc.Element `json:"clientKeyShare"`
+	ClientNonce    []byte       `json:"clientNonce"`
 }
 
 // Serialize returns the byte encoding of KE1.
 func (m *KE1) Serialize() []byte {
-	return encoding.Concat3(m.CredentialRequest.Serialize(), m.ClientNonce, m.ClientPublicKeyshare.Encode())
+	return encoding.Concat3(m.CredentialRequest.Serialize(), m.ClientNonce, m.ClientKeyShare.Encode())
 }
 
 // KE2 is the second message of the login flow, created by the server and sent to the client.
 type KE2 struct {
 	*CredentialResponse
-	ServerPublicKeyshare *ecc.Element `json:"serverPublicKeyshare"`
-	ServerNonce          []byte       `json:"serverNonce"`
-	ServerMac            []byte       `json:"serverMac"`
+	ServerKeyShare *ecc.Element `json:"serverKeyShare"`
+	ServerNonce    []byte       `json:"serverNonce"`
+	ServerMac      []byte       `json:"serverMac"`
 }
 
 // Serialize returns the byte encoding of KE2.
 func (m *KE2) Serialize() []byte {
 	return encoding.Concat(
 		m.CredentialResponse.Serialize(),
-		encoding.Concat3(m.ServerNonce, m.ServerPublicKeyshare.Encode(), m.ServerMac),
+		encoding.Concat3(m.ServerNonce, m.ServerKeyShare.Encode(), m.ServerMac),
 	)
 }
 

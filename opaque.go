@@ -13,12 +13,12 @@
 package opaque
 
 import (
+	"bytes"
 	"crypto"
 	"errors"
 	"fmt"
 
 	"github.com/bytemare/ecc"
-	"github.com/bytemare/hash"
 	"github.com/bytemare/ksf"
 
 	"github.com/bytemare/opaque/internal"
@@ -26,6 +26,8 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
+
+	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
 // Group identifies the prime-order group with hash-to-curve capability to use in OPRF and AKE.
@@ -69,15 +71,6 @@ func (g Group) Group() ecc.Group {
 
 const confIDsLength = 6
 
-var (
-	errInvalidOPRFid = errors.New("invalid OPRF group id")
-	errInvalidKDFid  = errors.New("invalid KDF id")
-	errInvalidMACid  = errors.New("invalid MAC id")
-	errInvalidHASHid = errors.New("invalid Hash id")
-	errInvalidKSFid  = errors.New("invalid KSF id")
-	errInvalidAKEid  = errors.New("invalid AKE group id")
-)
-
 // Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
 // as well as KDF, MAC, Hash should be the same.
 type Configuration struct {
@@ -103,6 +96,43 @@ func DefaultConfiguration() *Configuration {
 	}
 }
 
+// Equals compares two configurations and returns nil if they are equal, or an error otherwise.
+func (c *Configuration) Equals(other *Configuration) error {
+	if other == nil {
+		return fmt.Errorf("%w: nil configuration ", ErrCodeConfiguration)
+	}
+
+	if c.KDF != other.KDF {
+		return fmt.Errorf("%w: KDF mismatch", ErrCodeConfiguration)
+	}
+
+	if c.MAC != other.MAC {
+		return fmt.Errorf("%w: MAC mismatch", ErrCodeConfiguration)
+	}
+
+	if c.Hash != other.Hash {
+		return fmt.Errorf("%w: Hash mismatch", ErrCodeConfiguration)
+	}
+
+	if c.KSF != other.KSF {
+		return fmt.Errorf("%w: KSF mismatch", ErrCodeConfiguration)
+	}
+
+	if c.OPRF != other.OPRF {
+		return fmt.Errorf("%w: OPRF mismatch", ErrCodeConfiguration)
+	}
+
+	if c.AKE != other.AKE {
+		return fmt.Errorf("%w: AKE mismatch", ErrCodeConfiguration)
+	}
+
+	if !bytes.Equal(c.Context, other.Context) {
+		return fmt.Errorf("%w: context mismatch", ErrCodeConfiguration)
+	}
+
+	return nil
+}
+
 // Client returns a newly instantiated Client from the Configuration.
 func (c *Configuration) Client() (*Client, error) {
 	return NewClient(c)
@@ -119,61 +149,8 @@ func (c *Configuration) GenerateOPRFSeed() []byte {
 }
 
 // KeyGen returns a key pair in the AKE ecc.
-func (c *Configuration) KeyGen() (secretKey, publicKey []byte) {
-	return ake.KeyGen(ecc.Group(c.AKE))
-}
-
-// verify returns an error on the first non-compliant parameter, nil otherwise.
-func (c *Configuration) verify() error {
-	if !c.OPRF.Available() || !c.OPRF.OPRF().Available() {
-		return errInvalidOPRFid
-	}
-
-	if !c.AKE.Available() || !c.AKE.Group().Available() {
-		return errInvalidAKEid
-	}
-
-	if c.KDF >= 25 || !hash.Hash(c.KDF).Available() { //nolint:gosec // overflow is checked beforehand.
-		return errInvalidKDFid
-	}
-
-	if c.MAC >= 25 || !hash.Hash(c.MAC).Available() { //nolint:gosec // overflow is checked beforehand.
-		return errInvalidMACid
-	}
-
-	if c.Hash >= 25 || !hash.Hash(c.Hash).Available() { //nolint:gosec // overflow is checked beforehand.
-		return errInvalidHASHid
-	}
-
-	if c.KSF != 0 && !c.KSF.Available() {
-		return errInvalidKSFid
-	}
-
-	return nil
-}
-
-// toInternal builds the internal representation of the configuration parameters.
-func (c *Configuration) toInternal() (*internal.Configuration, error) {
-	if err := c.verify(); err != nil {
-		return nil, err
-	}
-
-	g := c.AKE.Group()
-	o := c.OPRF.OPRF()
-	mac := internal.NewMac(c.MAC)
-	ip := &internal.Configuration{
-		OPRF:         o,
-		Group:        g,
-		KSF:          internal.NewKSF(c.KSF),
-		KDF:          internal.NewKDF(c.KDF),
-		MAC:          mac,
-		Hash:         internal.NewHash(c.Hash),
-		NonceLen:     internal.NonceLength,
-		EnvelopeSize: internal.NonceLength + mac.Size(),
-		Context:      c.Context,
-	}
-
-	return ip, nil
+func (c *Configuration) KeyGen() (secretKey *ecc.Scalar, publicKey *ecc.Element) {
+	return ake.KeyGen(ecc.Group(c.AKE), nil)
 }
 
 // Deserializer returns a pointer to a Deserializer structure allowing deserialization of messages in the given
@@ -205,12 +182,12 @@ func (c *Configuration) Serialize() []byte {
 func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	// corresponds to the configuration length + 2-byte encoding of empty context
 	if len(encoded) < confIDsLength+2 {
-		return nil, internal.ErrConfigurationInvalidLength
+		return nil, ErrConfiguration.Join(internal.ErrInvalidEncodingLength)
 	}
 
 	ctx, _, err := encoding.DecodeVector(encoded[confIDsLength:])
 	if err != nil {
-		return nil, fmt.Errorf("decoding the configuration context: %w", err)
+		return nil, ErrConfiguration.Join(internal.ErrInvalidContextEncoding, err)
 	}
 
 	c := &Configuration{
@@ -223,8 +200,8 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		Context: ctx,
 	}
 
-	if err2 := c.verify(); err2 != nil {
-		return nil, err2
+	if err = c.verify(); err != nil {
+		return nil, err
 	}
 
 	return c, nil
@@ -242,9 +219,9 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 	publicKey := i.Group.Base().Multiply(scalar)
 
 	regRecord := &message.RegistrationRecord{
-		PublicKey:  publicKey,
-		MaskingKey: RandomBytes(i.KDF.Size()),
-		Envelope:   make([]byte, internal.NonceLength+i.MAC.Size()),
+		ClientPublicKey: publicKey,
+		MaskingKey:      RandomBytes(i.KDF.Size()),
+		Envelope:        make([]byte, internal.NonceLength+i.MAC.Size()),
 	}
 
 	return &ClientRecord{
@@ -264,4 +241,122 @@ type ClientRecord struct {
 // RandomBytes returns random bytes of length len (wrapper for crypto/rand).
 func RandomBytes(length int) []byte {
 	return internal.RandomBytes(length)
+}
+
+// IsValidScalar checks if the provided scalar is valid.
+// It must be:
+// - non-nil
+// - non-zero
+// - part of the correct group.
+func IsValidScalar(g ecc.Group, s *ecc.Scalar) error {
+	if s == nil {
+		return internal.ErrScalarNil
+	}
+
+	if s.Group() != g {
+		return internal.ErrScalarGroupMismatch
+	}
+
+	// Check if the scalar is zero.
+	if s.IsZero() {
+		return internal.ErrScalarZero
+	}
+
+	return nil
+}
+
+// IsValidElement checks if the provided element is valid.
+// It must be:
+// - non-nil
+// - non-identity (point at infinity)
+// - part of the correct group.
+func IsValidElement(g ecc.Group, e *ecc.Element) error {
+	if e == nil {
+		return internal.ErrElementNil
+	}
+
+	if e.Group() != g {
+		return internal.ErrElementGroupMismatch
+	}
+
+	// Check if the element is the identity element (point at infinity).
+	if e.IsIdentity() {
+		return internal.ErrElementIdentity
+	}
+
+	return nil
+}
+
+// AKEOptions override the secure default values or internally generated values. Only use this if you know what you're
+// doing. Reusing seeds and nonces across sessions is a security risk, and breaks forward secrecy.
+type AKEOptions struct {
+	SecretKeyShare     *ecc.Scalar
+	SecretKeyShareSeed []byte
+	Nonce              []byte
+}
+
+// verify returns an error on the first non-compliant parameter, nil otherwise.
+func (c *Configuration) verify() error {
+	if !c.OPRF.Available() || !c.OPRF.OPRF().Available() {
+		return ErrConfiguration.Join(internal.ErrInvalidOPRFid)
+	}
+
+	if !c.AKE.Available() || !c.AKE.Group().Available() {
+		return ErrConfiguration.Join(internal.ErrInvalidAKEid)
+	}
+
+	if !internal.IsHashFunctionValid(c.KDF) {
+		return ErrConfiguration.Join(internal.ErrInvalidKDFid)
+	}
+
+	if !internal.IsHashFunctionValid(c.MAC) {
+		return ErrConfiguration.Join(internal.ErrInvalidMACid)
+	}
+
+	if !internal.IsHashFunctionValid(c.Hash) {
+		return ErrConfiguration.Join(internal.ErrInvalidHASHid)
+	}
+
+	if c.KSF != 0 && !c.KSF.Available() {
+		return ErrConfiguration.Join(internal.ErrInvalidKSFid)
+	}
+
+	return nil
+}
+
+// toInternal builds the internal representation of the configuration parameters.
+func (c *Configuration) toInternal() (*internal.Configuration, error) {
+	if err := c.verify(); err != nil {
+		return nil, err
+	}
+
+	g := c.AKE.Group()
+	o := c.OPRF.OPRF()
+	mac := internal.NewMac(c.MAC)
+	ip := &internal.Configuration{
+		OPRF:         o,
+		Group:        g,
+		KSF:          internalKSF.NewKSF(c.KSF),
+		KDF:          internal.NewKDF(c.KDF),
+		MAC:          mac,
+		Hash:         internal.NewHash(c.Hash),
+		NonceLen:     internal.NonceLength,
+		EnvelopeSize: internal.NonceLength + mac.Size(),
+		Context:      c.Context,
+	}
+
+	return ip, nil
+}
+
+// getSecretKeyShare assumes either SecretKeyShare is set or SecretKeyShareSeed is != 0.
+func (o *AKEOptions) getSecretKeyShare(c *internal.Configuration) (*ecc.Scalar, error) {
+	if o.SecretKeyShare != nil {
+		if err := IsValidScalar(c.Group, o.SecretKeyShare); err != nil {
+			return nil, errors.Join(internal.ErrSecretShareInvalid, err)
+		}
+
+		return c.Group.NewScalar().Set(o.SecretKeyShare), nil
+	}
+
+	return c.MakeSecretKeyShare(o.SecretKeyShareSeed), nil
 }

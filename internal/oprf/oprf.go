@@ -12,15 +12,13 @@ package oprf
 
 import (
 	"crypto"
+	"errors"
 
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/tag"
 )
-
-// SeedLength is the default length used for seeds.
-const SeedLength = 32
 
 // Identifier of the OPRF compatible cipher suite to be used.
 type Identifier string
@@ -45,29 +43,8 @@ const (
 	maxDeriveKeyPairTries = 255
 )
 
-func (i Identifier) dst(prefix string) []byte {
-	return encoding.Concat([]byte(prefix), i.contextString())
-}
-
-func (i Identifier) contextString() []byte {
-	return encoding.Concatenate([]byte(tag.OPRFVersionPrefix), []byte(i))
-}
-
-func (i Identifier) hash(input ...[]byte) []byte {
-	h := map[Identifier]crypto.Hash{
-		Ristretto255Sha512: crypto.SHA512,
-		P256Sha256:         crypto.SHA256,
-		P384Sha384:         crypto.SHA384,
-		P521Sha512:         crypto.SHA512,
-	}[i].New()
-	h.Reset()
-
-	for _, i := range input {
-		_, _ = h.Write(i)
-	}
-
-	return h.Sum(nil)
-}
+// ErrDeriveKeyPairError is thrown in a panic if DeriveKeyPair fails to produce a valid keypair.
+var ErrDeriveKeyPairError = errors.New("DeriveKeyPairError")
 
 // Available returns whether the Identifier has been registered of not.
 func (i Identifier) Available() bool {
@@ -110,7 +87,11 @@ func (i Identifier) DeriveKey(seed, info []byte) *ecc.Scalar {
 
 	for s == nil || s.IsZero() {
 		if counter > maxDeriveKeyPairTries {
-			panic("DeriveKeyPairError")
+			// The panic is defensive: with cryptographic hash functions the loop
+			// should succeed in the first iteration. Triggering the panic in tests
+			// would require deliberately breaking the hash construction, so we leave
+			// it as untested safeguard code.
+			panic(ErrDeriveKeyPairError)
 		}
 
 		s = i.Group().HashToScalar(encoding.Concat(deriveInput, []byte{counter}), dst)
@@ -126,11 +107,26 @@ func (i Identifier) DeriveKeyPair(seed, info []byte) (*ecc.Scalar, *ecc.Element)
 	return sk, i.Group().Base().Multiply(sk)
 }
 
-// Client returns an OPRF client.
-func (i Identifier) Client() *Client {
-	return &Client{
-		Identifier: i,
-		input:      nil,
-		blind:      nil,
+func (i Identifier) dst(prefix string) []byte {
+	return encoding.Concat([]byte(prefix), i.contextString())
+}
+
+func (i Identifier) contextString() []byte {
+	return encoding.Concatenate([]byte(tag.OPRFVersionPrefix), []byte(i))
+}
+
+func (i Identifier) hash(input ...[]byte) []byte {
+	h := map[Identifier]crypto.Hash{
+		Ristretto255Sha512: crypto.SHA512,
+		P256Sha256:         crypto.SHA256,
+		P384Sha384:         crypto.SHA384,
+		P521Sha512:         crypto.SHA512,
+	}[i].New()
+	h.Reset()
+
+	for _, i := range input {
+		_, _ = h.Write(i)
 	}
+
+	return h.Sum(nil)
 }

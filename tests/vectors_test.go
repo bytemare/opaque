@@ -30,8 +30,8 @@ import (
 
 type ByteToHex []byte
 
-func (j ByteToHex) MarshalJSON() ([]byte, error) {
-	return json.Marshal(hex.EncodeToString(j))
+func (j *ByteToHex) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(*j))
 }
 
 func (j *ByteToHex) UnmarshalJSON(b []byte) error {
@@ -84,26 +84,26 @@ type inputs struct {
 }
 
 type intermediates struct {
-	AuthKey         ByteToHex `json:"auth_key"`       //
-	ClientMacKey    ByteToHex `json:"client_mac_key"` //
-	ClientPublicKey ByteToHex `json:"client_public_key"`
-	Envelope        ByteToHex `json:"envelope"`         //
-	HandshakeSecret ByteToHex `json:"handshake_secret"` //
-	MaskingKey      ByteToHex `json:"masking_key"`
-	OprfKey         ByteToHex `json:"oprf_key"`
-	RandomPWD       ByteToHex `json:"randomized_pwd"` //
-	ServerMacKey    ByteToHex `json:"server_mac_key"` //
+	AuthKey            ByteToHex `json:"auth_key"`
+	ClientMacKey       ByteToHex `json:"client_mac_key"`
+	ClientPublicKey    ByteToHex `json:"client_public_key"`
+	Envelope           ByteToHex `json:"envelope"`
+	HandshakeSecret    ByteToHex `json:"handshake_secret"`
+	MaskingKey         ByteToHex `json:"masking_key"`
+	OprfKey            ByteToHex `json:"oprf_key"`
+	RandomizedPassword ByteToHex `json:"randomized_password"`
+	ServerMacKey       ByteToHex `json:"server_mac_key"`
 }
 
 type outputs struct {
-	KE1                  ByteToHex `json:"KE1"`                   //
-	KE2                  ByteToHex `json:"KE2"`                   //
-	KE3                  ByteToHex `json:"KE3"`                   //
-	ExportKey            ByteToHex `json:"export_key"`            //
-	RegistrationRequest  ByteToHex `json:"registration_request"`  //
-	RegistrationResponse ByteToHex `json:"registration_response"` //
-	RegistrationRecord   ByteToHex `json:"registration_upload"`   //
-	SessionKey           ByteToHex `json:"session_key"`           //
+	KE1                  ByteToHex `json:"KE1"`
+	KE2                  ByteToHex `json:"KE2"`
+	KE3                  ByteToHex `json:"KE3"`
+	ExportKey            ByteToHex `json:"export_key"`
+	RegistrationRequest  ByteToHex `json:"registration_request"`
+	RegistrationResponse ByteToHex `json:"registration_response"`
+	RegistrationRecord   ByteToHex `json:"registration_upload"`
+	SessionKey           ByteToHex `json:"session_key"`
 }
 
 type vector struct {
@@ -123,7 +123,10 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 		panic(err)
 	}
 
-	regReq := client.RegistrationInit(v.Inputs.Password, opaque.ClientRegistrationInitOptions{OPRFBlind: blind})
+	regReq, err := client.RegistrationInit(v.Inputs.Password, &opaque.ClientOptions{OPRFBlind: blind})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !bytes.Equal(v.Outputs.RegistrationRequest, regReq.Serialize()) {
 		t.Fatalf(
@@ -135,12 +138,17 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 
 	// Server
 	server, _ := conf.Server()
-	pks, err := server.Deserialize.DecodeAkePublicKey(v.Inputs.ServerPublicKey)
-	if err != nil {
-		panic(err)
+	server.ServerKeyMaterial = &opaque.ServerKeyMaterial{
+		Identity:       nil,
+		PrivateKey:     nil,
+		PublicKeyBytes: v.Inputs.ServerPublicKey,
+		OPRFGlobalSeed: v.Inputs.OprfSeed,
 	}
 
-	regResp := server.RegistrationResponse(regReq, pks, v.Inputs.CredentialIdentifier, v.Inputs.OprfSeed)
+	regResp, err := server.RegistrationResponse(regReq, v.Inputs.CredentialIdentifier, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	vRegResp, err := client.Deserialize.RegistrationResponse(v.Outputs.RegistrationResponse)
 	if err != nil {
@@ -152,7 +160,7 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 		t.Fatal("registration response data do not match")
 	}
 
-	if !bytes.Equal(vRegResp.Pks.Encode(), regResp.Pks.Encode()) {
+	if !bytes.Equal(vRegResp.ServerPublicKey, regResp.ServerPublicKey) {
 		t.Fatal("registration response serverPublicKey do not match")
 	}
 
@@ -161,14 +169,17 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	}
 
 	// Client
-	upload, exportKey := client.RegistrationFinalize(
+	upload, exportKey, err := client.RegistrationFinalize(
 		regResp,
-		opaque.ClientRegistrationFinalizeOptions{
-			ClientIdentity: v.Inputs.ClientIdentity,
-			ServerIdentity: v.Inputs.ServerIdentity,
-			EnvelopeNonce:  v.Inputs.EnvelopeNonce,
+		v.Inputs.ClientIdentity,
+		v.Inputs.ServerIdentity,
+		&opaque.ClientOptions{
+			EnvelopeNonce: v.Inputs.EnvelopeNonce,
 		},
 	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !bytes.Equal(v.Outputs.ExportKey, exportKey) {
 		t.Fatalf("exportKey do not match\nexpected %v,\ngot %v", v.Outputs.ExportKey, exportKey)
@@ -204,15 +215,28 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 			panic(err)
 		}
 
-		KE1 := client.GenerateKE1(v.Inputs.Password, opaque.GenerateKE1Options{
-			OPRFBlind:      blind,
-			KeyShareSeed:   v.Inputs.ClientKeyshareSeed,
-			AKENonce:       v.Inputs.ClientNonce,
-			AKENonceLength: internal.NonceLength,
+		KE1, err := client.GenerateKE1(v.Inputs.Password, &opaque.ClientOptions{
+			OPRFBlind: blind,
+			AKE: &opaque.AKEOptions{
+				SecretKeyShare:     nil,
+				SecretKeyShareSeed: v.Inputs.ClientKeyshareSeed,
+				Nonce:              v.Inputs.ClientNonce,
+			},
 		})
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		if !bytes.Equal(v.Outputs.KE1, KE1.Serialize()) {
-			t.Fatalf("KE1 do not match")
+			log.Println(hex.EncodeToString(v.Inputs.ClientNonce))
+			log.Println(hex.EncodeToString(v.Inputs.ClientKeyshareSeed))
+			log.Println(KE1.ClientKeyShare.Hex())
+			log.Println(hex.EncodeToString(KE1.ClientNonce))
+			t.Fatalf(
+				"KE1 do not match:\nwant %v,\ngot  %v",
+				hex.EncodeToString(v.Outputs.KE1),
+				hex.EncodeToString(KE1.Serialize()),
+			)
 		}
 	}
 
@@ -239,7 +263,7 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 	record.CredentialIdentifier = v.Inputs.CredentialIdentifier
 	record.ClientIdentity = v.Inputs.ClientIdentity
 
-	v.loginResponse(t, server, record)
+	serverOutput := v.loginResponse(t, server, record)
 
 	if isFake(v.Config.Fake) {
 		return
@@ -251,18 +275,12 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ke3, exportKey, err := client.GenerateKE3(
-		cke2,
-		opaque.GenerateKE3Options{
-			ClientIdentity: v.Inputs.ClientIdentity,
-			ServerIdentity: v.Inputs.ServerIdentity,
-		},
-	)
+	ke3, sessionKey, exportKey, err := client.GenerateKE3(cke2, v.Inputs.ClientIdentity, v.Inputs.ServerIdentity)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	//if !bytes.Equal(v.Intermediates.ClientMacKey, client.Ake.ClientMacKey) {
+	//if !bytes.Equal(v.Intermediates.ClientMacKey, client.ake.ClientMacKey) {
 	//	t.Fatal("client mac keys do not match")
 	//}
 
@@ -270,7 +288,7 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 		t.Fatal("Client export keys do not match")
 	}
 
-	if !bytes.Equal(v.Outputs.SessionKey, client.SessionKey()) {
+	if !bytes.Equal(v.Outputs.SessionKey, sessionKey) {
 		t.Fatal("Client session keys do not match")
 	}
 
@@ -278,11 +296,11 @@ func (v *vector) testLogin(conf *opaque.Configuration, t *testing.T) {
 		t.Fatal("KE3 do not match")
 	}
 
-	if err := server.LoginFinish(ke3); err != nil {
+	if err := server.LoginFinish(ke3, serverOutput.ClientMAC); err != nil {
 		t.Fatal(err)
 	}
 
-	if !bytes.Equal(v.Outputs.SessionKey, server.SessionKey()) {
+	if !bytes.Equal(v.Outputs.SessionKey, serverOutput.SessionSecret) {
 		t.Fatal("Server session keys do not match")
 	}
 }
@@ -322,43 +340,55 @@ func (v *vector) test(t *testing.T) {
 	v.testLogin(p, t)
 }
 
-func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.ClientRecord) {
+func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.ClientRecord) *opaque.ServerOutput {
 	ke1, err := s.Deserialize.KE1(v.Outputs.KE1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := s.SetKeyMaterial(
-		v.Inputs.ServerIdentity,
-		v.Inputs.ServerPrivateKey,
-		v.Inputs.ServerPublicKey,
-		v.Inputs.OprfSeed); err != nil {
+	sk, err := s.Deserialize.DecodePrivateKey(v.Inputs.ServerPrivateKey)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	ke2, err := s.GenerateKE2(
+	pk := sk.Group().Base().Multiply(sk)
+
+	skm := &opaque.ServerKeyMaterial{
+		Identity:       v.Inputs.ServerIdentity,
+		PrivateKey:     sk,
+		PublicKeyBytes: pk.Encode(),
+		OPRFGlobalSeed: v.Inputs.OprfSeed,
+	}
+
+	if err := s.SetKeyMaterial(skm); err != nil {
+		t.Fatal(err)
+	}
+
+	ke2, serverOutput, err := s.GenerateKE2(
 		ke1,
 		record,
-		opaque.GenerateKE2Options{
-			KeyShareSeed:   v.Inputs.ServerKeyshareSeed,
-			AKENonce:       v.Inputs.ServerNonce,
-			AKENonceLength: internal.NonceLength,
-			MaskingNonce:   v.Inputs.MaskingNonce,
+		&opaque.ServerOptions{
+			AKE: &opaque.AKEOptions{
+				SecretKeyShare:     nil,
+				SecretKeyShareSeed: v.Inputs.ServerKeyshareSeed,
+				Nonce:              v.Inputs.ServerNonce,
+			},
+			MaskingNonce: v.Inputs.MaskingNonce,
 		},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	//if !bytes.Equal(v.Intermediates.HandshakeSecret, s.Ake.HandshakeSecret) {
-	//	t.Fatalf("HandshakeSecrets do not match : %v", s.Ake.HandshakeSecret)
+	//if !bytes.Equal(v.Intermediates.HandshakeSecret, s.ake.HandshakeSecret) {
+	//	t.Fatalf("HandshakeSecrets do not match : %v", s.ake.HandshakeSecret)
 	//}
 
-	//if !bytes.Equal(v.Intermediates.ServerMacKey, s.Ake.ServerMacKey) {
-	//	t.Fatalf("ServerMacs do not match.expected %v,\ngot %v", v.Intermediates.ServerMacKey, s.Ake.ServerMacKey)
+	//if !bytes.Equal(v.Intermediates.ServerMacKey, s.ake.ServerMacKey) {
+	//	t.Fatalf("ServerMacs do not match.expected %v,\ngot %v", v.Intermediates.ServerMacKey, s.ake.ServerMacKey)
 	//}
 
-	//if !bytes.Equal(v.Intermediates.ClientMacKey, s.Ake.Keys.ClientMacKey) {
+	//if !bytes.Equal(v.Intermediates.ClientMacKey, s.ake.Keys.ClientMacKey) {
 	//	t.Fatal("ClientMacs do not match")
 	//}
 
@@ -368,12 +398,20 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 			t.Fatal(err)
 		}
 
-		if !bytes.Equal(vectorKE3.ClientMac, s.ExpectedMAC()) {
-			t.Fatalf("Expected client MACs do not match : %v", s.ExpectedMAC())
+		if !bytes.Equal(vectorKE3.ClientMac, serverOutput.ClientMAC) {
+			t.Fatalf(
+				"Expected client MACs do not match : want %q, got %q",
+				hex.EncodeToString(serverOutput.ClientMAC),
+				hex.EncodeToString(vectorKE3.ClientMac),
+			)
 		}
 
-		if !bytes.Equal(v.Outputs.SessionKey, s.SessionKey()) {
-			t.Fatalf("Server's session key is invalid : %v", v.Outputs.SessionKey)
+		if !bytes.Equal(v.Outputs.SessionKey, serverOutput.SessionSecret) {
+			t.Fatalf(
+				"Server's session key is invalid : want %q, got %q",
+				hex.EncodeToString(serverOutput.SessionSecret),
+				hex.EncodeToString(v.Outputs.SessionKey),
+			)
 		}
 	}
 
@@ -405,7 +443,7 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatal("nonces do not match")
 	}
 
-	if !bytes.Equal(vectorKE2.ServerPublicKeyshare.Encode(), ke2.ServerPublicKeyshare.Encode()) {
+	if !bytes.Equal(vectorKE2.ServerKeyShare.Encode(), ke2.ServerKeyShare.Encode()) {
 		t.Fatal("epks do not match")
 	}
 
@@ -417,9 +455,11 @@ func (v *vector) loginResponse(t *testing.T, s *opaque.Server, record *opaque.Cl
 		t.Fatalf("KE2 do not match")
 	}
 
-	if !isFake(v.Config.Fake) && !bytes.Equal(v.Outputs.SessionKey, s.Ake.SessionKey()) {
-		t.Fatalf("Server SessionKey do not match:\n%v\n%v", v.Outputs.SessionKey, s.Ake.SessionKey())
+	if !isFake(v.Config.Fake) && !bytes.Equal(v.Outputs.SessionKey, serverOutput.SessionSecret) {
+		t.Fatalf("Server SessionKey do not match:\n%v\n%v", v.Outputs.SessionKey, serverOutput.SessionSecret)
 	}
+
+	return serverOutput
 }
 
 func isFake(f string) bool {
@@ -497,15 +537,13 @@ func groupToGroup(g string) opaque.Group {
 	}
 }
 
-type draftVectors []*vector
-
-func loadOpaqueVectors(filepath string) (draftVectors, error) {
+func loadOpaqueVectors(filepath string) ([]*vector, error) {
 	contents, err := os.ReadFile(filepath)
 	if err != nil {
 		return nil, err
 	}
 
-	var v draftVectors
+	var v []*vector
 	errJSON := json.Unmarshal(contents, &v)
 	if errJSON != nil {
 		return nil, errJSON
@@ -514,6 +552,7 @@ func loadOpaqueVectors(filepath string) (draftVectors, error) {
 	return v, nil
 }
 
+// TestOpaqueVectors executes the official OPAQUE test vectors, guaranteeing interoperability with external implementations.
 func TestOpaqueVectors(t *testing.T) {
 	vectorFile := "vectors.json"
 

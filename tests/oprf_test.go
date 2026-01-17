@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	group "github.com/bytemare/ecc"
+	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
@@ -116,22 +116,21 @@ func (tv *testVector) Decode() (*test, error) {
 }
 
 func testBlind(t *testing.T, c oprf.Identifier, test *test) {
-	client := c.Client()
 	for i := 0; i < len(test.Input); i++ {
 		s := c.Group().NewScalar()
 		if err := s.Decode(test.Blind[i]); err != nil {
 			t.Fatal(fmt.Errorf("blind decoding to scalar in suite %v errored with %q", c, err))
 		}
 
-		blinded := client.Blind(test.Input[i], s).Encode()
+		_, blinded := c.Blind(test.Input[i], s)
 
-		if !bytes.Equal(test.BlindedElement[i], blinded) {
+		if !bytes.Equal(test.BlindedElement[i], blinded.Encode()) {
 			t.Fatal("unexpected blinded output")
 		}
 	}
 }
 
-func testEvaluation(t *testing.T, c oprf.Identifier, privKey *group.Scalar, test *test) {
+func testEvaluation(t *testing.T, c oprf.Identifier, privKey *ecc.Scalar, test *test) {
 	for i := 0; i < len(test.BlindedElement); i++ {
 		b := c.Group().NewElement()
 		if err := b.Decode(test.BlindedElement[i]); err != nil {
@@ -146,7 +145,6 @@ func testEvaluation(t *testing.T, c oprf.Identifier, privKey *group.Scalar, test
 }
 
 func testFinalization(t *testing.T, c oprf.Identifier, test *test) {
-	client := c.Client()
 	for i := 0; i < len(test.EvaluationElement); i++ {
 		ev := c.Group().NewElement()
 		if err := ev.Decode(test.EvaluationElement[i]); err != nil {
@@ -158,9 +156,7 @@ func testFinalization(t *testing.T, c oprf.Identifier, test *test) {
 			t.Fatal(fmt.Errorf("blind decoding to scalar in suite %v errored with %q", c, err))
 		}
 
-		client.Blind(test.Input[i], s)
-
-		output := client.Finalize(ev)
+		output := c.Finalize(s, test.Input[i], ev)
 		if !bytes.Equal(test.Output[i], output) {
 			t.Fatal("unexpected output")
 		}
@@ -246,6 +242,7 @@ func loadVOPRFVectors(filepath string) (testVectors, error) {
 	return v, nil
 }
 
+// TestVOPRFVectors validates the VOPRF implementation against published vectors, ensuring compatibility with the reference draft.
 func TestVOPRFVectors(t *testing.T) {
 	vectorFile := "oprfVectors.json"
 
