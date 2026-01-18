@@ -10,6 +10,7 @@ package oprf
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/bytemare/ecc"
 
@@ -30,9 +31,16 @@ func (i Identifier) Blind(input []byte, blind *ecc.Scalar) (*ecc.Scalar, *ecc.El
 		// NOTE: HashToGroup returning the identity would violate the OPRF security
 		// assumptions and is not expected to happen in practice; we panic rather
 		// than attempt recovery. This branch is effectively unreachable in unit
-		// tests because the standardized hash-to-curve map never yields the base
-		// point.
-		panic(errInvalidInput)
+		// tests because the standardized hash-to-curve map never yields the
+		// point at infinity (or identity).
+		panic(
+			fmt.Sprintf(
+				"%s: hash to group returned identity for input %q and dst %q",
+				errInvalidInput,
+				input,
+				i.dst(tag.OPRFPointPrefix),
+			),
+		)
 	}
 
 	return blind, p.Multiply(blind)
