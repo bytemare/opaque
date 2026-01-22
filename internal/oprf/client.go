@@ -18,6 +18,8 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 )
 
+const panicHTGFmt = "%s: hash to group returned identity for input %q and dst %q"
+
 var errInvalidInput = errors.New("invalid input - OPRF input deterministically maps to the group identity element")
 
 // Blind masks the input.
@@ -29,18 +31,11 @@ func (i Identifier) Blind(input []byte, blind *ecc.Scalar) (*ecc.Scalar, *ecc.El
 	p := i.Group().HashToGroup(input, i.dst(tag.OPRFPointPrefix))
 	if p.IsIdentity() {
 		// NOTE: HashToGroup returning the identity would violate the OPRF security
-		// assumptions and is not expected to happen in practice; we panic rather
+		// assumptions and is not expected to happen in practice, so we panic rather
 		// than attempt recovery. This branch is effectively unreachable in unit
 		// tests because the standardized hash-to-curve map never yields the
 		// point at infinity (or identity).
-		panic(
-			fmt.Sprintf(
-				"%s: hash to group returned identity for input %q and dst %q",
-				errInvalidInput,
-				input,
-				i.dst(tag.OPRFPointPrefix),
-			),
-		)
+		panic(fmt.Sprintf(panicHTGFmt, errInvalidInput, input, i.dst(tag.OPRFPointPrefix)))
 	}
 
 	return blind, p.Multiply(blind)
