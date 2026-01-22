@@ -189,6 +189,7 @@ func (c *Configuration) skmVerifyEncoding(data []byte) error {
 }
 
 func skmVerifyEncodingHeaderPublicKey(data []byte, refLength int) (int, error) {
+	// The following is never triggered due to the structure check and failsafe before the call, but is kept for safety.
 	if len(data) < 2 {
 		return 0, internal.ErrInvalidEncodingLength
 	}
