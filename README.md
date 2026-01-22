@@ -52,22 +52,19 @@ You can find the documentation and usage examples in [the package doc](https://p
   secret.
 - For unknown users, return a fake record (`GetFakeRecord`) to reduce
   user-enumeration signals.
-- Rate limiting and replay tracking are application responsibilities. OPAQUE
-  authenticates transcripts; session management is up to you.
+- Rate limiting and replay tracking are application layer responsibilities. OPAQUE
+  authenticates the transcripts, and session management is up to you.
 - The server is concurrency-safe for typical use. Avoid a hidden global state in
   your app layer.
 - Store `ServerKeyMaterial` securely. Treat secrets (e.g., private key and OPRF
   seed) appropriately.
-- `Client.ClearState()` best-effort clears ephemeral material, but zeroization
+- `Client.ClearState()` is a best-effort to clear ephemeral material, but zeroization
   has language/runtime limits.
 
 ## Versioning
 
 [SemVer](https://semver.org) is used for versioning. For the versions
 available, see the [tags on the repository](https://github.com/bytemare/opaque/tags).
-
-Minor v0.x versions match the corresponding CFRG draft version; the master
-branch implements the latest changes of [the draft development](https://github.com/cfrg/draft-irtf-cfrg-opaque).
 
 ## Contributing
 

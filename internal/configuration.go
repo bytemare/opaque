@@ -12,7 +12,6 @@ package internal
 import (
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"runtime"
 
 	"github.com/bytemare/ecc"
@@ -52,17 +51,10 @@ func (c *Configuration) MakeSecretKeyShare(seed []byte) *ecc.Scalar {
 	return oprf.IDFromGroup(c.Group).DeriveKey(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
 }
 
-// RandomBytes returns random bytes of length len (wrapper for crypto/rand).
+// RandomBytes returns random bytes of length len (wraps crypto/rand).
 func RandomBytes(length int) []byte {
 	r := make([]byte, length)
-	if _, err := rand.Read(r); err != nil {
-		// We can as well not panic and try again in a loop and a counter to stop.
-		//
-		// NOTE: This panic path cannot be reached in unit tests without forcing the
-		// global crypto/rand reader to fail, which terminates the process before
-		// assertions can run. It remains here as a defensive guard for production.
-		panic(fmt.Errorf("unexpected error in generating random bytes : %w", err))
-	}
+	_, _ = rand.Read(r) //nolint:errcheck // Documented to never return an error.
 
 	return r
 }
