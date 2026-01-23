@@ -241,26 +241,33 @@ func (s *Server) chooseOPRFKey(clientCredentialIdentifier []byte, clientOPRFKey 
 		return nil, internal.ErrNoCredentialIdentifier
 	}
 
-	return s.deriveOPRFKey(clientCredentialIdentifier)
+	return s.DeriveOPRFKey(clientCredentialIdentifier, nil)
 }
 
-// deriveOPRFKey derives the client OPRF key from the credentialIdentifier and global OPRF seed.
-func (s *Server) deriveOPRFKey(clientCredentialIdentifier []byte) (*ecc.Scalar, error) {
-	if s.ServerKeyMaterial == nil { // sanity check, but never reached, as it would have failed earlier.
-		return nil, ErrServerKeyMaterial.Join(internal.ErrServerKeyMaterialNil)
+// DeriveOPRFKey derives the client OPRF key from the credentialIdentifier and global OPRF seed.
+func (s *Server) DeriveOPRFKey(clientCredentialIdentifier, oprfGlobalSeedOverride []byte) (*ecc.Scalar, error) {
+	var globalSeed []byte
+	if len(oprfGlobalSeedOverride) != 0 {
+		globalSeed = oprfGlobalSeedOverride
+	} else {
+		if s.ServerKeyMaterial == nil { // sanity check, but never reached, as it would have failed earlier.
+			return nil, ErrServerKeyMaterial.Join(internal.ErrServerKeyMaterialNil)
+		}
+
+		globalSeed = s.ServerKeyMaterial.OPRFGlobalSeed
 	}
 
-	if err := s.isOPRFSeedValid(s.ServerKeyMaterial.OPRFGlobalSeed); err != nil {
+	if err := s.isOPRFSeedValid(globalSeed); err != nil {
 		return nil, ErrServerKeyMaterial.Join(err)
 	}
 
-	seed := s.conf.KDF.Expand(
-		s.ServerKeyMaterial.OPRFGlobalSeed,
+	clientSeed := s.conf.KDF.Expand(
+		globalSeed,
 		encoding.SuffixString(clientCredentialIdentifier, tag.ExpandOPRF),
 		internal.SeedLength,
 	)
 
-	return s.conf.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair)), nil
+	return s.conf.OPRF.DeriveKey(clientSeed, []byte(tag.DeriveKeyPair)), nil
 }
 
 func (s *Server) credentialResponse(
