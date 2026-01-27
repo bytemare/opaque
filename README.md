@@ -31,8 +31,7 @@ about security and performance has been taken, it comes with no warranty.
 
 ## References
 
-- [The original paper](https://eprint.iacr.org/2018/163.pdf) from Jarecki,
-  Krawczyk, and Xu.
+- [The original paper](https://eprint.iacr.org/2018/163.pdf) from Jarecki, Krawczyk, and Xu.
 - [RFC 9807](https://datatracker.ietf.org/doc/rfc9807).
 - [OPAQUE in WhatsApp](https://www.whatsapp.com/security/WhatsApp_Security_Encrypted_Backups_Whitepaper.pdf)
   to enable end-to-end encrypted backups.
