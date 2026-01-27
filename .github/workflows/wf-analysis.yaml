@@ -23,11 +23,11 @@ on:
     # Every 3 days at 7 a.m.
     - cron: '0 7 */3 * *'
 
-permissions: { }
+permissions: {}
 
 jobs:
   Lint:
-    uses: bytemare/workflows/.github/workflows/lint.yaml@3bdedbc011566debb865c20fcd12e7b395677529
+    uses: bytemare/workflows/.github/workflows/lint.yaml@d5a06bc8d9820c7b603cfcd3b69821f84eedd23c
     permissions:
       contents: read
       packages: read
@@ -42,8 +42,30 @@ jobs:
         BASH,BASH_EXEC,VALIDATE_EDITORCONFIG,ENV,GITHUB_ACTIONS,GO_MODULES,MARKDOWN,YAML
       super-linter-rules-path: .github
 
+  Licenses:
+    uses: bytemare/workflows/.github/workflows/license-check.yaml@d5a06bc8d9820c7b603cfcd3b69821f84eedd23c
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+      actions: read
+    with:
+      # ---- Baseline PR gate (fast, GitHub-native) ----
+      allow_spdx: "MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,Unlicense,CC0-1.0"
+      warn_only: false              # set true for a gentle rollout
+      use_pr_comment: true          # posts summary on PRs (requires pull-requests: write)
+      run_component_detection: true # submits PR dependency graph for polyglot repos
+
+      # ---- High assurance gate (ORT + ScanCode) ----
+      # Enable only when you provide an ORT policy repo; runs on assurance: high or v* tags.
+      assurance: standard           # switch to "high" once ort_config_repository is set
+      # ort_config_repository: "https://github.com/bytemare/global-ort-config.git"
+      # ort_config_revision: ""     # optional pin for deterministic policy
+      # ort_fail_on: "violations"   # fail mode: violations|issues|never
+      # ort_cli_args: "-P ort.analyzer.enabledPackageManagers=NPM,Yarn,Gradle,GoMod -l org=your-org -l dist=oss"
+
   Governance:
-    uses: bytemare/workflows/.github/workflows/governance.yaml@3bdedbc011566debb865c20fcd12e7b395677529
+    uses: bytemare/workflows/.github/workflows/governance.yaml@d5a06bc8d9820c7b603cfcd3b69821f84eedd23c
     permissions:
       contents: read
       security-events: write
@@ -81,7 +103,7 @@ jobs:
       codecov: ${{ secrets.CODECOV_TOKEN }}
 
   SAST:
-    uses: bytemare/workflows/.github/workflows/sast.yaml@3bdedbc011566debb865c20fcd12e7b395677529
+    uses: bytemare/workflows/.github/workflows/sast.yaml@d5a06bc8d9820c7b603cfcd3b69821f84eedd23c
     permissions:
       contents: read
       security-events: write
@@ -91,7 +113,7 @@ jobs:
       semgrep: true
       # CodeQL
       codeql: true
-      codeql-language: go
+      codeql-language: go # comma-separated list supported
       # SonarQube
       sonarqube: true
       sonarqube-configuration: .github/sonar-project.properties

@@ -1,8 +1,10 @@
 # OPAQUE
 
-[![OPAQUE](https://github.com/bytemare/opaque/actions/workflows/wf-analysis.yaml/badge.svg)](https://github.com/bytemare/opaque/actions/workflows/wf-analysis.yaml)
+[![CI](https://github.com/bytemare/opaque/actions/workflows/wf-analysis.yaml/badge.svg)](https://github.com/bytemare/opaque/actions/workflows/wf-analysis.yaml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/bytemare/opaque.svg)](https://pkg.go.dev/github.com/bytemare/opaque)
 [![codecov](https://codecov.io/gh/bytemare/opaque/branch/main/graph/badge.svg?token=5bQfB0OctA)](https://codecov.io/gh/bytemare/opaque)
+[![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/bytemare/opaque/badge)](https://scorecard.dev/viewer/?uri=github.com/bytemare/opaque)
 
 ```go
   import "github.com/bytemare/opaque"
@@ -13,10 +15,9 @@ the augmented password-authenticated key exchange (aPAKE) protocol that is
 secure against pre-computation attacks. It enables a client to authenticate to
 a server without ever revealing its password to the server.
 
-This implementation is developed by one of the authors of the
-[RFC](https://datatracker.ietf.org/doc/rfc9807). It has not been audited, and
-even though great care about security and performance has been taken, it comes
-with no warranty.
+This implementation is developed and maintained by one of the authors of the
+[RFC](https://datatracker.ietf.org/doc/rfc9807). It has not been independently audited, and even though great care
+about security and performance has been taken, it comes with no warranty.
 
 ## What is OPAQUE?
 
@@ -30,8 +31,7 @@ with no warranty.
 
 ## References
 
-- [The original paper](https://eprint.iacr.org/2018/163.pdf) from Jarecki,
-  Krawczyk, and Xu.
+- [The original paper](https://eprint.iacr.org/2018/163.pdf) from Jarecki, Krawczyk, and Xu.
 - [RFC 9807](https://datatracker.ietf.org/doc/rfc9807).
 - [OPAQUE in WhatsApp](https://www.whatsapp.com/security/WhatsApp_Security_Encrypted_Backups_Whitepaper.pdf)
   to enable end-to-end encrypted backups.
@@ -65,6 +65,19 @@ You can find the documentation and usage examples in [the package doc](https://p
 
 [SemVer](https://semver.org) is used for versioning. For the versions
 available, see the [tags on the repository](https://github.com/bytemare/opaque/tags).
+
+## Release Integrity (SLSA Level 3)
+Releases are built with the reusable [bytemare/slsa](https://github.com/bytemare/slsa) workflow and ship the evidence required for SLSA Level 3 compliance:
+
+- 📦 Artifacts are uploaded to the release page, and include the deterministic source archive plus subjects.sha256, signed SBOM (sbom.cdx.json), GitHub provenance (*.intoto.jsonl), a reproducibility report (verification.json), and a signed Verification Summary Attestation (verification-summary.attestation.json[.bundle]).
+- ✍️ All artifacts are signed using [Sigstore](https://sigstore.dev) with transparency via [Rekor](https://rekor.sigstore.dev).
+- ✅ Verification (or see the latest docs at [bytemare/slsa](https://github.com/bytemare/slsa)):
+```shell
+curl -sSL https://raw.githubusercontent.com/bytemare/slsa/main/verify-release.sh -o verify-release.sh
+chmod +x verify-release.sh
+./verify-release.sh --repo <owner>/<repo> --tag <tag> --mode full --signer-repo bytemare/slsa
+```
+Run again with `--mode reproduce` to build in a container, or `--mode vsa` to validate just the verification summary.
 
 ## Contributing
 

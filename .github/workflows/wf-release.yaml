@@ -1,0 +1,39 @@
+#
+# SPDX-License-Identifier: MIT
+#
+# Copyright (C) 2026 Daniel Bourdrez. All Rights Reserved.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree or at
+# https://spdx.org/licenses/MIT.html
+#
+
+---
+
+name: Release
+
+on:
+  push:
+    tags:
+      - '*.*.*'      # run when a semver tag is pushed
+      - 'v*.*.*'    # run when a semver tag starting with v (e.g. v1.2.3) is pushed
+  workflow_dispatch: { } # allow manual runs
+  pull_request: { }      # allow running in PR for dry-runs
+
+permissions: { }
+
+jobs:
+  Release:
+    uses: bytemare/slsa/.github/workflows/slsa.yaml@6b6b2069083d1ce7d0b2b61636f5bf6c784b5b43
+    with:
+      dry_run: ${{ github.event_name == 'pull_request' }}
+      create_release: ${{ github.event_name != 'pull_request' }}
+      sign_blobs: true
+      extended_metadata: false # Set to true for forensics mode
+      workflow_ref: 6b6b2069083d1ce7d0b2b61636f5bf6c784b5b43
+    permissions:
+      contents: write               # create/update release & upload assets
+      id-token: write               # OIDC for attestations/provenance
+      attestations: write         # SBOM + build attestation API
+      actions: read                 # needed for attest-build-provenance
+      security-events: write  # allow SARIF upload (if needed in future)
