@@ -1,0 +1,81 @@
+#
+# SPDX-License-Identifier: MIT
+#
+# Copyright (C) 2026 Daniel Bourdrez. All Rights Reserved.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree or at
+# https://spdx.org/licenses/MIT.html
+#
+
+---
+
+name: Verify SLSA Compliance
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to verify'
+        required: true
+      mode:
+        description: 'Verification mode ("quick", "full", or "full,reproduce")'
+        required: false
+        default: full
+      emit_vsa:
+        description: 'Emit VSA during verification (true/false)'
+        required: false
+        default: 'false'
+
+permissions: {}
+
+jobs:
+  quick_verification:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'quick' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: bytemare/slsa/.github/workflows/verify.yaml@6b6b2069083d1ce7d0b2b61636f5bf6c784b5b43
+    with:
+      repo: ${{ github.repository }}
+      tag: ${{ github.event.inputs.tag }}
+      mode: quick
+      workflow_ref: ${{ github.sha }}
+
+  full_verification:
+    if: ${{ github.event_name == 'workflow_dispatch' && (contains(github.event.inputs.mode, 'full') || !github.event.inputs.mode) }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: bytemare/slsa/.github/workflows/verify.yaml@6b6b2069083d1ce7d0b2b61636f5bf6c784b5b43
+    with:
+      repo: ${{ github.repository }}
+      tag: ${{ github.event.inputs.tag }}
+      mode: ${{ github.event.inputs.mode || 'full' }}
+      emit_vsa: ${{ github.event.inputs.emit_vsa == 'true' }}
+      verifier_id: https://github.com/bytemare/slsa/.github/workflows/verify.yaml
+      workflow_ref: ${{ github.sha }}
+
+  reproduce_verification:
+    if: ${{ github.event_name == 'workflow_dispatch' && contains(github.event.inputs.mode, 'reproduce') }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: bytemare/slsa/.github/workflows/verify.yaml@6b6b2069083d1ce7d0b2b61636f5bf6c784b5b43
+    with:
+      repo: ${{ github.repository }}
+      tag: ${{ github.event.inputs.tag }}
+      mode: reproduce
+      workflow_ref: ${{ github.sha }}
+
+  vsa_only:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'vsa' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: bytemare/slsa/.github/workflows/verify.yaml@6b6b2069083d1ce7d0b2b61636f5bf6c784b5b43
+    with:
+      repo: ${{ github.repository }}
+      tag: ${{ github.event.inputs.tag }}
+      mode: vsa
+      workflow_ref: ${{ github.sha }}
