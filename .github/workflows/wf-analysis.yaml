@@ -98,7 +98,7 @@ jobs:
       codecov-coverage-setup-go: true
     secrets:
       # OpenSSF Scorecard token
-      scorecard: ${{ secrets.SCORECARD_TOKEN }}
+      scorecard: ${{ secrets.SCORECARD_READ_TOKEN }}
       # Codecov token
       codecov: ${{ secrets.CODECOV_TOKEN }}
 
