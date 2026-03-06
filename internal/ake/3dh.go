@@ -79,13 +79,14 @@ func k3dh(
 func core3DH(
 	conf *internal.Configuration, identities *Identities, ikm, ke1 []byte, ke2 *message.KE2,
 ) (sessionSecret, macS, macC []byte) {
-	conf.Hash.Reset()
-	initTranscript(conf, identities, ke1, ke2)
-	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, conf.Hash.Sum()) // preamble
-	serverMac := conf.MAC.MAC(serverMacKey, conf.Hash.Sum())                                // transcript2
-	conf.Hash.Write(serverMac)
-	transcript3 := conf.Hash.Sum()
-	conf.Hash.Reset()
+	h := conf.NewHash()
+	initTranscript(h, identities, conf.Context, ke1, ke2)
+	preamble := h.Sum()
+	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, preamble)
+	serverMac := conf.MAC.MAC(serverMacKey, preamble)
+	h.Write(serverMac)
+	transcript3 := h.Sum()
+
 	clientMac := conf.MAC.MAC(clientMacKey, transcript3)
 
 	return sessionSecret, serverMac, clientMac
@@ -107,9 +108,9 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func initTranscript(conf *internal.Configuration, identities *Identities, ke1 []byte, ke2 *message.KE2) {
-	addToHash(conf, []byte(tag.VersionTag),
-		encoding.EncodeVector(conf.Context),
+func initTranscript(h *internal.Hash, identities *Identities, context, ke1 []byte, ke2 *message.KE2) {
+	addToHash(h, []byte(tag.VersionTag),
+		encoding.EncodeVector(context),
 		encoding.EncodeVector(identities.ClientIdentity),
 		ke1,
 		encoding.EncodeVector(identities.ServerIdentity),
@@ -119,9 +120,9 @@ func initTranscript(conf *internal.Configuration, identities *Identities, ke1 []
 	)
 }
 
-func addToHash(conf *internal.Configuration, data ...[]byte) {
+func addToHash(h *internal.Hash, data ...[]byte) {
 	for _, d := range data {
-		conf.Hash.Write(d)
+		h.Write(d)
 	}
 }
 

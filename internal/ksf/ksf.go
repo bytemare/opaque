@@ -80,6 +80,16 @@ func NewKSF(id ksf.Identifier) *KSF {
 	return &KSF{id.Get()}
 }
 
+// HardenWithOptions stretches the input and salt into a derived key
+// of the requested length, using the provided parameters, if any.
+func (k *KSF) HardenWithOptions(input []byte, options *Options) []byte {
+	if len(options.Parameters) != 0 {
+		k.Parameterize(options.Parameters...)
+	}
+
+	return k.Harden(input, options.Salt, options.Length)
+}
+
 type ksfInterface interface {
 	// Harden uses default parameters for the key derivation function over the input password and salt.
 	Harden(password, salt []byte, length int) []byte

@@ -9,6 +9,7 @@
 package opaque_test
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/bytemare/opaque"
@@ -153,6 +154,73 @@ func TestNewServer_DefaultConfiguration(t *testing.T) {
 	if want, got := def.AKE.Group(), ke2.ServerKeyShare.Group(); want != got {
 		t.Fatalf("expected default server group %v, got %v", want, got)
 	}
+}
+
+// TestServer_GenerateKE2_Concurrent validates the documented goroutine-safe server behavior by exercising multiple
+// concurrent GenerateKE2 calls against the same immutable inputs. This test is especially valuable under -race.
+func TestServer_GenerateKE2_Concurrent(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		regClient, server := setup(t2, conf)
+
+		r1, err := regClient.RegistrationInit(password)
+		if err != nil {
+			t2.Fatal(err)
+		}
+
+		r2, err := server.RegistrationResponse(r1, credentialIdentifier, nil)
+		if err != nil {
+			t2.Fatal(err)
+		}
+
+		record, _, err := regClient.RegistrationFinalize(r2, clientIdentity, serverIdentity)
+		if err != nil {
+			t2.Fatal(err)
+		}
+
+		loginClient := getClient(t2, conf)
+		ke1, err := loginClient.GenerateKE1(password)
+		if err != nil {
+			t2.Fatal(err)
+		}
+
+		clientRecord := &opaque.ClientRecord{
+			RegistrationRecord:   record,
+			CredentialIdentifier: credentialIdentifier,
+			ClientIdentity:       clientIdentity,
+		}
+
+		const workers = 16
+
+		var (
+			wg   sync.WaitGroup
+			errs = make(chan error, workers)
+		)
+
+		for range workers {
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+
+				ke2, output, err := server.GenerateKE2(ke1, clientRecord)
+				if err != nil {
+					errs <- err
+					return
+				}
+
+				if ke2 == nil || output == nil || len(output.ClientMAC) == 0 || len(output.SessionSecret) == 0 {
+					errs <- internal.ErrMissingMAC
+				}
+			}()
+		}
+
+		wg.Wait()
+		close(errs)
+
+		for err := range errs {
+			t2.Fatalf("concurrent GenerateKE2 failed: %v", err)
+		}
+	})
 }
 
 // TestServer_RegistrationResponse_InvalidServerPublicKey ensures the server refuses to operate when its own key bytes are corrupted, preventing malicious serialization changes.

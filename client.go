@@ -117,7 +117,7 @@ func (c *Client) RegistrationFinalize(
 		return nil, nil, ErrRegistration.Join(err)
 	}
 
-	randomizedPassword := c.buildPRK(resp.EvaluatedMessage, o.KDFSalt, o.KSFOptions.Salt, o.KSFOptions.Length)
+	randomizedPassword := c.buildPRK(resp.EvaluatedMessage, o)
 	maskingKey := c.conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), c.conf.KDF.Size())
 	env, clientPublicKey, exportKey := envelope.Store(
 		c.conf,
@@ -181,7 +181,7 @@ func (c *Client) GenerateKE3(
 	}
 
 	// Finalize the OPRF.
-	randomizedPassword := c.buildPRK(ke2.EvaluatedMessage, o.KDFSalt, o.KSFOptions.Salt, o.KSFOptions.Length)
+	randomizedPassword := c.buildPRK(ke2.EvaluatedMessage, o)
 	defer internal.ClearSlice(&randomizedPassword)
 
 	// Decrypt the masked response.
@@ -254,11 +254,11 @@ func (c *Client) ClearState() {
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation *ecc.Element, kdfSalt, ksfSalt []byte, ksfLength int) []byte {
+func (c *Client) buildPRK(evaluation *ecc.Element, options *clientOptions) []byte {
 	output := c.conf.OPRF.Finalize(c.oprf.blind, c.oprf.password, evaluation)
-	stretched := c.conf.KSF.Harden(output, ksfSalt, ksfLength)
+	stretched := c.conf.NewKSF().HardenWithOptions(output, options.KSFOptions)
 
-	return c.conf.KDF.Extract(kdfSalt, encoding.Concat(output, stretched))
+	return c.conf.KDF.Extract(options.KDFSalt, encoding.Concat(output, stretched))
 }
 
 func (c *Client) validateRegistrationResponse(resp *message.RegistrationResponse) error {
@@ -270,7 +270,7 @@ func (c *Client) validateRegistrationResponse(resp *message.RegistrationResponse
 		return ErrRegistrationResponse.Join(internal.ErrRegistrationResponseEmpty)
 	}
 
-	if err := IsValidElement(c.conf.Group, resp.EvaluatedMessage); err != nil {
+	if err := IsValidElement(c.conf.OPRF.Group(), resp.EvaluatedMessage); err != nil {
 		return ErrRegistrationResponse.Join(internal.ErrInvalidEvaluatedMessage, err)
 	}
 
@@ -286,7 +286,7 @@ func (c *Client) validateCredentialResponse(cr *message.CredentialResponse) erro
 		return internal.ErrCredentialResponseNil
 	}
 
-	if err := IsValidElement(c.conf.Group, cr.EvaluatedMessage); err != nil {
+	if err := IsValidElement(c.conf.OPRF.Group(), cr.EvaluatedMessage); err != nil {
 		return errors.Join(internal.ErrCredentialResponseInvalid, internal.ErrInvalidEvaluatedMessage, err)
 	}
 

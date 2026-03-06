@@ -280,7 +280,7 @@ func TestClient_RegistrationFinalize_InvalidEvaluatedMessage(t *testing.T) {
 // TestClient_RegistrationFinalize_KSFCustomization demonstrates that callers can tune KSF parameters without breaking record derivation, which is important for deployments that increase work factors over time.
 func TestClient_RegistrationFinalize_KSFCustomization(t *testing.T) {
 	testAll(t, func(t *testing.T, conf *configuration) {
-		params := conf.internal.KSF.Parameters()
+		params := conf.internal.NewKSF().Parameters()
 		if len(params) == 0 {
 			t.Skip("KSF has no tunable parameters")
 		}

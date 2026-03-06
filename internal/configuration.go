@@ -10,15 +10,18 @@
 package internal
 
 import (
+	"crypto"
 	"crypto/rand"
 	"errors"
 	"runtime"
 
 	"github.com/bytemare/ecc"
+	"github.com/bytemare/ksf"
 
-	"github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
+
+	internalksf "github.com/bytemare/opaque/internal/ksf"
 )
 
 const (
@@ -33,13 +36,23 @@ const (
 type Configuration struct {
 	KDF          *KDF
 	MAC          *Mac
-	Hash         *Hash
-	KSF          *ksf.KSF
 	OPRF         oprf.Identifier
 	Context      []byte
+	Hash         crypto.Hash
 	NonceLen     int
 	EnvelopeSize int
+	KSF          ksf.Identifier
 	Group        ecc.Group
+}
+
+// NewHash returns a fresh hashing state for one protocol operation.
+func (c *Configuration) NewHash() *Hash {
+	return NewHash(c.Hash)
+}
+
+// NewKSF returns a fresh key stretching function instance with default parameters.
+func (c *Configuration) NewKSF() *internalksf.KSF {
+	return internalksf.NewKSF(c.KSF)
 }
 
 // MakeSecretKeyShare generates a secret key share from the provided seed. If the seed is empty, it gets a random one.

@@ -373,7 +373,7 @@ func (s *Server) validateKE1(ke1 *message.KE1) error {
 		return ErrKE1.Join(internal.ErrInvalidBlindedMessage, err)
 	}
 
-	if err := IsValidElement(s.conf.OPRF.Group(), ke1.ClientKeyShare); err != nil {
+	if err := IsValidElement(s.conf.Group, ke1.ClientKeyShare); err != nil {
 		return ErrKE1.Join(internal.ErrInvalidClientKeyShare, err)
 	}
 

@@ -131,12 +131,8 @@ type clientOptions struct {
 }
 
 func (c *Client) clientOptionsKSFParser(out *clientOptions, in *ClientOptions) error {
-	if err := out.KSFOptions.Set(c.conf.KSF, in.KSFSalt, in.KSFParameters, in.KSFLength); err != nil {
+	if err := out.KSFOptions.Set(c.conf.NewKSF(), in.KSFSalt, in.KSFParameters, in.KSFLength); err != nil {
 		return ErrClientOptions.Join(err)
-	}
-
-	if len(out.KSFOptions.Parameters) != 0 {
-		c.conf.KSF.Parameterize(out.KSFOptions.Parameters...)
 	}
 
 	return nil
