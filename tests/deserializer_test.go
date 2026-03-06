@@ -9,6 +9,7 @@
 package opaque_test
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"testing"
@@ -226,6 +227,30 @@ func TestDeserializer_RegistrationResponse_Errors(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestDeserializer_RegistrationResponse_MixedGroups ensures parsing uses the OPRF length for the evaluated message
+// and the AKE length for the server public key when the groups differ.
+func TestDeserializer_RegistrationResponse_MixedGroups(t *testing.T) {
+	conf := mixedGroupConfiguration()
+	d := getDeserializer(t, conf)
+
+	evaluatedMessage := conf.OPRF.Group().Base().Multiply(conf.OPRF.Group().NewScalar().Random()).Encode()
+	_, serverPublicKey := conf.KeyGen()
+	input := encoding.Concat(evaluatedMessage, serverPublicKey.Encode())
+
+	resp, err := d.RegistrationResponse(input)
+	if err != nil {
+		t.Fatalf(testErrValidConf, err)
+	}
+
+	if !bytes.Equal(resp.EvaluatedMessage.Encode(), evaluatedMessage) {
+		t.Fatalf("unexpected evaluated message bytes")
+	}
+
+	if !bytes.Equal(resp.ServerPublicKey, serverPublicKey.Encode()) {
+		t.Fatalf("unexpected server public key bytes")
+	}
 }
 
 // TestDeserializer_RegistrationRecord_Errors confirms storage records are thoroughly validated before use, preserving envelope integrity and key consistency.

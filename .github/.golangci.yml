@@ -5,6 +5,7 @@ linters:
     - embeddedstructfieldcheck
     - noinlineerr
     - nonamedreturns
+    - revive
     - varnamelen
   enable:
     - arangolint
@@ -90,7 +91,6 @@ linters:
     - protogetter
     - reassign
     - recvcheck
-    - revive
     - rowserrcheck
     - sloglint
     - spancheck

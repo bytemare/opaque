@@ -26,11 +26,9 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
-
-	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
-// Group identifies the prime-order group with hash-to-curve capability to use in OPRF and AKE.
+// Group identifies a supported group configuration for OPRF or AKE.
 type Group byte
 
 const (
@@ -71,8 +69,8 @@ func (g Group) Group() ecc.Group {
 
 const confIDsLength = 6
 
-// Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
-// as well as KDF, MAC, Hash should be the same.
+// Configuration represents an OPAQUE configuration. OPRF and AKE can use different groups.
+// Matching KDF, MAC, and Hash selections remain recommended but are not required.
 type Configuration struct {
 	Context []byte
 	KDF     crypto.Hash    `json:"kdf"`
@@ -336,10 +334,10 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 	ip := &internal.Configuration{
 		OPRF:         o,
 		Group:        g,
-		KSF:          internalKSF.NewKSF(c.KSF),
+		KSF:          c.KSF,
 		KDF:          internal.NewKDF(c.KDF),
 		MAC:          mac,
-		Hash:         internal.NewHash(c.Hash),
+		Hash:         c.Hash,
 		NonceLen:     internal.NonceLength,
 		EnvelopeSize: internal.NonceLength + mac.Size(),
 		Context:      c.Context,

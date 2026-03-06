@@ -79,6 +79,34 @@ func TestFull(t *testing.T) {
 	}
 }
 
+// TestFull_MixedOPRFAndAKEGroups ensures registration and login work when the OPRF and AKE use different groups.
+func TestFull_MixedOPRFAndAKEGroups(t *testing.T) {
+	conf := mixedGroupConfiguration()
+	conf.Context = []byte("OPAQUEMixedGroupTest")
+
+	tester := &testParams{
+		Configuration: conf,
+		username:      []byte("client"),
+		userID:        []byte("client"),
+		serverID:      []byte("server"),
+		password:      []byte("password"),
+		oprfSeed:      conf.GenerateOPRFSeed(),
+		ksfParameters: []int{3, 65536, 4},
+		ksfSalt:       []byte("ksfSalt"),
+		kdfSalt:       []byte("kdfSalt"),
+		nonceLength:   internal.NonceLength,
+	}
+
+	tester.serverSecretKey, tester.serverPublicKey = conf.KeyGen()
+
+	_, _, record, exportKeyReg := testRegistration(t, tester)
+	_, _, exportKeyLogin := testAuthentication(t, tester, record)
+
+	if !bytes.Equal(exportKeyReg, exportKeyLogin) {
+		t.Errorf("export keys differ")
+	}
+}
+
 func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Server, *opaque.ClientRecord, []byte) {
 	// Client
 	client, err := p.Client()
@@ -543,6 +571,32 @@ func TestBadConfiguration(t *testing.T) {
 				return err
 			}, badConf.error)
 		})
+	}
+}
+
+// TestConfiguration_MixedGroups confirms configurations preserve distinct OPRF and AKE groups across constructors and serialization.
+func TestConfiguration_MixedGroups(t *testing.T) {
+	conf := mixedGroupConfiguration()
+
+	if _, err := conf.Client(); err != nil {
+		t.Fatalf("unexpected client error: %v", err)
+	}
+
+	if _, err := conf.Server(); err != nil {
+		t.Fatalf("unexpected server error: %v", err)
+	}
+
+	if _, err := conf.Deserializer(); err != nil {
+		t.Fatalf("unexpected deserializer error: %v", err)
+	}
+
+	conf2, err := opaque.DeserializeConfiguration(conf.Serialize())
+	if err != nil {
+		t.Fatalf("unexpected configuration deserialization error: %v", err)
+	}
+
+	if err := conf.Equals(conf2); err != nil {
+		t.Fatalf("unexpected inequality: %v", err)
 	}
 }
 

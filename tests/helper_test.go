@@ -27,8 +27,6 @@ import (
 	"github.com/bytemare/opaque/internal/envelope"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
-
-	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
 func init() {
@@ -95,14 +93,26 @@ func toInternal(c *opaque.Configuration) (*internal.Configuration, error) {
 	return &internal.Configuration{
 		OPRF:         o,
 		Group:        g,
-		KSF:          internalKSF.NewKSF(c.KSF),
+		KSF:          c.KSF,
 		KDF:          internal.NewKDF(c.KDF),
 		MAC:          mac,
-		Hash:         internal.NewHash(c.Hash),
+		Hash:         c.Hash,
 		NonceLen:     internal.NonceLength,
 		EnvelopeSize: internal.NonceLength + mac.Size(),
 		Context:      c.Context,
 	}, nil
+}
+
+func mixedGroupConfiguration() *opaque.Configuration {
+	return &opaque.Configuration{
+		OPRF:    opaque.RistrettoSha512,
+		AKE:     opaque.P256Sha256,
+		KSF:     ksf.Argon2id,
+		KDF:     crypto.SHA512,
+		MAC:     crypto.SHA512,
+		Hash:    crypto.SHA512,
+		Context: nil,
+	}
 }
 
 var configurationTable = map[opaque.Group]*configuration{
@@ -438,7 +448,7 @@ func buildPRK(
 	evaluation *ecc.Element,
 ) ([]byte, error) {
 	unblinded := conf.OPRF.Finalize(blind, password, evaluation)
-	hardened := conf.KSF.Harden(unblinded, nil, conf.OPRF.Group().ElementLength())
+	hardened := conf.NewKSF().Harden(unblinded, nil, conf.OPRF.Group().ElementLength())
 
 	return conf.KDF.Extract(nil, encoding.Concat(unblinded, hardened)), nil
 }
