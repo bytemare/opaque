@@ -319,7 +319,8 @@ func (c *Configuration) verify() error {
 		return ErrConfiguration.Join(err)
 	}
 
-	// If the KSF is not set it defaults to 0, which is valid and means no key stretching. If it is set, it must be available.
+	// If the KSF is not set it defaults to 0, which is valid and means no key stretching.
+	// If it is set, it must be available.
 	if c.KSF != 0 && !c.KSF.Available() {
 		return ErrConfiguration.Join(internal.ErrInvalidKSFid)
 	}

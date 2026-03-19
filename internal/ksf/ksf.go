@@ -53,15 +53,15 @@ func (o *Options) Set(f KSF, salt []byte, parameters []uint64, length int) error
 
 	if len(parameters) == 0 {
 		o.Parameters = append([]uint64(nil), defaults...)
-
 	} else {
 		if len(parameters) != len(defaults) {
 			return fmt.Errorf("%w: expected %d, got %d", ErrParameters, len(defaults), len(parameters))
 		}
 
 		if err := f.VerifyParameters(parameters...); err != nil {
-			return fmt.Errorf("%w: %v", ErrParameterValue, err)
+			return errors.Join(ErrParameterValue, err)
 		}
+
 		o.Parameters = make([]uint64, len(parameters))
 		copy(o.Parameters, parameters)
 	}
@@ -73,15 +73,6 @@ func (o *Options) Set(f KSF, salt []byte, parameters []uint64, length int) error
 	o.Salt = salt
 
 	return nil
-}
-
-// NewKSF returns a newly instantiated KSF.
-func NewKSF(id ksf.Identifier) KSF {
-	if id == 0 {
-		return IdentityKSF(0)
-	}
-
-	return id
 }
 
 // KSF is a key stretching function.

@@ -13,6 +13,7 @@ import (
 	"slices"
 
 	"github.com/bytemare/ecc"
+
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -118,6 +119,7 @@ func (c *Client) RegistrationFinalize(
 
 	randomizedPassword := c.buildPRK(resp.EvaluatedMessage, o)
 	defer internal.ClearSlice(&randomizedPassword)
+
 	maskingKey := c.conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), c.conf.Hash.Size())
 	env, clientPublicKey, exportKey := envelope.Store(
 		c.conf,

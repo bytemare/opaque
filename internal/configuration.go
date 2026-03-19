@@ -43,6 +43,7 @@ var (
 
 // Configuration is the internal representation of the instance runtime parameters.
 type Configuration struct {
+	KSF          ksf.KSF
 	KDF          *KDF
 	MAC          *Mac
 	OPRF         oprf.Identifier
@@ -50,7 +51,6 @@ type Configuration struct {
 	Hash         crypto.Hash
 	NonceLen     int
 	EnvelopeSize int
-	KSF          ksf.KSF
 	Group        ecc.Group
 }
 

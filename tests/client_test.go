@@ -23,7 +23,7 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 
-	ksf2 "github.com/bytemare/opaque/internal/ksf"
+	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
 // TestNewClient_DefaultConfiguration guarantees that passing nil configuration falls back to the hardened defaults, which is essential so applications relying on the safe baseline do not accidentally run with zeroed parameters.
@@ -176,7 +176,7 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 		expectErrors(t2, func() error {
 			_, _, err := client4.RegistrationFinalize(r2b, nil, nil, &opaque.ClientOptions{KSFParameters: badParams})
 			return err
-		}, opaque.ErrClientOptions, ksf2.ErrParameters)
+		}, opaque.ErrClientOptions, internalKSF.ErrParameters)
 
 		// g) KSF options: negative length
 		client5 := getClient(t2, conf)
@@ -191,7 +191,7 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 		expectErrors(t2, func() error {
 			_, _, err := client5.RegistrationFinalize(r2c, nil, nil, &opaque.ClientOptions{KSFLength: -1})
 			return err
-		}, opaque.ErrClientOptions, ksf2.ErrNegativeKSFLength)
+		}, opaque.ErrClientOptions, internalKSF.ErrNegativeKSFLength)
 
 		// h) Envelope nonce options: length mismatch
 		client6 := getClient(t2, conf)
@@ -338,7 +338,7 @@ func TestClient_RegistrationFinalize_InvalidKSFParameterValue(t *testing.T) {
 				KSFParameters: []uint64{3, 65536, 256},
 			})
 			return err
-		}, opaque.ErrClientOptions, ksf2.ErrParameterValue)
+		}, opaque.ErrClientOptions, internalKSF.ErrParameterValue)
 	})
 }
 
@@ -958,6 +958,7 @@ func TestClient_GenerateKE3_InvalidKE2Mac(t *testing.T) {
 // TestClientPRK validates the PRK derivation pipeline across KSF backends, ensuring deterministic outputs used in test vectors remain stable and interoperable.
 func TestClientPRK(t *testing.T) {
 	type prkTest struct {
+		ksf           internalKSF.KSF
 		name          string
 		input         string
 		ksfSalt       string
@@ -966,7 +967,6 @@ func TestClientPRK(t *testing.T) {
 		ksfParameters []uint64
 		ksfLength     int
 		kdf           crypto.Hash
-		ksf           ksf.Identifier
 	}
 
 	tests := []prkTest{
@@ -1005,7 +1005,7 @@ func TestClientPRK(t *testing.T) {
 		},
 		{
 			name:          "Identity",
-			ksf:           0,
+			ksf:           internalKSF.IdentityKSF(0),
 			ksfSalt:       "ksfSalt",
 			ksfLength:     32,
 			ksfParameters: []uint64{1, 2},
@@ -1019,9 +1019,13 @@ func TestClientPRK(t *testing.T) {
 	for _, ksfTest := range tests {
 		t.Run(ksfTest.name, func(t *testing.T) {
 			input := []byte(ksfTest.input)
-			stretcher := ksf2.NewKSF(ksfTest.ksf)
+			stretcher := ksfTest.ksf
 
-			stretched, err := stretcher.Harden(input, []byte(ksfTest.ksfSalt), ksfTest.ksfLength, ksfTest.ksfParameters...)
+			stretched, err := stretcher.Harden(
+				input,
+				[]byte(ksfTest.ksfSalt),
+				ksfTest.ksfLength,
+				ksfTest.ksfParameters...)
 			if err != nil {
 				t.Fatalf("KSF hardening failed: %v", err)
 			}
