@@ -215,7 +215,7 @@ func getServer(t *testing.T, c *configuration) *opaque.Server {
 func TestConfigurationTableIncludesAllAvailableGroups(t *testing.T) {
 	available := make(map[opaque.Group]struct{})
 
-	for g := opaque.Group(0); g < 255; g++ {
+	for g := range opaque.Group(255) {
 		if g.Available() {
 			available[g] = struct{}{}
 		}

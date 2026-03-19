@@ -197,10 +197,8 @@ func TestServer_GenerateKE2_Concurrent(t *testing.T) {
 		)
 
 		for range workers {
-			wg.Add(1)
 
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 
 				ke2, output, err := server.GenerateKE2(ke1, clientRecord)
 				if err != nil {
@@ -211,7 +209,7 @@ func TestServer_GenerateKE2_Concurrent(t *testing.T) {
 				if ke2 == nil || output == nil || len(output.ClientMAC) == 0 || len(output.SessionSecret) == 0 {
 					errs <- internal.ErrMissingMAC
 				}
-			}()
+			})
 		}
 
 		wg.Wait()

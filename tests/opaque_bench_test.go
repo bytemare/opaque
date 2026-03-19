@@ -122,7 +122,6 @@ func BenchmarkLogin(b *testing.B) {
 // BenchmarkRegistrationSuites compares registration performance across supported suites to catch regressions.
 func BenchmarkRegistrationSuites(b *testing.B) {
 	for _, conf := range configurationTable {
-		conf := conf
 		b.Run(conf.name, func(b *testing.B) {
 			server, err := conf.conf.Server()
 			if err != nil {
@@ -165,7 +164,6 @@ func BenchmarkRegistrationSuites(b *testing.B) {
 // BenchmarkLoginSuites compares login performance across supported suites to track curve-level changes.
 func BenchmarkLoginSuites(b *testing.B) {
 	for _, conf := range configurationTable {
-		conf := conf
 		b.Run(conf.name, func(b *testing.B) {
 			// Setup server
 			server, err := conf.conf.Server()

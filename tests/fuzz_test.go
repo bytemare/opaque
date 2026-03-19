@@ -30,7 +30,7 @@ const fmtGotValidInput = "got %q but input is valid"
 
 type fuzzConfError struct {
 	error       error
-	value       interface{}
+	value       any
 	isAvailable bool
 }
 
