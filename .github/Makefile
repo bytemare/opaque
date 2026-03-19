@@ -52,10 +52,19 @@ vectors:
 	@echo "Testing vectors ..."
 	@go test -v ../tests/vectors_test.go
 
+GO_COVERAGE_REPORT_PATH ?= coverage.out
+GO_COVERAGE_PACKAGE ?= ../...
+GO_COVERAGE_TEST_TARGET ?= ../...
+
 .PHONY: cover
 cover:
-	@echo "Testing with coverage ..."
-	@go test -v -race -covermode=atomic -coverpkg=../... -coverprofile=./coverage.out ../tests
+	@echo "Generating Go coverage..."
+	@report_path="$(GO_COVERAGE_REPORT_PATH)" && \
+    	    cover_pkg="$(GO_COVERAGE_PACKAGE)" && \
+    	    test_target="$(GO_COVERAGE_TEST_TARGET)" && \
+    	    mkdir -p "$$(dirname "$$report_path")" && \
+    	    go test -v -race -covermode=atomic -coverpkg="$$cover_pkg" -coverprofile="$$report_path" $$test_target && \
+    	    echo "Go coverage report generated: $$report_path"
 
 .PHONY: fuzz
 fuzz:
