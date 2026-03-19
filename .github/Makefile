@@ -19,6 +19,7 @@ update-linters:
 fmt:
 	@echo "Formatting ..."
 	@go mod tidy
+	@go fix ../...
 	@go fmt ../...
 	@golines -m 120 -t 4 -w ../
 	@gofumpt -w -extra ../
