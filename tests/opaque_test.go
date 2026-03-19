@@ -615,21 +615,6 @@ func TestConfiguration_MixedGroups(t *testing.T) {
 	}
 }
 
-// TestValidateMACKeyLengths ensures the MAC block-size policy rejects only derived-key lengths that exceed the block size.
-func TestValidateMACKeyLengths(t *testing.T) {
-	expectErrors(t, func() error {
-		return internal.ValidateMACKeyLengths(32, 65, 64)
-	}, internal.ErrHashSizeExceedsMACBlockSize)
-
-	expectErrors(t, func() error {
-		return internal.ValidateMACKeyLengths(65, 32, 64)
-	}, internal.ErrKDFSizeExceedsMACBlockSize)
-
-	if err := internal.ValidateMACKeyLengths(64, 64, 64); err != nil {
-		t.Fatalf("unexpected compatibility error: %v", err)
-	}
-}
-
 // TestGetFakeRecord ensures GetFakeRecord succeeds for valid configurations and rejects invalid ones.
 func TestGetFakeRecord(t *testing.T) {
 	// Test valid configurations

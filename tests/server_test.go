@@ -197,9 +197,7 @@ func TestServer_GenerateKE2_Concurrent(t *testing.T) {
 		)
 
 		for range workers {
-
 			wg.Go(func() {
-
 				ke2, output, err := server.GenerateKE2(ke1, clientRecord)
 				if err != nil {
 					errs <- err

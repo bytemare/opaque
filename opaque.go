@@ -26,6 +26,8 @@ import (
 	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/message"
+
+	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
 // Group identifies a supported group configuration for OPRF or AKE.
@@ -334,13 +336,18 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 		return nil, err
 	}
 
+	ksfid := internalKSF.KSF(c.KSF)
+	if c.KSF == 0 {
+		ksfid = internalKSF.IdentityKSF(0)
+	}
+
 	g := c.AKE.Group()
 	o := c.OPRF.OPRF()
 	mac := internal.NewMac(c.MAC)
 	ip := &internal.Configuration{
 		OPRF:         o,
 		Group:        g,
-		KSF:          c.KSF,
+		KSF:          ksfid,
 		KDF:          internal.NewKDF(c.KDF),
 		MAC:          mac,
 		Hash:         c.Hash,
