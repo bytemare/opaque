@@ -61,4 +61,6 @@ jobs:
         run: make -C .github test
 
       - name: Fuzz
-        run: make -C .github fuzz FUZZTIME=${{ github.event.inputs.time_per_target }}
+        env:
+          FUZZTIME: ${{ github.event.inputs.time_per_target }}
+        run: make -C .github fuzz

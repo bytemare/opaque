@@ -39,7 +39,7 @@ jobs:
       super-linter: true
       super-linter-validate-all-codebase: true
       super-linter-enabled-linters: |
-        VALIDATE_BASH,VALIDATE_BASH_EXEC,VALIDATE_EDITORCONFIG,VALIDATE_ENV,VALIDATE_GITHUB_ACTIONS,VALIDATE_GO_MODULES,VALIDATE_MARKDOWN,VALIDATE_YAML
+        VALIDATE_BASH,VALIDATE_BASH_EXEC,VALIDATE_EDITORCONFIG,VALIDATE_ENV,VALIDATE_GITHUB_ACTIONS,VALIDATE_MARKDOWN,VALIDATE_YAML
       super-linter-rules-path: .github
 
   Governance:
@@ -102,7 +102,6 @@ jobs:
       # CodeQL
       codeql: true
       codeql-language: go # comma-separated list supported
-      codeql-go-version-file: "go.work"
       codeql-go-check-latest: true
       # SonarQube
       sonarqube: true
@@ -110,7 +109,6 @@ jobs:
       # Shared coverage generation (one-time, consumed by SonarQube and Codecov)
       coverage-enabled: true
       coverage-go-enabled: true
-      coverage-go-version-file: "tests/go.mod"
       coverage-go-check-latest: true
       coverage-go-command: "make -C .github cover"
       coverage-go-report-path: ".github/coverage.out"
