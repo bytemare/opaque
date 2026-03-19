@@ -20,6 +20,9 @@ var (
 	// ErrParameters indicates an invalid amount of KSF parameters.
 	ErrParameters = errors.New("invalid number of KSF parameters")
 
+	// ErrParameterValue indicates that one or more KSF parameters have invalid values.
+	ErrParameterValue = errors.New("invalid KSF parameter value")
+
 	// ErrNegativeKSFLength indicates that the requested KSF output length is negative.
 	ErrNegativeKSFLength = errors.New("the requested KSF output length is negative")
 )
@@ -27,7 +30,7 @@ var (
 // Options holds optional parameters to tweak the KSF and provide a custom salt.
 type Options struct {
 	Salt       []byte
-	Parameters []int
+	Parameters []uint64
 	Length     int
 }
 
@@ -40,21 +43,27 @@ func NewOptions(length int) *Options {
 	}
 }
 
-// Set sets the options for the KSF. If parameters are provided, they must match the amount of canonical parameters.
-func (o *Options) Set(f ksfInterface, salt []byte, parameters []int, length int) error {
-	if len(parameters) != 0 {
-		if len(parameters) != len(f.Parameters()) {
-			return fmt.Errorf("%w: expected %d, got %d",
-				ErrParameters, len(f.Parameters()), len(parameters))
-		}
-
-		o.Parameters = parameters
-	} else {
-		o.Parameters = f.Parameters()
-	}
-
+// Set sets the options for the KSF. If parameters are provided, they must match the KSF shape and value constraints.
+func (o *Options) Set(f KSF, salt []byte, parameters []uint64, length int) error {
 	if length < 0 {
 		return ErrNegativeKSFLength
+	}
+
+	defaults := f.DefaultParameters()
+
+	if len(parameters) == 0 {
+		o.Parameters = append([]uint64(nil), defaults...)
+
+	} else {
+		if len(parameters) != len(defaults) {
+			return fmt.Errorf("%w: expected %d, got %d", ErrParameters, len(defaults), len(parameters))
+		}
+
+		if err := f.VerifyParameters(parameters...); err != nil {
+			return fmt.Errorf("%w: %v", ErrParameterValue, err)
+		}
+		o.Parameters = make([]uint64, len(parameters))
+		copy(o.Parameters, parameters)
 	}
 
 	if length != 0 {
@@ -66,59 +75,55 @@ func (o *Options) Set(f ksfInterface, salt []byte, parameters []int, length int)
 	return nil
 }
 
-// KSF wraps a key stretching function and exposes its functions.
-type KSF struct {
-	ksfInterface
-}
-
 // NewKSF returns a newly instantiated KSF.
-func NewKSF(id ksf.Identifier) *KSF {
+func NewKSF(id ksf.Identifier) KSF {
 	if id == 0 {
-		return &KSF{&IdentityKSF{}}
+		return IdentityKSF(0)
 	}
 
-	return &KSF{id.Get()}
+	return id
 }
 
-// HardenWithOptions stretches the input and salt into a derived key
-// of the requested length, using the provided parameters, if any.
-func (k *KSF) HardenWithOptions(input []byte, options *Options) []byte {
-	if len(options.Parameters) != 0 {
-		k.Parameterize(options.Parameters...)
-	}
-
-	return k.Harden(input, options.Salt, options.Length)
-}
-
-type ksfInterface interface {
+// KSF is a key stretching function.
+type KSF interface {
 	// Harden uses default parameters for the key derivation function over the input password and salt.
-	Harden(password, salt []byte, length int) []byte
+	Harden(password, salt []byte, length int, parameters ...uint64) ([]byte, error)
 
-	// Parameterize replaces the functions parameters with the new ones.
-	// Must match the amount of parameters for the KSF.
-	Parameterize(parameters ...int)
+	// UnsafeHarden is the same as Harden but panics if the KSF identifier is not
+	// recognized or the parameters are invalid, and does not return an error.
+	// It is the caller's responsibility to ensure that the parameters are valid for the KSF.
+	UnsafeHarden(password, salt []byte, length int, parameters ...uint64) []byte
 
-	// Parameters returns the list of internal parameters. If none were provided or modified,
-	// the recommended defaults values are used.
-	Parameters() []int
+	// VerifyParameters checks whether the provided parameters are valid for the  KSF specified by the identifier.
+	VerifyParameters(parameters ...uint64) error
+
+	// DefaultParameters returns the list of default recommended parameters.
+	DefaultParameters() []uint64
 }
 
 // IdentityKSF represents a KSF with no operations.
-type IdentityKSF struct{}
+type IdentityKSF ksf.Identifier
 
 // Harden returns the password as is.
-func (i IdentityKSF) Harden(password, _ []byte, _ int) []byte {
+func (i IdentityKSF) Harden(password, _ []byte, _ int, _ ...uint64) ([]byte, error) {
+	return password, nil
+}
+
+// UnsafeHarden is the same as Harden but panics if the KSF identifier is not
+// recognized or the parameters are invalid, and does not return an error.
+// It is the caller's responsibility to ensure that the parameters are valid for the KSF.
+func (i IdentityKSF) UnsafeHarden(password, _ []byte, _ int, _ ...uint64) []byte {
 	return password
 }
 
-// Parameterize applies KSF parameters if defined.
-func (i IdentityKSF) Parameterize(_ ...int) {
+// VerifyParameters returns always nil.
+func (i IdentityKSF) VerifyParameters(_ ...uint64) error {
 	// no-op
+	return nil
 }
 
-// Parameters returns the list of internal parameters. If none were provided or modified,
-// the recommended defaults values are used.
-func (i IdentityKSF) Parameters() []int {
+// DefaultParameters returns the list of default recommended parameters.
+func (i IdentityKSF) DefaultParameters() []uint64 {
 	// no-op
 	return nil
 }

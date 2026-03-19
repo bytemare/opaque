@@ -75,6 +75,10 @@ func verify(c *opaque.Configuration) error {
 		return internal.ErrInvalidHASHid
 	}
 
+	if err := internal.ValidateMACKeyLengths(c.KDF, c.Hash, c.MAC); err != nil {
+		return err
+	}
+
 	if c.KSF != 0 && !c.KSF.Available() {
 		return internal.ErrInvalidKSFid
 	}
@@ -448,7 +452,7 @@ func buildPRK(
 	evaluation *ecc.Element,
 ) ([]byte, error) {
 	unblinded := conf.OPRF.Finalize(blind, password, evaluation)
-	hardened := conf.NewKSF().Harden(unblinded, nil, conf.OPRF.Group().ElementLength())
+	hardened := conf.KSF.UnsafeHarden(unblinded, nil, conf.OPRF.Group().ElementLength())
 
 	return conf.KDF.Extract(nil, encoding.Concat(unblinded, hardened)), nil
 }
@@ -464,7 +468,7 @@ func getEnvelope(
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	maskingKey := conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), conf.KDF.Size())
+	maskingKey := conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), conf.Hash.Size())
 	clearText := xorResponse(conf, maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
 	e := clearText[conf.Group.ElementLength():]
 

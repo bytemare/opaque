@@ -16,12 +16,10 @@ import (
 	"runtime"
 
 	"github.com/bytemare/ecc"
-	"github.com/bytemare/ksf"
 
+	"github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
-
-	internalksf "github.com/bytemare/opaque/internal/ksf"
 )
 
 const (
@@ -30,6 +28,17 @@ const (
 
 	// SeedLength is the default length used for seeds.
 	SeedLength = 32
+)
+
+var (
+	// ErrSliceDifferentLength indicates the provided slice is of different length than the configured value.
+	ErrSliceDifferentLength = errors.New("provided slice is different length than the configured value")
+
+	// ErrSliceShorterLength indicates the provided slice is shorter than the configured value.
+	ErrSliceShorterLength = errors.New("provided slice is shorter than the configured value")
+
+	// ErrProvidedLengthNegative indicates the provided length is negative.
+	ErrProvidedLengthNegative = errors.New("provided length is negative")
 )
 
 // Configuration is the internal representation of the instance runtime parameters.
@@ -41,18 +50,13 @@ type Configuration struct {
 	Hash         crypto.Hash
 	NonceLen     int
 	EnvelopeSize int
-	KSF          ksf.Identifier
+	KSF          ksf.KSF
 	Group        ecc.Group
 }
 
 // NewHash returns a fresh hashing state for one protocol operation.
 func (c *Configuration) NewHash() *Hash {
 	return NewHash(c.Hash)
-}
-
-// NewKSF returns a fresh key stretching function instance with default parameters.
-func (c *Configuration) NewKSF() *internalksf.KSF {
-	return internalksf.NewKSF(c.KSF)
 }
 
 // MakeSecretKeyShare generates a secret key share from the provided seed. If the seed is empty, it gets a random one.
@@ -71,17 +75,6 @@ func RandomBytes(length int) []byte {
 
 	return r
 }
-
-var (
-	// ErrSliceDifferentLength indicates the provided slice is of different length than the configured value.
-	ErrSliceDifferentLength = errors.New("provided slice is different length than the configured value")
-
-	// ErrSliceShorterLength indicates the provided slice is shorter than the configured value.
-	ErrSliceShorterLength = errors.New("provided slice is shorter than the configured value")
-
-	// ErrProvidedLengthNegative indicates the provided length is negative.
-	ErrProvidedLengthNegative = errors.New("provided length is negative")
-)
 
 // ClearScalar attempts to safely clearing the internal secret value of the scalar, by first setting its bytes to a
 // random value and then zeroes it out.

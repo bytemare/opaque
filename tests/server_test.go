@@ -492,7 +492,7 @@ func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
 
 		// e) masking key invalid length
 		rec3 := *rec.RegistrationRecord
-		rec3.MaskingKey = internal.RandomBytes(conf.internal.KDF.Size() - 1)
+		rec3.MaskingKey = internal.RandomBytes(conf.internal.Hash.Size() - 1)
 		badRec3 := &opaque.ClientRecord{
 			CredentialIdentifier: rec.CredentialIdentifier,
 			ClientIdentity:       rec.ClientIdentity,
@@ -505,7 +505,7 @@ func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
 
 		// f) masking key all zeros
 		rec4 := *rec.RegistrationRecord
-		rec4.MaskingKey = make([]byte, conf.internal.KDF.Size())
+		rec4.MaskingKey = make([]byte, conf.internal.Hash.Size())
 		badRec4 := &opaque.ClientRecord{
 			CredentialIdentifier: rec.CredentialIdentifier,
 			ClientIdentity:       rec.ClientIdentity,

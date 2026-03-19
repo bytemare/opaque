@@ -208,18 +208,18 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 // GetFakeRecord creates a fake Client record to be used when no existing client record exists,
 // to defend against client enumeration techniques.
 func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecord, error) {
-	i, err := c.toInternal()
+	conf, err := c.toInternal()
 	if err != nil {
 		return nil, err
 	}
 
-	scalar := i.Group.NewScalar().Random()
-	publicKey := i.Group.Base().Multiply(scalar)
+	scalar := conf.Group.NewScalar().Random()
+	publicKey := conf.Group.Base().Multiply(scalar)
 
 	regRecord := &message.RegistrationRecord{
 		ClientPublicKey: publicKey,
-		MaskingKey:      RandomBytes(i.KDF.Size()),
-		Envelope:        make([]byte, internal.NonceLength+i.MAC.Size()),
+		MaskingKey:      RandomBytes(conf.Hash.Size()),
+		Envelope:        make([]byte, internal.NonceLength+conf.MAC.Size()),
 	}
 
 	return &ClientRecord{
@@ -315,6 +315,11 @@ func (c *Configuration) verify() error {
 		return ErrConfiguration.Join(internal.ErrInvalidHASHid)
 	}
 
+	if err := internal.ValidateMACKeyLengths(c.KDF, c.Hash, c.MAC); err != nil {
+		return ErrConfiguration.Join(err)
+	}
+
+	// If the KSF is not set it defaults to 0, which is valid and means no key stretching. If it is set, it must be available.
 	if c.KSF != 0 && !c.KSF.Available() {
 		return ErrConfiguration.Join(internal.ErrInvalidKSFid)
 	}

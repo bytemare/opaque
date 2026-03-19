@@ -44,7 +44,7 @@ vulncheck:
 .PHONY: test
 test:
 	@echo "Running all tests ..."
-	@go test -v -vet=all ../...
+	@go test -v -race -vet=all ../...
 
 .PHONY: vectors
 vectors:

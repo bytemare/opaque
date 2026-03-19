@@ -174,7 +174,7 @@ func TestClient_GenerateKE3_ParseOptionsErrors(t *testing.T) {
 					setClientSecretKeyShare(t2, c, nil)
 				},
 				options: &opaque.ClientOptions{
-					KSFParameters: []int{1},
+					KSFParameters: []uint64{1},
 					AKE: &opaque.AKEOptions{
 						SecretKeyShare: conf.internal.Group.NewScalar().Random(),
 					},
@@ -336,9 +336,4 @@ func TestClient_RegistrationFinalize_EnvelopeLength(t *testing.T) {
 			t2.Fatalf("RegistrationFinalize failed: %v", err)
 		}
 	})
-}
-
-// TestIdentityKSFParameterizeNoOp asserts that the Identity KSF ignores parameter changes, which matters because some flows rely on the no-op mode to avoid accidental stretching.
-func TestIdentityKSFParameterizeNoOp(t *testing.T) {
-	internalKSF.IdentityKSF{}.Parameterize(1, 2, 3)
 }

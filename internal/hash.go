@@ -33,12 +33,22 @@ func NewKDF(id crypto.Hash) *KDF {
 
 // Extract exposes an Extract only KDF method.
 func (k *KDF) Extract(salt, ikm []byte) []byte {
-	return k.h.HKDFExtract(ikm, salt)
+	out, err := k.h.HKDFExtract(ikm, salt)
+	if err != nil {
+		panic(err)
+	}
+
+	return out
 }
 
 // Expand exposes an Expand only KDF method.
 func (k *KDF) Expand(key, info []byte, length int) []byte {
-	return k.h.HKDFExpand(key, info, length)
+	out, err := k.h.HKDFExpand(key, info, length)
+	if err != nil {
+		panic(err)
+	}
+
+	return out
 }
 
 // Size returns the output size of the Extract method.
@@ -69,6 +79,30 @@ func (m *Mac) MAC(key, message []byte) []byte {
 // Size returns the MAC's output length.
 func (m *Mac) Size() int {
 	return m.h.Size()
+}
+
+// BlockSize returns the MAC's underlying hash block size.
+func (m *Mac) BlockSize() int {
+	return m.h.BlockSize()
+}
+
+// ValidateMACKeyLengths enforces the implementation policy that derived MAC keys must not exceed the MAC block size.
+// Using keys larger than the block size ends up  being hashed by the HMAC function, which is standard but reduces the
+// advertised security level associated to the key length. Hence, we take the stance that the client expects a higher
+// security level than what the chosen hash functions provide, ad therefore reject such configurations.
+func ValidateMACKeyLengths(k, h, m crypto.Hash) error {
+	mac := NewMac(m)
+	kdfSize, hashSize, macBlockSize := k.Size(), h.Size(), mac.BlockSize()
+
+	if hashSize > macBlockSize {
+		return ErrHashSizeExceedsMACBlockSize
+	}
+
+	if kdfSize > macBlockSize {
+		return ErrKDFSizeExceedsMACBlockSize
+	}
+
+	return nil
 }
 
 // Hash wraps a hash function and exposes only necessary hashing methods.

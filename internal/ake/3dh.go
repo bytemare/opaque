@@ -80,8 +80,7 @@ func core3DH(
 	conf *internal.Configuration, identities *Identities, ikm, ke1 []byte, ke2 *message.KE2,
 ) (sessionSecret, macS, macC []byte) {
 	h := conf.NewHash()
-	initTranscript(h, identities, conf.Context, ke1, ke2)
-	preamble := h.Sum()
+	preamble := initTranscript(h, identities, conf.Context, ke1, ke2)
 	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, preamble)
 	serverMac := conf.MAC.MAC(serverMacKey, preamble)
 	h.Write(serverMac)
@@ -108,30 +107,28 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func initTranscript(h *internal.Hash, identities *Identities, context, ke1 []byte, ke2 *message.KE2) {
-	addToHash(h, []byte(tag.VersionTag),
-		encoding.EncodeVector(context),
-		encoding.EncodeVector(identities.ClientIdentity),
-		ke1,
-		encoding.EncodeVector(identities.ServerIdentity),
-		ke2.CredentialResponse.Serialize(),
-		ke2.ServerNonce,
-		ke2.ServerKeyShare.Encode(),
-	)
-}
+// initTranscript initializes the transcript by adding the following values to the running hash state in h and returns
+// the current hash output:
+// Version || Context || ClientIdentity || KE1 || ServerIdentity || CredentialResponse || ServerNonce || ServerKeyShare.
+func initTranscript(h *internal.Hash, identities *Identities, context, ke1 []byte, ke2 *message.KE2) []byte {
+	h.Write([]byte(tag.VersionTag))
+	h.Write(encoding.EncodeVector(context))
+	h.Write(encoding.EncodeVector(identities.ClientIdentity))
+	h.Write(ke1)
+	h.Write(encoding.EncodeVector(identities.ServerIdentity))
+	h.Write(ke2.CredentialResponse.Serialize())
+	h.Write(ke2.ServerNonce)
+	h.Write(ke2.ServerKeyShare.Encode())
 
-func addToHash(h *internal.Hash, data ...[]byte) {
-	for _, d := range data {
-		h.Write(d)
-	}
+	return h.Sum()
 }
 
 func deriveKeys(h *internal.KDF, ikm, context []byte) (serverMacKey, clientMacKey, sessionSecret []byte) {
 	prk := h.Extract(nil, ikm)
 	sessionSecret = deriveSecret(h, prk, []byte(tag.SessionKey), context)
 	handshakeSecret := deriveSecret(h, prk, []byte(tag.Handshake), context)
-	serverMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacServer), nil)
-	clientMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacClient), nil)
+	serverMacKey = deriveSecret(h, handshakeSecret, []byte(tag.MacServer), nil)
+	clientMacKey = deriveSecret(h, handshakeSecret, []byte(tag.MacClient), nil)
 
 	return serverMacKey, clientMacKey, sessionSecret
 }

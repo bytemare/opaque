@@ -305,7 +305,7 @@ func (s *Server) verifyRecord(record *ClientRecord) error {
 		return ErrClientRecord.Join(internal.ErrEnvelopeInvalid, internal.ErrInvalidEncodingLength)
 	}
 
-	if len(record.MaskingKey) != s.conf.KDF.Size() {
+	if len(record.MaskingKey) != s.conf.Hash.Size() {
 		return ErrClientRecord.Join(internal.ErrEnvelopeInvalid, internal.ErrInvalidMaskingKey)
 	}
 

@@ -10,6 +10,7 @@ package opaque_test
 
 import (
 	"bytes"
+	"crypto"
 	"errors"
 	"fmt"
 	"testing"
@@ -250,6 +251,36 @@ func TestDeserializer_RegistrationResponse_MixedGroups(t *testing.T) {
 
 	if !bytes.Equal(resp.ServerPublicKey, serverPublicKey.Encode()) {
 		t.Fatalf("unexpected server public key bytes")
+	}
+}
+
+// TestDeserializer_RegistrationRecord_MixedKDFAndHashSizes ensures record parsing derives the masking-key length from
+// the KDF, not the transcript hash.
+func TestDeserializer_RegistrationRecord_MixedKDFAndHashSizes(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+	conf.KDF = crypto.SHA512
+	conf.MAC = crypto.SHA256
+	conf.Hash = crypto.SHA256
+
+	d := getDeserializer(t, conf)
+	_, clientPublicKey := conf.KeyGen()
+	input := encoding.Concat3(
+		clientPublicKey.Encode(),
+		internal.RandomBytes(conf.Hash.Size()),
+		internal.RandomBytes(internal.NonceLength+conf.MAC.Size()),
+	)
+
+	record, err := d.RegistrationRecord(input)
+	if err != nil {
+		t.Fatalf(testErrValidConf, err)
+	}
+
+	if !bytes.Equal(record.ClientPublicKey.Encode(), clientPublicKey.Encode()) {
+		t.Fatalf("unexpected client public key bytes")
+	}
+
+	if len(record.MaskingKey) != conf.Hash.Size() {
+		t.Fatalf("unexpected masking key length: got %d, want %d", len(record.MaskingKey), conf.Hash.Size())
 	}
 }
 

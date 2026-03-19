@@ -34,7 +34,7 @@ type testParams struct {
 	serverSecretKey                                                  *ecc.Scalar
 	serverPublicKey                                                  *ecc.Element
 	username, userID, serverID, password, oprfSeed, ksfSalt, kdfSalt []byte
-	ksfParameters                                                    []int
+	ksfParameters                                                    []uint64
 	ksfLength, nonceLength                                           int
 }
 
@@ -55,7 +55,7 @@ func TestFull(t *testing.T) {
 		serverID:      ids,
 		password:      password,
 		oprfSeed:      conf.GenerateOPRFSeed(),
-		ksfParameters: []int{3, 65536, 4},
+		ksfParameters: []uint64{3, 65536, 4},
 		ksfSalt:       []byte("ksfSalt"),
 		kdfSalt:       []byte("kdfSalt"),
 		nonceLength:   internal.NonceLength,
@@ -79,11 +79,7 @@ func TestFull(t *testing.T) {
 	}
 }
 
-// TestFull_MixedOPRFAndAKEGroups ensures registration and login work when the OPRF and AKE use different groups.
-func TestFull_MixedOPRFAndAKEGroups(t *testing.T) {
-	conf := mixedGroupConfiguration()
-	conf.Context = []byte("OPAQUEMixedGroupTest")
-
+func testFullMixed(t *testing.T, conf *opaque.Configuration) {
 	tester := &testParams{
 		Configuration: conf,
 		username:      []byte("client"),
@@ -91,7 +87,7 @@ func TestFull_MixedOPRFAndAKEGroups(t *testing.T) {
 		serverID:      []byte("server"),
 		password:      []byte("password"),
 		oprfSeed:      conf.GenerateOPRFSeed(),
-		ksfParameters: []int{3, 65536, 4},
+		ksfParameters: []uint64{3, 65536, 4},
 		ksfSalt:       []byte("ksfSalt"),
 		kdfSalt:       []byte("kdfSalt"),
 		nonceLength:   internal.NonceLength,
@@ -105,6 +101,25 @@ func TestFull_MixedOPRFAndAKEGroups(t *testing.T) {
 	if !bytes.Equal(exportKeyReg, exportKeyLogin) {
 		t.Errorf("export keys differ")
 	}
+}
+
+// TestFull_MixedOPRFAndAKEGroups ensures registration and login work when the OPRF and AKE use different groups.
+func TestFull_MixedOPRFAndAKEGroups(t *testing.T) {
+	conf := mixedGroupConfiguration()
+	conf.Context = []byte("OPAQUEMixedGroupTest")
+
+	testFullMixed(t, conf)
+}
+
+// TestFull_MixedKDFMACHashSizes ensures the end-to-end flow works when the transcript hash, MAC, and KDF sizes differ.
+func TestFull_MixedKDFMACHashSizes(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+	conf.Context = []byte("OPAQUEMixedSizeTest")
+	conf.KDF = crypto.SHA512
+	conf.MAC = crypto.SHA256
+	conf.Hash = crypto.SHA256
+
+	testFullMixed(t, conf)
 }
 
 func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Server, *opaque.ClientRecord, []byte) {
@@ -597,6 +612,21 @@ func TestConfiguration_MixedGroups(t *testing.T) {
 
 	if err := conf.Equals(conf2); err != nil {
 		t.Fatalf("unexpected inequality: %v", err)
+	}
+}
+
+// TestValidateMACKeyLengths ensures the MAC block-size policy rejects only derived-key lengths that exceed the block size.
+func TestValidateMACKeyLengths(t *testing.T) {
+	expectErrors(t, func() error {
+		return internal.ValidateMACKeyLengths(32, 65, 64)
+	}, internal.ErrHashSizeExceedsMACBlockSize)
+
+	expectErrors(t, func() error {
+		return internal.ValidateMACKeyLengths(65, 32, 64)
+	}, internal.ErrKDFSizeExceedsMACBlockSize)
+
+	if err := internal.ValidateMACKeyLengths(64, 64, 64); err != nil {
+		t.Fatalf("unexpected compatibility error: %v", err)
 	}
 }
 

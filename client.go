@@ -13,7 +13,6 @@ import (
 	"slices"
 
 	"github.com/bytemare/ecc"
-
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
 	"github.com/bytemare/opaque/internal/encoding"
@@ -118,7 +117,8 @@ func (c *Client) RegistrationFinalize(
 	}
 
 	randomizedPassword := c.buildPRK(resp.EvaluatedMessage, o)
-	maskingKey := c.conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), c.conf.KDF.Size())
+	defer internal.ClearSlice(&randomizedPassword)
+	maskingKey := c.conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), c.conf.Hash.Size())
 	env, clientPublicKey, exportKey := envelope.Store(
 		c.conf,
 		randomizedPassword,
@@ -256,7 +256,9 @@ func (c *Client) ClearState() {
 // buildPRK derives the randomized password from the OPRF output.
 func (c *Client) buildPRK(evaluation *ecc.Element, options *clientOptions) []byte {
 	output := c.conf.OPRF.Finalize(c.oprf.blind, c.oprf.password, evaluation)
-	stretched := c.conf.NewKSF().HardenWithOptions(output, options.KSFOptions)
+	// It's safe to use UnsafeHarden as long as the options have been properly validated with ValidateParameters.
+	stretched := c.conf.KSF.UnsafeHarden(output,
+		options.KSFOptions.Salt, options.KSFOptions.Length, options.KSFOptions.Parameters...)
 
 	return c.conf.KDF.Extract(options.KDFSalt, encoding.Concat(output, stretched))
 }
