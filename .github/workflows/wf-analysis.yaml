@@ -27,7 +27,7 @@ permissions: {}
 
 jobs:
   Lint:
-    uses: bytemare/workflows/.github/workflows/suite-lint.yaml@66c5ecdf13473029efbf3dd3d4c3a676f4aac5aa
+    uses: bytemare/workflows/.github/workflows/suite-lint.yaml@ff64c6dc9b529c0fafa1570b232399f36bf5a12e
     permissions:
       contents: read
       packages: read
@@ -43,7 +43,7 @@ jobs:
       super-linter-rules-path: .github
 
   Governance:
-    uses: bytemare/workflows/.github/workflows/suite-governance.yaml@66c5ecdf13473029efbf3dd3d4c3a676f4aac5aa
+    uses: bytemare/workflows/.github/workflows/suite-governance.yaml@ff64c6dc9b529c0fafa1570b232399f36bf5a12e
     permissions:
       contents: write   # GitHub Dependency Submission API requirement to submit dependencies to the graph
       pull-requests: write  # needed when posting the summary
@@ -68,10 +68,10 @@ jobs:
       scorecard: true
       # Dependency Review
       dependency-review: true
+      dependency_review_config_file: ".github/dependency-review-config.yaml"
       # OSS Review Toolkit (ORT)
       ort: true
       # ---- Baseline PR gate (fast, GitHub-native) ----
-      dependency_review_config_file: ".github/dependency-review-config.yaml"
       allow_spdx: "MIT,Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,Unlicense,CC0-1.0"
       warn_only: false              # set true for a gentle rollout
       use_pr_comment: true          # posts summary on PRs (requires pull-requests: write)
@@ -89,7 +89,7 @@ jobs:
       scorecard: ${{ secrets.SCORECARD_READ_TOKEN }}
 
   CodeScan:
-    uses: bytemare/workflows/.github/workflows/suite-codescan.yaml@66c5ecdf13473029efbf3dd3d4c3a676f4aac5aa
+    uses: bytemare/workflows/.github/workflows/suite-codescan.yaml@ff64c6dc9b529c0fafa1570b232399f36bf5a12e
     permissions:
       contents: read
       security-events: write
