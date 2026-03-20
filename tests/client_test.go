@@ -338,7 +338,7 @@ func TestClient_RegistrationFinalize_InvalidKSFParameterValue(t *testing.T) {
 				KSFParameters: []uint64{3, 65536, 256},
 			})
 			return err
-		}, opaque.ErrClientOptions, internalKSF.ErrParameterValue)
+		}, opaque.ErrClientOptions, internalKSF.ErrParameters)
 	})
 }
 

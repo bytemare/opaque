@@ -317,6 +317,7 @@ func (c *Configuration) verify() error {
 		return ErrConfiguration.Join(internal.ErrInvalidHASHid)
 	}
 
+	// This will probably never be triggered with current hash functions that have output sizes.
 	if err := internal.ValidateMACKeyLengths(c.KDF, c.Hash, c.MAC); err != nil {
 		return ErrConfiguration.Join(err)
 	}

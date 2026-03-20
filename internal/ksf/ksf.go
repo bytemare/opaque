@@ -11,20 +11,20 @@ package ksf
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/bytemare/ksf"
 )
 
 var (
-	// ErrParameters indicates an invalid amount of KSF parameters.
-	ErrParameters = errors.New("invalid number of KSF parameters")
-
-	// ErrParameterValue indicates that one or more KSF parameters have invalid values.
-	ErrParameterValue = errors.New("invalid KSF parameter value")
+	// ErrParameters indicates invalid KSF parameters.
+	ErrParameters = errors.New("invalid KSF parameters")
 
 	// ErrNegativeKSFLength indicates that the requested KSF output length is negative.
 	ErrNegativeKSFLength = errors.New("the requested KSF output length is negative")
+
+	// ErrUnexpectedIdentityParameters indicates that parameters were provided for the Identity KSF,
+	// which does not take any parameters.
+	ErrUnexpectedIdentityParameters = errors.New("unexpected parameters with the Identity KSF")
 )
 
 // Options holds optional parameters to tweak the KSF and provide a custom salt.
@@ -54,12 +54,8 @@ func (o *Options) Set(f KSF, salt []byte, parameters []uint64, length int) error
 	if len(parameters) == 0 {
 		o.Parameters = append([]uint64(nil), defaults...)
 	} else {
-		if len(parameters) != len(defaults) {
-			return fmt.Errorf("%w: expected %d, got %d", ErrParameters, len(defaults), len(parameters))
-		}
-
 		if err := f.VerifyParameters(parameters...); err != nil {
-			return errors.Join(ErrParameterValue, err)
+			return errors.Join(ErrParameters, err)
 		}
 
 		o.Parameters = make([]uint64, len(parameters))
@@ -107,9 +103,12 @@ func (i IdentityKSF) UnsafeHarden(password, _ []byte, _ int, _ ...uint64) []byte
 	return password
 }
 
-// VerifyParameters returns always nil.
-func (i IdentityKSF) VerifyParameters(_ ...uint64) error {
-	// no-op
+// VerifyParameters fails if any arguments are provided, since the IdentityKSF does not take any parameters.
+func (i IdentityKSF) VerifyParameters(parameters ...uint64) error {
+	if len(parameters) != 0 {
+		return errors.Join(ErrParameters, ErrUnexpectedIdentityParameters)
+	}
+
 	return nil
 }
 

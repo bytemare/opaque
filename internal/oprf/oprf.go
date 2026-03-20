@@ -89,7 +89,7 @@ func (i Identifier) DeriveKey(seed, info []byte) *ecc.Scalar {
 		// The panic is defensive: with cryptographic hash functions the loop
 		// should succeed in the first iteration. Triggering the panic in tests
 		// would require deliberately breaking the hash construction, so we leave
-		// it as untested safeguard code.
+		// it as untested safeguard.
 		if counter > maxDeriveKeyPairTries {
 			panic(ErrDeriveKeyPairError)
 		}
