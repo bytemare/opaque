@@ -79,13 +79,13 @@ func k3dh(
 func core3DH(
 	conf *internal.Configuration, identities *Identities, ikm, ke1 []byte, ke2 *message.KE2,
 ) (sessionSecret, macS, macC []byte) {
-	conf.Hash.Reset()
-	initTranscript(conf, identities, ke1, ke2)
-	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, conf.Hash.Sum()) // preamble
-	serverMac := conf.MAC.MAC(serverMacKey, conf.Hash.Sum())                                // transcript2
-	conf.Hash.Write(serverMac)
-	transcript3 := conf.Hash.Sum()
-	conf.Hash.Reset()
+	h := conf.NewHash()
+	preamble := initTranscript(h, identities, conf.Context, ke1, ke2)
+	serverMacKey, clientMacKey, sessionSecret := deriveKeys(conf.KDF, ikm, preamble)
+	serverMac := conf.MAC.MAC(serverMacKey, preamble)
+	h.Write(serverMac)
+	transcript3 := h.Sum()
+
 	clientMac := conf.MAC.MAC(clientMacKey, transcript3)
 
 	return sessionSecret, serverMac, clientMac
@@ -107,30 +107,28 @@ func deriveSecret(h *internal.KDF, secret, label, context []byte) []byte {
 	return expandLabel(h, secret, label, context)
 }
 
-func initTranscript(conf *internal.Configuration, identities *Identities, ke1 []byte, ke2 *message.KE2) {
-	addToHash(conf, []byte(tag.VersionTag),
-		encoding.EncodeVector(conf.Context),
-		encoding.EncodeVector(identities.ClientIdentity),
-		ke1,
-		encoding.EncodeVector(identities.ServerIdentity),
-		ke2.CredentialResponse.Serialize(),
-		ke2.ServerNonce,
-		ke2.ServerKeyShare.Encode(),
-	)
-}
+// initTranscript initializes the transcript by adding the following values to the running hash state in h and returns
+// the current hash output:
+// Version || Context || ClientIdentity || KE1 || ServerIdentity || CredentialResponse || ServerNonce || ServerKeyShare.
+func initTranscript(h *internal.Hash, identities *Identities, context, ke1 []byte, ke2 *message.KE2) []byte {
+	h.Write([]byte(tag.VersionTag))
+	h.Write(encoding.EncodeVector(context))
+	h.Write(encoding.EncodeVector(identities.ClientIdentity))
+	h.Write(ke1)
+	h.Write(encoding.EncodeVector(identities.ServerIdentity))
+	h.Write(ke2.CredentialResponse.Serialize())
+	h.Write(ke2.ServerNonce)
+	h.Write(ke2.ServerKeyShare.Encode())
 
-func addToHash(conf *internal.Configuration, data ...[]byte) {
-	for _, d := range data {
-		conf.Hash.Write(d)
-	}
+	return h.Sum()
 }
 
 func deriveKeys(h *internal.KDF, ikm, context []byte) (serverMacKey, clientMacKey, sessionSecret []byte) {
 	prk := h.Extract(nil, ikm)
 	sessionSecret = deriveSecret(h, prk, []byte(tag.SessionKey), context)
 	handshakeSecret := deriveSecret(h, prk, []byte(tag.Handshake), context)
-	serverMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacServer), nil)
-	clientMacKey = expandLabel(h, handshakeSecret, []byte(tag.MacClient), nil)
+	serverMacKey = deriveSecret(h, handshakeSecret, []byte(tag.MacServer), nil)
+	clientMacKey = deriveSecret(h, handshakeSecret, []byte(tag.MacClient), nil)
 
 	return serverMacKey, clientMacKey, sessionSecret
 }

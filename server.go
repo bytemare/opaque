@@ -305,7 +305,7 @@ func (s *Server) verifyRecord(record *ClientRecord) error {
 		return ErrClientRecord.Join(internal.ErrEnvelopeInvalid, internal.ErrInvalidEncodingLength)
 	}
 
-	if len(record.MaskingKey) != s.conf.KDF.Size() {
+	if len(record.MaskingKey) != s.conf.Hash.Size() {
 		return ErrClientRecord.Join(internal.ErrEnvelopeInvalid, internal.ErrInvalidMaskingKey)
 	}
 
@@ -373,7 +373,7 @@ func (s *Server) validateKE1(ke1 *message.KE1) error {
 		return ErrKE1.Join(internal.ErrInvalidBlindedMessage, err)
 	}
 
-	if err := IsValidElement(s.conf.OPRF.Group(), ke1.ClientKeyShare); err != nil {
+	if err := IsValidElement(s.conf.Group, ke1.ClientKeyShare); err != nil {
 		return ErrKE1.Join(internal.ErrInvalidClientKeyShare, err)
 	}
 

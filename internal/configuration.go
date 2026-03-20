@@ -10,6 +10,7 @@
 package internal
 
 import (
+	"crypto"
 	"crypto/rand"
 	"errors"
 	"runtime"
@@ -29,17 +30,33 @@ const (
 	SeedLength = 32
 )
 
+var (
+	// ErrSliceDifferentLength indicates the provided slice is of different length than the configured value.
+	ErrSliceDifferentLength = errors.New("provided slice is different length than the configured value")
+
+	// ErrSliceShorterLength indicates the provided slice is shorter than the configured value.
+	ErrSliceShorterLength = errors.New("provided slice is shorter than the configured value")
+
+	// ErrProvidedLengthNegative indicates the provided length is negative.
+	ErrProvidedLengthNegative = errors.New("provided length is negative")
+)
+
 // Configuration is the internal representation of the instance runtime parameters.
 type Configuration struct {
+	KSF          ksf.KSF
 	KDF          *KDF
 	MAC          *Mac
-	Hash         *Hash
-	KSF          *ksf.KSF
 	OPRF         oprf.Identifier
 	Context      []byte
+	Hash         crypto.Hash
 	NonceLen     int
 	EnvelopeSize int
 	Group        ecc.Group
+}
+
+// NewHash returns a fresh hashing state for one protocol operation.
+func (c *Configuration) NewHash() *Hash {
+	return NewHash(c.Hash)
 }
 
 // MakeSecretKeyShare generates a secret key share from the provided seed. If the seed is empty, it gets a random one.
@@ -58,17 +75,6 @@ func RandomBytes(length int) []byte {
 
 	return r
 }
-
-var (
-	// ErrSliceDifferentLength indicates the provided slice is of different length than the configured value.
-	ErrSliceDifferentLength = errors.New("provided slice is different length than the configured value")
-
-	// ErrSliceShorterLength indicates the provided slice is shorter than the configured value.
-	ErrSliceShorterLength = errors.New("provided slice is shorter than the configured value")
-
-	// ErrProvidedLengthNegative indicates the provided length is negative.
-	ErrProvidedLengthNegative = errors.New("provided length is negative")
-)
 
 // ClearScalar attempts to safely clearing the internal secret value of the scalar, by first setting its bytes to a
 // random value and then zeroes it out.

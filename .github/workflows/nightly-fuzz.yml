@@ -16,6 +16,11 @@ on:
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
+    inputs:
+      time_per_target:
+        description: 'Number of seconds to fuzz each target (default: 120s)'
+        required: false
+        default: '120s'
 
 permissions: { }
 
@@ -25,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go: [ '1.25' ]
+        go: [ '1.26' ]
     runs-on: ubuntu-latest
 
     steps:
@@ -56,4 +61,6 @@ jobs:
         run: make -C .github test
 
       - name: Fuzz
-        run: make -C .github fuzz FUZZTIME=80s
+        env:
+          FUZZTIME: ${{ github.event.inputs.time_per_target }}
+        run: make -C .github fuzz

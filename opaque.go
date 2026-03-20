@@ -30,7 +30,7 @@ import (
 	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
-// Group identifies the prime-order group with hash-to-curve capability to use in OPRF and AKE.
+// Group identifies a supported group configuration for OPRF or AKE.
 type Group byte
 
 const (
@@ -71,8 +71,8 @@ func (g Group) Group() ecc.Group {
 
 const confIDsLength = 6
 
-// Configuration represents an OPAQUE configuration. Note that OprfGroup and AKEGroup are recommended to be the same,
-// as well as KDF, MAC, Hash should be the same.
+// Configuration represents an OPAQUE configuration. OPRF and AKE can use different groups.
+// Matching KDF, MAC, and Hash selections remain recommended but are not required.
 type Configuration struct {
 	Context []byte
 	KDF     crypto.Hash    `json:"kdf"`
@@ -210,18 +210,18 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 // GetFakeRecord creates a fake Client record to be used when no existing client record exists,
 // to defend against client enumeration techniques.
 func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecord, error) {
-	i, err := c.toInternal()
+	conf, err := c.toInternal()
 	if err != nil {
 		return nil, err
 	}
 
-	scalar := i.Group.NewScalar().Random()
-	publicKey := i.Group.Base().Multiply(scalar)
+	scalar := conf.Group.NewScalar().Random()
+	publicKey := conf.Group.Base().Multiply(scalar)
 
 	regRecord := &message.RegistrationRecord{
 		ClientPublicKey: publicKey,
-		MaskingKey:      RandomBytes(i.KDF.Size()),
-		Envelope:        make([]byte, internal.NonceLength+i.MAC.Size()),
+		MaskingKey:      RandomBytes(conf.Hash.Size()),
+		Envelope:        make([]byte, internal.NonceLength+conf.MAC.Size()),
 	}
 
 	return &ClientRecord{
@@ -317,6 +317,13 @@ func (c *Configuration) verify() error {
 		return ErrConfiguration.Join(internal.ErrInvalidHASHid)
 	}
 
+	// This will probably never be triggered with current hash functions that have output sizes.
+	if err := internal.ValidateMACKeyLengths(c.KDF, c.Hash, c.MAC); err != nil {
+		return ErrConfiguration.Join(err)
+	}
+
+	// If the KSF is not set it defaults to 0, which is valid and means no key stretching.
+	// If it is set, it must be available.
 	if c.KSF != 0 && !c.KSF.Available() {
 		return ErrConfiguration.Join(internal.ErrInvalidKSFid)
 	}
@@ -330,16 +337,21 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 		return nil, err
 	}
 
+	ksfid := internalKSF.KSF(c.KSF)
+	if c.KSF == 0 {
+		ksfid = internalKSF.IdentityKSF(0)
+	}
+
 	g := c.AKE.Group()
 	o := c.OPRF.OPRF()
 	mac := internal.NewMac(c.MAC)
 	ip := &internal.Configuration{
 		OPRF:         o,
 		Group:        g,
-		KSF:          internalKSF.NewKSF(c.KSF),
+		KSF:          ksfid,
 		KDF:          internal.NewKDF(c.KDF),
 		MAC:          mac,
-		Hash:         internal.NewHash(c.Hash),
+		Hash:         c.Hash,
 		NonceLen:     internal.NonceLength,
 		EnvelopeSize: internal.NonceLength + mac.Size(),
 		Context:      c.Context,

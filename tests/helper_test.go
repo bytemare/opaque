@@ -27,8 +27,6 @@ import (
 	"github.com/bytemare/opaque/internal/envelope"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
-
-	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
 func init() {
@@ -77,6 +75,10 @@ func verify(c *opaque.Configuration) error {
 		return internal.ErrInvalidHASHid
 	}
 
+	if err := internal.ValidateMACKeyLengths(c.KDF, c.Hash, c.MAC); err != nil {
+		return err
+	}
+
 	if c.KSF != 0 && !c.KSF.Available() {
 		return internal.ErrInvalidKSFid
 	}
@@ -95,14 +97,26 @@ func toInternal(c *opaque.Configuration) (*internal.Configuration, error) {
 	return &internal.Configuration{
 		OPRF:         o,
 		Group:        g,
-		KSF:          internalKSF.NewKSF(c.KSF),
+		KSF:          c.KSF,
 		KDF:          internal.NewKDF(c.KDF),
 		MAC:          mac,
-		Hash:         internal.NewHash(c.Hash),
+		Hash:         c.Hash,
 		NonceLen:     internal.NonceLength,
 		EnvelopeSize: internal.NonceLength + mac.Size(),
 		Context:      c.Context,
 	}, nil
+}
+
+func mixedGroupConfiguration() *opaque.Configuration {
+	return &opaque.Configuration{
+		OPRF:    opaque.RistrettoSha512,
+		AKE:     opaque.P256Sha256,
+		KSF:     ksf.Argon2id,
+		KDF:     crypto.SHA512,
+		MAC:     crypto.SHA512,
+		Hash:    crypto.SHA512,
+		Context: nil,
+	}
 }
 
 var configurationTable = map[opaque.Group]*configuration{
@@ -201,7 +215,7 @@ func getServer(t *testing.T, c *configuration) *opaque.Server {
 func TestConfigurationTableIncludesAllAvailableGroups(t *testing.T) {
 	available := make(map[opaque.Group]struct{})
 
-	for g := opaque.Group(0); g < 255; g++ {
+	for g := range opaque.Group(255) {
 		if g.Available() {
 			available[g] = struct{}{}
 		}
@@ -438,7 +452,7 @@ func buildPRK(
 	evaluation *ecc.Element,
 ) ([]byte, error) {
 	unblinded := conf.OPRF.Finalize(blind, password, evaluation)
-	hardened := conf.KSF.Harden(unblinded, nil, conf.OPRF.Group().ElementLength())
+	hardened := conf.KSF.UnsafeHarden(unblinded, nil, conf.OPRF.Group().ElementLength())
 
 	return conf.KDF.Extract(nil, encoding.Concat(unblinded, hardened)), nil
 }
@@ -454,7 +468,7 @@ func getEnvelope(
 		return nil, nil, fmt.Errorf("finalizing OPRF : %w", err)
 	}
 
-	maskingKey := conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), conf.KDF.Size())
+	maskingKey := conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), conf.Hash.Size())
 	clearText := xorResponse(conf, maskingKey, ke2.MaskingNonce, ke2.MaskedResponse)
 	e := clearText[conf.Group.ElementLength():]
 

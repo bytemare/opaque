@@ -11,6 +11,7 @@ package opaque_test
 import (
 	"crypto"
 	"encoding/hex"
+	"slices"
 	"testing"
 
 	"github.com/bytemare/ecc"
@@ -22,7 +23,7 @@ import (
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 
-	ksf2 "github.com/bytemare/opaque/internal/ksf"
+	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
 // TestNewClient_DefaultConfiguration guarantees that passing nil configuration falls back to the hardened defaults, which is essential so applications relying on the safe baseline do not accidentally run with zeroed parameters.
@@ -171,11 +172,11 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 		if err != nil {
 			t2.Fatal(err)
 		}
-		badParams := []int{1} // wrong count for Argon2id default (expects 3)
+		badParams := []uint64{1} // wrong count for Argon2id default (expects 3)
 		expectErrors(t2, func() error {
 			_, _, err := client4.RegistrationFinalize(r2b, nil, nil, &opaque.ClientOptions{KSFParameters: badParams})
 			return err
-		}, opaque.ErrClientOptions, ksf2.ErrParameters)
+		}, opaque.ErrClientOptions, internalKSF.ErrParameters)
 
 		// g) KSF options: negative length
 		client5 := getClient(t2, conf)
@@ -190,7 +191,7 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 		expectErrors(t2, func() error {
 			_, _, err := client5.RegistrationFinalize(r2c, nil, nil, &opaque.ClientOptions{KSFLength: -1})
 			return err
-		}, opaque.ErrClientOptions, ksf2.ErrNegativeKSFLength)
+		}, opaque.ErrClientOptions, internalKSF.ErrNegativeKSFLength)
 
 		// h) Envelope nonce options: length mismatch
 		client6 := getClient(t2, conf)
@@ -280,7 +281,8 @@ func TestClient_RegistrationFinalize_InvalidEvaluatedMessage(t *testing.T) {
 // TestClient_RegistrationFinalize_KSFCustomization demonstrates that callers can tune KSF parameters without breaking record derivation, which is important for deployments that increase work factors over time.
 func TestClient_RegistrationFinalize_KSFCustomization(t *testing.T) {
 	testAll(t, func(t *testing.T, conf *configuration) {
-		params := conf.internal.KSF.Parameters()
+		params := conf.internal.KSF.DefaultParameters()
+		defaults := append([]uint64(nil), params...)
 		if len(params) == 0 {
 			t.Skip("KSF has no tunable parameters")
 		}
@@ -296,7 +298,7 @@ func TestClient_RegistrationFinalize_KSFCustomization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		custom := append([]int(nil), params...)
+		custom := append([]uint64(nil), params...)
 		options := &opaque.ClientOptions{
 			KSFParameters: custom,
 			KSFLength:     conf.internal.KDF.Size(),
@@ -309,6 +311,34 @@ func TestClient_RegistrationFinalize_KSFCustomization(t *testing.T) {
 		if record == nil {
 			t.Fatal("expected non-nil registration record")
 		}
+
+		if got := conf.internal.KSF.DefaultParameters(); !slices.Equal(got, defaults) {
+			t.Fatalf("custom KSF options mutated defaults: got %v, want %v", got, defaults)
+		}
+	})
+}
+
+// TestClient_RegistrationFinalize_InvalidKSFParameterValue ensures invalid KSF values fail with regular errors instead
+// of reaching the underlying KSF implementation and panicking.
+func TestClient_RegistrationFinalize_InvalidKSFParameterValue(t *testing.T) {
+	testAll(t, func(t2 *testing.T, conf *configuration) {
+		client, server := setup(t2, conf)
+		req, err := client.RegistrationInit(password)
+		if err != nil {
+			t2.Fatal(err)
+		}
+
+		resp, err := server.RegistrationResponse(req, credentialIdentifier, nil)
+		if err != nil {
+			t2.Fatal(err)
+		}
+
+		expectErrors(t2, func() error {
+			_, _, err := client.RegistrationFinalize(resp, nil, nil, &opaque.ClientOptions{
+				KSFParameters: []uint64{3, 65536, 256},
+			})
+			return err
+		}, opaque.ErrClientOptions, internalKSF.ErrParameters)
 	})
 }
 
@@ -884,7 +914,7 @@ func TestClient_GenerateKE3_InvalidServerPublicKey(t *testing.T) {
 		authKey := conf.internal.KDF.Expand(
 			randomizedPassword,
 			encoding.SuffixString(env.Nonce, tag.AuthKey),
-			conf.internal.KDF.Size(),
+			conf.internal.Hash.Size(),
 		)
 		authTag := conf.internal.MAC.MAC(authKey, encoding.Concat(env.Nonce, ctc))
 		env.AuthTag = authTag
@@ -928,15 +958,15 @@ func TestClient_GenerateKE3_InvalidKE2Mac(t *testing.T) {
 // TestClientPRK validates the PRK derivation pipeline across KSF backends, ensuring deterministic outputs used in test vectors remain stable and interoperable.
 func TestClientPRK(t *testing.T) {
 	type prkTest struct {
+		ksf           internalKSF.KSF
 		name          string
 		input         string
 		ksfSalt       string
 		kdfSalt       string
 		output        string
-		ksfParameters []int
+		ksfParameters []uint64
 		ksfLength     int
 		kdf           crypto.Hash
-		ksf           ksf.Identifier
 	}
 
 	tests := []prkTest{
@@ -945,7 +975,7 @@ func TestClientPRK(t *testing.T) {
 			ksf:           ksf.Argon2id,
 			ksfSalt:       "ksfSalt",
 			ksfLength:     32,
-			ksfParameters: []int{3, 65536, 4},
+			ksfParameters: []uint64{3, 65536, 4},
 			kdf:           crypto.SHA512,
 			kdfSalt:       "kdfSalt",
 			input:         "password",
@@ -956,7 +986,7 @@ func TestClientPRK(t *testing.T) {
 			ksf:           ksf.Scrypt,
 			ksfSalt:       "ksfSalt",
 			ksfLength:     32,
-			ksfParameters: []int{32768, 8, 1},
+			ksfParameters: []uint64{32768, 8, 1},
 			kdf:           crypto.SHA512,
 			kdfSalt:       "kdfSalt",
 			input:         "password",
@@ -967,7 +997,7 @@ func TestClientPRK(t *testing.T) {
 			ksf:           ksf.PBKDF2Sha512,
 			ksfSalt:       "ksfSalt",
 			ksfLength:     32,
-			ksfParameters: []int{10000},
+			ksfParameters: []uint64{10000},
 			kdf:           crypto.SHA512,
 			kdfSalt:       "kdfSalt",
 			input:         "password",
@@ -975,10 +1005,10 @@ func TestClientPRK(t *testing.T) {
 		},
 		{
 			name:          "Identity",
-			ksf:           0,
+			ksf:           internalKSF.IdentityKSF(0),
 			ksfSalt:       "ksfSalt",
 			ksfLength:     32,
-			ksfParameters: []int{1, 2},
+			ksfParameters: []uint64{1, 2},
 			kdf:           crypto.SHA512,
 			kdfSalt:       "kdfSalt",
 			input:         "password",
@@ -989,9 +1019,16 @@ func TestClientPRK(t *testing.T) {
 	for _, ksfTest := range tests {
 		t.Run(ksfTest.name, func(t *testing.T) {
 			input := []byte(ksfTest.input)
-			stretcher := ksf2.NewKSF(ksfTest.ksf)
-			stretcher.Parameterize(ksfTest.ksfParameters...)
-			stretched := stretcher.Harden(input, []byte(ksfTest.ksfSalt), ksfTest.ksfLength)
+			stretcher := ksfTest.ksf
+
+			stretched, err := stretcher.Harden(
+				input,
+				[]byte(ksfTest.ksfSalt),
+				ksfTest.ksfLength,
+				ksfTest.ksfParameters...)
+			if err != nil {
+				t.Fatalf("KSF hardening failed: %v", err)
+			}
 
 			extract := internal.NewKDF(ksfTest.kdf)
 			output := hex.EncodeToString(extract.Extract([]byte(ksfTest.kdfSalt), encoding.Concat(input, stretched)))

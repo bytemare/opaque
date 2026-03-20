@@ -1,0 +1,25 @@
+# Dependency Review Action config
+fail-on-severity: low
+license-check: true
+vulnerability-check: true
+
+# Only check runtime deps to avoid noise from dev/test tools
+fail-on-scopes:
+  - runtime
+
+# Permissive allow-list suitable for MIT projects
+allow-licenses:
+  - MIT
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+  - Unlicense
+  - CC0-1.0
+  - LicenseRef-scancode-google-patent-license-golang
+
+# Allow first-party GitHub Actions where license detection may fail
+# GitHub Actions don't have standardized license metadata in their manifests,
+# so we explicitly allow actions from namespaces we control and know are MIT licensed.
+allow-dependencies-licenses:
+  - pkg:githubactions/bytemare/*

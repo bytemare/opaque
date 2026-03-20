@@ -33,12 +33,23 @@ func NewKDF(id crypto.Hash) *KDF {
 
 // Extract exposes an Extract only KDF method.
 func (k *KDF) Extract(salt, ikm []byte) []byte {
-	return k.h.HKDFExtract(ikm, salt)
+	//nolint:errcheck // We can ignore the error since we use FIPS140 compliant input with:
+	// - only valid hash functions
+	// - keys always longer than 112 bits.
+	out, _ := k.h.HKDFExtract(ikm, salt)
+
+	return out
 }
 
 // Expand exposes an Expand only KDF method.
 func (k *KDF) Expand(key, info []byte, length int) []byte {
-	return k.h.HKDFExpand(key, info, length)
+	//nolint:errcheck // We can ignore the error since we use FIPS140 compliant input with:
+	// - only valid hash functions
+	// - keys always longer than 112 bits.
+	// - lengths at SeedLength or the hash output size
+	out, _ := k.h.HKDFExpand(key, info, length)
+
+	return out
 }
 
 // Size returns the output size of the Extract method.
@@ -69,6 +80,35 @@ func (m *Mac) MAC(key, message []byte) []byte {
 // Size returns the MAC's output length.
 func (m *Mac) Size() int {
 	return m.h.Size()
+}
+
+// BlockSize returns the MAC's underlying hash block size.
+func (m *Mac) BlockSize() int {
+	return m.h.BlockSize()
+}
+
+// ValidateMACKeyLengths enforces the implementation policy that derived MAC keys must not exceed the MAC block size.
+// Using keys larger than the block size ends up  being hashed by the HMAC function, which is standard but reduces the
+// advertised security level associated to the key length. Hence, we take the stance that the client expects a higher
+// security level than what the chosen hash functions provide, and therefore reject such configurations.
+// This is highly unlikely to be an issue in practice, since the block size of common hash functions is already quite
+// large (e.g. 64 bytes for SHA-256), but we enforce it to avoid confusion and to be explicit about the security level
+// of the derived keys.
+func ValidateMACKeyLengths(k, h, m crypto.Hash) error {
+	mac := NewMac(m)
+	kdfSize, hashSize, macBlockSize := k.Size(), h.Size(), mac.BlockSize()
+
+	if hashSize > macBlockSize {
+		// Unreachable since we prevalidated compatible hash functions.
+		return ErrHashSizeExceedsMACBlockSize
+	}
+
+	if kdfSize > macBlockSize {
+		// Unreachable since we prevalidated compatible hash functions.
+		return ErrKDFSizeExceedsMACBlockSize
+	}
+
+	return nil
 }
 
 // Hash wraps a hash function and exposes only necessary hashing methods.

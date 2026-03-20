@@ -84,9 +84,9 @@ type ClientOptions struct {
 	KSFSalt             []byte
 	EnvelopeNonce       []byte
 	KDFSalt             []byte
-	KSFParameters       []int
+	KSFParameters       []uint64
 	EnvelopeNonceLength int
-	KSFLength           int
+	KSFLength           int // If 0 or not set, will default to the OPRF length.
 }
 
 func (c *Client) verifyOptionBlind(clientOptions ...*ClientOptions) (*ecc.Scalar, error) {
@@ -133,10 +133,6 @@ type clientOptions struct {
 func (c *Client) clientOptionsKSFParser(out *clientOptions, in *ClientOptions) error {
 	if err := out.KSFOptions.Set(c.conf.KSF, in.KSFSalt, in.KSFParameters, in.KSFLength); err != nil {
 		return ErrClientOptions.Join(err)
-	}
-
-	if len(out.KSFOptions.Parameters) != 0 {
-		c.conf.KSF.Parameterize(out.KSFOptions.Parameters...)
 	}
 
 	return nil

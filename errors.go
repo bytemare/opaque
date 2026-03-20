@@ -148,13 +148,11 @@ func (c ErrorCode) Error() string {
 // Is implements the errors.Is method for the ErrorCode type.
 // It allows checking if the error is of a specific ErrorCode.
 func (c ErrorCode) Is(target error) bool {
-	var errCode ErrorCode
-	if errors.As(target, &errCode) {
+	if errCode, ok := errors.AsType[ErrorCode](target); ok {
 		return byte(c) == byte(errCode)
 	}
 
-	var opaqueErr *Error
-	if errors.As(target, &opaqueErr) {
+	if opaqueErr, ok := errors.AsType[*Error](target); ok {
 		return byte(c) == byte(opaqueErr.Code)
 	}
 

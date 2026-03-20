@@ -32,6 +32,12 @@ var (
 
 	// ErrInvalidAKEid indicates that the provided AKE group identifier is invalid.
 	ErrInvalidAKEid = errors.New("invalid AKE group id")
+
+	// ErrHashSizeExceedsMACBlockSize indicates that the selected Hash output size does not fit the MAC block-size policy.
+	ErrHashSizeExceedsMACBlockSize = errors.New("hash output size exceeds MAC block size")
+
+	// ErrKDFSizeExceedsMACBlockSize indicates that the selected KDF output size does not fit the MAC block-size policy.
+	ErrKDFSizeExceedsMACBlockSize = errors.New("KDF output size exceeds MAC block size")
 )
 
 // Server authentication errors: upon error, the protocol must be aborted and the keys must not be used.

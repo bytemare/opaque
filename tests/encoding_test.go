@@ -220,7 +220,7 @@ func TestOS2IP_Failures(t *testing.T) {
 
 func hasPanic(f func()) (has bool, err error) {
 	err = nil
-	var report interface{}
+	var report any
 	func() {
 		defer func() {
 			if report = recover(); report != nil {

@@ -5,6 +5,7 @@ linters:
     - embeddedstructfieldcheck
     - noinlineerr
     - nonamedreturns
+    - revive
     - varnamelen
   enable:
     - arangolint
@@ -90,7 +91,6 @@ linters:
     - protogetter
     - reassign
     - recvcheck
-    - revive
     - rowserrcheck
     - sloglint
     - spancheck
@@ -155,6 +155,9 @@ linters:
         - '9'
     nlreturn:
       block-size: 2
+    nolintlint:
+      require-explanation: true
+      require-specific: true
     prealloc:
       simple: false
       range-loops: true

@@ -50,7 +50,8 @@ func (d *Deserializer) RegistrationResponse(registrationResponse []byte) (*messa
 		return nil, ErrRegistrationResponse.Join(internal.ErrInvalidEvaluatedMessage, err)
 	}
 
-	pksBytes := registrationResponse[d.conf.OPRF.Group().ElementLength() : 2*d.conf.OPRF.Group().ElementLength()]
+	offset := d.conf.OPRF.Group().ElementLength()
+	pksBytes := registrationResponse[offset : offset+d.conf.Group.ElementLength()]
 
 	_, err = DeserializeElement(d.conf.Group, pksBytes)
 	if err != nil {

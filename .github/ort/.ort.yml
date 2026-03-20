@@ -1,0 +1,13 @@
+---
+
+excludes:
+  paths:
+    - pattern: ".github/CODE_OF_CONDUCT.md"
+      reason: "DOCUMENTATION_OF"
+      comment: "Project OSS Contributor Covenant Code of Conduct. The CC-BY-SA-4.0 license applies to the CoC document text itself, not to the project source code. Not part of release artifacts."
+    - pattern: ".github/CONTRIBUTING.md"
+      reason: "DOCUMENTATION_OF"
+      comment: "Project OSS contributing guide. Not part of release artifacts."
+    - pattern: "README.md"
+      reason: "DOCUMENTATION_OF"
+      comment: "Project OSS documentation. Not part of release artifacts."

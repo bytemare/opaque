@@ -30,11 +30,11 @@ func (e *Envelope) Serialize() []byte {
 }
 
 func exportKey(conf *internal.Configuration, randomizedPassword, nonce []byte) []byte {
-	return conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExportKey), conf.KDF.Size())
+	return conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.ExportKey), conf.Hash.Size())
 }
 
 func authTag(conf *internal.Configuration, randomizedPassword, nonce, ctc []byte) []byte {
-	authKey := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.AuthKey), conf.KDF.Size())
+	authKey := conf.KDF.Expand(randomizedPassword, encoding.SuffixString(nonce, tag.AuthKey), conf.Hash.Size())
 	return conf.MAC.MAC(authKey, encoding.Concat(nonce, ctc))
 }
 

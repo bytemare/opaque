@@ -34,7 +34,7 @@ type testParams struct {
 	serverSecretKey                                                  *ecc.Scalar
 	serverPublicKey                                                  *ecc.Element
 	username, userID, serverID, password, oprfSeed, ksfSalt, kdfSalt []byte
-	ksfParameters                                                    []int
+	ksfParameters                                                    []uint64
 	ksfLength, nonceLength                                           int
 }
 
@@ -55,7 +55,7 @@ func TestFull(t *testing.T) {
 		serverID:      ids,
 		password:      password,
 		oprfSeed:      conf.GenerateOPRFSeed(),
-		ksfParameters: []int{3, 65536, 4},
+		ksfParameters: []uint64{3, 65536, 4},
 		ksfSalt:       []byte("ksfSalt"),
 		kdfSalt:       []byte("kdfSalt"),
 		nonceLength:   internal.NonceLength,
@@ -77,6 +77,49 @@ func TestFull(t *testing.T) {
 	if !bytes.Equal(exportKeyReg, exportKeyLogin) {
 		t.Errorf("export keys differ")
 	}
+}
+
+func testFullMixed(t *testing.T, conf *opaque.Configuration) {
+	tester := &testParams{
+		Configuration: conf,
+		username:      []byte("client"),
+		userID:        []byte("client"),
+		serverID:      []byte("server"),
+		password:      []byte("password"),
+		oprfSeed:      conf.GenerateOPRFSeed(),
+		ksfParameters: []uint64{3, 65536, 4},
+		ksfSalt:       []byte("ksfSalt"),
+		kdfSalt:       []byte("kdfSalt"),
+		nonceLength:   internal.NonceLength,
+	}
+
+	tester.serverSecretKey, tester.serverPublicKey = conf.KeyGen()
+
+	_, _, record, exportKeyReg := testRegistration(t, tester)
+	_, _, exportKeyLogin := testAuthentication(t, tester, record)
+
+	if !bytes.Equal(exportKeyReg, exportKeyLogin) {
+		t.Errorf("export keys differ")
+	}
+}
+
+// TestFull_MixedOPRFAndAKEGroups ensures registration and login work when the OPRF and AKE use different groups.
+func TestFull_MixedOPRFAndAKEGroups(t *testing.T) {
+	conf := mixedGroupConfiguration()
+	conf.Context = []byte("OPAQUEMixedGroupTest")
+
+	testFullMixed(t, conf)
+}
+
+// TestFull_MixedKDFMACHashSizes ensures the end-to-end flow works when the transcript hash, MAC, and KDF sizes differ.
+func TestFull_MixedKDFMACHashSizes(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+	conf.Context = []byte("OPAQUEMixedSizeTest")
+	conf.KDF = crypto.SHA512
+	conf.MAC = crypto.SHA256
+	conf.Hash = crypto.SHA256
+
+	testFullMixed(t, conf)
 }
 
 func testRegistration(t *testing.T, p *testParams) (*opaque.Client, *opaque.Server, *opaque.ClientRecord, []byte) {
@@ -543,6 +586,32 @@ func TestBadConfiguration(t *testing.T) {
 				return err
 			}, badConf.error)
 		})
+	}
+}
+
+// TestConfiguration_MixedGroups confirms configurations preserve distinct OPRF and AKE groups across constructors and serialization.
+func TestConfiguration_MixedGroups(t *testing.T) {
+	conf := mixedGroupConfiguration()
+
+	if _, err := conf.Client(); err != nil {
+		t.Fatalf("unexpected client error: %v", err)
+	}
+
+	if _, err := conf.Server(); err != nil {
+		t.Fatalf("unexpected server error: %v", err)
+	}
+
+	if _, err := conf.Deserializer(); err != nil {
+		t.Fatalf("unexpected deserializer error: %v", err)
+	}
+
+	conf2, err := opaque.DeserializeConfiguration(conf.Serialize())
+	if err != nil {
+		t.Fatalf("unexpected configuration deserialization error: %v", err)
+	}
+
+	if err := conf.Equals(conf2); err != nil {
+		t.Fatalf("unexpected inequality: %v", err)
 	}
 }
 

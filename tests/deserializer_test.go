@@ -9,6 +9,8 @@
 package opaque_test
 
 import (
+	"bytes"
+	"crypto"
 	"errors"
 	"fmt"
 	"testing"
@@ -226,6 +228,60 @@ func TestDeserializer_RegistrationResponse_Errors(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestDeserializer_RegistrationResponse_MixedGroups ensures parsing uses the OPRF length for the evaluated message
+// and the AKE length for the server public key when the groups differ.
+func TestDeserializer_RegistrationResponse_MixedGroups(t *testing.T) {
+	conf := mixedGroupConfiguration()
+	d := getDeserializer(t, conf)
+
+	evaluatedMessage := conf.OPRF.Group().Base().Multiply(conf.OPRF.Group().NewScalar().Random()).Encode()
+	_, serverPublicKey := conf.KeyGen()
+	input := encoding.Concat(evaluatedMessage, serverPublicKey.Encode())
+
+	resp, err := d.RegistrationResponse(input)
+	if err != nil {
+		t.Fatalf(testErrValidConf, err)
+	}
+
+	if !bytes.Equal(resp.EvaluatedMessage.Encode(), evaluatedMessage) {
+		t.Fatalf("unexpected evaluated message bytes")
+	}
+
+	if !bytes.Equal(resp.ServerPublicKey, serverPublicKey.Encode()) {
+		t.Fatalf("unexpected server public key bytes")
+	}
+}
+
+// TestDeserializer_RegistrationRecord_MixedKDFAndHashSizes ensures record parsing derives the masking-key length from
+// the KDF, not the transcript hash.
+func TestDeserializer_RegistrationRecord_MixedKDFAndHashSizes(t *testing.T) {
+	conf := opaque.DefaultConfiguration()
+	conf.KDF = crypto.SHA512
+	conf.MAC = crypto.SHA256
+	conf.Hash = crypto.SHA256
+
+	d := getDeserializer(t, conf)
+	_, clientPublicKey := conf.KeyGen()
+	input := encoding.Concat3(
+		clientPublicKey.Encode(),
+		internal.RandomBytes(conf.Hash.Size()),
+		internal.RandomBytes(internal.NonceLength+conf.MAC.Size()),
+	)
+
+	record, err := d.RegistrationRecord(input)
+	if err != nil {
+		t.Fatalf(testErrValidConf, err)
+	}
+
+	if !bytes.Equal(record.ClientPublicKey.Encode(), clientPublicKey.Encode()) {
+		t.Fatalf("unexpected client public key bytes")
+	}
+
+	if len(record.MaskingKey) != conf.Hash.Size() {
+		t.Fatalf("unexpected masking key length: got %d, want %d", len(record.MaskingKey), conf.Hash.Size())
+	}
 }
 
 // TestDeserializer_RegistrationRecord_Errors confirms storage records are thoroughly validated before use, preserving envelope integrity and key consistency.
