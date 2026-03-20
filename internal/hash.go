@@ -33,7 +33,7 @@ func NewKDF(id crypto.Hash) *KDF {
 
 // Extract exposes an Extract only KDF method.
 func (k *KDF) Extract(salt, ikm []byte) []byte {
-	// We can ignore the error since we use FIPS140 compliant input with:
+	//nolint:errcheck // We can ignore the error since we use FIPS140 compliant input with:
 	// - only valid hash functions
 	// - keys always longer than 112 bits.
 	out, _ := k.h.HKDFExtract(ikm, salt)
@@ -43,7 +43,7 @@ func (k *KDF) Extract(salt, ikm []byte) []byte {
 
 // Expand exposes an Expand only KDF method.
 func (k *KDF) Expand(key, info []byte, length int) []byte {
-	// We can ignore the error since we use FIPS140 compliant input with:
+	//nolint:errcheck // We can ignore the error since we use FIPS140 compliant input with:
 	// - only valid hash functions
 	// - keys always longer than 112 bits.
 	// - lengths at SeedLength or the hash output size
