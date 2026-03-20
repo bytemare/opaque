@@ -27,7 +27,7 @@ permissions: {}
 
 jobs:
   Lint:
-    uses: bytemare/workflows/.github/workflows/suite-lint.yaml@c0af4f34c0568cb06aa51dd902ac5c51fd207e79
+    uses: bytemare/workflows/.github/workflows/suite-lint.yaml@c3c8631ecbccbb3d6ce57d9974ccfa659d573fe3
     permissions:
       contents: read
       packages: read
@@ -43,7 +43,7 @@ jobs:
       super-linter-rules-path: .github
 
   Governance:
-    uses: bytemare/workflows/.github/workflows/suite-governance.yaml@c0af4f34c0568cb06aa51dd902ac5c51fd207e79
+    uses: bytemare/workflows/.github/workflows/suite-governance.yaml@c3c8631ecbccbb3d6ce57d9974ccfa659d573fe3
     permissions:
       contents: write   # GitHub Dependency Submission API requirement to submit dependencies to the graph
       pull-requests: write  # needed when posting the summary
@@ -89,7 +89,7 @@ jobs:
       scorecard: ${{ secrets.SCORECARD_READ_TOKEN }}
 
   CodeScan:
-    uses: bytemare/workflows/.github/workflows/suite-codescan.yaml@c0af4f34c0568cb06aa51dd902ac5c51fd207e79
+    uses: bytemare/workflows/.github/workflows/suite-codescan.yaml@c3c8631ecbccbb3d6ce57d9974ccfa659d573fe3
     permissions:
       contents: read
       security-events: write
