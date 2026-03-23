@@ -81,8 +81,9 @@ func (s *Server) resolveServerInputs(options []*ServerOptions) (*serverInputs, e
 // Only use this if you know what you're doing. Reusing seeds and nonces across sessions is a security risk,
 // and breaks forward secrecy.
 type ClientOptions struct {
-	OPRFBlind           *ecc.Scalar
-	Password            []byte // Only used in RegistrationFinalize and GenerateKE3, for session resumption without previous state, and ignored otherwise.
+	OPRFBlind *ecc.Scalar
+	Password  []byte // Only used in RegistrationFinalize and GenerateKE3, for session resumption
+	// without previous state, and ignored otherwise.
 	AKE                 *AKEOptions
 	KE1                 []byte
 	KSFSalt             []byte

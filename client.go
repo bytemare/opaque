@@ -204,12 +204,7 @@ func (c *Client) GenerateKE3(
 	}
 
 	// Finalize the AKE.
-	identities := ake.SetIdentities(
-		clientIdentity,
-		clientPublicKey,
-		serverIdentity,
-		serverPublicKeyBytes,
-	)
+	identities := ake.SetIdentities(clientIdentity, clientPublicKey, serverIdentity, serverPublicKeyBytes)
 
 	ke3, sessionKey, macOK := ake.Finalize(
 		c.conf,
