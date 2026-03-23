@@ -139,15 +139,15 @@ func (s *Server) GenerateKE2(
 		return nil, nil, err
 	}
 
-	o, err := s.resolveGenerateKE2Inputs(record, options)
+	inputs, err := s.resolveGenerateKE2Inputs(record, options)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	defer internal.ClearScalar(&o.ClientOPRFKey)
-	defer internal.ClearScalar(&o.SecretKeyShare)
+	defer internal.ClearScalar(&inputs.ClientOPRFKey)
+	defer internal.ClearScalar(&inputs.SecretKeyShare)
 
-	ke2, output := s.coreGenerateKE2(ke1, record, o)
+	ke2, output := s.coreGenerateKE2(ke1, record, inputs)
 
 	return ke2, output, nil
 }
@@ -173,8 +173,8 @@ type ServerOutput struct {
 	SessionSecret []byte
 }
 
-func newServerOptions() *serverOptions {
-	return &serverOptions{
+func newServerInputs() *serverInputs {
+	return &serverInputs{
 		ClientOPRFKey:  nil,
 		MaskingNonce:   nil,
 		SecretKeyShare: nil,
@@ -185,21 +185,20 @@ func newServerOptions() *serverOptions {
 func (s *Server) resolveGenerateKE2Inputs(
 	record *ClientRecord,
 	options []*ServerOptions,
-) (*serverOptions, error) {
-	o := newServerOptions()
-
-	if err := s.parseOptions(o, options); err != nil {
+) (*serverInputs, error) {
+	inputs, err := s.resolveServerInputs(options)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := s.patchGenerateKE2Options(o, record); err != nil {
+	if err = s.finalizeGenerateKE2Inputs(inputs, record); err != nil {
 		return nil, err
 	}
 
-	return o, nil
+	return inputs, nil
 }
 
-func (s *Server) patchGenerateKE2Options(options *serverOptions, record *ClientRecord) error {
+func (s *Server) finalizeGenerateKE2Inputs(options *serverInputs, record *ClientRecord) error {
 	if options.SecretKeyShare == nil {
 		options.SecretKeyShare = s.conf.MakeSecretKeyShare(nil)
 	}
@@ -224,10 +223,10 @@ func (s *Server) patchGenerateKE2Options(options *serverOptions, record *ClientR
 func (s *Server) coreGenerateKE2(
 	ke1 *message.KE1,
 	record *ClientRecord,
-	o *serverOptions,
+	inputs *serverInputs,
 ) (*message.KE2, *ServerOutput) {
 	response := s.credentialResponse(ke1.BlindedMessage,
-		record.RegistrationRecord, o.MaskingNonce, s.ServerKeyMaterial.PublicKeyBytes, o.ClientOPRFKey)
+		record.RegistrationRecord, inputs.MaskingNonce, s.ServerKeyMaterial.PublicKeyBytes, inputs.ClientOPRFKey)
 
 	identities := ake.SetIdentities(
 		record.ClientIdentity,
@@ -238,15 +237,15 @@ func (s *Server) coreGenerateKE2(
 
 	ke2 := &message.KE2{
 		CredentialResponse: response,
-		ServerKeyShare:     s.conf.Group.Base().Multiply(o.SecretKeyShare),
-		ServerNonce:        o.AKENonce,
+		ServerKeyShare:     s.conf.Group.Base().Multiply(inputs.SecretKeyShare),
+		ServerNonce:        inputs.AKENonce,
 		ServerMac:          nil,
 	}
 
 	clientMac, sessionSecret := ake.Respond(
 		s.conf,
 		s.ServerKeyMaterial.PrivateKey,
-		o.SecretKeyShare,
+		inputs.SecretKeyShare,
 		identities,
 		record.ClientPublicKey,
 		ke2,
@@ -314,7 +313,7 @@ func (s *Server) credentialResponse(
 	return message.NewCredentialResponse(z, maskingNonce, maskedResponse)
 }
 
-type serverOptions struct {
+type serverInputs struct {
 	ClientOPRFKey  *ecc.Scalar
 	MaskingNonce   []byte
 	SecretKeyShare *ecc.Scalar

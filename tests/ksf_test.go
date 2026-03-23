@@ -88,7 +88,7 @@ func TestKSFOptionsSet_InvalidParameterValues(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			options := internalKSF.NewOptions(32)
+			options := internalKSF.NewParameters(32)
 			expectErrors(t, func() error {
 				return options.Set(test.id, nil, test.parameters, 32)
 			}, test.expected)

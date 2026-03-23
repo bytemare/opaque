@@ -27,16 +27,16 @@ var (
 	ErrUnexpectedIdentityParameters = errors.New("unexpected parameters with the Identity KSF")
 )
 
-// Options holds optional parameters to tweak the KSF and provide a custom salt.
-type Options struct {
+// Parameters holds optional parameters to tweak the KSF and provide a custom salt.
+type Parameters struct {
 	Salt       []byte
 	Parameters []uint64
 	Length     int
 }
 
-// NewOptions returns a new Options instance with the provided length.
-func NewOptions(length int) *Options {
-	return &Options{
+// NewParameters returns a new Parameters instance with the provided length.
+func NewParameters(length int) *Parameters {
+	return &Parameters{
 		Salt:       nil,
 		Parameters: nil,
 		Length:     length,
@@ -44,7 +44,7 @@ func NewOptions(length int) *Options {
 }
 
 // Set sets the options for the KSF. If parameters are provided, they must match the KSF shape and value constraints.
-func (o *Options) Set(f KSF, salt []byte, parameters []uint64, length int) error {
+func (o *Parameters) Set(f KSF, salt []byte, parameters []uint64, length int) error {
 	if length < 0 {
 		return ErrNegativeKSFLength
 	}
