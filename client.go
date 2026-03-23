@@ -85,19 +85,14 @@ func (c *Client) RegistrationInit(
 	)
 
 	if len(options) != 0 {
-		blind, err = c.verifyOptionBlind(options...)
+		blind, err = c.verifyOptionBlind(options[0].OPRFBlind)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	var m *ecc.Element
-
-	c.oprf.blind, m = c.conf.OPRF.Blind(password, blind)
-	c.oprf.password = slices.Clone(password)
-
 	return &message.RegistrationRequest{
-		BlindedMessage: m,
+		BlindedMessage: c.startOPRF(password, blind),
 	}, nil
 }
 
@@ -155,10 +150,7 @@ func (c *Client) GenerateKE1(password []byte, options ...*ClientOptions) (*messa
 		return nil, err
 	}
 
-	var m *ecc.Element
-
-	c.oprf.blind, m = c.conf.OPRF.Blind(password, o.OPRFBlind)
-	c.oprf.password = slices.Clone(password)
+	m := c.startOPRF(password, o.OPRFBlind)
 	ke1 := ake.Start(c.conf.Group, c.ake.SecretKeyShare, o.AKENonce)
 	ke1.BlindedMessage = m
 	c.ake.ke1 = ke1.Serialize()
@@ -238,6 +230,21 @@ func (c *Client) GenerateKE3(
 // ClearState attempts to zero out the client's secret material and state, and sets them to nil. It is strongly
 // recommended to call this method after the client is done with the protocol, to avoid leaking sensitive key material.
 func (c *Client) ClearState() {
+	// OPRF
+	if c.oprf.blind != nil {
+		internal.ClearScalar(&c.oprf.blind)
+	}
+
+	if len(c.oprf.password) > 0 {
+		internal.ClearSlice(&c.oprf.password)
+	}
+
+	c.oprf = oprfState{
+		blind:    nil,
+		password: nil,
+	} // clear the OPRF state reference.
+
+	// AKE
 	if c.ake.SecretKeyShare != nil {
 		internal.ClearScalar(&c.ake.SecretKeyShare)
 	}
@@ -246,13 +253,10 @@ func (c *Client) ClearState() {
 		internal.ClearSlice(&c.ake.ke1)
 	}
 
-	if c.oprf.blind != nil {
-		internal.ClearScalar(&c.oprf.blind)
-	}
-
-	if len(c.oprf.password) > 0 {
-		internal.ClearSlice(&c.oprf.password)
-	}
+	c.ake = akeState{
+		SecretKeyShare: nil,
+		ke1:            nil,
+	} // clear the AKE state reference.
 }
 
 // buildPRK derives the randomized password from the OPRF output.
@@ -263,6 +267,15 @@ func (c *Client) buildPRK(evaluation *ecc.Element, options *clientOptions) []byt
 		options.KSFOptions.Salt, options.KSFOptions.Length, options.KSFOptions.Parameters...)
 
 	return c.conf.KDF.Extract(options.KDFSalt, encoding.Concat(output, stretched))
+}
+
+func (c *Client) startOPRF(password []byte, blind *ecc.Scalar) *ecc.Element {
+	var m *ecc.Element
+
+	c.oprf.blind, m = c.conf.OPRF.Blind(password, blind)
+	c.oprf.password = slices.Clone(password)
+
+	return m
 }
 
 func (c *Client) validateRegistrationResponse(resp *message.RegistrationResponse) error {
@@ -304,7 +317,7 @@ func (c *Client) validateCredentialResponse(cr *message.CredentialResponse) erro
 	}
 
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
-	if len(cr.MaskedResponse) != c.conf.Group.ElementLength()+c.conf.EnvelopeSize {
+	if len(cr.MaskedResponse) != c.conf.Sizes.MaskedResponse {
 		return errors.Join(
 			internal.ErrCredentialResponseInvalid,
 			internal.ErrCredentialResponseInvalidMaskedResponse,

@@ -312,7 +312,7 @@ func FuzzDeserializeRegistrationRecord(f *testing.F) {
 
 		_, err = server.Deserialize.RegistrationRecord(r3)
 		if err != nil {
-			maxMessageLength := conf.Group.ElementLength() + conf.Hash.Size() + conf.EnvelopeSize
+			maxMessageLength := conf.Group.ElementLength() + conf.Hash.Size() + conf.Sizes.Envelope
 
 			if errors.Is(err, errInvalidMessageLength) && len(r3) == maxMessageLength {
 				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
@@ -352,7 +352,7 @@ func FuzzDeserializeKE1(f *testing.F) {
 		_, err = server.Deserialize.KE1(ke1)
 		if err != nil {
 			if errors.Is(err, errInvalidMessageLength) &&
-				len(ke1) == c.OPRF.Group().ElementLength()+conf.NonceLen+conf.Group.ElementLength() {
+				len(ke1) == c.OPRF.Group().ElementLength()+conf.Sizes.Nonce+conf.Group.ElementLength() {
 				t.Fatalf("got %q but input length is valid", errInvalidMessageLength)
 			}
 
@@ -364,7 +364,7 @@ func FuzzDeserializeKE1(f *testing.F) {
 			}
 
 			if errors.Is(err, errInvalidClientEPK) {
-				input := ke1[conf.OPRF.Group().ElementLength()+conf.NonceLen:]
+				input := ke1[conf.OPRF.Group().ElementLength()+conf.Sizes.Nonce:]
 				if err := isValidOPRFPoint(conf, input, errInvalidClientEPK); err != nil {
 					t.Fatal(err)
 				}
@@ -419,10 +419,10 @@ func FuzzDeserializeKE2(f *testing.F) {
 
 			maxResponseLength := conf.OPRF.Group().
 				ElementLength() +
-				conf.NonceLen + conf.Group.ElementLength() + conf.EnvelopeSize
+				conf.Sizes.Nonce + conf.Group.ElementLength() + conf.Sizes.Envelope
 
 			if errors.Is(err, errInvalidMessageLength) &&
-				len(ke2) == maxResponseLength+conf.NonceLen+conf.Group.ElementLength()+conf.MAC.Size() {
+				len(ke2) == maxResponseLength+conf.Sizes.Nonce+conf.Group.ElementLength()+conf.MAC.Size() {
 				t.Fatalf(fmtGotValidInput, errInvalidMessageLength)
 			}
 
@@ -434,7 +434,7 @@ func FuzzDeserializeKE2(f *testing.F) {
 			}
 
 			if errors.Is(err, internal.ErrInvalidServerKeyShare) {
-				input := ke2[conf.OPRF.Group().ElementLength()+conf.NonceLen:]
+				input := ke2[conf.OPRF.Group().ElementLength()+conf.Sizes.Nonce:]
 				if err := isValidAKEPoint(conf, input, internal.ErrInvalidServerKeyShare); err != nil {
 					t.Fatal(err)
 				}

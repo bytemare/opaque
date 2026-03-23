@@ -44,7 +44,7 @@ func getDeserializer(t *testing.T, c *opaque.Configuration) *opaque.Deserializer
 // TestDeserializer_New ensures constructing a deserializer with a configuration succeeds and protects against unsupported suites, forming the base for all parsing helpers.
 func TestDeserializer_New(t *testing.T) {
 	// Test valid configurations
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		if _, err := conf.conf.Deserializer(); err != nil {
 			t.Fatalf(testErrValidConf, err)
 		}
@@ -159,7 +159,7 @@ func generateDeserializerErrorTest(method, name string, input []byte, errors ...
 // TestDeserializer_RegistrationRequest_Errors validates that malformed registration requests are rejected during decoding, preventing bogus client material from entering the protocol.
 func TestDeserializer_RegistrationRequest_Errors(t *testing.T) {
 	method := "RegistrationRequest"
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		c := conf.conf
 		d := getDeserializer(t, c)
 
@@ -177,7 +177,7 @@ func TestDeserializer_RegistrationRequest_Errors(t *testing.T) {
 		}
 
 		for _, te := range tests {
-			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t *testing.T) {
 				f := getDeserializerMethod(te.method)
 
 				expectErrors(t, func() error {
@@ -191,7 +191,7 @@ func TestDeserializer_RegistrationRequest_Errors(t *testing.T) {
 // TestDeserializer_RegistrationResponse_Errors checks that invalid registration responses fail early, helping clients avoid using corrupted server outputs.
 func TestDeserializer_RegistrationResponse_Errors(t *testing.T) {
 	method := "RegistrationResponse"
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		c := conf.conf
 		d := getDeserializer(t, c)
 
@@ -219,7 +219,7 @@ func TestDeserializer_RegistrationResponse_Errors(t *testing.T) {
 		}
 
 		for _, te := range tests {
-			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t *testing.T) {
 				f := getDeserializerMethod(te.method)
 
 				expectErrors(t, func() error {
@@ -287,7 +287,7 @@ func TestDeserializer_RegistrationRecord_MixedKDFAndHashSizes(t *testing.T) {
 // TestDeserializer_RegistrationRecord_Errors confirms storage records are thoroughly validated before use, preserving envelope integrity and key consistency.
 func TestDeserializer_RegistrationRecord_Errors(t *testing.T) {
 	method := "RegistrationRecord"
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		c := conf.conf
 		d := getDeserializer(t, c)
 
@@ -295,7 +295,7 @@ func TestDeserializer_RegistrationRecord_Errors(t *testing.T) {
 		randomElement := conf.getValidElementBytes()
 		zeroElement := c.OPRF.Group().NewElement().Encode()
 		okMaskingKey := internal.RandomBytes(c.Hash.Size())
-		okEnvelope := internal.RandomBytes(conf.internal.EnvelopeSize)
+		okEnvelope := internal.RandomBytes(conf.internal.Sizes.Envelope)
 
 		makeBadRecord := func(pk, maskingKey, envelope []byte) []byte {
 			return encoding.Concat3(pk, maskingKey, envelope)
@@ -321,7 +321,7 @@ func TestDeserializer_RegistrationRecord_Errors(t *testing.T) {
 				opaque.ErrRegistrationRecord, internal.ErrInvalidMaskingKey, internal.ErrSliceIsAllZeros),
 		}
 		for _, te := range tests {
-			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t *testing.T) {
 				f := getDeserializerMethod(te.method)
 
 				expectErrors(t, func() error {
@@ -335,7 +335,7 @@ func TestDeserializer_RegistrationRecord_Errors(t *testing.T) {
 // TestDeserializer_KE1_Errors ensures malformed KE1 messages are caught during parsing, so servers never operate on invalid key shares or nonces.
 func TestDeserializer_KE1_Errors(t *testing.T) {
 	method := "KE1"
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		c := conf.conf
 		d := getDeserializer(t, c)
 
@@ -348,32 +348,39 @@ func TestDeserializer_KE1_Errors(t *testing.T) {
 			generateDeserializerErrorTestEmptyInput(method),
 			generateDeserializerErrorTestInputTooShort(method),
 			generateDeserializerErrorTestInputTooLong(method),
-			generateDeserializerErrorTest(method, "invalid blinded message",
-				encoding.Concat(badElement, internal.RandomBytes(conf.internal.NonceLen+c.AKE.Group().ElementLength())),
-				opaque.ErrKE1, internal.ErrInvalidBlindedMessage),
+			generateDeserializerErrorTest(
+				method,
+				"invalid blinded message",
+				encoding.Concat(
+					badElement,
+					internal.RandomBytes(conf.internal.Sizes.Nonce+c.AKE.Group().ElementLength()),
+				),
+				opaque.ErrKE1,
+				internal.ErrInvalidBlindedMessage,
+			),
 			generateDeserializerErrorTest(
 				method,
 				"blinded message is zero",
 				encoding.Concat(
 					zeroElement,
-					internal.RandomBytes(conf.internal.NonceLen+c.AKE.Group().ElementLength()),
+					internal.RandomBytes(conf.internal.Sizes.Nonce+c.AKE.Group().ElementLength()),
 				),
 				opaque.ErrKE1,
 				internal.ErrInvalidBlindedMessage,
 			),
 			generateDeserializerErrorTest(method, "nonce is all zeros",
-				encoding.Concat3(randomElement, make([]byte, conf.internal.NonceLen), randomElement),
+				encoding.Concat3(randomElement, make([]byte, conf.internal.Sizes.Nonce), randomElement),
 				opaque.ErrKE1, internal.ErrMissingNonce, internal.ErrSliceIsAllZeros),
 			generateDeserializerErrorTest(method, "invalid client key share",
-				encoding.Concat3(randomElement, internal.RandomBytes(conf.internal.NonceLen), badElement),
+				encoding.Concat3(randomElement, internal.RandomBytes(conf.internal.Sizes.Nonce), badElement),
 				opaque.ErrKE1, internal.ErrInvalidClientKeyShare),
 			generateDeserializerErrorTest(method, "client key share is zero",
-				encoding.Concat3(randomElement, internal.RandomBytes(conf.internal.NonceLen), zeroElement),
+				encoding.Concat3(randomElement, internal.RandomBytes(conf.internal.Sizes.Nonce), zeroElement),
 				opaque.ErrKE1, internal.ErrInvalidClientKeyShare),
 		}
 
 		for _, te := range tests {
-			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t *testing.T) {
 				f := getDeserializerMethod(te.method)
 
 				expectErrors(t, func() error {
@@ -404,16 +411,16 @@ func TestDeserializer_KE1_Errors(t *testing.T) {
 // TestDeserializer_KE2_Errors enumerates bad KE2 payloads, reinforcing that clients decline tampered server responses before decrypting envelopes.
 func TestDeserializer_KE2_Errors(t *testing.T) {
 	method := "KE2"
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		c := conf.conf
 		d := getDeserializer(t, c)
 
 		badElement := conf.getBadElement()
 		okElement := conf.getValidElementBytes()
 		zeroElement := c.OPRF.Group().NewElement().Encode()
-		okMaskingNonce := internal.RandomBytes(conf.internal.NonceLen)
-		okMaskedResponse := internal.RandomBytes(conf.internal.Group.ElementLength() + conf.internal.EnvelopeSize)
-		okServerNonce := internal.RandomBytes(conf.internal.NonceLen)
+		okMaskingNonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
+		okMaskedResponse := internal.RandomBytes(conf.internal.Group.ElementLength() + conf.internal.Sizes.Envelope)
+		okServerNonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
 		okServerMac := internal.RandomBytes(c.MAC.Size())
 
 		makeBadKe2 := func(evaluated, maskingNonce, maskedResponse, serverNonce, pks, serverMac []byte) []byte {
@@ -438,7 +445,7 @@ func TestDeserializer_KE2_Errors(t *testing.T) {
 		)
 		ke2BadMaskingNonce := makeBadKe2(
 			okElement,
-			make([]byte, conf.internal.NonceLen),
+			make([]byte, conf.internal.Sizes.Nonce),
 			okMaskedResponse,
 			okServerNonce,
 			okElement,
@@ -447,7 +454,7 @@ func TestDeserializer_KE2_Errors(t *testing.T) {
 		ke2BadMaskedResponse := makeBadKe2(
 			okElement,
 			okMaskingNonce,
-			make([]byte, conf.internal.Group.ElementLength()+conf.internal.EnvelopeSize),
+			make([]byte, conf.internal.Group.ElementLength()+conf.internal.Sizes.Envelope),
 			okServerNonce,
 			okElement,
 			okServerMac,
@@ -472,7 +479,7 @@ func TestDeserializer_KE2_Errors(t *testing.T) {
 			okElement,
 			okMaskingNonce,
 			okMaskedResponse,
-			make([]byte, conf.internal.NonceLen),
+			make([]byte, conf.internal.Sizes.Nonce),
 			okElement,
 			okServerMac,
 		)
@@ -528,7 +535,7 @@ func TestDeserializer_KE2_Errors(t *testing.T) {
 				opaque.ErrKE2, internal.ErrMissingMAC, internal.ErrSliceIsAllZeros),
 		}
 		for _, te := range tests {
-			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t *testing.T) {
 				f := getDeserializerMethod(te.method)
 
 				expectErrors(t, func() error {
@@ -542,7 +549,7 @@ func TestDeserializer_KE2_Errors(t *testing.T) {
 // TestDeserializer_KE3_Errors verifies that final client messages are validated before server processing, preventing acceptance of truncated MACs or missing key shares.
 func TestDeserializer_KE3_Errors(t *testing.T) {
 	method := "KE3"
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		c := conf.conf
 		d := getDeserializer(t, c)
 
@@ -557,7 +564,7 @@ func TestDeserializer_KE3_Errors(t *testing.T) {
 		}
 
 		for _, te := range tests {
-			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t2 *testing.T) {
+			t.Run(fmt.Sprintf("%s-%s", conf.name, te.name), func(t *testing.T) {
 				f := getDeserializerMethod(te.method)
 
 				expectErrors(t, func() error {
@@ -620,7 +627,7 @@ func TestDeserializeScalarScenarios(t *testing.T) {
 
 // TestDecodeAkePrivateKey demonstrates that valid private keys survive the dedicated decoder, ensuring serialized material can reboot servers.
 func TestDecodeAkePrivateKey(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		key := conf.conf.AKE.Group().NewScalar().Random()
 
 		d := getDeserializer(t, conf.conf)
@@ -636,7 +643,7 @@ func TestDecodeAkePrivateKey(t *testing.T) {
 
 // TestDecodeBadAkePrivateKey ensures the decoder spots corrupted AKE private keys, a critical guard against tampering.
 func TestDecodeBadAkePrivateKey(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		badKey := conf.getBadScalar()
 		d := getDeserializer(t, conf.conf)
 
@@ -649,7 +656,7 @@ func TestDecodeBadAkePrivateKey(t *testing.T) {
 
 // TestDecodeAkePublicKey verifies successful decoding for well-formed public keys, proving the API works for backups and migrations.
 func TestDecodeAkePublicKey(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		s := conf.conf.AKE.Group().NewScalar().Random()
 		p := conf.conf.AKE.Group().Base().Multiply(s)
 
@@ -666,7 +673,7 @@ func TestDecodeAkePublicKey(t *testing.T) {
 
 // TestDecodeBadAkePublicKey ensures invalid public key encodings trigger errors, defending against inconsistent curve points.
 func TestDecodeBadAkePublicKey(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		badKey := conf.getBadElement()
 
 		d := getDeserializer(t, conf.conf)

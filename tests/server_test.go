@@ -26,7 +26,7 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 	/*
 		Nil and invalid server public key
 	*/
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		server, err := conf.conf.Server()
 		if err != nil {
 			t.Fatal(err)
@@ -77,7 +77,7 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 		}
 
 		for _, tt := range seeds {
-			t.Run(tt.name, func(t2 *testing.T) {
+			t.Run(tt.name, func(t *testing.T) {
 				server.ServerKeyMaterial.OPRFGlobalSeed = tt.seed
 
 				expectErrors(t, func() error {
@@ -159,28 +159,28 @@ func TestNewServer_DefaultConfiguration(t *testing.T) {
 // TestServer_GenerateKE2_Concurrent validates the documented goroutine-safe server behavior by exercising multiple
 // concurrent GenerateKE2 calls against the same immutable inputs. This test is especially valuable under -race.
 func TestServer_GenerateKE2_Concurrent(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		regClient, server := setup(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		regClient, server := setup(t, conf)
 
 		r1, err := regClient.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		r2, err := server.RegistrationResponse(r1, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		record, _, err := regClient.RegistrationFinalize(r2, clientIdentity, serverIdentity)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
-		loginClient := getClient(t2, conf)
+		loginClient := getClient(t, conf)
 		ke1, err := loginClient.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		clientRecord := &opaque.ClientRecord{
@@ -214,15 +214,15 @@ func TestServer_GenerateKE2_Concurrent(t *testing.T) {
 		close(errs)
 
 		for err := range errs {
-			t2.Fatalf("concurrent GenerateKE2 failed: %v", err)
+			t.Fatalf("concurrent GenerateKE2 failed: %v", err)
 		}
 	})
 }
 
 // TestServer_RegistrationResponse_InvalidServerPublicKey ensures the server refuses to operate when its own key bytes are corrupted, preventing malicious serialization changes.
 func TestServer_RegistrationResponse_InvalidServerPublicKey(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		server := getServer(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		server := getServer(t, conf)
 
 		// Valid SKM first, then corrupt the public key bytes length.
 		sk, pk := conf.conf.KeyGen()
@@ -232,18 +232,18 @@ func TestServer_RegistrationResponse_InvalidServerPublicKey(t *testing.T) {
 			PublicKeyBytes: pk.Encode(),
 			OPRFGlobalSeed: conf.conf.GenerateOPRFSeed(),
 		}); err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		// Corrupt length
 		server.ServerKeyMaterial.PublicKeyBytes = internal.RandomBytes(conf.internal.Group.ElementLength() - 1)
 
-		client := getClient(t2, conf)
+		client := getClient(t, conf)
 		r1, err := client.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, err := server.RegistrationResponse(r1, credentialIdentifier, nil)
 			return err
 		}, opaque.ErrServerKeyMaterial, internal.ErrInvalidServerPublicKey, internal.ErrInvalidElement, internal.ErrInvalidEncodingLength)
@@ -252,8 +252,8 @@ func TestServer_RegistrationResponse_InvalidServerPublicKey(t *testing.T) {
 
 // TestServer_RegistrationResponse_InvalidRequest covers malformed registration requests so the server never signs arbitrary inputs or processes empty blinds.
 func TestServer_RegistrationResponse_InvalidRequest(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		server := getServer(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		server := getServer(t, conf)
 		// Set valid SKM
 		sk, pk := conf.conf.KeyGen()
 		if err := server.SetKeyMaterial(&opaque.ServerKeyMaterial{
@@ -262,11 +262,11 @@ func TestServer_RegistrationResponse_InvalidRequest(t *testing.T) {
 			PublicKeyBytes: pk.Encode(),
 			OPRFGlobalSeed: conf.conf.GenerateOPRFSeed(),
 		}); err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// a) nil request
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, err := server.RegistrationResponse(nil, credentialIdentifier, nil)
 			return err
 		}, opaque.ErrRegistration, internal.ErrRegistrationRequestNil)
@@ -274,7 +274,7 @@ func TestServer_RegistrationResponse_InvalidRequest(t *testing.T) {
 		// b) blinded message wrong group
 		og := getOtherGroup(conf)
 		wrong := og.Base().Multiply(og.NewScalar().Random())
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, err := server.RegistrationResponse(
 				&message.RegistrationRequest{BlindedMessage: wrong},
 				credentialIdentifier,
@@ -288,7 +288,7 @@ func TestServer_RegistrationResponse_InvalidRequest(t *testing.T) {
 		zero := g.NewScalar()
 		zero.Zero()
 		idElem := g.Base().Multiply(zero)
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, err := server.RegistrationResponse(
 				&message.RegistrationRequest{BlindedMessage: idElem},
 				credentialIdentifier,
@@ -301,42 +301,42 @@ func TestServer_RegistrationResponse_InvalidRequest(t *testing.T) {
 
 // TestServer_RegistrationResponse_ExplicitOPRFKey demonstrates that supplying an explicit OPRF key yields valid responses, which is necessary for deterministic provisioning flows.
 func TestServer_RegistrationResponse_ExplicitOPRFKey(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
 
 		req, err := client.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		explicit := conf.internal.OPRF.Group().NewScalar().Random()
 		resp, err := server.RegistrationResponse(req, credentialIdentifier, explicit)
 		if err != nil {
-			t2.Fatalf("expected explicit OPRF key to work, got %v", err)
+			t.Fatalf("expected explicit OPRF key to work, got %v", err)
 		}
 		if resp == nil || resp.EvaluatedMessage == nil {
-			t2.Fatal("expected evaluated message in registration response")
+			t.Fatal("expected evaluated message in registration response")
 		}
 	})
 }
 
 // TestServer_RegistrationResponse_ExplicitOPRFKeyErrors ensures the server rejects explicit client keys from the wrong group or missing identifiers, preventing cross-group misuse.
 func TestServer_RegistrationResponse_ExplicitOPRFKeyErrors(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
 
 		req, err := client.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		bad := getOtherGroup(conf).NewScalar().Random()
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, err := server.RegistrationResponse(req, credentialIdentifier, bad)
 			return err
 		}, opaque.ErrServerOptions, internal.ErrClientOPRFKey)
 
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, err := server.RegistrationResponse(req, nil, nil)
 			return err
 		}, internal.ErrNoCredentialIdentifier)
@@ -345,13 +345,13 @@ func TestServer_RegistrationResponse_ExplicitOPRFKeyErrors(t *testing.T) {
 
 // TestServer_GenerateKE2_InvalidKE1 checks that the server validates every field of the incoming KE1, blocking bad points, missing nonces, and nil messages before secrets are derived.
 func TestServer_GenerateKE2_InvalidKE1(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, nil)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		rec := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()
 
 		// a) nil KE1
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server.GenerateKE2(nil, rec)
 			return err
 		}, opaque.ErrKE1, internal.ErrKE1Nil)
@@ -359,14 +359,14 @@ func TestServer_GenerateKE2_InvalidKE1(t *testing.T) {
 		// Build a good KE1 as baseline
 		goodKE1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// b) invalid blinded message group
 		og := getOtherGroup(conf)
 		bad := *goodKE1
 		bad.BlindedMessage = og.Base().Multiply(og.NewScalar().Random())
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server.GenerateKE2(&bad, rec)
 			return err
 		}, opaque.ErrKE1, internal.ErrInvalidBlindedMessage, internal.ErrElementGroupMismatch)
@@ -374,7 +374,7 @@ func TestServer_GenerateKE2_InvalidKE1(t *testing.T) {
 		// c) invalid client key share group
 		bad2 := *goodKE1
 		bad2.ClientKeyShare = og.Base().Multiply(og.NewScalar().Random())
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server.GenerateKE2(&bad2, rec)
 			return err
 		}, opaque.ErrKE1, internal.ErrInvalidClientKeyShare, internal.ErrElementGroupMismatch)
@@ -382,7 +382,7 @@ func TestServer_GenerateKE2_InvalidKE1(t *testing.T) {
 		// d) missing client nonce
 		bad3 := *goodKE1
 		bad3.ClientNonce = nil
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server.GenerateKE2(&bad3, rec)
 			return err
 		}, opaque.ErrKE1, internal.ErrMissingNonce)
@@ -391,36 +391,36 @@ func TestServer_GenerateKE2_InvalidKE1(t *testing.T) {
 
 // TestServer_GenerateKE2_InvalidOptions verifies that unsafe server overrides (bad client key, nonce, or key share) are rejected, preserving protocol invariants even when advanced options are used.
 func TestServer_GenerateKE2_InvalidOptions(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, nil)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		rec := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()
 
 		ke1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// a) ClientOPRFKey wrong group
 		og := getOtherGroup(conf)
 		badOPRF := og.NewScalar().Random()
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server.GenerateKE2(ke1, rec, &opaque.ServerOptions{ClientOPRFKey: badOPRF})
 			return err
 		}, opaque.ErrServerOptions, internal.ErrClientOPRFKey)
 
 		// b) MaskingNonce wrong length
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server.GenerateKE2(
 				ke1,
 				rec,
-				&opaque.ServerOptions{MaskingNonce: internal.RandomBytes(conf.internal.NonceLen - 1)},
+				&opaque.ServerOptions{MaskingNonce: internal.RandomBytes(conf.internal.Sizes.Nonce - 1)},
 			)
 			return err
 		}, opaque.ErrServerOptions, internal.ErrMaskingNonceLength)
 
 		// c) AKE SecretKeyShare wrong group
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server.GenerateKE2(
 				ke1,
 				rec,
@@ -433,29 +433,29 @@ func TestServer_GenerateKE2_InvalidOptions(t *testing.T) {
 
 // TestServer_GenerateKE2_InvalidRecord exercises every validation on stored client records so corrupted envelopes or masking keys cannot progress through authentication.
 func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		_, server := setup(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		_, server := setup(t, conf)
 		// a) nil record
 		ke1 := func() *message.KE1 {
-			c := getClient(t2, conf)
+			c := getClient(t, conf)
 			k, err := c.GenerateKE1(password)
 			if err != nil {
-				t2.Fatal(err)
+				t.Fatal(err)
 			}
 			return k
 		}()
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server.GenerateKE2(ke1, nil)
 			return err
 		}, opaque.ErrClientRecord, internal.ErrClientRecordNil)
 
 		// Build valid record
-		client, server2 := setup(t2, conf)
-		rec := registration(t2, client, server2, password, credentialIdentifier, nil, nil)
+		client, server2 := setup(t, conf)
+		rec := registration(t, client, server2, password, credentialIdentifier, nil, nil)
 		client.ClearState()
 		goodKE1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// b) missing registration record
@@ -464,7 +464,7 @@ func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
 			ClientIdentity:       rec.ClientIdentity,
 			RegistrationRecord:   nil,
 		}
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server2.GenerateKE2(goodKE1, badRec)
 			return err
 		}, opaque.ErrClientRecord, internal.ErrNilRegistrationRecord)
@@ -479,7 +479,7 @@ func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
 			ClientIdentity:       rec.ClientIdentity,
 			RegistrationRecord:   &rec2,
 		}
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server2.GenerateKE2(goodKE1, badRec2)
 			return err
 		}, opaque.ErrClientRecord, internal.ErrInvalidClientPublicKey, internal.ErrElementGroupMismatch)
@@ -494,7 +494,7 @@ func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
 			ClientIdentity:       rec.ClientIdentity,
 			RegistrationRecord:   &rec3,
 		}
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server2.GenerateKE2(goodKE1, badRec3)
 			return err
 		}, opaque.ErrClientRecord, internal.ErrEnvelopeInvalid, internal.ErrInvalidMaskingKey)
@@ -507,7 +507,7 @@ func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
 			ClientIdentity:       rec.ClientIdentity,
 			RegistrationRecord:   &rec4,
 		}
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server2.GenerateKE2(goodKE1, badRec4)
 			return err
 		}, opaque.ErrClientRecord, internal.ErrInvalidMaskingKey, internal.ErrSliceIsAllZeros)
@@ -518,7 +518,7 @@ func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
 			ClientIdentity:       rec.ClientIdentity,
 			RegistrationRecord:   rec.RegistrationRecord,
 		}
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := server2.GenerateKE2(goodKE1, badRec5)
 			return err
 		}, internal.ErrNoCredentialIdentifier)
@@ -527,28 +527,28 @@ func TestServer_GenerateKE2_InvalidRecord(t *testing.T) {
 
 // TestServer_LoginFinish_InvalidInputs ensures the final login step rejects missing KE3 messages and tampered MACs, safeguarding session key confirmation on the server side.
 func TestServer_LoginFinish_InvalidInputs(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, serverIdentity)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		rec := registration(t, client, server, password, credentialIdentifier, nil, serverIdentity)
 		client.ClearState()
 
 		ke1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke2, out, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke3, _, _, err := client.GenerateKE3(ke2, nil, serverIdentity)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// a) nil ke3
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			return server.LoginFinish(nil, out.ClientMAC)
 		}, opaque.ErrKE3, internal.ErrKE3Nil)
 
@@ -556,7 +556,7 @@ func TestServer_LoginFinish_InvalidInputs(t *testing.T) {
 		bad := *ke3
 		bad.ClientMac = append([]byte(nil), ke3.ClientMac...)
 		bad.ClientMac[0] ^= 0xff
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			return server.LoginFinish(&bad, out.ClientMAC)
 		}, opaque.ErrAuthentication, internal.ErrClientAuthentication, internal.ErrInvalidClientMac)
 	})
@@ -567,7 +567,7 @@ func TestServerInit_InvalidEnvelope(t *testing.T) {
 	/*
 		Record envelope of invalid length
 	*/
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		client, server := setup(t, conf)
 		record := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()

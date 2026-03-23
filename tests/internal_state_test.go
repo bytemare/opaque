@@ -61,9 +61,9 @@ func setClientUnexported[T any](t *testing.T, client *opaque.Client, structName,
 
 // TestClient_GenerateKE1_PreExistingSecretShare ensures the client refuses to reuse an ephemeral secret share, preserving forward secrecy guarantees for subsequent login attempts.
 func TestClient_GenerateKE1_PreExistingSecretShare(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client := getClient(t2, conf)
-		setClientSecretKeyShare(t2, client, conf.internal.MakeSecretKeyShare(nil))
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client := getClient(t, conf)
+		setClientSecretKeyShare(t, client, conf.internal.MakeSecretKeyShare(nil))
 
 		expectErrors(t, func() error {
 			_, err := client.GenerateKE1(password)
@@ -74,7 +74,7 @@ func TestClient_GenerateKE1_PreExistingSecretShare(t *testing.T) {
 
 // TestClient_GenerateKE3_StateChecks covers the defensive guards that demand blind, key share, and KE1 state before KE3 generation, preventing misuse of the authenticated key exchange flow.
 func TestClient_GenerateKE3_StateChecks(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		type testCase struct {
 			name     string
 			mutate   func(*opaque.Client)
@@ -86,28 +86,28 @@ func TestClient_GenerateKE3_StateChecks(t *testing.T) {
 			{
 				name: "missing-blind",
 				mutate: func(c *opaque.Client) {
-					setClientOPRFBlind(t2, c, nil)
+					setClientOPRFBlind(t, c, nil)
 				},
 				expected: []error{opaque.ErrClientOptions, internal.ErrNoOPRFBlind},
 			},
 			{
 				name: "missing-secret-share",
 				mutate: func(c *opaque.Client) {
-					setClientSecretKeyShare(t2, c, nil)
+					setClientSecretKeyShare(t, c, nil)
 				},
 				expected: []error{opaque.ErrClientOptions, internal.ErrClientNoKeyShare},
 			},
 			{
 				name: "missing-ke1",
 				mutate: func(c *opaque.Client) {
-					setClientKE1(t2, c, nil)
+					setClientKE1(t, c, nil)
 				},
 				expected: []error{opaque.ErrClientOptions, internal.ErrKE1Missing},
 			},
 			{
 				name: "options-provided-no-blind",
 				mutate: func(c *opaque.Client) {
-					setClientOPRFBlind(t2, c, nil)
+					setClientOPRFBlind(t, c, nil)
 				},
 				options:  []*opaque.ClientOptions{{}},
 				expected: []error{opaque.ErrClientOptions, internal.ErrNoOPRFBlind},
@@ -115,7 +115,7 @@ func TestClient_GenerateKE3_StateChecks(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			t2.Run(tc.name, func(t3 *testing.T) {
+			t.Run(tc.name, func(t3 *testing.T) {
 				client, server := setup(t3, conf)
 				record := registration(
 					t3,
@@ -151,7 +151,7 @@ func TestClient_GenerateKE3_StateChecks(t *testing.T) {
 
 // TestClient_GenerateKE3_ParseOptionsErrors ensures option parsing rejects missing blind overrides and invalid KSF parameters, keeping tunable knobs from undermining the protocol.
 func TestClient_GenerateKE3_ParseOptionsErrors(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		type testCase struct {
 			name     string
 			mutate   func(*opaque.Client)
@@ -163,7 +163,7 @@ func TestClient_GenerateKE3_ParseOptionsErrors(t *testing.T) {
 			{
 				name: "options-no-blind",
 				mutate: func(c *opaque.Client) {
-					setClientOPRFBlind(t2, c, nil)
+					setClientOPRFBlind(t, c, nil)
 				},
 				options:  &opaque.ClientOptions{},
 				expected: []error{opaque.ErrClientOptions, internal.ErrNoOPRFBlind},
@@ -171,7 +171,7 @@ func TestClient_GenerateKE3_ParseOptionsErrors(t *testing.T) {
 			{
 				name: "invalid-ksf-parameters",
 				mutate: func(c *opaque.Client) {
-					setClientSecretKeyShare(t2, c, nil)
+					setClientSecretKeyShare(t, c, nil)
 				},
 				options: &opaque.ClientOptions{
 					KSFParameters: []uint64{1},
@@ -184,7 +184,7 @@ func TestClient_GenerateKE3_ParseOptionsErrors(t *testing.T) {
 		}
 
 		for _, tc := range cases {
-			t2.Run(tc.name, func(t3 *testing.T) {
+			t.Run(tc.name, func(t3 *testing.T) {
 				client, server := setup(t3, conf)
 				record := registration(
 					t3,
@@ -220,23 +220,23 @@ func TestClient_GenerateKE3_ParseOptionsErrors(t *testing.T) {
 
 // TestClient_GenerateKE3_CustomSecretShareOption documents that injecting a custom secret share without matching MAC material fails closed, demonstrating the envelope MAC gate still protects the session.
 func TestClient_GenerateKE3_CustomSecretShareOption(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
-		record := registration(t2, client, server, password, credentialIdentifier, clientIdentity, serverIdentity)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		record := registration(t, client, server, password, credentialIdentifier, clientIdentity, serverIdentity)
 
 		client.ClearState()
 		ke1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatalf("GenerateKE1 failed: %v", err)
+			t.Fatalf("GenerateKE1 failed: %v", err)
 		}
 
 		ke2, _, err := server.GenerateKE2(ke1, record)
 		if err != nil {
-			t2.Fatalf("GenerateKE2 failed: %v", err)
+			t.Fatalf("GenerateKE2 failed: %v", err)
 		}
 
-		share := getClientSecretKeyShare(t2, client)
-		setClientSecretKeyShare(t2, client, nil)
+		share := getClientSecretKeyShare(t, client)
+		setClientSecretKeyShare(t, client, nil)
 
 		expectErrors(t, func() error {
 			_, _, _, err := client.GenerateKE3(
@@ -254,10 +254,10 @@ func TestClient_GenerateKE3_CustomSecretShareOption(t *testing.T) {
 
 // TestServer_GenerateKE2_ServerOptions verifies the server accepts safe option overrides, such as explicit client OPRF keys or pre-chosen shares, which is important for controlled testing and deterministic deployments.
 func TestServer_GenerateKE2_ServerOptions(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		recordBuilder := func() (*opaque.Client, *opaque.Server, *opaque.ClientRecord) {
-			client, server := setup(t2, conf)
-			rec := registration(t2, client, server, password, credentialIdentifier, clientIdentity, serverIdentity)
+			client, server := setup(t, conf)
+			rec := registration(t, client, server, password, credentialIdentifier, clientIdentity, serverIdentity)
 			return client, server, rec
 		}
 
@@ -266,7 +266,7 @@ func TestServer_GenerateKE2_ServerOptions(t *testing.T) {
 			client.ClearState()
 			ke1, err := client.GenerateKE1(password)
 			if err != nil {
-				t2.Fatalf("GenerateKE1 failed: %v", err)
+				t.Fatalf("GenerateKE1 failed: %v", err)
 			}
 
 			if _, _, err = server.GenerateKE2(
@@ -274,7 +274,7 @@ func TestServer_GenerateKE2_ServerOptions(t *testing.T) {
 				record,
 				&opaque.ServerOptions{ClientOPRFKey: conf.internal.Group.NewScalar().Random()},
 			); err != nil {
-				t2.Fatalf("GenerateKE2 with custom client key failed: %v", err)
+				t.Fatalf("GenerateKE2 with custom client key failed: %v", err)
 			}
 		}
 
@@ -283,11 +283,11 @@ func TestServer_GenerateKE2_ServerOptions(t *testing.T) {
 			client.ClearState()
 			ke1, err := client.GenerateKE1(password)
 			if err != nil {
-				t2.Fatalf("GenerateKE1 failed: %v", err)
+				t.Fatalf("GenerateKE1 failed: %v", err)
 			}
 
 			if _, _, err = server.GenerateKE2(ke1, record, &opaque.ServerOptions{AKE: nil}); err != nil {
-				t2.Fatalf("GenerateKE2 with nil AKE options failed: %v", err)
+				t.Fatalf("GenerateKE2 with nil AKE options failed: %v", err)
 			}
 		}
 
@@ -296,7 +296,7 @@ func TestServer_GenerateKE2_ServerOptions(t *testing.T) {
 			client.ClearState()
 			ke1, err := client.GenerateKE1(password)
 			if err != nil {
-				t2.Fatalf("GenerateKE1 failed: %v", err)
+				t.Fatalf("GenerateKE1 failed: %v", err)
 			}
 
 			if _, _, err = server.GenerateKE2(
@@ -306,7 +306,7 @@ func TestServer_GenerateKE2_ServerOptions(t *testing.T) {
 					AKE: &opaque.AKEOptions{SecretKeyShare: conf.internal.Group.NewScalar().Random()},
 				},
 			); err != nil {
-				t2.Fatalf("GenerateKE2 with explicit secret share failed: %v", err)
+				t.Fatalf("GenerateKE2 with explicit secret share failed: %v", err)
 			}
 		}
 	})
@@ -314,26 +314,26 @@ func TestServer_GenerateKE2_ServerOptions(t *testing.T) {
 
 // TestClient_RegistrationFinalize_EnvelopeLength confirms that providing explicit envelope nonce lengths behaves as expected, protecting customization paths from silently downgrading randomness.
 func TestClient_RegistrationFinalize_EnvelopeLength(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
 		req, err := client.RegistrationInit(password)
 		if err != nil {
-			t2.Fatalf("RegistrationInit failed: %v", err)
+			t.Fatalf("RegistrationInit failed: %v", err)
 		}
 
 		resp, err := server.RegistrationResponse(req, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatalf("RegistrationResponse failed: %v", err)
+			t.Fatalf("RegistrationResponse failed: %v", err)
 		}
 
-		nonce := internal.RandomBytes(conf.internal.NonceLen)
+		nonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
 		options := &opaque.ClientOptions{
 			EnvelopeNonce:       nonce,
 			EnvelopeNonceLength: len(nonce),
 		}
 
 		if _, _, err = client.RegistrationFinalize(resp, nil, nil, options); err != nil {
-			t2.Fatalf("RegistrationFinalize failed: %v", err)
+			t.Fatalf("RegistrationFinalize failed: %v", err)
 		}
 	})
 }

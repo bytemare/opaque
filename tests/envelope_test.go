@@ -44,10 +44,10 @@ func assertEnvelopeRecover(
 
 // TestEnvelopeIdentityFallback verifies that nil client/server identities fall back to the corresponding public keys.
 func TestEnvelopeIdentityFallback(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		internalConf := conf.internal
 		randomizedPassword := internal.RandomBytes(internalConf.KDF.Size())
-		nonce := internal.RandomBytes(internalConf.NonceLen)
+		nonce := internal.RandomBytes(internalConf.Sizes.Nonce)
 
 		_, serverPublicKey := conf.conf.KeyGen()
 		serverPublicKeyBytes := serverPublicKey.Encode()
@@ -62,7 +62,7 @@ func TestEnvelopeIdentityFallback(t *testing.T) {
 			nonce,
 		)
 		assertEnvelopeRecover(
-			t2,
+			t,
 			internalConf,
 			randomizedPassword,
 			serverPublicKeyBytes,
@@ -82,10 +82,10 @@ func TestEnvelopeIdentityFallback(t *testing.T) {
 			nonce,
 		)
 		if !pkuExplicit.Equal(pkuNil) {
-			t2.Fatal("expected deterministic client public key for the same inputs")
+			t.Fatal("expected deterministic client public key for the same inputs")
 		}
 		assertEnvelopeRecover(
-			t2,
+			t,
 			internalConf,
 			randomizedPassword,
 			serverPublicKeyBytes,
@@ -105,7 +105,7 @@ func TestEnvelopeIdentityFallback(t *testing.T) {
 			nonce,
 		)
 		assertEnvelopeRecover(
-			t2,
+			t,
 			internalConf,
 			randomizedPassword,
 			serverPublicKeyBytes,
@@ -125,7 +125,7 @@ func TestEnvelopeIdentityFallback(t *testing.T) {
 			nonce,
 		)
 		assertEnvelopeRecover(
-			t2,
+			t,
 			internalConf,
 			randomizedPassword,
 			serverPublicKeyBytes,

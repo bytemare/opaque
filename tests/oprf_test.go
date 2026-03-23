@@ -204,7 +204,7 @@ func (v oprfVector) test(t *testing.T) {
 		t.Fatalf(
 			"GroupDST output is not valid.\n\twant: %v\n\tgot : %v",
 			hex.EncodeToString(dst),
-			hex.EncodeToString(dst2),
+			hex.EncodeToString(dst),
 		)
 	}
 

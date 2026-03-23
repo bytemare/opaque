@@ -87,7 +87,7 @@ func (s *Server) RegistrationResponse(
 	clientOPRFKey *ecc.Scalar, // If set, this will be used as the client OPRF key directly instead
 	// of deriving it from the credentialIdentifier and globalOPRFSeed.
 ) (*message.RegistrationResponse, error) {
-	if len(s.ServerKeyMaterial.PublicKeyBytes) != s.conf.Group.ElementLength() {
+	if len(s.ServerKeyMaterial.PublicKeyBytes) != s.conf.Sizes.AKEElement {
 		return nil, ErrServerKeyMaterial.Join(
 			internal.ErrInvalidServerPublicKey,
 			internal.ErrInvalidElement,
@@ -95,13 +95,15 @@ func (s *Server) RegistrationResponse(
 		)
 	}
 
+	// If clientOPRFKey is provided, use it. Otherwise, derive a fresh one.
 	ku, err := s.chooseOPRFKey(clientCredentialIdentifier, clientOPRFKey)
 	if err != nil {
 		return nil, err
 	}
 
 	defer func() {
-		// If the OPRF key was derived internally, we attempt to wipe it to avoid leaking the key.
+		// If clientOPRFKey was not provided,  we attempt to wipe the internally
+		// derived ku to avoid leaking the key.
 		if clientOPRFKey == nil {
 			internal.ClearScalar(&ku)
 		}
@@ -137,32 +139,15 @@ func (s *Server) GenerateKE2(
 		return nil, nil, err
 	}
 
-	o := &serverOptions{
-		ClientOPRFKey:  nil,
-		MaskingNonce:   nil,
-		SecretKeyShare: nil,
-		AKENonce:       nil,
+	o, err := s.resolveGenerateKE2Inputs(record, options)
+	if err != nil {
+		return nil, nil, err
 	}
+
 	defer internal.ClearScalar(&o.ClientOPRFKey)
 	defer internal.ClearScalar(&o.SecretKeyShare)
 
-	err := s.parseOptions(o, options)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if len(o.AKENonce) == 0 {
-		o.AKENonce = internal.RandomBytes(internal.NonceLength)
-	}
-
-	ku, err := s.chooseOPRFKey(record.CredentialIdentifier, o.ClientOPRFKey)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	defer internal.ClearScalar(&ku)
-
-	ke2, output := s.coreGenerateKE2(ke1, record, o, ku)
+	ke2, output := s.coreGenerateKE2(ke1, record, o)
 
 	return ke2, output, nil
 }
@@ -188,13 +173,61 @@ type ServerOutput struct {
 	SessionSecret []byte
 }
 
+func newServerOptions() *serverOptions {
+	return &serverOptions{
+		ClientOPRFKey:  nil,
+		MaskingNonce:   nil,
+		SecretKeyShare: nil,
+		AKENonce:       nil,
+	}
+}
+
+func (s *Server) resolveGenerateKE2Inputs(
+	record *ClientRecord,
+	options []*ServerOptions,
+) (*serverOptions, error) {
+	o := newServerOptions()
+
+	if err := s.parseOptions(o, options); err != nil {
+		return nil, err
+	}
+
+	if err := s.patchGenerateKE2Options(o, record); err != nil {
+		return nil, err
+	}
+
+	return o, nil
+}
+
+func (s *Server) patchGenerateKE2Options(options *serverOptions, record *ClientRecord) error {
+	if options.SecretKeyShare == nil {
+		options.SecretKeyShare = s.conf.MakeSecretKeyShare(nil)
+	}
+
+	if options.AKENonce == nil {
+		options.AKENonce = internal.RandomBytes(s.conf.Sizes.Nonce)
+	}
+
+	if options.ClientOPRFKey == nil {
+		// No OPRF key override, so we derive the OPRF key from the credential identifier and global seed.
+		var err error
+
+		options.ClientOPRFKey, err = s.deriveOPRFKey(record.CredentialIdentifier)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (s *Server) coreGenerateKE2(
 	ke1 *message.KE1,
 	record *ClientRecord,
-	o *serverOptions, ku *ecc.Scalar,
+	o *serverOptions,
 ) (*message.KE2, *ServerOutput) {
 	response := s.credentialResponse(ke1.BlindedMessage,
-		record.RegistrationRecord, o.MaskingNonce, s.ServerKeyMaterial.PublicKeyBytes, ku)
+		record.RegistrationRecord, o.MaskingNonce, s.ServerKeyMaterial.PublicKeyBytes, o.ClientOPRFKey)
 
 	identities := ake.SetIdentities(
 		record.ClientIdentity,
@@ -237,15 +270,15 @@ func (s *Server) chooseOPRFKey(clientCredentialIdentifier []byte, clientOPRFKey 
 		return clientOPRFKey, nil
 	}
 
-	if len(clientCredentialIdentifier) == 0 {
-		return nil, internal.ErrNoCredentialIdentifier
-	}
-
 	return s.deriveOPRFKey(clientCredentialIdentifier)
 }
 
 // deriveOPRFKey derives the client OPRF key from the credentialIdentifier and global OPRF seed.
 func (s *Server) deriveOPRFKey(clientCredentialIdentifier []byte) (*ecc.Scalar, error) {
+	if len(clientCredentialIdentifier) == 0 {
+		return nil, internal.ErrNoCredentialIdentifier
+	}
+
 	if s.ServerKeyMaterial == nil { // sanity check, but never reached, as it would have failed earlier.
 		return nil, ErrServerKeyMaterial.Join(internal.ErrServerKeyMaterialNil)
 	}
@@ -301,11 +334,11 @@ func (s *Server) verifyRecord(record *ClientRecord) error {
 		return ErrClientRecord.Join(internal.ErrInvalidClientPublicKey, err)
 	}
 
-	if len(record.Envelope) != s.conf.EnvelopeSize {
+	if len(record.Envelope) != s.conf.Sizes.Envelope {
 		return ErrClientRecord.Join(internal.ErrEnvelopeInvalid, internal.ErrInvalidEncodingLength)
 	}
 
-	if len(record.MaskingKey) != s.conf.Hash.Size() {
+	if len(record.MaskingKey) != s.conf.Sizes.Hash {
 		return ErrClientRecord.Join(internal.ErrEnvelopeInvalid, internal.ErrInvalidMaskingKey)
 	}
 
@@ -345,7 +378,7 @@ func (s *Server) isOPRFSeedValid(seed []byte) error {
 		return internal.ErrOPRFKeyNoSeed
 	}
 
-	if len(seed) != s.conf.Hash.Size() {
+	if len(seed) != s.conf.Sizes.Hash {
 		return internal.ErrInvalidOPRFSeedLength
 	}
 

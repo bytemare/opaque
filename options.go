@@ -43,7 +43,7 @@ func (s *Server) parseOptions(o *serverOptions, options []*ServerOptions) error 
 
 	// MaskingNonce.
 	if len(options[0].MaskingNonce) != 0 {
-		if len(options[0].MaskingNonce) != s.conf.NonceLen {
+		if len(options[0].MaskingNonce) != s.conf.Sizes.Nonce {
 			return ErrServerOptions.Join(internal.ErrMaskingNonceLength)
 		}
 
@@ -89,14 +89,14 @@ type ClientOptions struct {
 	KSFLength           int // If 0 or not set, will default to the OPRF length.
 }
 
-func (c *Client) verifyOptionBlind(clientOptions ...*ClientOptions) (*ecc.Scalar, error) {
-	if clientOptions[0].OPRFBlind != nil {
-		if err := IsValidScalar(c.conf.OPRF.Group(), clientOptions[0].OPRFBlind); err != nil {
+func (c *Client) verifyOptionBlind(blind *ecc.Scalar) (*ecc.Scalar, error) {
+	if blind != nil {
+		if err := IsValidScalar(c.conf.OPRF.Group(), blind); err != nil {
 			return nil, ErrClientOptions.Join(internal.ErrInvalidOPRFBlind, err)
 		}
 	}
 
-	return clientOptions[0].OPRFBlind, nil
+	return blind, nil
 }
 
 func getEnvelopeNonce(clientOptions ...*ClientOptions) ([]byte, error) {
@@ -130,6 +130,16 @@ type clientOptions struct {
 	AKENonce      []byte
 }
 
+func newClientOptions(conf *internal.Configuration) *clientOptions {
+	return &clientOptions{
+		OPRFBlind:     nil,
+		KDFSalt:       nil,
+		KSFOptions:    ksf.NewOptions(conf.OPRF.Group().ElementLength()),
+		AKENonce:      nil,
+		EnvelopeNonce: nil,
+	}
+}
+
 func (c *Client) clientOptionsKSFParser(out *clientOptions, in *ClientOptions) error {
 	if err := out.KSFOptions.Set(c.conf.KSF, in.KSFSalt, in.KSFParameters, in.KSFLength); err != nil {
 		return ErrClientOptions.Join(err)
@@ -161,14 +171,35 @@ func (c *Client) clientOptionsKE1Parser(in *ClientOptions) error {
 	return nil
 }
 
-func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*clientOptions, error) {
-	o := &clientOptions{
-		OPRFBlind:     nil,
-		KDFSalt:       nil,
-		KSFOptions:    ksf.NewOptions(c.conf.OPRF.Group().ElementLength()),
-		EnvelopeNonce: nil,
-		AKENonce:      nil,
+func (c *Client) parseBlindOption(o *clientOptions, blind *ecc.Scalar) error {
+	// If there's an OPRF blind from the session and an OPRF blind in the options, we can't proceed.
+	if c.oprf.blind != nil && blind != nil {
+		return ErrClientOptions.Join(internal.ErrDoubleOPRFBlind)
 	}
+
+	// If there's no OPRF blind in the options and no OPRF blind from the session, we can't proceed.
+	if blind == nil && c.oprf.blind == nil {
+		return ErrClientOptions.Join(internal.ErrNoOPRFBlind)
+	}
+
+	var err error
+
+	// If the OPRF blind provided in the options is valid, use it.
+	// Otherwise, use the one from the session (which we know is not nil
+	// because of the previous check).
+	o.OPRFBlind, err = c.verifyOptionBlind(blind)
+	// The combination of the double-blind check and the ErrNoOPRFBlind guard means
+	// verifyOptionBlind is only invoked when options[0].OPRFBlind == nil, so its error
+	// path is structurally unreachable.
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*clientOptions, error) {
+	o := newClientOptions(c.conf)
 
 	if len(options) == 0 {
 		if c.oprf.blind == nil {
@@ -181,21 +212,7 @@ func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*cl
 	}
 
 	// OPRF Blind.
-	var err error
-
-	if c.oprf.blind != nil && options[0].OPRFBlind != nil {
-		return nil, ErrClientOptions.Join(internal.ErrDoubleOPRFBlind)
-	}
-
-	if o.OPRFBlind == nil && c.oprf.blind == nil {
-		return nil, ErrClientOptions.Join(internal.ErrNoOPRFBlind)
-	}
-
-	o.OPRFBlind, err = c.verifyOptionBlind(options...)
-	// The combination of the double-blind check and the ErrNoOPRFBlind guard means
-	// verifyOptionBlind is only invoked when options[0].OPRFBlind == nil, so its error
-	// path is structurally unreachable.
-	if err != nil {
+	if err := c.parseBlindOption(o, options[0].OPRFBlind); err != nil {
 		return nil, err
 	}
 
@@ -205,11 +222,13 @@ func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*cl
 	}
 
 	// KSF options.
-	if err = c.clientOptionsKSFParser(o, options[0]); err != nil {
+	if err := c.clientOptionsKSFParser(o, options[0]); err != nil {
 		return nil, err
 	}
 
 	// Envelope nonce.
+	var err error
+
 	o.EnvelopeNonce, err = getEnvelopeNonce(options...)
 	if err != nil {
 		return nil, ErrClientOptions.Join(err)
@@ -219,13 +238,7 @@ func (c *Client) parseOptionsRegistrationFinalize(options []*ClientOptions) (*cl
 }
 
 func (c *Client) parseOptionsKE1(options []*ClientOptions) (*clientOptions, error) {
-	o := &clientOptions{
-		OPRFBlind:     nil,
-		KDFSalt:       nil,
-		KSFOptions:    ksf.NewOptions(c.conf.OPRF.Group().ElementLength()),
-		AKENonce:      nil,
-		EnvelopeNonce: nil,
-	}
+	o := newClientOptions(c.conf)
 
 	if len(options) == 0 || options[0] == nil {
 		c.ake.SecretKeyShare = c.conf.MakeSecretKeyShare(nil)
@@ -237,7 +250,7 @@ func (c *Client) parseOptionsKE1(options []*ClientOptions) (*clientOptions, erro
 	// OPRF Blind.
 	var err error
 
-	o.OPRFBlind, err = c.verifyOptionBlind(options...)
+	o.OPRFBlind, err = c.verifyOptionBlind(options[0].OPRFBlind)
 	if err != nil {
 		return nil, err
 	}
@@ -282,31 +295,14 @@ func (c *Client) ke3NoOptions(o *clientOptions) (*clientOptions, error) {
 }
 
 func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, error) {
-	o := &clientOptions{
-		OPRFBlind:     nil,
-		KDFSalt:       nil,
-		KSFOptions:    ksf.NewOptions(c.conf.OPRF.Group().ElementLength()),
-		AKENonce:      nil,
-		EnvelopeNonce: nil,
-	}
+	o := newClientOptions(c.conf)
 
 	if len(options) == 0 || options[0] == nil {
 		return c.ke3NoOptions(o)
 	}
 
 	// OPRF Blind.
-	var err error
-
-	if c.oprf.blind != nil && options[0].OPRFBlind != nil {
-		return nil, ErrClientOptions.Join(internal.ErrDoubleOPRFBlind)
-	}
-
-	if options[0].OPRFBlind == nil && c.oprf.blind == nil {
-		return nil, ErrClientOptions.Join(internal.ErrNoOPRFBlind)
-	}
-
-	o.OPRFBlind, err = c.verifyOptionBlind(options...)
-	if err != nil {
+	if err := c.parseBlindOption(o, options[0].OPRFBlind); err != nil {
 		return nil, err
 	}
 
@@ -316,16 +312,18 @@ func (c *Client) parseOptionsKE3(options []*ClientOptions) (*clientOptions, erro
 	}
 
 	// KSF options.
-	if err = c.clientOptionsKSFParser(o, options[0]); err != nil {
+	if err := c.clientOptionsKSFParser(o, options[0]); err != nil {
 		return nil, err
 	}
 
 	// KE1.
-	if err = c.clientOptionsKE1Parser(options[0]); err != nil {
+	if err := c.clientOptionsKE1Parser(options[0]); err != nil {
 		return nil, err
 	}
 
 	// Ephemeral secret key share.
+	var err error
+
 	c.ake.SecretKeyShare, err = c.parseOptionsKE3ESK(options[0].AKE)
 	if err != nil {
 		return nil, ErrClientOptions.Join(err)

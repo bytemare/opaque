@@ -27,6 +27,8 @@ import (
 	"github.com/bytemare/opaque/internal/envelope"
 	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
+
+	internalKSF "github.com/bytemare/opaque/internal/ksf"
 )
 
 func init() {
@@ -91,20 +93,20 @@ func toInternal(c *opaque.Configuration) (*internal.Configuration, error) {
 		return nil, err
 	}
 
-	g := c.AKE.Group()
-	o := c.OPRF.OPRF()
-	mac := internal.NewMac(c.MAC)
-	return &internal.Configuration{
-		OPRF:         o,
-		Group:        g,
-		KSF:          c.KSF,
-		KDF:          internal.NewKDF(c.KDF),
-		MAC:          mac,
-		Hash:         c.Hash,
-		NonceLen:     internal.NonceLength,
-		EnvelopeSize: internal.NonceLength + mac.Size(),
-		Context:      c.Context,
-	}, nil
+	ksfid := internalKSF.KSF(c.KSF)
+	if c.KSF == 0 {
+		ksfid = internalKSF.IdentityKSF(0)
+	}
+
+	return internal.NewConfiguration(
+		c.OPRF.OPRF(),
+		c.AKE.Group(),
+		ksfid,
+		c.KDF,
+		c.MAC,
+		c.Hash,
+		c.Context,
+	), nil
 }
 
 func mixedGroupConfiguration() *opaque.Configuration {
@@ -171,7 +173,8 @@ type testError struct {
 
 func testForErrors(t *testing.T, te *testError) {
 	t.Helper()
-	t.Run(te.name, func(t2 *testing.T) {
+	t.Run(te.name, func(t *testing.T) {
+		t.Helper()
 		expectErrors(t, te.f, te.errors...)
 	})
 }
@@ -432,7 +435,7 @@ func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
 	pad := c.KDF.Expand(
 		key,
 		encoding.SuffixString(nonce, tag.CredentialResponsePad),
-		c.Group.ElementLength()+c.EnvelopeSize,
+		c.Group.ElementLength()+c.Sizes.Envelope,
 	)
 
 	dst := make([]byte, len(pad))
@@ -473,8 +476,8 @@ func getEnvelope(
 	e := clearText[conf.Group.ElementLength():]
 
 	env := &envelope.Envelope{
-		Nonce:   e[:conf.NonceLen],
-		AuthTag: e[conf.NonceLen:],
+		Nonce:   e[:conf.Sizes.Nonce],
+		AuthTag: e[conf.Sizes.Nonce:],
 	}
 
 	return env, randomizedPassword, nil
