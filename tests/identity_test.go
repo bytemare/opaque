@@ -79,7 +79,7 @@ func TestIdentityFallbackProtocol(t *testing.T) {
 					resp,
 					tc.clientIdentity,
 					tc.serverIdentity,
-					&opaque.ClientOptions{EnvelopeNonce: regNonce},
+					&opaque.ClientOptions{RegistrationEnvelopeNonce: regNonce},
 				)
 				if err != nil {
 					t3.Fatalf("registration finalize failed: %v", err)
@@ -98,7 +98,7 @@ func TestIdentityFallbackProtocol(t *testing.T) {
 					resp,
 					explicitClientID,
 					explicitServerID,
-					&opaque.ClientOptions{EnvelopeNonce: regNonce},
+					&opaque.ClientOptions{RegistrationEnvelopeNonce: regNonce},
 				)
 				if err != nil {
 					t3.Fatalf("explicit registration finalize failed: %v", err)

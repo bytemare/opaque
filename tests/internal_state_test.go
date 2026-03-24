@@ -328,8 +328,8 @@ func TestClient_RegistrationFinalize_EnvelopeLength(t *testing.T) {
 
 		nonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
 		options := &opaque.ClientOptions{
-			EnvelopeNonce:       nonce,
-			EnvelopeNonceLength: len(nonce),
+			RegistrationEnvelopeNonce:       nonce,
+			RegistrationEnvelopeNonceLength: len(nonce),
 		}
 
 		if _, _, err = client.RegistrationFinalize(resp, nil, nil, options); err != nil {

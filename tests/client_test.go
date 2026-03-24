@@ -209,7 +209,10 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 				r2d,
 				nil,
 				nil,
-				&opaque.ClientOptions{EnvelopeNonce: nonce, EnvelopeNonceLength: conf.internal.Sizes.Nonce - 1},
+				&opaque.ClientOptions{
+					RegistrationEnvelopeNonce:       nonce,
+					RegistrationEnvelopeNonceLength: conf.internal.Sizes.Nonce - 1,
+				},
 			)
 			return err
 		}, opaque.ErrClientOptions, internal.ErrEnvelopeNonceOptions, internal.ErrSliceDifferentLength)
@@ -226,7 +229,12 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 		}
 		shortNonce := internal.RandomBytes(conf.internal.Sizes.Nonce - 1)
 		expectErrors(t, func() error {
-			_, _, err := client7.RegistrationFinalize(r2e, nil, nil, &opaque.ClientOptions{EnvelopeNonce: shortNonce})
+			_, _, err := client7.RegistrationFinalize(
+				r2e,
+				nil,
+				nil,
+				&opaque.ClientOptions{RegistrationEnvelopeNonce: shortNonce},
+			)
 			return err
 		}, opaque.ErrClientOptions, internal.ErrEnvelopeNonceOptions, internal.ErrSliceShorterLength)
 
@@ -247,7 +255,7 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 				r2f,
 				nil,
 				nil,
-				&opaque.ClientOptions{EnvelopeNonce: someNonce, EnvelopeNonceLength: -1},
+				&opaque.ClientOptions{RegistrationEnvelopeNonce: someNonce, RegistrationEnvelopeNonceLength: -1},
 			)
 			return err
 		}, opaque.ErrClientOptions, internal.ErrEnvelopeNonceOptions, internal.ErrProvidedLengthNegative)
@@ -301,7 +309,7 @@ func TestClient_RegistrationFinalize_ExplicitFinalizeInputs(t *testing.T) {
 			resp,
 			clientIdentity,
 			serverIdentity,
-			&opaque.ClientOptions{EnvelopeNonce: envelopeNonce},
+			&opaque.ClientOptions{RegistrationEnvelopeNonce: envelopeNonce},
 		)
 		if err != nil {
 			t.Fatalf("same-client RegistrationFinalize failed: %v", err)
@@ -313,9 +321,9 @@ func TestClient_RegistrationFinalize_ExplicitFinalizeInputs(t *testing.T) {
 			clientIdentity,
 			serverIdentity,
 			&opaque.ClientOptions{
-				OPRFBlind:     blind,
-				Password:      password,
-				EnvelopeNonce: envelopeNonce,
+				OPRFBlind:                 blind,
+				ResumePassword:            password,
+				RegistrationEnvelopeNonce: envelopeNonce,
 			},
 		)
 		if err != nil {
@@ -365,7 +373,7 @@ func TestClient_RegistrationFinalize_PasswordOptions(t *testing.T) {
 				resp,
 				nil,
 				nil,
-				&opaque.ClientOptions{Password: []byte("different-password")},
+				&opaque.ClientOptions{ResumePassword: []byte("different-password")},
 			)
 			return err
 		}, opaque.ErrClientOptions, internal.ErrDoublePassword)
@@ -728,11 +736,11 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 			errors: []error{opaque.ErrClientOptions, internal.ErrDoubleOPRFBlind},
 		})
 
-		// c) Double KE1: KE1 present in state and also provided in options.
+		// c) Double resume KE1: KE1 present in state and also provided in options.
 		testForErrors(t, &testError{
 			name: "double-ke1",
 			f: func() error {
-				_, _, _, err := clientC.GenerateKE3(ke2c, nil, nil, &opaque.ClientOptions{KE1: ke1c.Serialize()})
+				_, _, _, err := clientC.GenerateKE3(ke2c, nil, nil, &opaque.ClientOptions{ResumeKE1: ke1c.Serialize()})
 				return err
 			},
 			errors: []error{opaque.ErrClientOptions, internal.ErrDoubleKE1},
@@ -765,8 +773,8 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 					nil,
 					nil,
 					&opaque.ClientOptions{
-						OPRFBlind: conf.internal.Group.NewScalar().Random(),
-						Password:  password,
+						OPRFBlind:      conf.internal.Group.NewScalar().Random(),
+						ResumePassword: password,
 					},
 				)
 				return err
@@ -792,9 +800,9 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 					nil,
 					nil,
 					&opaque.ClientOptions{
-						OPRFBlind: badBlind,
-						Password:  password,
-						KE1:       ke1.Serialize(),
+						OPRFBlind:      badBlind,
+						ResumePassword: password,
+						ResumeKE1:      ke1.Serialize(),
 					},
 				)
 				return err
@@ -813,9 +821,9 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 					nil,
 					nil,
 					&opaque.ClientOptions{
-						OPRFBlind: conf.internal.Group.NewScalar().Random(),
-						Password:  password,
-						KE1:       badKE1,
+						OPRFBlind:      conf.internal.Group.NewScalar().Random(),
+						ResumePassword: password,
+						ResumeKE1:      badKE1,
 					},
 				)
 				return err
@@ -833,9 +841,9 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 					nil,
 					nil,
 					&opaque.ClientOptions{
-						OPRFBlind: conf.internal.Group.NewScalar().Random(),
-						Password:  password,
-						KE1:       ke1.Serialize(),
+						OPRFBlind:      conf.internal.Group.NewScalar().Random(),
+						ResumePassword: password,
+						ResumeKE1:      ke1.Serialize(),
 					},
 				)
 				return err
@@ -889,9 +897,9 @@ func TestClient_GenerateKE3_ExplicitCompletionInputs(t *testing.T) {
 			clientIdentity,
 			serverIdentity,
 			&opaque.ClientOptions{
-				OPRFBlind: blind,
-				Password:  password,
-				KE1:       ke1.Serialize(),
+				OPRFBlind:      blind,
+				ResumePassword: password,
+				ResumeKE1:      ke1.Serialize(),
 				AKE: &opaque.AKEOptions{
 					SecretKeyShareSeed: secretKeyShareSeed,
 				},
@@ -951,7 +959,7 @@ func TestClient_GenerateKE3_PasswordOptions(t *testing.T) {
 				ke2,
 				nil,
 				nil,
-				&opaque.ClientOptions{Password: []byte("different-password")},
+				&opaque.ClientOptions{ResumePassword: []byte("different-password")},
 			)
 			return err
 		}, opaque.ErrClientOptions, internal.ErrDoublePassword)
@@ -964,7 +972,7 @@ func TestClient_GenerateKE3_PasswordOptions(t *testing.T) {
 				nil,
 				&opaque.ClientOptions{
 					OPRFBlind: blind,
-					KE1:       ke1.Serialize(),
+					ResumeKE1: ke1.Serialize(),
 					AKE: &opaque.AKEOptions{
 						SecretKeyShareSeed: secretKeyShareSeed,
 					},

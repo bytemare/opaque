@@ -90,16 +90,21 @@ func (s *Server) resolveServerInputs(options []*ServerOptions) (*serverInputs, e
 // and breaks forward secrecy.
 type ClientOptions struct {
 	OPRFBlind *ecc.Scalar
-	Password  []byte // Only used in RegistrationFinalize and GenerateKE3, for session resumption
-	// without previous state, and ignored otherwise.
-	AKE                 *AKEOptions
-	KE1                 []byte
-	KSFSalt             []byte
-	EnvelopeNonce       []byte
-	KDFSalt             []byte
-	KSFParameters       []uint64
-	EnvelopeNonceLength int
-	KSFLength           int // If 0 or not set, will default to the OPRF length.
+	// ResumePassword is only used in RegistrationFinalize and GenerateKE3, to complete a run from a different
+	// client instance that does not hold the prior state.
+	ResumePassword []byte
+	AKE            *AKEOptions
+	// ResumeKE1 is only used in GenerateKE3, to complete a run from a different client instance that does not hold
+	// the prior state.
+	ResumeKE1 []byte
+	KSFSalt   []byte
+	// RegistrationEnvelopeNonce is only used in RegistrationFinalize.
+	RegistrationEnvelopeNonce []byte
+	KDFSalt                   []byte
+	KSFParameters             []uint64
+	// RegistrationEnvelopeNonceLength is only used in RegistrationFinalize.
+	RegistrationEnvelopeNonceLength int
+	KSFLength                       int // If 0 or not set, will default to the OPRF length.
 }
 
 func (c *Client) validateOPRFBlindOption(blind *ecc.Scalar) (*ecc.Scalar, error) {
@@ -117,8 +122,8 @@ func resolveEnvelopeNonce(clientOptions ...*ClientOptions) ([]byte, error) {
 		return internal.RandomBytes(internal.NonceLength), nil
 	}
 
-	nonce := clientOptions[0].EnvelopeNonce
-	nonceLength := clientOptions[0].EnvelopeNonceLength
+	nonce := clientOptions[0].RegistrationEnvelopeNonce
+	nonceLength := clientOptions[0].RegistrationEnvelopeNonceLength
 
 	if err := validateOptionsLength(nonce, nonceLength, internal.NonceLength); err != nil {
 		return nil, ErrClientOptions.Join(internal.ErrEnvelopeNonceOptions, err)
@@ -168,25 +173,25 @@ func (c *Client) resolveKSFInputs(out *ksf.Parameters, in *ClientOptions) error 
 }
 
 // resolveKE1 resolves the KE1 state from the client or options without mutating the client.
-func (c *Client) resolveKE1(in *ClientOptions) ([]byte, error) {
+func (c *Client) resolveKE1(options *ClientOptions) ([]byte, error) {
 	if len(c.ake.ke1) != 0 {
-		if len(in.KE1) != 0 {
+		if len(options.ResumeKE1) != 0 {
 			return nil, ErrClientOptions.Join(internal.ErrDoubleKE1)
 		}
 
 		return c.ake.ke1, nil
 	}
 
-	if len(in.KE1) == 0 {
+	if len(options.ResumeKE1) == 0 {
 		return nil, ErrClientOptions.Join(internal.ErrKE1Missing)
 	}
 
 	// Validate that the provided KE1 message is well-formed.
-	if _, err := c.Deserialize.KE1(in.KE1); err != nil {
+	if _, err := c.Deserialize.KE1(options.ResumeKE1); err != nil {
 		return nil, ErrClientOptions.Join(err)
 	}
 
-	return in.KE1, nil
+	return options.ResumeKE1, nil
 }
 
 func (c *Client) resolveFinalizeBlindCandidate(optionBlind *ecc.Scalar) (*ecc.Scalar, bool, error) {
@@ -253,7 +258,7 @@ func (c *Client) resolveRegistrationFinalizeInputs(options []*ClientOptions) (*c
 	}
 
 	// OPRF Blind.
-	if err := c.resolveOPRFFinalizeInputs(inputs, options[0].OPRFBlind, options[0].Password); err != nil {
+	if err := c.resolveOPRFFinalizeInputs(inputs, options[0].OPRFBlind, options[0].ResumePassword); err != nil {
 		return nil, err
 	}
 
@@ -346,7 +351,7 @@ func (c *Client) resolveKE3Inputs(options []*ClientOptions) (*clientInputs, erro
 	}
 
 	// OPRF Blind.
-	if err := c.resolveOPRFFinalizeInputs(inputs, options[0].OPRFBlind, options[0].Password); err != nil {
+	if err := c.resolveOPRFFinalizeInputs(inputs, options[0].OPRFBlind, options[0].ResumePassword); err != nil {
 		return nil, err
 	}
 

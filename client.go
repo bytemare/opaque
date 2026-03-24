@@ -98,7 +98,7 @@ func (c *Client) RegistrationInit(
 
 // RegistrationFinalize returns a RegistrationRecord message given the identities and the server's RegistrationResponse,
 // and the export key, that the client can use for other means. If a different client instance is used than the one
-// that called RegistrationInit, ClientOptions must provide both Password and OPRFBlind.
+// that called RegistrationInit, ClientOptions must provide both ResumePassword and OPRFBlind.
 func (c *Client) RegistrationFinalize(
 	resp *message.RegistrationResponse,
 	clientIdentity, serverIdentity []byte,
@@ -136,8 +136,8 @@ func (c *Client) RegistrationFinalize(
 
 // GenerateKE1 initiates the authentication process, returning a KE1 message, blinding the given password. This method
 // initiates a state, so the same client instance should be used to call GenerateKE3() later on.
-// To complete GenerateKE3() from a different client instance for the same message, ClientOptions must provide Password,
-// OPRFBlind, KE1, and AKE.SecretKeyShare or AKE.SecretKeyShareSeed.
+// To complete GenerateKE3() from a different client instance for the same message, ClientOptions must provide
+// ResumePassword, OPRFBlind, ResumeKE1, and AKE.SecretKeyShare or AKE.SecretKeyShareSeed.
 func (c *Client) GenerateKE1(password []byte, options ...*ClientOptions) (*message.KE1, error) {
 	if c.oprf.blind != nil {
 		return nil, ErrClientState.Join(internal.ErrClientPreviousBlind)
