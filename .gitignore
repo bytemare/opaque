@@ -16,4 +16,5 @@
 
 .idea
 .gocache
+.gocache-fuzz-ci
 coverage.out

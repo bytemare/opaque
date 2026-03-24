@@ -45,7 +45,9 @@ jobs:
             go.dev:443
             golang.org:443
             proxy.golang.org:443
+            results-receiver.actions.githubusercontent.com:443
             release-assets.githubusercontent.com:443
+            *.blob.core.windows.net:443
 
       - name: Checkout repo
         uses: actions/checkout@0c366fd6a839edf440554fa01a7085ccba70ac98
@@ -57,10 +59,20 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
+      # Persist the dedicated CI fuzz cache across nightly runs so the fuzzer can
+      # keep benefiting from previously discovered interesting inputs.
+      - name: Restore fuzz cache
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        with:
+          path: .gocache-fuzz-ci
+          key: nightly-fuzz-${{ runner.os }}-go${{ matrix.go }}-${{ hashFiles('go.mod', 'go.sum', 'tests/**/*.go') }}
+          restore-keys: |
+            nightly-fuzz-${{ runner.os }}-go${{ matrix.go }}-
+
       - name: Run Tests
         run: make -C .github test
 
       - name: Fuzz
         env:
           FUZZTIME: ${{ github.event.inputs.time_per_target }}
-        run: make -C .github fuzz
+        run: make -C .github fuzz-ci
