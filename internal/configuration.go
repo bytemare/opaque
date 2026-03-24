@@ -41,17 +41,87 @@ var (
 	ErrProvidedLengthNegative = errors.New("provided length is negative")
 )
 
+// Sizes centralizes all runtime-derived protocol lengths.
+type Sizes struct {
+	OPRFElement          int
+	AKEElement           int
+	AKEScalar            int
+	Nonce                int
+	MAC                  int
+	Hash                 int
+	Envelope             int
+	MaskedResponse       int
+	RegistrationRequest  int
+	RegistrationResponse int
+	RegistrationRecord   int
+	CredentialRequest    int
+	CredentialResponse   int
+	KE1                  int
+	KE2                  int
+	KE3                  int
+}
+
 // Configuration is the internal representation of the instance runtime parameters.
 type Configuration struct {
-	KSF          ksf.KSF
-	KDF          *KDF
-	MAC          *Mac
-	OPRF         oprf.Identifier
-	Context      []byte
-	Hash         crypto.Hash
-	NonceLen     int
-	EnvelopeSize int
-	Group        ecc.Group
+	KSF     ksf.KSF
+	KDF     *KDF
+	MAC     *Mac
+	OPRF    oprf.Identifier
+	Context []byte
+	Hash    crypto.Hash
+	Group   ecc.Group
+	Sizes   Sizes
+}
+
+// NewSizes returns the precomputed protocol lengths for the selected runtime.
+func NewSizes(oprfGroup, akeGroup ecc.Group, nonceLen, macSize, hashSize int) Sizes {
+	oprfElementLen := oprfGroup.ElementLength()
+	akeElementLen := akeGroup.ElementLength()
+	envelopeLen := nonceLen + macSize
+	maskedResponseLen := akeElementLen + envelopeLen
+	credentialResponseLen := oprfElementLen + nonceLen + maskedResponseLen
+
+	return Sizes{
+		OPRFElement:          oprfElementLen,
+		AKEElement:           akeElementLen,
+		AKEScalar:            akeGroup.ScalarLength(),
+		Nonce:                nonceLen,
+		MAC:                  macSize,
+		Hash:                 hashSize,
+		Envelope:             envelopeLen,
+		MaskedResponse:       maskedResponseLen,
+		RegistrationRequest:  oprfElementLen,
+		RegistrationResponse: oprfElementLen + akeElementLen,
+		RegistrationRecord:   akeElementLen + hashSize + envelopeLen,
+		CredentialRequest:    oprfElementLen,
+		CredentialResponse:   credentialResponseLen,
+		KE1:                  oprfElementLen + nonceLen + akeElementLen,
+		KE2:                  credentialResponseLen + nonceLen + akeElementLen + macSize,
+		KE3:                  macSize,
+	}
+}
+
+// NewConfiguration builds the immutable internal runtime configuration.
+func NewConfiguration(
+	oprfID oprf.Identifier,
+	group ecc.Group,
+	ksfID ksf.KSF,
+	kdfID, macID, hashID crypto.Hash,
+	context []byte,
+) *Configuration {
+	mac := NewMac(macID)
+	sizes := NewSizes(oprfID.Group(), group, NonceLength, mac.Size(), hashID.Size())
+
+	return &Configuration{
+		KSF:     ksfID,
+		KDF:     NewKDF(kdfID),
+		MAC:     mac,
+		OPRF:    oprfID,
+		Context: append([]byte(nil), context...),
+		Hash:    hashID,
+		Group:   group,
+		Sizes:   sizes,
+	}
 }
 
 // NewHash returns a fresh hashing state for one protocol operation.
@@ -76,8 +146,8 @@ func RandomBytes(length int) []byte {
 	return r
 }
 
-// ClearScalar attempts to safely clearing the internal secret value of the scalar, by first setting its bytes to a
-// random value and then zeroes it out.
+// ClearScalar attempts to safely clearing the internal secret value of the scalar,
+// by first setting its bytes to a random value and then zeroes it out.
 func ClearScalar(s **ecc.Scalar) {
 	if s != nil {
 		if *s != nil {

@@ -174,7 +174,7 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 		v.Inputs.ClientIdentity,
 		v.Inputs.ServerIdentity,
 		&opaque.ClientOptions{
-			EnvelopeNonce: v.Inputs.EnvelopeNonce,
+			RegistrationEnvelopeNonce: v.Inputs.EnvelopeNonce,
 		},
 	)
 	if err != nil {

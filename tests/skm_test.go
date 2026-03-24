@@ -27,7 +27,7 @@ func TestServerInit_NoKeyMaterial(t *testing.T) {
 	/*
 		SetKeyMaterial has not been called or was not successful
 	*/
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		server, err := conf.conf.Server()
 		if err != nil {
 			t.Fatal(err)
@@ -57,8 +57,8 @@ func TestServerInit_NoKeyMaterial(t *testing.T) {
 
 // TestServer_SetKeyMaterial_Invalid enumerates failure cases for server key material — wrong group, bad encoding, and mismatched pairs — ensuring only consistent long-term keys are accepted.
 func TestServer_SetKeyMaterial_Invalid(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		server := getServer(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		server := getServer(t, conf)
 
 		// a) invalid private key group
 		og := getOtherGroup(conf)
@@ -70,7 +70,7 @@ func TestServer_SetKeyMaterial_Invalid(t *testing.T) {
 			OPRFGlobalSeed: conf.conf.GenerateOPRFSeed(),
 		}
 		expectErrors(
-			t2,
+			t,
 			func() error { return server.SetKeyMaterial(skm) },
 			opaque.ErrServerKeyMaterial,
 			internal.ErrInvalidPrivateKey,
@@ -85,7 +85,7 @@ func TestServer_SetKeyMaterial_Invalid(t *testing.T) {
 			OPRFGlobalSeed: conf.conf.GenerateOPRFSeed(),
 		}
 		expectErrors(
-			t2,
+			t,
 			func() error { return server.SetKeyMaterial(skm) },
 			opaque.ErrServerKeyMaterial,
 			internal.ErrInvalidPublicKey,
@@ -101,7 +101,7 @@ func TestServer_SetKeyMaterial_Invalid(t *testing.T) {
 			OPRFGlobalSeed: conf.conf.GenerateOPRFSeed(),
 		}
 		expectErrors(
-			t2,
+			t,
 			func() error { return server.SetKeyMaterial(skm) },
 			opaque.ErrServerKeyMaterial,
 			internal.ErrInvalidPublicKeyBytes,
@@ -112,7 +112,7 @@ func TestServer_SetKeyMaterial_Invalid(t *testing.T) {
 // TestServerKeyMaterial_Decode_Success round-trips a valid SKM encoding over bytes and hex to confirm stable serialization.
 func TestServerKeyMaterial_Decode_Success(t *testing.T) {
 	// encode -> decode -> check equality
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		sk, pk := conf.conf.KeyGen()
 		skm := &opaque.ServerKeyMaterial{
 			Identity:       serverIdentity,
@@ -272,7 +272,7 @@ func validateServerKeyMaterial(t *testing.T, decoded, reference *opaque.ServerKe
 
 // TestServerKeyMaterial_Decode_Failure enumerates malformed encodings so the decoder fails fast on truncated headers, wrong groups, and inconsistent lengths.
 func TestServerKeyMaterial_Decode_Failure(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		c := conf.conf
 		g := c.AKE.Group()
 		sk, pk := c.KeyGen()

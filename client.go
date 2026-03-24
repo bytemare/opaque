@@ -85,39 +85,36 @@ func (c *Client) RegistrationInit(
 	)
 
 	if len(options) != 0 {
-		blind, err = c.verifyOptionBlind(options...)
+		blind, err = c.validateOPRFBlindOption(options[0].OPRFBlind)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	var m *ecc.Element
-
-	c.oprf.blind, m = c.conf.OPRF.Blind(password, blind)
-	c.oprf.password = slices.Clone(password)
-
 	return &message.RegistrationRequest{
-		BlindedMessage: m,
+		BlindedMessage: c.startOPRF(password, blind),
 	}, nil
 }
 
 // RegistrationFinalize returns a RegistrationRecord message given the identities and the server's RegistrationResponse,
-// and the export key, that the client can use for other means.
+// and the export key, that the client can use for other means. If a different client instance is used than the one
+// that called RegistrationInit, ClientOptions must provide both ResumePassword and OPRFBlind.
 func (c *Client) RegistrationFinalize(
 	resp *message.RegistrationResponse,
 	clientIdentity, serverIdentity []byte,
 	options ...*ClientOptions,
 ) (record *message.RegistrationRecord, exportKey []byte, err error) {
-	o, err := c.parseOptionsRegistrationFinalize(options)
+	inputs, err := c.resolveRegistrationFinalizeInputs(options)
 	if err != nil {
 		return nil, nil, err
 	}
+	defer internal.ClearSlice(&inputs.Password)
 
 	if err = c.validateRegistrationResponse(resp); err != nil {
 		return nil, nil, ErrRegistration.Join(err)
 	}
 
-	randomizedPassword := c.buildPRK(resp.EvaluatedMessage, o)
+	randomizedPassword := c.buildPRK(resp.EvaluatedMessage, inputs)
 	defer internal.ClearSlice(&randomizedPassword)
 
 	maskingKey := c.conf.KDF.Expand(randomizedPassword, []byte(tag.MaskingKey), c.conf.Hash.Size())
@@ -127,7 +124,7 @@ func (c *Client) RegistrationFinalize(
 		resp.ServerPublicKey,
 		clientIdentity,
 		serverIdentity,
-		o.EnvelopeNonce,
+		inputs.EnvelopeNonce,
 	)
 
 	return &message.RegistrationRecord{
@@ -139,8 +136,8 @@ func (c *Client) RegistrationFinalize(
 
 // GenerateKE1 initiates the authentication process, returning a KE1 message, blinding the given password. This method
 // initiates a state, so the same client instance should be used to call GenerateKE3() later on.
-// Alternatively, provide a OPRF Blind in the ClientOptions to use a custom blind value, and reuse the same blind when
-// invoking GenerateKE3() for the same message but different client instances.
+// To complete GenerateKE3() from a different client instance for the same message, ClientOptions must provide
+// ResumePassword, OPRFBlind, ResumeKE1, and AKE.SecretKeyShare or AKE.SecretKeyShareSeed.
 func (c *Client) GenerateKE1(password []byte, options ...*ClientOptions) (*message.KE1, error) {
 	if c.oprf.blind != nil {
 		return nil, ErrClientState.Join(internal.ErrClientPreviousBlind)
@@ -150,16 +147,13 @@ func (c *Client) GenerateKE1(password []byte, options ...*ClientOptions) (*messa
 		return nil, ErrClientState.Join(internal.ErrClientPreExistingKeyShare)
 	}
 
-	o, err := c.parseOptionsKE1(options)
+	inputs, err := c.resolveKE1Inputs(options)
 	if err != nil {
 		return nil, err
 	}
 
-	var m *ecc.Element
-
-	c.oprf.blind, m = c.conf.OPRF.Blind(password, o.OPRFBlind)
-	c.oprf.password = slices.Clone(password)
-	ke1 := ake.Start(c.conf.Group, c.ake.SecretKeyShare, o.AKENonce)
+	m := c.startOPRF(password, inputs.OPRFBlind)
+	ke1 := ake.Start(c.conf.Group, c.ake.SecretKeyShare, inputs.AKENonce)
 	ke1.BlindedMessage = m
 	c.ake.ke1 = ke1.Serialize()
 
@@ -177,13 +171,14 @@ func (c *Client) GenerateKE3(
 		return nil, nil, nil, err
 	}
 
-	o, err := c.parseOptionsKE3(options)
+	inputs, err := c.resolveKE3Inputs(options)
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	defer internal.ClearSlice(&inputs.Password)
 
 	// Finalize the OPRF.
-	randomizedPassword := c.buildPRK(ke2.EvaluatedMessage, o)
+	randomizedPassword := c.buildPRK(ke2.EvaluatedMessage, inputs)
 	defer internal.ClearSlice(&randomizedPassword)
 
 	// Decrypt the masked response.
@@ -209,21 +204,16 @@ func (c *Client) GenerateKE3(
 	}
 
 	// Finalize the AKE.
-	identities := ake.SetIdentities(
-		clientIdentity,
-		clientPublicKey,
-		serverIdentity,
-		serverPublicKeyBytes,
-	)
+	identities := ake.SetIdentities(clientIdentity, clientPublicKey, serverIdentity, serverPublicKeyBytes)
 
 	ke3, sessionKey, macOK := ake.Finalize(
 		c.conf,
 		clientSecretKey,
-		c.ake.SecretKeyShare,
+		inputs.SecretKeyShare,
 		identities,
 		serverPublicKey,
 		ke2,
-		c.ake.ke1,
+		inputs.KE1,
 	)
 	if !macOK {
 		return nil, nil, nil, ErrAuthentication.Join(
@@ -238,6 +228,21 @@ func (c *Client) GenerateKE3(
 // ClearState attempts to zero out the client's secret material and state, and sets them to nil. It is strongly
 // recommended to call this method after the client is done with the protocol, to avoid leaking sensitive key material.
 func (c *Client) ClearState() {
+	// OPRF
+	if c.oprf.blind != nil {
+		internal.ClearScalar(&c.oprf.blind)
+	}
+
+	if len(c.oprf.password) > 0 {
+		internal.ClearSlice(&c.oprf.password)
+	}
+
+	c.oprf = oprfState{
+		blind:    nil,
+		password: nil,
+	} // clear the OPRF state reference.
+
+	// AKE
 	if c.ake.SecretKeyShare != nil {
 		internal.ClearScalar(&c.ake.SecretKeyShare)
 	}
@@ -246,23 +251,29 @@ func (c *Client) ClearState() {
 		internal.ClearSlice(&c.ake.ke1)
 	}
 
-	if c.oprf.blind != nil {
-		internal.ClearScalar(&c.oprf.blind)
-	}
-
-	if len(c.oprf.password) > 0 {
-		internal.ClearSlice(&c.oprf.password)
-	}
+	c.ake = akeState{
+		SecretKeyShare: nil,
+		ke1:            nil,
+	} // clear the AKE state reference.
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation *ecc.Element, options *clientOptions) []byte {
-	output := c.conf.OPRF.Finalize(c.oprf.blind, c.oprf.password, evaluation)
-	// It's safe to use UnsafeHarden as long as the options have been properly validated with ValidateParameters.
+func (c *Client) buildPRK(evaluation *ecc.Element, inputs *clientInputs) []byte {
+	output := c.conf.OPRF.Finalize(inputs.OPRFBlind, inputs.Password, evaluation)
+	// It's safe to use UnsafeHarden as long as the inputs have been properly validated with ValidateParameters.
 	stretched := c.conf.KSF.UnsafeHarden(output,
-		options.KSFOptions.Salt, options.KSFOptions.Length, options.KSFOptions.Parameters...)
+		inputs.KSF.Salt, inputs.KSF.Length, inputs.KSF.Parameters...)
 
-	return c.conf.KDF.Extract(options.KDFSalt, encoding.Concat(output, stretched))
+	return c.conf.KDF.Extract(inputs.KDFSalt, encoding.Concat(output, stretched))
+}
+
+func (c *Client) startOPRF(password []byte, blind *ecc.Scalar) *ecc.Element {
+	var m *ecc.Element
+
+	c.oprf.blind, m = c.conf.OPRF.Blind(password, blind)
+	c.oprf.password = slices.Clone(password)
+
+	return m
 }
 
 func (c *Client) validateRegistrationResponse(resp *message.RegistrationResponse) error {
@@ -304,7 +315,7 @@ func (c *Client) validateCredentialResponse(cr *message.CredentialResponse) erro
 	}
 
 	// This test is very important as it avoids buffer overflows in subsequent parsing.
-	if len(cr.MaskedResponse) != c.conf.Group.ElementLength()+c.conf.EnvelopeSize {
+	if len(cr.MaskedResponse) != c.conf.Sizes.MaskedResponse {
 		return errors.Join(
 			internal.ErrCredentialResponseInvalid,
 			internal.ErrCredentialResponseInvalidMaskedResponse,

@@ -220,8 +220,8 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 
 	regRecord := &message.RegistrationRecord{
 		ClientPublicKey: publicKey,
-		MaskingKey:      RandomBytes(conf.Hash.Size()),
-		Envelope:        make([]byte, internal.NonceLength+conf.MAC.Size()),
+		MaskingKey:      RandomBytes(conf.Sizes.Hash),
+		Envelope:        make([]byte, conf.Sizes.Envelope),
 	}
 
 	return &ClientRecord{
@@ -289,6 +289,7 @@ func IsValidElement(g ecc.Group, e *ecc.Element) error {
 
 // AKEOptions override the secure default values or internally generated values. Only use this if you know what you're
 // doing. Reusing seeds and nonces across sessions is a security risk, and breaks forward secrecy.
+// If the SecretKeyShare is provided, SecretKeyShareSeed is ignored.
 type AKEOptions struct {
 	SecretKeyShare     *ecc.Scalar
 	SecretKeyShareSeed []byte
@@ -342,22 +343,15 @@ func (c *Configuration) toInternal() (*internal.Configuration, error) {
 		ksfid = internalKSF.IdentityKSF(0)
 	}
 
-	g := c.AKE.Group()
-	o := c.OPRF.OPRF()
-	mac := internal.NewMac(c.MAC)
-	ip := &internal.Configuration{
-		OPRF:         o,
-		Group:        g,
-		KSF:          ksfid,
-		KDF:          internal.NewKDF(c.KDF),
-		MAC:          mac,
-		Hash:         c.Hash,
-		NonceLen:     internal.NonceLength,
-		EnvelopeSize: internal.NonceLength + mac.Size(),
-		Context:      c.Context,
-	}
-
-	return ip, nil
+	return internal.NewConfiguration(
+		c.OPRF.OPRF(),
+		c.AKE.Group(),
+		ksfid,
+		c.KDF,
+		c.MAC,
+		c.Hash,
+		c.Context,
+	), nil
 }
 
 // getSecretKeyShare assumes either SecretKeyShare is set or SecretKeyShareSeed is != 0.

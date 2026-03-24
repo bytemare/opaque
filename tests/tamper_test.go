@@ -30,16 +30,16 @@ import (
 
 // TestTamper_ContextMismatch proves that mismatched configuration contexts cause authentication failure, ensuring domain separation is enforced.
 func TestTamper_ContextMismatch(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		// Client uses base configuration
-		client := getClient(t2, conf)
+		client := getClient(t, conf)
 
 		// Server uses same parameters but different Context
 		srvConf := *conf.conf
 		srvConf.Context = []byte("server-context")
 		server, err := srvConf.Server()
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// Prepare SKM from original configuration to keep same keys/group
@@ -51,23 +51,23 @@ func TestTamper_ContextMismatch(t *testing.T) {
 			OPRFGlobalSeed: internal.RandomBytes(conf.conf.Hash.Size()),
 		}
 		if err := server.SetKeyMaterial(skm); err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// Registration (context not used in transcript for registration response)
 		r1, err := client.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		r2, err := server.RegistrationResponse(r1, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		rec, _, err := client.RegistrationFinalize(r2, nil, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		record := &opaque.ClientRecord{RegistrationRecord: rec, CredentialIdentifier: credentialIdentifier}
@@ -75,15 +75,15 @@ func TestTamper_ContextMismatch(t *testing.T) {
 		client.ClearState()
 		ke1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke2, _, err := server.GenerateKE2(ke1, record)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, _, err := client.GenerateKE3(ke2, nil, nil)
 			return err
 		}, opaque.ErrAuthentication)
@@ -92,19 +92,19 @@ func TestTamper_ContextMismatch(t *testing.T) {
 
 // TestTamper_IdentityBindingMismatch confirms swapping identities in the envelope results in failure, protecting channel binding semantics.
 func TestTamper_IdentityBindingMismatch(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, nil)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		rec := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()
 
 		ke1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke2, _, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// Supply explicit identities that differ from server's implicit ones
@@ -112,19 +112,19 @@ func TestTamper_IdentityBindingMismatch(t *testing.T) {
 		badServerID := []byte("bad-server-id")
 
 		// ClientIdentity mismatch
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, _, err := client.GenerateKE3(ke2, badClientID, nil)
 			return err
 		}, opaque.ErrAuthentication)
 
 		// ServerIdentity mismatch
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, _, err := client.GenerateKE3(ke2, nil, badServerID)
 			return err
 		}, opaque.ErrAuthentication)
 
 		// Both identities mismatch
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, _, err := client.GenerateKE3(ke2, badClientID, badServerID)
 			return err
 		}, opaque.ErrAuthentication)
@@ -133,36 +133,36 @@ func TestTamper_IdentityBindingMismatch(t *testing.T) {
 
 // TestTamper_KE2MismatchWithClientState ensures replaying a KE2 against a different client state fails, preventing cross-session key reuse.
 func TestTamper_KE2MismatchWithClientState(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, serverIdentity)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		rec := registration(t, client, server, password, credentialIdentifier, nil, serverIdentity)
 		client.ClearState()
 
 		// Build two different KE1 messages with two clients
 		ke1a, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke2a, _, err := server.GenerateKE2(ke1a, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
-		client2 := getClient(t2, conf)
+		client2 := getClient(t, conf)
 		ke1b, err := client2.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke2b, _, err := server.GenerateKE2(ke1b, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// Use KE2b against client1 state (which holds KE1a) → should fail transcript MAC
 		expectErrors(
-			t2,
+			t,
 			func() error { _, _, _, err := client.GenerateKE3(ke2b, nil, serverIdentity); return err },
 			opaque.ErrAuthentication,
 		)
@@ -170,7 +170,7 @@ func TestTamper_KE2MismatchWithClientState(t *testing.T) {
 		// Complete with ke2a then try to reuse ke3 against a different server output
 		ke3, _, _, err := client.GenerateKE3(ke2a, nil, serverIdentity)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// Produce new server output to mismatch
@@ -178,40 +178,40 @@ func TestTamper_KE2MismatchWithClientState(t *testing.T) {
 
 		ke1c, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke2c, outC, err := server.GenerateKE2(ke1c, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// Now verify with mismatched output
-		expectErrors(t2, func() error { return server.LoginFinish(ke3, outC.ClientMAC) }, opaque.ErrAuthentication)
+		expectErrors(t, func() error { return server.LoginFinish(ke3, outC.ClientMAC) }, opaque.ErrAuthentication)
 
 		// Ensure ke2c can still be used legitimately
 		_, _, _, err = client.GenerateKE3(ke2c, nil, serverIdentity)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 	})
 }
 
 // TestTamper_MaskingNonceBitflip demonstrates that bitflipping the masking nonce is detected, highlighting the sensitivity of envelope integrity.
 func TestTamper_MaskingNonceBitflip(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, nil)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		rec := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()
 
 		ke1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke2, _, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// Flip a bit in masking nonce (not all zeros) to break unmasking
@@ -219,7 +219,7 @@ func TestTamper_MaskingNonceBitflip(t *testing.T) {
 
 		// Expect authentication failure due to server public key decode or subsequent MACs
 		expectErrors(
-			t2,
+			t,
 			func() error { _, _, _, err := client.GenerateKE3(ke2, nil, nil); return err },
 			opaque.ErrAuthentication,
 		)
@@ -228,26 +228,26 @@ func TestTamper_MaskingNonceBitflip(t *testing.T) {
 
 // TestTamper_MaskedResponseBitflip shows that corrupting the ciphertext envelope yields an authentication failure, preventing undetected tampering with stored keys.
 func TestTamper_MaskedResponseBitflip(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, nil)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		rec := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()
 
 		ke1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke2, _, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// Flip a bit in masked response to corrupt decrypted data
 		ke2.MaskedResponse[0] ^= 0x80
 
 		expectErrors(
-			t2,
+			t,
 			func() error { _, _, _, err := client.GenerateKE3(ke2, nil, nil); return err },
 			opaque.ErrAuthentication,
 		)
@@ -258,32 +258,32 @@ func TestTamper_MaskedResponseBitflip(t *testing.T) {
 // is the responsibility of the application layer (session tracking). This test documents that behavior.
 // TestTamper_KE3Replay_AcceptedWithoutAppTracking captures that replaying KE3 succeeds without application-level state, documenting the requirement for anti-replay tracking.
 func TestTamper_KE3Replay_AcceptedWithoutAppTracking(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, serverIdentity)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		rec := registration(t, client, server, password, credentialIdentifier, nil, serverIdentity)
 		client.ClearState()
 
 		ke1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke2, out, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		ke3, _, _, err := client.GenerateKE3(ke2, nil, serverIdentity)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		if err := server.LoginFinish(ke3, out.ClientMAC); err != nil {
-			t2.Fatalf("unexpected error on first verification: %v", err)
+			t.Fatalf("unexpected error on first verification: %v", err)
 		}
 		// Replay the exact same KE3 and MAC
 		if err := server.LoginFinish(ke3, out.ClientMAC); err != nil {
-			t2.Fatalf("unexpected error on second verification: %v", err)
+			t.Fatalf("unexpected error on second verification: %v", err)
 		}
 	})
 }

@@ -47,9 +47,9 @@ func TestIdentityFallbackProtocol(t *testing.T) {
 		},
 	}
 
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		for _, tc := range cases {
-			t2.Run(tc.name, func(t3 *testing.T) {
+			t.Run(tc.name, func(t3 *testing.T) {
 				server := getServer(t3, conf)
 				sk, pk := conf.conf.KeyGen()
 				if err := server.SetKeyMaterial(&opaque.ServerKeyMaterial{
@@ -63,7 +63,7 @@ func TestIdentityFallbackProtocol(t *testing.T) {
 
 				client := getClient(t3, conf)
 				regBlind := conf.conf.OPRF.Group().NewScalar().Random()
-				regNonce := internal.RandomBytes(conf.internal.NonceLen)
+				regNonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
 
 				req, err := client.RegistrationInit(password, &opaque.ClientOptions{OPRFBlind: regBlind})
 				if err != nil {
@@ -79,7 +79,7 @@ func TestIdentityFallbackProtocol(t *testing.T) {
 					resp,
 					tc.clientIdentity,
 					tc.serverIdentity,
-					&opaque.ClientOptions{EnvelopeNonce: regNonce},
+					&opaque.ClientOptions{RegistrationEnvelopeNonce: regNonce},
 				)
 				if err != nil {
 					t3.Fatalf("registration finalize failed: %v", err)
@@ -98,7 +98,7 @@ func TestIdentityFallbackProtocol(t *testing.T) {
 					resp,
 					explicitClientID,
 					explicitServerID,
-					&opaque.ClientOptions{EnvelopeNonce: regNonce},
+					&opaque.ClientOptions{RegistrationEnvelopeNonce: regNonce},
 				)
 				if err != nil {
 					t3.Fatalf("explicit registration finalize failed: %v", err)
@@ -119,7 +119,7 @@ func TestIdentityFallbackProtocol(t *testing.T) {
 
 				ke1Blind := conf.conf.OPRF.Group().NewScalar().Random()
 				clientSecretShare := conf.conf.AKE.Group().NewScalar().Random()
-				clientNonce := internal.RandomBytes(conf.internal.NonceLen)
+				clientNonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
 				clientOptions := &opaque.ClientOptions{
 					OPRFBlind: ke1Blind,
 					AKE: &opaque.AKEOptions{
@@ -135,8 +135,8 @@ func TestIdentityFallbackProtocol(t *testing.T) {
 				}
 
 				serverSecretShare := conf.conf.AKE.Group().NewScalar().Random()
-				serverNonce := internal.RandomBytes(conf.internal.NonceLen)
-				maskingNonce := internal.RandomBytes(conf.internal.NonceLen)
+				serverNonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
+				maskingNonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
 				ke2, serverOut, err := server.GenerateKE2(
 					ke1,
 					record,

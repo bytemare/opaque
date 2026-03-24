@@ -50,14 +50,14 @@ func TestNewClient_DefaultConfiguration(t *testing.T) {
 
 // TestClient_RegistrationInit_PreviousBlind ensures the client rejects attempts to start a second registration while a previous OPRF blind is still cached, preventing state reuse that could leak correlation information.
 func TestClient_RegistrationInit_PreviousBlind(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client := getClient(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client := getClient(t, conf)
 
 		if _, err := client.RegistrationInit(password); err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, err := client.RegistrationInit(password)
 			return err
 		}, opaque.ErrClientState, internal.ErrClientPreviousBlind)
@@ -66,8 +66,8 @@ func TestClient_RegistrationInit_PreviousBlind(t *testing.T) {
 
 // TestClient_RegistrationInit_InvalidOptions_OPRFBlind checks that supplying an OPRF blind from the wrong group is caught, preserving group separation guarantees required by the protocol.
 func TestClient_RegistrationInit_InvalidOptions_OPRFBlind(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client := getClient(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client := getClient(t, conf)
 
 		// Build an OPRF blind from a different group than the configuration requires.
 		var otherGroup ecc.Group
@@ -78,7 +78,7 @@ func TestClient_RegistrationInit_InvalidOptions_OPRFBlind(t *testing.T) {
 		}
 		badBlind := otherGroup.NewScalar().Random()
 
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, err := client.RegistrationInit(password, &opaque.ClientOptions{OPRFBlind: badBlind})
 			return err
 		}, opaque.ErrClientOptions, internal.ErrInvalidOPRFBlind)
@@ -110,21 +110,21 @@ func TestClient_RegistrationFinalize_InvalidServerKeyLength(t *testing.T) {
 
 // TestClient_RegistrationFinalize_InvalidOptionsAndResponses exercises the full matrix of bad inputs and option combinations so the registration finalization code cannot proceed with inconsistent or attacker-chosen state.
 func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
 
 		// Prepare a valid RegistrationRequest/Response to reach options/response validation.
 		r1, err := client.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		r2, err := server.RegistrationResponse(r1, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// a) Double OPRF blind: state already has one. Providing another must error.
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := client.RegistrationFinalize(
 				r2,
 				nil,
@@ -135,119 +135,127 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 		}, opaque.ErrClientOptions, internal.ErrDoubleOPRFBlind)
 
 		// b) Invalid RegistrationResponse: nil
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := client.RegistrationFinalize(nil, nil, nil)
 			return err
 		}, opaque.ErrRegistration, internal.ErrRegistrationResponseNil)
 
 		// c) Invalid RegistrationResponse: empty fields
 		emptyResp := &message.RegistrationResponse{}
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := client.RegistrationFinalize(emptyResp, nil, nil)
 			return err
 		}, opaque.ErrRegistration, internal.ErrRegistrationResponseEmpty)
 
 		// d) No prior blind and no OPRFBlind option
-		client2 := getClient(t2, conf)
-		expectErrors(t2, func() error {
+		client2 := getClient(t, conf)
+		expectErrors(t, func() error {
 			_, _, err := client2.RegistrationFinalize(r2, nil, nil)
 			return err
 		}, opaque.ErrClientOptions, internal.ErrNoOPRFBlind)
 
 		// e) Options provided without blind
-		client3 := getClient(t2, conf)
-		expectErrors(t2, func() error {
+		client3 := getClient(t, conf)
+		expectErrors(t, func() error {
 			_, _, err := client3.RegistrationFinalize(nil, nil, nil, &opaque.ClientOptions{})
 			return err
 		}, opaque.ErrClientOptions, internal.ErrNoOPRFBlind)
 
 		// f) KSF options: wrong parameter count
 		// Use a valid blind from state to pass blind checks.
-		client4 := getClient(t2, conf)
+		client4 := getClient(t, conf)
 		r1b, err := client4.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		r2b, err := server.RegistrationResponse(r1b, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		badParams := []uint64{1} // wrong count for Argon2id default (expects 3)
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := client4.RegistrationFinalize(r2b, nil, nil, &opaque.ClientOptions{KSFParameters: badParams})
 			return err
 		}, opaque.ErrClientOptions, internalKSF.ErrParameters)
 
 		// g) KSF options: negative length
-		client5 := getClient(t2, conf)
+		client5 := getClient(t, conf)
 		r1c, err := client5.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		r2c, err := server.RegistrationResponse(r1c, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := client5.RegistrationFinalize(r2c, nil, nil, &opaque.ClientOptions{KSFLength: -1})
 			return err
 		}, opaque.ErrClientOptions, internalKSF.ErrNegativeKSFLength)
 
 		// h) Envelope nonce options: length mismatch
-		client6 := getClient(t2, conf)
+		client6 := getClient(t, conf)
 		r1d, err := client6.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		r2d, err := server.RegistrationResponse(r1d, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
-		nonce := internal.RandomBytes(conf.internal.NonceLen)
-		expectErrors(t2, func() error {
+		nonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
+		expectErrors(t, func() error {
 			_, _, err := client6.RegistrationFinalize(
 				r2d,
 				nil,
 				nil,
-				&opaque.ClientOptions{EnvelopeNonce: nonce, EnvelopeNonceLength: conf.internal.NonceLen - 1},
+				&opaque.ClientOptions{
+					RegistrationEnvelopeNonce:       nonce,
+					RegistrationEnvelopeNonceLength: conf.internal.Sizes.Nonce - 1,
+				},
 			)
 			return err
 		}, opaque.ErrClientOptions, internal.ErrEnvelopeNonceOptions, internal.ErrSliceDifferentLength)
 
 		// i) Envelope nonce options: shorter than reference with no override
-		client7 := getClient(t2, conf)
+		client7 := getClient(t, conf)
 		r1e, err := client7.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		r2e, err := server.RegistrationResponse(r1e, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
-		shortNonce := internal.RandomBytes(conf.internal.NonceLen - 1)
-		expectErrors(t2, func() error {
-			_, _, err := client7.RegistrationFinalize(r2e, nil, nil, &opaque.ClientOptions{EnvelopeNonce: shortNonce})
+		shortNonce := internal.RandomBytes(conf.internal.Sizes.Nonce - 1)
+		expectErrors(t, func() error {
+			_, _, err := client7.RegistrationFinalize(
+				r2e,
+				nil,
+				nil,
+				&opaque.ClientOptions{RegistrationEnvelopeNonce: shortNonce},
+			)
 			return err
 		}, opaque.ErrClientOptions, internal.ErrEnvelopeNonceOptions, internal.ErrSliceShorterLength)
 
 		// j) Envelope nonce options: negative length
-		client8 := getClient(t2, conf)
+		client8 := getClient(t, conf)
 		r1f, err := client8.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		r2f, err := server.RegistrationResponse(r1f, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		// Provide a non-nil nonce so negative length is validated (input!=nil)
-		someNonce := internal.RandomBytes(conf.internal.NonceLen)
-		expectErrors(t2, func() error {
+		someNonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
+		expectErrors(t, func() error {
 			_, _, err := client8.RegistrationFinalize(
 				r2f,
 				nil,
 				nil,
-				&opaque.ClientOptions{EnvelopeNonce: someNonce, EnvelopeNonceLength: -1},
+				&opaque.ClientOptions{RegistrationEnvelopeNonce: someNonce, RegistrationEnvelopeNonceLength: -1},
 			)
 			return err
 		}, opaque.ErrClientOptions, internal.ErrEnvelopeNonceOptions, internal.ErrProvidedLengthNegative)
@@ -256,25 +264,119 @@ func TestClient_RegistrationFinalize_InvalidOptionsAndResponses(t *testing.T) {
 
 // TestClient_RegistrationFinalize_InvalidEvaluatedMessage proves that an evaluated OPRF element from a foreign group is rejected, maintaining the curve membership guarantees required for OPAQUE security proofs.
 func TestClient_RegistrationFinalize_InvalidEvaluatedMessage(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
 
 		req, err := client.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		resp, err := server.RegistrationResponse(req, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		resp.EvaluatedMessage = getOtherGroup(conf).Base().Multiply(getOtherGroup(conf).NewScalar().Random())
 
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := client.RegistrationFinalize(resp, nil, nil)
 			return err
 		}, opaque.ErrRegistration, internal.ErrInvalidEvaluatedMessage)
+	})
+}
+
+// TestClient_RegistrationFinalize_ExplicitFinalizeInputs verifies registration finalization can be completed from a
+// fresh client instance when the caller supplies the blind and password explicitly.
+func TestClient_RegistrationFinalize_ExplicitFinalizeInputs(t *testing.T) {
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+
+		blind := conf.conf.OPRF.Group().NewScalar().Random()
+		envelopeNonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
+
+		req, err := client.RegistrationInit(password, &opaque.ClientOptions{OPRFBlind: blind})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp, err := server.RegistrationResponse(req, credentialIdentifier, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		recordSameClient, exportSameClient, err := client.RegistrationFinalize(
+			resp,
+			clientIdentity,
+			serverIdentity,
+			&opaque.ClientOptions{RegistrationEnvelopeNonce: envelopeNonce},
+		)
+		if err != nil {
+			t.Fatalf("same-client RegistrationFinalize failed: %v", err)
+		}
+
+		freshClient := getClient(t, conf)
+		recordFreshClient, exportFreshClient, err := freshClient.RegistrationFinalize(
+			resp,
+			clientIdentity,
+			serverIdentity,
+			&opaque.ClientOptions{
+				OPRFBlind:                 blind,
+				ResumePassword:            password,
+				RegistrationEnvelopeNonce: envelopeNonce,
+			},
+		)
+		if err != nil {
+			t.Fatalf("fresh-client RegistrationFinalize failed: %v", err)
+		}
+
+		if !slices.Equal(recordSameClient.Serialize(), recordFreshClient.Serialize()) {
+			t.Fatal("registration record mismatch between same-client and fresh-client finalize")
+		}
+
+		if !slices.Equal(exportSameClient, exportFreshClient) {
+			t.Fatal("registration export key mismatch between same-client and fresh-client finalize")
+		}
+	})
+}
+
+// TestClient_RegistrationFinalize_PasswordOptions ensures password completion inputs fail closed when they are missing
+// or duplicated.
+func TestClient_RegistrationFinalize_PasswordOptions(t *testing.T) {
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+
+		blind := conf.conf.OPRF.Group().NewScalar().Random()
+		req, err := client.RegistrationInit(password, &opaque.ClientOptions{OPRFBlind: blind})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		resp, err := server.RegistrationResponse(req, credentialIdentifier, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		freshClient := getClient(t, conf)
+		expectErrors(t, func() error {
+			_, _, err := freshClient.RegistrationFinalize(
+				resp,
+				nil,
+				nil,
+				&opaque.ClientOptions{OPRFBlind: blind},
+			)
+			return err
+		}, opaque.ErrClientOptions, internal.ErrNoPassword)
+
+		expectErrors(t, func() error {
+			_, _, err := client.RegistrationFinalize(
+				resp,
+				nil,
+				nil,
+				&opaque.ClientOptions{ResumePassword: []byte("different-password")},
+			)
+			return err
+		}, opaque.ErrClientOptions, internal.ErrDoublePassword)
 	})
 }
 
@@ -321,19 +423,19 @@ func TestClient_RegistrationFinalize_KSFCustomization(t *testing.T) {
 // TestClient_RegistrationFinalize_InvalidKSFParameterValue ensures invalid KSF values fail with regular errors instead
 // of reaching the underlying KSF implementation and panicking.
 func TestClient_RegistrationFinalize_InvalidKSFParameterValue(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client, server := setup(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
 		req, err := client.RegistrationInit(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		resp, err := server.RegistrationResponse(req, credentialIdentifier, nil)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, err := client.RegistrationFinalize(resp, nil, nil, &opaque.ClientOptions{
 				KSFParameters: []uint64{3, 65536, 256},
 			})
@@ -344,13 +446,13 @@ func TestClient_RegistrationFinalize_InvalidKSFParameterValue(t *testing.T) {
 
 // TestClient_GenerateKE1_PreviousBlind confirms the client will not reuse a cached blind, protecting unlinkability across authentication attempts.
 func TestClient_GenerateKE1_PreviousBlind(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
-		client := getClient(t2, conf)
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client := getClient(t, conf)
 		if _, err := client.GenerateKE1(password); err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, err := client.GenerateKE1(password)
 			return err
 		}, opaque.ErrClientState, internal.ErrClientPreviousBlind)
@@ -359,9 +461,9 @@ func TestClient_GenerateKE1_PreviousBlind(t *testing.T) {
 
 // TestClient_GenerateKE1_InvalidOptions validates that the client catches malformed blinding and bad secret-key-share inputs, preventing attackers from pushing the state machine onto an unsafe curve.
 func TestClient_GenerateKE1_InvalidOptions(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		// Bad OPRF blind ecc.
-		client := getClient(t2, conf)
+		client := getClient(t, conf)
 		var otherGroup ecc.Group
 		if conf.internal.Group == ecc.Ristretto255Sha512 {
 			otherGroup = ecc.P256Sha256
@@ -369,7 +471,7 @@ func TestClient_GenerateKE1_InvalidOptions(t *testing.T) {
 			otherGroup = ecc.Ristretto255Sha512
 		}
 		badBlind := otherGroup.NewScalar().Random()
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name: "bad-oprf-blind",
 			f: func() error {
 				_, err := client.GenerateKE1(password, &opaque.ClientOptions{OPRFBlind: badBlind})
@@ -379,9 +481,9 @@ func TestClient_GenerateKE1_InvalidOptions(t *testing.T) {
 		})
 
 		// Bad AKE secret share ecc.
-		client = getClient(t2, conf)
+		client = getClient(t, conf)
 		badSK := otherGroup.NewScalar().Random()
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name: "bad-ake-secret-share",
 			f: func() error {
 				_, err := client.GenerateKE1(
@@ -397,18 +499,18 @@ func TestClient_GenerateKE1_InvalidOptions(t *testing.T) {
 
 // TestClient_GenerateKE3_InvalidMaskingNonce ensures malformed masking nonces and responses are caught, which blocks attackers from tampering with the envelope while keeping MACs intact.
 func TestClient_GenerateKE3_InvalidMaskingNonce(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		baseline := func() (*opaque.Client, *message.KE2, *opaque.ClientRecord) {
-			client, server := setup(t2, conf)
-			rec := registration(t2, client, server, password, credentialIdentifier, nil, nil)
+			client, server := setup(t, conf)
+			rec := registration(t, client, server, password, credentialIdentifier, nil, nil)
 			client.ClearState()
 			ke1, err := client.GenerateKE1(password)
 			if err != nil {
-				t2.Fatal(err)
+				t.Fatal(err)
 			}
 			ke2, _, err := server.GenerateKE2(ke1, rec)
 			if err != nil {
-				t2.Fatal(err)
+				t.Fatal(err)
 			}
 			return client, ke2, rec
 		}
@@ -421,7 +523,7 @@ func TestClient_GenerateKE3_InvalidMaskingNonce(t *testing.T) {
 			MaskingNonce:     nil,
 			MaskedResponse:   ke2A.CredentialResponse.MaskedResponse,
 		}
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, _, err := clientA.GenerateKE3(&bad, nil, nil)
 			return err
 		}, opaque.ErrKE2, internal.ErrCredentialResponseNoMaskingNonce)
@@ -435,7 +537,7 @@ func TestClient_GenerateKE3_InvalidMaskingNonce(t *testing.T) {
 			MaskingNonce:     zeros,
 			MaskedResponse:   ke2B.CredentialResponse.MaskedResponse,
 		}
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, _, err := clientB.GenerateKE3(&bad2, nil, nil)
 			return err
 		}, opaque.ErrKE2, internal.ErrCredentialResponseInvalidMaskingNonce, internal.ErrSliceIsAllZeros)
@@ -448,7 +550,7 @@ func TestClient_GenerateKE3_InvalidMaskingNonce(t *testing.T) {
 			MaskingNonce:     ke2C.CredentialResponse.MaskingNonce,
 			MaskedResponse:   internal.RandomBytes(conf.internal.Group.ElementLength()),
 		}
-		expectErrors(t2, func() error {
+		expectErrors(t, func() error {
 			_, _, _, err := clientC.GenerateKE3(&bad3, nil, nil)
 			return err
 		}, opaque.ErrKE2, internal.ErrCredentialResponseInvalidMaskedResponse, internal.ErrInvalidEncodingLength)
@@ -457,32 +559,34 @@ func TestClient_GenerateKE3_InvalidMaskingNonce(t *testing.T) {
 
 // TestClient_GenerateKE3_InvalidKE2Fields walks through the KE2 validation ladder so any malformed response from the server fails fast before secrets are derived.
 func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		// a) nil KE2
-		freshClient := getClient(t2, conf)
-		testForErrors(t2, &testError{
+		freshClient := getClient(t, conf)
+		testForErrors(t, &testError{
 			name:   "nil-ke2",
 			f:      func() error { _, _, _, err := freshClient.GenerateKE3(nil, nil, nil); return err },
 			errors: []error{opaque.ErrKE2, internal.ErrKE2Nil},
 		})
 
 		// Build a valid baseline KE2 to mutate.
-		client, server := setup(t2, conf)
-		rec := registration(t2, client, server, password, credentialIdentifier, nil, nil)
+		client, server := setup(t, conf)
+		rec := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()
+
 		ke1, err := client.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
+
 		ke2, _, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// b) nil credential response
 		ke2b := *ke2
 		ke2b.CredentialResponse = nil
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name:   "nil-credential-response",
 			f:      func() error { _, _, _, err := client.GenerateKE3(&ke2b, nil, nil); return err },
 			errors: []error{opaque.ErrKE2, internal.ErrCredentialResponseNil},
@@ -495,7 +599,7 @@ func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 			MaskingNonce:     ke2.CredentialResponse.MaskingNonce,
 			MaskedResponse:   ke2.CredentialResponse.MaskedResponse,
 		}
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name: "nil-evaluated-message",
 			f:    func() error { _, _, _, err := client.GenerateKE3(&ke2b1, nil, nil); return err },
 			errors: []error{
@@ -515,7 +619,7 @@ func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 			MaskingNonce:     ke2.CredentialResponse.MaskingNonce,
 			MaskedResponse:   ke2.CredentialResponse.MaskedResponse,
 		}
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name: "wrong-group-evaluated-message",
 			f:    func() error { _, _, _, err := client.GenerateKE3(&ke2b2, nil, nil); return err },
 			errors: []error{
@@ -529,7 +633,7 @@ func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 		// c) missing server key share
 		ke2c := *ke2
 		ke2c.ServerKeyShare = nil
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name:   "missing-server-keyshare",
 			f:      func() error { _, _, _, err := client.GenerateKE3(&ke2c, nil, nil); return err },
 			errors: []error{opaque.ErrKE2, internal.ErrServerKeyShareMissing},
@@ -538,7 +642,7 @@ func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 		// c.1) invalid server key share (wrong group)
 		ke2c1 := *ke2
 		ke2c1.ServerKeyShare = getOtherGroup(conf).Base().Multiply(getOtherGroup(conf).NewScalar().Random())
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name:   "invalid-server-keyshare",
 			f:      func() error { _, _, _, err := client.GenerateKE3(&ke2c1, nil, nil); return err },
 			errors: []error{opaque.ErrKE2, internal.ErrInvalidServerKeyShare, internal.ErrElementGroupMismatch},
@@ -547,7 +651,7 @@ func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 		// d) missing server nonce
 		ke2d := *ke2
 		ke2d.ServerNonce = nil
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name:   "missing-server-nonce",
 			f:      func() error { _, _, _, err := client.GenerateKE3(&ke2d, nil, nil); return err },
 			errors: []error{opaque.ErrKE2, internal.ErrMissingNonce},
@@ -555,8 +659,8 @@ func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 
 		// e) zero server nonce
 		ke2e := *ke2
-		ke2e.ServerNonce = make([]byte, conf.internal.NonceLen)
-		testForErrors(t2, &testError{
+		ke2e.ServerNonce = make([]byte, conf.internal.Sizes.Nonce)
+		testForErrors(t, &testError{
 			name:   "zero-server-nonce",
 			f:      func() error { _, _, _, err := client.GenerateKE3(&ke2e, nil, nil); return err },
 			errors: []error{opaque.ErrKE2, internal.ErrMissingNonce, internal.ErrSliceIsAllZeros},
@@ -565,7 +669,7 @@ func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 		// f) missing server mac
 		ke2f := *ke2
 		ke2f.ServerMac = nil
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name:   "missing-server-mac",
 			f:      func() error { _, _, _, err := client.GenerateKE3(&ke2f, nil, nil); return err },
 			errors: []error{opaque.ErrKE2, internal.ErrMissingMAC},
@@ -574,7 +678,7 @@ func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 		// g) zero server mac
 		ke2g := *ke2
 		ke2g.ServerMac = make([]byte, conf.internal.MAC.Size())
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name:   "zero-server-mac",
 			f:      func() error { _, _, _, err := client.GenerateKE3(&ke2g, nil, nil); return err },
 			errors: []error{opaque.ErrKE2, internal.ErrMissingMAC, internal.ErrSliceIsAllZeros},
@@ -584,41 +688,41 @@ func TestClient_GenerateKE3_InvalidKE2Fields(t *testing.T) {
 
 // TestClient_GenerateKE3_InvalidOptions stresses every invalid client option combination so the KE3 generator stays robust against misconfiguration or malicious overrides.
 func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		// Build a valid KE2 as a baseline.
-		clientA, server := setup(t2, conf)
-		rec := registration(t2, clientA, server, password, credentialIdentifier, nil, nil)
+		clientA, server := setup(t, conf)
+		rec := registration(t, clientA, server, password, credentialIdentifier, nil, nil)
 		clientA.ClearState()
 		ke1, err := clientA.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		ke2, _, err := server.GenerateKE2(ke1, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// a) No options and no prior client state => missing OPRF blind.
-		clientB := getClient(t2, conf)
-		testForErrors(t2, &testError{
+		clientB := getClient(t, conf)
+		testForErrors(t, &testError{
 			name:   "no-oprf-blind",
 			f:      func() error { _, _, _, err := clientB.GenerateKE3(ke2, nil, nil); return err },
 			errors: []error{opaque.ErrClientOptions, internal.ErrNoOPRFBlind},
 		})
 
 		// Prepare state for the next invalid options cases.
-		clientC := getClient(t2, conf)
+		clientC := getClient(t, conf)
 		ke1c, err := clientC.GenerateKE1(password)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 		ke2c, _, err := server.GenerateKE2(ke1c, rec)
 		if err != nil {
-			t2.Fatal(err)
+			t.Fatal(err)
 		}
 
 		// b) Double OPRF blind: state already has one, options also provide one.
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name: "double-oprf-blind",
 			f: func() error {
 				_, _, _, err := clientC.GenerateKE3(
@@ -632,18 +736,18 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 			errors: []error{opaque.ErrClientOptions, internal.ErrDoubleOPRFBlind},
 		})
 
-		// c) Double KE1: KE1 present in state and also provided in options.
-		testForErrors(t2, &testError{
+		// c) Double resume KE1: KE1 present in state and also provided in options.
+		testForErrors(t, &testError{
 			name: "double-ke1",
 			f: func() error {
-				_, _, _, err := clientC.GenerateKE3(ke2c, nil, nil, &opaque.ClientOptions{KE1: ke1c.Serialize()})
+				_, _, _, err := clientC.GenerateKE3(ke2c, nil, nil, &opaque.ClientOptions{ResumeKE1: ke1c.Serialize()})
 				return err
 			},
 			errors: []error{opaque.ErrClientOptions, internal.ErrDoubleKE1},
 		})
 
 		// d) Existing key share in state and also provided in options.
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name: "existing-keyshare-plus-option",
 			f: func() error {
 				_, _, _, err := clientC.GenerateKE3(
@@ -660,15 +764,18 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 		})
 
 		// e) Missing KE1 in state and options (but with provided OPRF blind).
-		clientD := getClient(t2, conf)
-		testForErrors(t2, &testError{
+		clientD := getClient(t, conf)
+		testForErrors(t, &testError{
 			name: "missing-ke1-with-oprf-blind",
 			f: func() error {
 				_, _, _, err := clientD.GenerateKE3(
 					ke2,
 					nil,
 					nil,
-					&opaque.ClientOptions{OPRFBlind: conf.internal.Group.NewScalar().Random()},
+					&opaque.ClientOptions{
+						OPRFBlind:      conf.internal.Group.NewScalar().Random(),
+						ResumePassword: password,
+					},
 				)
 				return err
 			},
@@ -683,16 +790,20 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 			other = ecc.Ristretto255Sha512
 		}
 		badBlind := other.NewScalar().Random()
-		clientE := getClient(t2, conf)
+		clientE := getClient(t, conf)
 		// Provide a valid KE1 in options but wrong-group blind
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name: "invalid-oprfblind-group",
 			f: func() error {
 				_, _, _, err := clientE.GenerateKE3(
 					ke2,
 					nil,
 					nil,
-					&opaque.ClientOptions{OPRFBlind: badBlind, KE1: ke1.Serialize()},
+					&opaque.ClientOptions{
+						OPRFBlind:      badBlind,
+						ResumePassword: password,
+						ResumeKE1:      ke1.Serialize(),
+					},
 				)
 				return err
 			},
@@ -700,16 +811,20 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 		})
 
 		// g) Invalid KE1 bytes in options
-		clientF := getClient(t2, conf)
+		clientF := getClient(t, conf)
 		badKE1 := internal.RandomBytes(conf.internal.Group.ElementLength()) // wrong total length for KE1
-		testForErrors(t2, &testError{
+		testForErrors(t, &testError{
 			name: "invalid-ke1-bytes",
 			f: func() error {
 				_, _, _, err := clientF.GenerateKE3(
 					ke2,
 					nil,
 					nil,
-					&opaque.ClientOptions{OPRFBlind: conf.internal.Group.NewScalar().Random(), KE1: badKE1},
+					&opaque.ClientOptions{
+						OPRFBlind:      conf.internal.Group.NewScalar().Random(),
+						ResumePassword: password,
+						ResumeKE1:      badKE1,
+					},
 				)
 				return err
 			},
@@ -717,20 +832,154 @@ func TestClient_GenerateKE3_InvalidOptions(t *testing.T) {
 		})
 
 		// h) Missing key share when KE1 provided in options
-		clientG := getClient(t2, conf)
-		testForErrors(t2, &testError{
+		clientG := getClient(t, conf)
+		testForErrors(t, &testError{
 			name: "missing-keyshare-with-ke1",
 			f: func() error {
 				_, _, _, err := clientG.GenerateKE3(
 					ke2,
 					nil,
 					nil,
-					&opaque.ClientOptions{OPRFBlind: conf.internal.Group.NewScalar().Random(), KE1: ke1.Serialize()},
+					&opaque.ClientOptions{
+						OPRFBlind:      conf.internal.Group.NewScalar().Random(),
+						ResumePassword: password,
+						ResumeKE1:      ke1.Serialize(),
+					},
 				)
 				return err
 			},
 			errors: []error{opaque.ErrClientOptions, internal.ErrClientNoKeyShare},
 		})
+	})
+}
+
+// TestClient_GenerateKE3_ExplicitCompletionInputs verifies a fresh client instance can complete KE3 generation when
+// all advertised completion inputs are supplied explicitly.
+func TestClient_GenerateKE3_ExplicitCompletionInputs(t *testing.T) {
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		record := registration(t, client, server, password, credentialIdentifier, clientIdentity, serverIdentity)
+
+		client.ClearState()
+
+		blind := conf.conf.OPRF.Group().NewScalar().Random()
+		secretKeyShareSeed := internal.RandomBytes(internal.SeedLength)
+		clientNonce := internal.RandomBytes(conf.internal.Sizes.Nonce)
+
+		ke1, err := client.GenerateKE1(password, &opaque.ClientOptions{
+			OPRFBlind: blind,
+			AKE: &opaque.AKEOptions{
+				SecretKeyShareSeed: secretKeyShareSeed,
+				Nonce:              clientNonce,
+			},
+		})
+		if err != nil {
+			t.Fatalf("GenerateKE1 failed: %v", err)
+		}
+
+		ke2, serverLoginState, err := server.GenerateKE2(ke1, record)
+		if err != nil {
+			t.Fatalf("GenerateKE2 failed: %v", err)
+		}
+
+		ke3SameClient, sessionSameClient, exportSameClient, err := client.GenerateKE3(
+			ke2,
+			clientIdentity,
+			serverIdentity,
+		)
+		if err != nil {
+			t.Fatalf("same-client GenerateKE3 failed: %v", err)
+		}
+
+		freshClient := getClient(t, conf)
+		ke3FreshClient, sessionFreshClient, exportFreshClient, err := freshClient.GenerateKE3(
+			ke2,
+			clientIdentity,
+			serverIdentity,
+			&opaque.ClientOptions{
+				OPRFBlind:      blind,
+				ResumePassword: password,
+				ResumeKE1:      ke1.Serialize(),
+				AKE: &opaque.AKEOptions{
+					SecretKeyShareSeed: secretKeyShareSeed,
+				},
+			},
+		)
+		if err != nil {
+			t.Fatalf("fresh-client GenerateKE3 failed: %v", err)
+		}
+
+		if !slices.Equal(ke3SameClient.Serialize(), ke3FreshClient.Serialize()) {
+			t.Fatal("KE3 mismatch between same-client and fresh-client completion")
+		}
+
+		if !slices.Equal(sessionSameClient, sessionFreshClient) {
+			t.Fatal("session key mismatch between same-client and fresh-client completion")
+		}
+
+		if !slices.Equal(exportSameClient, exportFreshClient) {
+			t.Fatal("export key mismatch between same-client and fresh-client completion")
+		}
+
+		if err := server.LoginFinish(ke3FreshClient, serverLoginState.ClientMAC); err != nil {
+			t.Fatalf("server rejected fresh-client KE3: %v", err)
+		}
+	})
+}
+
+// TestClient_GenerateKE3_PasswordOptions ensures explicit completion passwords behave correctly for missing and
+// duplicated cases.
+func TestClient_GenerateKE3_PasswordOptions(t *testing.T) {
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+		record := registration(t, client, server, password, credentialIdentifier, nil, nil)
+
+		client.ClearState()
+
+		blind := conf.conf.OPRF.Group().NewScalar().Random()
+		secretKeyShareSeed := internal.RandomBytes(internal.SeedLength)
+
+		ke1, err := client.GenerateKE1(password, &opaque.ClientOptions{
+			OPRFBlind: blind,
+			AKE: &opaque.AKEOptions{
+				SecretKeyShareSeed: secretKeyShareSeed,
+			},
+		})
+		if err != nil {
+			t.Fatalf("GenerateKE1 failed: %v", err)
+		}
+
+		ke2, _, err := server.GenerateKE2(ke1, record)
+		if err != nil {
+			t.Fatalf("GenerateKE2 failed: %v", err)
+		}
+
+		expectErrors(t, func() error {
+			_, _, _, err := client.GenerateKE3(
+				ke2,
+				nil,
+				nil,
+				&opaque.ClientOptions{ResumePassword: []byte("different-password")},
+			)
+			return err
+		}, opaque.ErrClientOptions, internal.ErrDoublePassword)
+
+		freshClient := getClient(t, conf)
+		expectErrors(t, func() error {
+			_, _, _, err := freshClient.GenerateKE3(
+				ke2,
+				nil,
+				nil,
+				&opaque.ClientOptions{
+					OPRFBlind: blind,
+					ResumeKE1: ke1.Serialize(),
+					AKE: &opaque.AKEOptions{
+						SecretKeyShareSeed: secretKeyShareSeed,
+					},
+				},
+			)
+			return err
+		}, opaque.ErrClientOptions, internal.ErrNoPassword)
 	})
 }
 
@@ -744,7 +993,7 @@ func getOtherGroup(conf *configuration) ecc.Group {
 
 // TestClient_GenerateKE3_BadMaskedResponse verifies the client aborts when the masked envelope response length is inconsistent, preventing accidental truncation or padding oracle issues.
 func TestClient_GenerateKE3_BadMaskedResponse(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		client, err := conf.conf.Client()
 		if err != nil {
 			t.Fatal(err)
@@ -782,7 +1031,7 @@ func TestClient_GenerateKE3_BadMaskedResponse(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		goodLength := conf.internal.Group.ElementLength() + conf.internal.EnvelopeSize
+		goodLength := conf.internal.Group.ElementLength() + conf.internal.Sizes.Envelope
 
 		// too short
 		ke2.MaskedResponse = internal.RandomBytes(goodLength - 1)
@@ -802,7 +1051,7 @@ func TestClient_GenerateKE3_BadMaskedResponse(t *testing.T) {
 
 // TestClient_GenerateKE3_InvalidEnvelopeTag shows that tampering with the envelope authentication tag results in an authentication failure, reinforcing the MAC’s role in key confirmation.
 func TestClient_GenerateKE3_InvalidEnvelopeTag(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		client, server := setup(t, conf)
 		rec := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()
@@ -850,7 +1099,7 @@ func cleartextCredentials(clientPublicKey, serverPublicKey, idc, ids []byte) []b
 
 // TestClient_GenerateKE3_ErrEnvelopeInvalidMac_WrongServerPublicKey ensures any mismatch between the stored masking key and the reconstructed server key trips the MAC check, preventing swap attacks.
 func TestClient_GenerateKE3_ErrEnvelopeInvalidMac_WrongServerPublicKey(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		client, server := setup(t, conf)
 		record := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()
@@ -880,7 +1129,7 @@ func TestClient_GenerateKE3_ErrEnvelopeInvalidMac_WrongServerPublicKey(t *testin
 
 // TestClient_GenerateKE3_InvalidServerPublicKey verifies that malformed server public key encodings are rejected even after envelope decryption, closing a gap where fake keys could be smuggled in.
 func TestClient_GenerateKE3_InvalidServerPublicKey(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		client, server := setup(t, conf)
 		record := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()
@@ -932,7 +1181,7 @@ func TestClient_GenerateKE3_InvalidServerPublicKey(t *testing.T) {
 
 // TestClient_GenerateKE3_InvalidKE2Mac confirms that manipulating the server MAC leads to an authentication error, proving the server’s keystream integrity protection works.
 func TestClient_GenerateKE3_InvalidKE2Mac(t *testing.T) {
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		client, server := setup(t, conf)
 		record := registration(t, client, server, password, credentialIdentifier, nil, nil)
 		client.ClearState()

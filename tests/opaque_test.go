@@ -618,7 +618,7 @@ func TestConfiguration_MixedGroups(t *testing.T) {
 // TestGetFakeRecord ensures GetFakeRecord succeeds for valid configurations and rejects invalid ones.
 func TestGetFakeRecord(t *testing.T) {
 	// Test valid configurations
-	testAll(t, func(t2 *testing.T, conf *configuration) {
+	testAll(t, func(t *testing.T, conf *configuration) {
 		if _, err := conf.conf.GetFakeRecord(nil); err != nil {
 			t.Fatalf("unexpected error on valid configuration: %v", err)
 		}
@@ -638,6 +638,51 @@ func TestGetFakeRecord(t *testing.T) {
 	if _, err := conf.GetFakeRecord(nil); err == nil {
 		t.Fatal("expected error on invalid configuration")
 	}
+}
+
+// TestRuntimeSizes ensures the internal runtime exposes the correct authoritative set of protocol lengths.
+func TestRuntimeSizes(t *testing.T) {
+	testAll(t, func(t *testing.T, conf *configuration) {
+		sizes := conf.internal.Sizes
+		oprfElement := conf.conf.OPRF.Group().ElementLength()
+		akeElement := conf.conf.AKE.Group().ElementLength()
+		macSize := internal.NewMac(conf.conf.MAC).Size()
+		hashSize := conf.conf.Hash.Size()
+
+		if sizes.OPRFElement != oprfElement {
+			t.Fatalf("unexpected OPRF element length: got %d, want %d", sizes.OPRFElement, oprfElement)
+		}
+		if sizes.AKEElement != akeElement {
+			t.Fatalf("unexpected AKE element length: got %d, want %d", sizes.AKEElement, akeElement)
+		}
+		if sizes.Nonce != internal.NonceLength {
+			t.Fatalf("unexpected nonce length: got %d, want %d", sizes.Nonce, internal.NonceLength)
+		}
+		if sizes.MAC != macSize {
+			t.Fatalf("unexpected MAC length: got %d, want %d", sizes.MAC, macSize)
+		}
+		if sizes.Hash != hashSize {
+			t.Fatalf("unexpected hash length: got %d, want %d", sizes.Hash, hashSize)
+		}
+		if sizes.Envelope != conf.internal.Sizes.Envelope {
+			t.Fatalf("unexpected envelope length: got %d, want %d", sizes.Envelope, conf.internal.Sizes.Envelope)
+		}
+		if sizes.RegistrationRecord != akeElement+hashSize+sizes.Envelope {
+			t.Fatalf("unexpected registration record length: got %d", sizes.RegistrationRecord)
+		}
+		if sizes.CredentialResponse != oprfElement+sizes.Nonce+sizes.MaskedResponse {
+			t.Fatalf("unexpected credential response length: got %d", sizes.CredentialResponse)
+		}
+		if sizes.KE1 != oprfElement+sizes.Nonce+akeElement {
+			t.Fatalf("unexpected KE1 length: got %d", sizes.KE1)
+		}
+		if sizes.KE2 != sizes.CredentialResponse+sizes.Nonce+akeElement+macSize {
+			t.Fatalf("unexpected KE2 length: got %d", sizes.KE2)
+		}
+		if sizes.KE3 != macSize {
+			t.Fatalf("unexpected KE3 length: got %d, want %d", sizes.KE3, macSize)
+		}
+	})
 }
 
 // TestErrorFormattingAndLogging exercises slog and fmt integration so structured logs capture error codes and messages without additional plumbing.

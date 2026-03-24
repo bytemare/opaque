@@ -13,6 +13,8 @@ import (
 	"fmt"
 )
 
+const restartAuthProtocol = "Restart the authentication protocol"
+
 // Configuration errors.
 var (
 	// ErrInvalidOPRFid indicates that the provided OPRF group identifier is invalid.
@@ -168,8 +170,10 @@ var (
 // Client options errors.
 var (
 	// ErrNoOPRFBlind indicates that neither the client state nor options contain an OPRF blind.
-	ErrNoOPRFBlind = errors.New("no OPRF blind in state or options. " +
-		"Restart the authentication protocol")
+	ErrNoOPRFBlind = errors.New("no OPRF blind in state or options. " + restartAuthProtocol)
+
+	// ErrNoPassword indicates that neither the client state nor options contain a password for OPRF finalization.
+	ErrNoPassword = errors.New("no password in state or options. " + restartAuthProtocol)
 
 	// ErrInvalidOPRFBlind indicates that the provided OPRF blind is invalid.
 	ErrInvalidOPRFBlind = errors.New("invalid OPRF blind")
@@ -179,13 +183,17 @@ var (
 	ErrDoubleOPRFBlind = errors.New("an OPRF blind already exists in the client state, " +
 		"but a blind has also been provided in the options")
 
+	// ErrDoublePassword indicates that a password already exists in the client state, but a password has also been
+	// provided in the options.
+	ErrDoublePassword = errors.New("a password already exists in the client state, " +
+		"but a password has also been provided in the options")
+
 	// ErrEnvelopeNonceOptions indicates that the provided nonce in the options is invalid.
 	ErrEnvelopeNonceOptions = errors.New("failed to validate envelope nonce parameters")
 
 	// ErrClientNoKeyShare indicates that the client state and options do not contain an ephemeral secret
 	// key share, which indicates no prior run of the GenerateKE1 method.
-	ErrClientNoKeyShare = errors.New("no ephemeral secret key share in state or options. " +
-		"Restart the authentication protocol")
+	ErrClientNoKeyShare = errors.New("no ephemeral secret key share in state or options. " + restartAuthProtocol)
 
 	// ErrClientExistingKeyShare indicates that the client state already contains a secret key share, but either another
 	// key or a seed have been provided as optional arguments to GenerateKE3. It is not recommended to set the key share
@@ -195,8 +203,7 @@ var (
 		" provided in the options, but only one must be set. It doesn't look like you know what you're doing")
 
 	// ErrKE1Missing indicates that the KE1 message is missing in the client state and options.
-	ErrKE1Missing = errors.New("no KE1 message in state or options. " +
-		"Restart the authentication protocol")
+	ErrKE1Missing = errors.New("no KE1 message in state or options. " + restartAuthProtocol)
 
 	// ErrDoubleKE1 indicates that a KE1 message already exists in the client state, but a KE1 message has
 	// also been provided in the options.

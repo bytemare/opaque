@@ -34,7 +34,7 @@ func Mask(
 ) (nonce, maskedResponse []byte) {
 	nonce = nonceIn
 	if len(nonce) == 0 {
-		nonce = internal.RandomBytes(conf.NonceLen)
+		nonce = internal.RandomBytes(conf.Sizes.Nonce)
 	}
 
 	clearText := encoding.Concat(serverPublicKey, env)
@@ -54,8 +54,8 @@ func Unmask(
 	serverPublicKeyBytes = clearText[:conf.Group.ElementLength()]
 	clearTextEnvelope := clearText[conf.Group.ElementLength():]
 	env = &envelope.Envelope{
-		Nonce:   clearTextEnvelope[:conf.NonceLen],
-		AuthTag: clearTextEnvelope[conf.NonceLen:],
+		Nonce:   clearTextEnvelope[:conf.Sizes.Nonce],
+		AuthTag: clearTextEnvelope[conf.Sizes.Nonce:],
 	}
 
 	serverPublicKey = conf.Group.NewElement()
@@ -74,7 +74,7 @@ func xorResponse(c *internal.Configuration, key, nonce, in []byte) []byte {
 	pad := c.KDF.Expand(
 		key,
 		encoding.SuffixString(nonce, tag.CredentialResponsePad),
-		c.Group.ElementLength()+c.EnvelopeSize,
+		c.Group.ElementLength()+c.Sizes.Envelope,
 	)
 
 	dst := make([]byte, len(pad))
