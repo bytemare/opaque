@@ -258,13 +258,13 @@ func (c *Client) ClearState() {
 }
 
 // buildPRK derives the randomized password from the OPRF output.
-func (c *Client) buildPRK(evaluation *ecc.Element, options *clientInputs) []byte {
-	output := c.conf.OPRF.Finalize(options.OPRFBlind, options.Password, evaluation)
-	// It's safe to use UnsafeHarden as long as the options have been properly validated with ValidateParameters.
+func (c *Client) buildPRK(evaluation *ecc.Element, inputs *clientInputs) []byte {
+	output := c.conf.OPRF.Finalize(inputs.OPRFBlind, inputs.Password, evaluation)
+	// It's safe to use UnsafeHarden as long as the inputs have been properly validated with ValidateParameters.
 	stretched := c.conf.KSF.UnsafeHarden(output,
-		options.KSF.Salt, options.KSF.Length, options.KSF.Parameters...)
+		inputs.KSF.Salt, inputs.KSF.Length, inputs.KSF.Parameters...)
 
-	return c.conf.KDF.Extract(options.KDFSalt, encoding.Concat(output, stretched))
+	return c.conf.KDF.Extract(inputs.KDFSalt, encoding.Concat(output, stretched))
 }
 
 func (c *Client) startOPRF(password []byte, blind *ecc.Scalar) *ecc.Element {

@@ -191,33 +191,15 @@ func (s *Server) resolveGenerateKE2Inputs(
 		return nil, err
 	}
 
-	if err = s.finalizeGenerateKE2Inputs(inputs, record); err != nil {
-		return nil, err
-	}
-
-	return inputs, nil
-}
-
-func (s *Server) finalizeGenerateKE2Inputs(options *serverInputs, record *ClientRecord) error {
-	if options.SecretKeyShare == nil {
-		options.SecretKeyShare = s.conf.MakeSecretKeyShare(nil)
-	}
-
-	if options.AKENonce == nil {
-		options.AKENonce = internal.RandomBytes(s.conf.Sizes.Nonce)
-	}
-
-	if options.ClientOPRFKey == nil {
+	if inputs.ClientOPRFKey == nil {
 		// No OPRF key override, so we derive the OPRF key from the credential identifier and global seed.
-		var err error
-
-		options.ClientOPRFKey, err = s.deriveOPRFKey(record.CredentialIdentifier)
+		inputs.ClientOPRFKey, err = s.deriveOPRFKey(record.CredentialIdentifier)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return inputs, nil
 }
 
 func (s *Server) coreGenerateKE2(

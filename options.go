@@ -30,8 +30,17 @@ type ServerOptions struct {
 func (s *Server) resolveServerInputs(options []*ServerOptions) (*serverInputs, error) {
 	inputs := newServerInputs()
 
+	defer func() {
+		if inputs.SecretKeyShare == nil {
+			inputs.SecretKeyShare = s.conf.MakeSecretKeyShare(nil)
+		}
+
+		if inputs.AKENonce == nil {
+			inputs.AKENonce = internal.RandomBytes(s.conf.Sizes.Nonce)
+		}
+	}()
+
 	if len(options) == 0 || options[0] == nil {
-		inputs.SecretKeyShare = s.conf.MakeSecretKeyShare(nil)
 		return inputs, nil
 	}
 
@@ -56,7 +65,6 @@ func (s *Server) resolveServerInputs(options []*ServerOptions) (*serverInputs, e
 
 	// AKE options.
 	if options[0].AKE == nil {
-		inputs.SecretKeyShare = s.conf.MakeSecretKeyShare(nil)
 		return inputs, nil
 	}
 
