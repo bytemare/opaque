@@ -185,9 +185,13 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 		return nil, ErrConfiguration.Join(internal.ErrInvalidEncodingLength)
 	}
 
-	ctx, _, err := encoding.DecodeVector(encoded[confIDsLength:])
+	ctx, offset, err := encoding.DecodeVector(encoded[confIDsLength:])
 	if err != nil {
 		return nil, ErrConfiguration.Join(internal.ErrInvalidContextEncoding, err)
+	}
+
+	if confIDsLength+offset != len(encoded) {
+		return nil, ErrConfiguration.Join(internal.ErrInvalidEncodingLength)
 	}
 
 	c := &Configuration{
@@ -221,7 +225,7 @@ func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecor
 	regRecord := &message.RegistrationRecord{
 		ClientPublicKey: publicKey,
 		MaskingKey:      RandomBytes(conf.Sizes.Hash),
-		Envelope:        make([]byte, conf.Sizes.Envelope),
+		Envelope:        RandomBytes(conf.Sizes.Envelope),
 	}
 
 	return &ClientRecord{
