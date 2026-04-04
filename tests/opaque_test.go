@@ -489,6 +489,36 @@ func TestDeserializeConfiguration_Short(t *testing.T) {
 	}, opaque.ErrConfiguration, internal.ErrInvalidEncodingLength)
 }
 
+// TestDeserializeConfiguration_TrailingBytes verifies that trailing bytes after the context vector are rejected.
+// This matches the strict parsing already used in DecodeServerKeyMaterial.
+func TestDeserializeConfiguration_TrailingBytes(t *testing.T) {
+	// Empty context: trailing bytes after the 2-byte zero-length header.
+	canonical := opaque.DefaultConfiguration().Serialize()
+	expectErrors(t, func() error {
+		_, err := opaque.DeserializeConfiguration(append(canonical, 0xDE, 0xAD))
+		return err
+	}, opaque.ErrConfiguration, internal.ErrInvalidEncodingLength)
+
+	// Non-empty context: exercises the case where the decoded offset > 2.
+	conf := opaque.DefaultConfiguration()
+	conf.Context = []byte("test-context")
+	encoded := conf.Serialize()
+
+	decoded, err := opaque.DeserializeConfiguration(encoded)
+	if err != nil {
+		t.Fatalf("round-trip with context failed: %v", err)
+	}
+
+	if err = conf.Equals(decoded); err != nil {
+		t.Fatalf("round-trip with context produced different config: %v", err)
+	}
+
+	expectErrors(t, func() error {
+		_, err := opaque.DeserializeConfiguration(append(encoded, 0xFF))
+		return err
+	}, opaque.ErrConfiguration, internal.ErrInvalidEncodingLength)
+}
+
 // TestBadConfiguration enumerates invalid algorithm identifiers to ensure misconfigured deployments fail during setup instead of misbehaving later.
 func TestBadConfiguration(t *testing.T) {
 	setBadValue := func(pos, val int) []byte {
@@ -615,12 +645,23 @@ func TestConfiguration_MixedGroups(t *testing.T) {
 	}
 }
 
-// TestGetFakeRecord ensures GetFakeRecord succeeds for valid configurations and rejects invalid ones.
+// TestGetFakeRecord ensures GetFakeRecord succeeds for valid configurations, rejects invalid ones,
+// and produces envelopes that are not trivially distinguishable from real registration envelopes.
 func TestGetFakeRecord(t *testing.T) {
 	// Test valid configurations
 	testAll(t, func(t *testing.T, conf *configuration) {
-		if _, err := conf.conf.GetFakeRecord(nil); err != nil {
+		record, err := conf.conf.GetFakeRecord(nil)
+		if err != nil {
 			t.Fatalf("unexpected error on valid configuration: %v", err)
+		}
+
+		// The envelope must contain random bytes rather than zero-fill.
+		// Real envelopes hold a random nonce + MAC tag, so an all-zero
+		// envelope would be trivially distinguishable at rest.
+		env := record.RegistrationRecord.Envelope
+		allZeros := make([]byte, len(env))
+		if bytes.Equal(env, allZeros) {
+			t.Error("fake record envelope is all zeros")
 		}
 	})
 

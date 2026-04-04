@@ -101,6 +101,37 @@ func TestServerInit_InvalidOPRFSeedLength(t *testing.T) {
 	})
 }
 
+// TestGenerateKE2_FakeRecord ensures fake records produce valid KE2 responses across all suites.
+func TestGenerateKE2_FakeRecord(t *testing.T) {
+	testAll(t, func(t *testing.T, conf *configuration) {
+		client, server := setup(t, conf)
+
+		fakeRecord, err := conf.conf.GetFakeRecord([]byte("fake-id"))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ke1, err := client.GenerateKE1(password)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ke2, _, err := server.GenerateKE2(ke1, fakeRecord)
+		if err != nil {
+			t.Fatalf("GenerateKE2 with fake record failed: %v", err)
+		}
+
+		if ke2 == nil {
+			t.Fatal("GenerateKE2 returned nil KE2")
+		}
+
+		if len(ke2.Serialize()) != conf.internal.Sizes.KE2 {
+			t.Fatalf("KE2 size mismatch: got %d, want %d",
+				len(ke2.Serialize()), conf.internal.Sizes.KE2)
+		}
+	})
+}
+
 // TestNewServer_DefaultConfiguration confirms that spinning up a server with nil configuration yields a working setup, exercising the end-to-end happy path for the default suite.
 func TestNewServer_DefaultConfiguration(t *testing.T) {
 	server, err := opaque.NewServer(nil)
