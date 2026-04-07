@@ -35,7 +35,7 @@ jobs:
 
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@fa2e9d605c4eeb9fcad4c99c224cee0c6c7f3594
+        uses: step-security/harden-runner@fe104658747b27e96e4f7e80cd0a94068e53901d
         with:
           disable-sudo: true
           egress-policy: block
@@ -55,7 +55,7 @@ jobs:
           fetch-depth: 0
 
       - name: Init go
-        uses: bytemare/actions/init-go@58d06b5d0834c1ab2b9391ed41f1cf8a4259316b
+        uses: bytemare/actions/init-go@e8f57f812a1e4012dc85c374bf56edd98be3ca41
         with:
           go-version: ${{ matrix.go }}
 
