@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/bytemare/ecc v0.9.0
-	github.com/bytemare/hash v0.6.2
+	github.com/bytemare/hash v0.6.3
 	github.com/bytemare/ksf v0.5.0
 )
 
