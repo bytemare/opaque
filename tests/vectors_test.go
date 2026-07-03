@@ -194,6 +194,19 @@ func (v *vector) testRegistration(conf *opaque.Configuration, t *testing.T) {
 	}
 }
 
+// testDeriveClientOPRFKey ensures that the oprf_seed input, combined with the credential_identifier, produces the
+// oprf_key intermediate value found in the test vector.
+func (v *vector) testDeriveClientOPRFKey(conf *opaque.Configuration, t *testing.T) {
+	clientOPRFKey, err := conf.DeriveClientOPRFKey(v.Inputs.OprfSeed, v.Inputs.CredentialIdentifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !bytes.Equal(v.Intermediates.OprfKey, clientOPRFKey.Encode()) {
+		t.Fatal("oprf keys do not match")
+	}
+}
+
 func getFakeEnvelope(c *opaque.Configuration) []byte {
 	if !hash.Hash(c.MAC).Available() {
 		panic(nil)
@@ -330,6 +343,7 @@ func (v *vector) test(t *testing.T) {
 	// Registration
 	if !isFake(v.Config.Fake) {
 		v.testRegistration(p, t)
+		v.testDeriveClientOPRFKey(p, t)
 	}
 
 	if isFake(v.Config.Fake) {

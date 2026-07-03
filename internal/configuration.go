@@ -17,6 +17,7 @@ import (
 
 	"github.com/bytemare/ecc"
 
+	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/ksf"
 	"github.com/bytemare/opaque/internal/oprf"
 	"github.com/bytemare/opaque/internal/tag"
@@ -136,6 +137,39 @@ func (c *Configuration) MakeSecretKeyShare(seed []byte) *ecc.Scalar {
 	}
 
 	return oprf.IDFromGroup(c.Group).DeriveKey(seed, []byte(tag.DeriveDiffieHellmanKeyPair))
+}
+
+// DeriveClientOPRFKey derives the client OPRF key from the clientCredentialIdentifier and the OPRF global seed.
+func (c *Configuration) DeriveClientOPRFKey(oprfSeed, clientCredentialIdentifier []byte) (*ecc.Scalar, error) {
+	if len(clientCredentialIdentifier) == 0 {
+		return nil, ErrNoCredentialIdentifier
+	}
+
+	if err := IsOPRFSeedValid(c, oprfSeed); err != nil {
+		return nil, err
+	}
+
+	seed := c.KDF.Expand(
+		oprfSeed,
+		encoding.SuffixString(clientCredentialIdentifier, tag.ExpandOPRF),
+		SeedLength,
+	)
+
+	return c.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair)), nil
+}
+
+// IsOPRFSeedValid returns an error if the OPRF global seed is empty or its length doesn't match the configuration's
+// hash size.
+func IsOPRFSeedValid(c *Configuration, seed []byte) error {
+	if len(seed) == 0 {
+		return ErrOPRFKeyNoSeed
+	}
+
+	if len(seed) != c.Sizes.Hash {
+		return ErrInvalidOPRFSeedLength
+	}
+
+	return nil
 }
 
 // RandomBytes returns random bytes of length len (wraps crypto/rand).
