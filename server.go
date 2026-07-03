@@ -9,13 +9,13 @@
 package opaque
 
 import (
+	"errors"
+
 	"github.com/bytemare/ecc"
 
 	"github.com/bytemare/opaque/internal"
 	"github.com/bytemare/opaque/internal/ake"
-	"github.com/bytemare/opaque/internal/encoding"
 	"github.com/bytemare/opaque/internal/masking"
-	"github.com/bytemare/opaque/internal/tag"
 	"github.com/bytemare/opaque/message"
 )
 
@@ -256,25 +256,20 @@ func (s *Server) chooseOPRFKey(clientCredentialIdentifier []byte, clientOPRFKey 
 
 // deriveOPRFKey derives the client OPRF key from the credentialIdentifier and global OPRF seed.
 func (s *Server) deriveOPRFKey(clientCredentialIdentifier []byte) (*ecc.Scalar, error) {
-	if len(clientCredentialIdentifier) == 0 {
-		return nil, internal.ErrNoCredentialIdentifier
-	}
-
 	if s.ServerKeyMaterial == nil { // sanity check, but never reached, as it would have failed earlier.
 		return nil, ErrServerKeyMaterial.Join(internal.ErrServerKeyMaterialNil)
 	}
 
-	if err := s.isOPRFSeedValid(s.ServerKeyMaterial.OPRFGlobalSeed); err != nil {
+	clientOPRFKey, err := s.conf.DeriveClientOPRFKey(s.ServerKeyMaterial.OPRFGlobalSeed, clientCredentialIdentifier)
+	if err != nil {
+		if errors.Is(err, internal.ErrNoCredentialIdentifier) {
+			return nil, err
+		}
+
 		return nil, ErrServerKeyMaterial.Join(err)
 	}
 
-	seed := s.conf.KDF.Expand(
-		s.ServerKeyMaterial.OPRFGlobalSeed,
-		encoding.SuffixString(clientCredentialIdentifier, tag.ExpandOPRF),
-		internal.SeedLength,
-	)
-
-	return s.conf.OPRF.DeriveKey(seed, []byte(tag.DeriveKeyPair)), nil
+	return clientOPRFKey, nil
 }
 
 func (s *Server) credentialResponse(
@@ -346,21 +341,9 @@ func (s *Server) validateKeyMaterial(skm *ServerKeyMaterial) error {
 	}
 
 	if skm.OPRFGlobalSeed != nil {
-		if err := s.isOPRFSeedValid(skm.OPRFGlobalSeed); err != nil {
+		if err := internal.IsOPRFSeedValid(s.conf, skm.OPRFGlobalSeed); err != nil {
 			return ErrServerKeyMaterial.Join(err)
 		}
-	}
-
-	return nil
-}
-
-func (s *Server) isOPRFSeedValid(seed []byte) error {
-	if len(seed) == 0 {
-		return internal.ErrOPRFKeyNoSeed
-	}
-
-	if len(seed) != s.conf.Sizes.Hash {
-		return internal.ErrInvalidOPRFSeedLength
 	}
 
 	return nil

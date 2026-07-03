@@ -207,6 +207,16 @@ func DeserializeConfiguration(encoded []byte) (*Configuration, error) {
 	return c, nil
 }
 
+// DeriveClientOPRFKey derives the client OPRF key from the clientCredentialIdentifier and the OPRF global seed.
+func (c *Configuration) DeriveClientOPRFKey(oprfSeed, clientCredentialIdentifier []byte) (*ecc.Scalar, error) {
+	conf, err := c.toInternal()
+	if err != nil {
+		return nil, err
+	}
+
+	return conf.DeriveClientOPRFKey(oprfSeed, clientCredentialIdentifier)
+}
+
 // GetFakeRecord creates a fake Client record to be used when no existing client record exists,
 // to defend against client enumeration techniques.
 func (c *Configuration) GetFakeRecord(credentialIdentifier []byte) (*ClientRecord, error) {
